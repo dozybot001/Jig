@@ -67,3 +67,61 @@ export function ChatIcon() {
 		</svg>
 	);
 }
+
+export function ArrowUpIcon() {
+	return (
+		<svg {...base} strokeWidth={1.8} aria-hidden="true">
+			<path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" />
+		</svg>
+	);
+}
+
+export function StopIcon() {
+	return (
+		<svg viewBox="0 0 16 16" aria-hidden="true">
+			<rect x="4" y="4" width="8" height="8" rx="1.5" fill="currentColor" />
+		</svg>
+	);
+}
+
+export function ComposeIcon() {
+	return (
+		<svg {...base} aria-hidden="true">
+			<path d="M13.5 8.5V13a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1H8" />
+			<path d="M11.8 2.2a1.2 1.2 0 0 1 1.7 1.7L8.5 9l-2 .5.5-2z" />
+		</svg>
+	);
+}
+
+export function SearchIcon() {
+	return (
+		<svg {...base} aria-hidden="true">
+			<circle cx="7" cy="7" r="4.5" />
+			<path d="m10.5 10.5 3 3" />
+		</svg>
+	);
+}
+
+export function ChevronIcon() {
+	return (
+		<svg {...base} className="chevron" aria-hidden="true">
+			<path d="m6 4 4 4-4 4" />
+		</svg>
+	);
+}
+
+/**
+ * Jig's mark: three parallel strokes forming a J. Drawn in the text colour, so it is ink on light
+ * themes and reversed on dark ones (spec 1.5). Decorative: the lockup around it carries the name.
+ */
+export function JigMark({ className, size }: { className?: string; size: number }) {
+	return (
+		<svg className={className} viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
+			<g fill="none" stroke="currentColor" strokeWidth={5} strokeLinecap="round">
+				<path d="M54 8V34A22 22 0 0 1 10 34" />
+				<path d="M45 8V34A13 13 0 0 1 19 34" />
+				<path d="M36 8V34A4 4 0 0 1 28 34" />
+			</g>
+		</svg>
+	);
+}

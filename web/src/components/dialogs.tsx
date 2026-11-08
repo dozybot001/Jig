@@ -93,13 +93,6 @@ export function RulesEditor({
 	);
 }
 
-/** A starting point offered on the empty page: a name and a role, and whether a folder is needed. */
-export interface SessionTemplate {
-	name: string;
-	responsibility: string;
-	needsFolder: boolean;
-}
-
 /**
  * Name and role first, since they define the session; then the folder and the model. Kind and group
  * are less common and sit under "More options". The dialog fits without scrolling (spec 9.2).
@@ -107,20 +100,18 @@ export interface SessionTemplate {
 export function NewSessionDialog({
 	onClose,
 	groupId,
-	template,
 }: {
 	onClose: () => void;
 	groupId?: string | null;
-	template?: SessionTemplate;
 }) {
 	useLang();
 	const settings = useAppState((state) => state.settings);
 	const groups = useAppState((state) => state.groups);
-	const [name, setName] = useState(template?.name ?? "");
+	const [name, setName] = useState("");
 	const [kind, setKind] = useState<SessionKind>("task");
 	const [group, setGroup] = useState<string>(groupId ?? "");
 	const [cwd, setCwd] = useState("");
-	const [responsibility, setResponsibility] = useState(template?.responsibility ?? "");
+	const [responsibility, setResponsibility] = useState("");
 	const [model, setModel] = useState({
 		provider: settings?.defaultModel.provider ?? "deepseek",
 		model: settings?.defaultModel.model ?? "deepseek-v4-pro",
@@ -134,7 +125,6 @@ export function NewSessionDialog({
 		cwdError: useId(),
 		cwdHint: useId(),
 	};
-	const needsFolder = template?.needsFolder ?? false;
 	const create = useAction(async () => {
 		await createSession({
 			name,
@@ -159,7 +149,7 @@ export function NewSessionDialog({
 					<Button
 						variant="primary"
 						busy={create.busy}
-						disabled={!name.trim() || (needsFolder && !cwd.trim())}
+						disabled={!name.trim()}
 						onClick={() => void create.run()}
 					>
 						{t("create")}
@@ -173,7 +163,7 @@ export function NewSessionDialog({
 					className="input"
 					value={name}
 					maxLength={60}
-					autoFocus={!needsFolder}
+					autoFocus
 					aria-invalid={nameError ? "true" : undefined}
 					aria-describedby={nameError ? ids.nameError : undefined}
 					onChange={(event) => setName(event.target.value)}
@@ -193,8 +183,7 @@ export function NewSessionDialog({
 					id={ids.cwd}
 					className="input"
 					value={cwd}
-					placeholder={needsFolder ? t("folderRequired") : t("folderPlaceholder")}
-					autoFocus={needsFolder}
+					placeholder={t("folderPlaceholder")}
 					aria-invalid={cwdError ? "true" : undefined}
 					aria-describedby={cwdError ? ids.cwdError : undefined}
 					onChange={(event) => setCwd(event.target.value)}

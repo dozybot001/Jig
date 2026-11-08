@@ -15,6 +15,7 @@ import { answerApproval, loadEarlier, markRead, toolCallFor } from "../actions.t
 import { t, useLang } from "../i18n.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
 import { Diff, Markdown, ScrollBlock } from "./content.tsx";
+import { ChevronIcon } from "./icons.tsx";
 import { Button, ErrorBox, useAction } from "./ui.tsx";
 
 function resultText(result: ToolResultMessage | undefined): string {
@@ -30,6 +31,23 @@ function callSummary(call: ToolCallBlock): string {
 	return JSON.stringify(args);
 }
 
+const TOOL_VERBS = [
+	"read",
+	"write",
+	"edit",
+	"glob",
+	"grep",
+	"shell",
+	"shell_job",
+	"todo",
+	"ask_user",
+	"web_fetch",
+] as const;
+
+function isToolVerb(name: string): name is (typeof TOOL_VERBS)[number] {
+	return (TOOL_VERBS as readonly string[]).includes(name);
+}
+
 function Thinking({ text, live }: { text: string; live: boolean }) {
 	// Open while it streams, folded once the answer starts (after AI Elements, prior-art 5.3).
 	const [open, setOpen] = useState(live);
@@ -38,11 +56,16 @@ function Thinking({ text, live }: { text: string; live: boolean }) {
 	}, [live]);
 	return (
 		<details
-			className="thinking"
+			className="activity"
 			open={open}
 			onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
 		>
-			<summary>{t("thinkingLabel")}</summary>
+			<summary>
+				<span className={live ? "activity-verb shimmer" : "activity-verb"}>
+					{t("thinkingLabel")}
+				</span>
+				<ChevronIcon />
+			</summary>
 			<div className="thinking-body">{text}</div>
 		</details>
 	);
@@ -201,21 +224,39 @@ const ToolCard = memo(function ToolCard({
 	useEffect(() => {
 		if (!pending) setOpen(false);
 	}, [pending]);
+	const running = status === "running";
+	const verb = isToolVerb(call.name)
+		? t(running ? `act_${call.name}_ing` : `act_${call.name}`)
+		: call.name;
+	const flagged = status !== "running" && status !== "done";
 	return (
-		<div className="msg-assistant">
+		<div className="msg-assistant msg-tool">
 			<details
-				className="card tool-card"
+				className="activity tool-card"
 				open={open || pending}
 				onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
 			>
 				<summary>
-					<span className="tool-name">{call.name}</span>
+					<span className={running ? "activity-verb shimmer" : "activity-verb"}>{verb}</span>
 					<span className="tool-summary">{callSummary(call)}</span>
-					<span className={`chip chip-${status}`}>
-						{t(`tool_${status}`)}
-						{detail?.diff &&
-							` ${t("linesAdded", { n: detail.added ?? 0 })} ${t("linesRemoved", { n: detail.removed ?? 0 })}`}
-					</span>
+					{detail?.diff && (
+						<span className="tool-stat">
+							<span className="stat-add" aria-hidden="true">
+								+{detail.added ?? 0}
+							</span>{" "}
+							<span className="stat-del" aria-hidden="true">
+								−{detail.removed ?? 0}
+							</span>
+							<span className="visually-hidden">
+								{t("linesAdded", { n: detail.added ?? 0 })}{" "}
+								{t("linesRemoved", { n: detail.removed ?? 0 })}
+							</span>
+						</span>
+					)}
+					{flagged && (
+						<span className={`tool-state tool-state-${status}`}>{t(`tool_${status}`)}</span>
+					)}
+					<ChevronIcon />
 				</summary>
 				<div className="tool-detail">
 					<h2>{t("toolArguments")}</h2>
@@ -349,18 +390,26 @@ function EntryView({
 			return null;
 		case "system":
 			return (
-				<details className="card divider-card">
-					<summary>{t("instructionsUpdated")}</summary>
-					<ScrollBlock className="code output" label={t("instructionsUpdated")}>
+				<details className="activity">
+					<summary>
+						<span className="activity-verb">{t("instructionsUpdated")}</span>
+						<ChevronIcon />
+					</summary>
+					<ScrollBlock className="code output note-body" label={t("instructionsUpdated")}>
 						{entry.message.content}
 					</ScrollBlock>
 				</details>
 			);
 		case "compaction":
 			return (
-				<details className="card divider-card">
-					<summary>{t("summaryTitle")}</summary>
-					<Markdown text={entry.compaction.summary} />
+				<details className="activity">
+					<summary>
+						<span className="activity-verb">{t("summaryTitle")}</span>
+						<ChevronIcon />
+					</summary>
+					<div className="tool-detail">
+						<Markdown text={entry.compaction.summary} />
+					</div>
 				</details>
 			);
 		case "notice": {
@@ -479,7 +528,7 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 					<EntryView key={entry.id} entry={entry} transcript={transcript} results={results} />
 				))}
 				{transcript.draft && (
-					<div aria-busy="true">
+					<div className="draft" aria-busy="true">
 						<AssistantBlocks
 							message={transcript.draft}
 							entryId={null}

@@ -7,15 +7,23 @@ import {
 	freeName,
 	loadModels,
 	sendMessage,
-	startChat,
+	startSession,
 	stopSession,
 	updateSession,
 	withdrawQueued,
 } from "../actions.ts";
 import { formatCost, formatNumber, t, useLang } from "../i18n.ts";
 import { type ModelInfo, type TranscriptState, useAppState } from "../state.ts";
-import { NewSessionDialog, SessionSettingsDialog, type SessionTemplate } from "./dialogs.tsx";
-import { ChatIcon, CodeIcon, MenuIcon, NotesIcon, PlusIcon } from "./icons.tsx";
+import { NewSessionDialog, SessionSettingsDialog } from "./dialogs.tsx";
+import {
+	ArrowUpIcon,
+	ChatIcon,
+	CodeIcon,
+	JigMark,
+	MenuIcon,
+	NotesIcon,
+	StopIcon,
+} from "./icons.tsx";
 import { Transcript } from "./transcript.tsx";
 import { Button, ErrorBox, Menu, Select, useAction } from "./ui.tsx";
 
@@ -138,7 +146,22 @@ export function ModelPicker({
 }
 
 /** A home-relative path, so the header stays short: /Users/me/Jig → ~/Jig. */
-function shortPath(path: string): string {
+/** On narrow screens the sidebar is a drawer; this opens it. */
+export function SidebarToggle({ className = "" }: { className?: string }) {
+	useLang();
+	return (
+		<Button
+			variant="icon"
+			className={`only-narrow ${className}`.trim()}
+			aria-label={t("sessions")}
+			onClick={() => document.querySelector(".app")?.classList.toggle("sidebar-open")}
+		>
+			<MenuIcon />
+		</Button>
+	);
+}
+
+export function shortPath(path: string): string {
 	return path.replace(/^\/(Users|home)\/[^/]+(?=\/|$)/, "~");
 }
 
@@ -147,9 +170,6 @@ function SessionHeader({ session }: { session: Session }) {
 	const models = useModels(session.provider);
 	const info = models.find((m) => m.id === session.model);
 	const [settingsOpen, setSettingsOpen] = useState(false);
-	const change = useAction((patch: Parameters<typeof updateSession>[1]) =>
-		updateSession(session.id, patch),
-	);
 	const cont = useAction(() => continueSession(session.id));
 	const compact = useAction(() => compactSession(session.id));
 	const busy = session.status === "working" || session.status === "waiting";
@@ -157,14 +177,7 @@ function SessionHeader({ session }: { session: Session }) {
 		session.usage.input + session.usage.output + session.usage.cacheRead + session.usage.cacheWrite;
 	return (
 		<header className="session-header">
-			<Button
-				variant="icon"
-				className="only-narrow"
-				aria-label={t("sessions")}
-				onClick={() => document.querySelector(".app")?.classList.toggle("sidebar-open")}
-			>
-				<MenuIcon />
-			</Button>
+			<SidebarToggle />
 			<div className="session-title">
 				<h1>{session.name}</h1>
 				<span className="session-meta" title={session.cwd ?? undefined}>
@@ -175,13 +188,6 @@ function SessionHeader({ session }: { session: Session }) {
 						` · ${t("contextUsed", { used: formatNumber(session.contextTokens), total: formatNumber(info.contextWindow) })}`}
 				</span>
 			</div>
-			<ModelPicker
-				provider={session.provider}
-				model={session.model}
-				thinking={session.thinking}
-				busy={change.busy}
-				onChange={(patch) => void change.run(patch)}
-			/>
 			{!busy && (session.status === "needs_review" || session.status === "error") && (
 				<Button
 					variant="primary"
@@ -200,7 +206,7 @@ function SessionHeader({ session }: { session: Session }) {
 					...(busy ? [] : [{ label: t("continue"), onSelect: () => void cont.run() }]),
 				]}
 			/>
-			<ErrorBox error={change.error ?? cont.error ?? compact.error} />
+			<ErrorBox error={cont.error ?? compact.error} />
 			{settingsOpen && (
 				<SessionSettingsDialog session={session} onClose={() => setSettingsOpen(false)} />
 			)}
@@ -258,11 +264,15 @@ function QueuedItem({ sessionId, id, text }: { sessionId: string; id: string; te
 	);
 }
 
+/** The box at the bottom: your message, the model choice and a round send or stop button (as in Codex). */
 function Composer({ session, transcript }: { session: Session; transcript: TranscriptState }) {
 	useLang();
 	const [text, setText] = useState("");
 	const ref = useAutoGrow(text);
 	const working = session.status === "working" || session.status === "waiting";
+	const change = useAction((patch: Parameters<typeof updateSession>[1]) =>
+		updateSession(session.id, patch),
+	);
 	const send = useAction(async () => {
 		const value = text;
 		if (!value.trim()) return;
@@ -270,6 +280,8 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 		setText("");
 	});
 	const stop = useAction(() => stopSession(session.id));
+	const hintId = `${session.id}-queued-hint`;
+	const sendLabel = working ? t("queueSend") : t("send");
 	return (
 		<div className="composer">
 			<div className="composer-inner">
@@ -280,15 +292,14 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 						))}
 					</section>
 				)}
-				<div className="composer-row">
+				<div className="composer-box">
 					<textarea
 						ref={ref}
-						className="textarea"
 						rows={1}
 						value={text}
 						placeholder={t("composerPlaceholder", { name: session.name })}
 						aria-label={t("composerPlaceholder", { name: session.name })}
-						aria-describedby={working ? `${session.id}-queued-hint` : undefined}
+						aria-describedby={working ? hintId : undefined}
 						onChange={(event) => setText(event.target.value)}
 						onKeyDown={(event) => {
 							if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -297,28 +308,46 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 							}
 						}}
 					/>
-					<div className="request-actions">
-						{working && (
-							<Button variant="danger" busy={stop.busy} onClick={() => void stop.run()}>
-								{t("stop")}
+					<div className="composer-bar">
+						<div className="composer-chips">
+							<ModelPicker
+								provider={session.provider}
+								model={session.model}
+								thinking={session.thinking}
+								busy={change.busy}
+								onChange={(patch) => void change.run(patch)}
+							/>
+						</div>
+						{working && !text.trim() ? (
+							<Button
+								className="send-button"
+								aria-label={t("stop")}
+								title={t("stop")}
+								busy={stop.busy}
+								onClick={() => void stop.run()}
+							>
+								<StopIcon />
+							</Button>
+						) : (
+							<Button
+								className="send-button"
+								aria-label={sendLabel}
+								title={sendLabel}
+								busy={send.busy}
+								disabled={!text.trim()}
+								onClick={() => void send.run()}
+							>
+								<ArrowUpIcon />
 							</Button>
 						)}
-						<Button
-							variant="primary"
-							busy={send.busy}
-							disabled={!text.trim()}
-							onClick={() => void send.run()}
-						>
-							{t("send")}
-						</Button>
 					</div>
 				</div>
 				{working && (
-					<span id={`${session.id}-queued-hint`} className="hint">
+					<span id={hintId} className="hint">
 						{t("composerQueued")}
 					</span>
 				)}
-				<ErrorBox error={send.error ?? stop.error} />
+				<ErrorBox error={send.error ?? stop.error ?? change.error} />
 			</div>
 		</div>
 	);
@@ -352,57 +381,172 @@ function TodoPanel({ session }: { session: Session }) {
 	);
 }
 
-/** No session open: centred, one primary action, and a few starting points (spec 12.3). */
-function EmptyMain() {
+type TemplateKey = "code" | "docs" | "chat";
+
+const TEMPLATES: { key: TemplateKey; icon: ReactNode }[] = [
+	{ key: "code", icon: <CodeIcon /> },
+	{ key: "docs", icon: <NotesIcon /> },
+	{ key: "chat", icon: <ChatIcon /> },
+];
+
+/** "Another folder…" in the folder choice; real choices are absolute or ~/ paths. */
+const OTHER_FOLDER = "other";
+
+/** A short session name from the first line of the first message; names may not hold @ or control characters. */
+function nameFrom(text: string): string {
+	const line = (text.trim().split("\n")[0] ?? "").replace(/[@\p{Cc}]/gu, "").trim();
+	const chars = [...line];
+	return chars.length > 24 ? `${chars.slice(0, 24).join("")}…` : line;
+}
+
+/**
+ * No session open: one composer in the middle of the page (as in Codex, spec 12.3). You pick a folder
+ * and a model in its bar and start by sending; the three templates under it add a role.
+ */
+function HomeView() {
 	useLang();
-	const [template, setTemplate] = useState<SessionTemplate | null | undefined>(undefined);
-	const chat = useAction(() => startChat(t("template_chat")));
-	const templates: { icon: ReactNode; key: "code" | "docs" | "chat"; needsFolder: boolean }[] = [
-		{ icon: <CodeIcon />, key: "code", needsFolder: true },
-		{ icon: <NotesIcon />, key: "docs", needsFolder: true },
-		{ icon: <ChatIcon />, key: "chat", needsFolder: false },
-	];
+	const settings = useAppState((state) => state.settings);
+	const sessions = useAppState((state) => state.sessions);
+	const [text, setText] = useState("");
+	const [folder, setFolder] = useState("");
+	const [typingFolder, setTypingFolder] = useState(false);
+	const [template, setTemplate] = useState<TemplateKey | null>(null);
+	const [model, setModel] = useState(
+		() =>
+			settings?.defaultModel ?? {
+				provider: "deepseek",
+				model: "deepseek-v4-pro",
+				thinking: "medium" as ThinkingLevel,
+			},
+	);
+	const [dialog, setDialog] = useState(false);
+	const ref = useAutoGrow(text);
+	useEffect(() => {
+		ref.current?.focus();
+	}, [ref]);
+	const recent = [
+		...new Set(
+			Object.values(sessions)
+				.sort((a, b) => b.lastActivityAt - a.lastActivityAt)
+				.map((session) => session.cwd)
+				.filter((cwd): cwd is string => Boolean(cwd)),
+		),
+	].slice(0, 5);
+	const role = template === "code" || template === "docs" ? template : null;
+	const missingFolder = role !== null && !folder.trim();
+	const start = useAction(async () => {
+		const value = text.trim();
+		if (!value || missingFolder) return;
+		await startSession(
+			{
+				name: freeName(nameFrom(value) || t("template_chat")),
+				kind: "task",
+				groupId: null,
+				cwd: folder.trim() || null,
+				responsibility: role ? t(`template_${role}_role`) : "",
+				...model,
+			},
+			value,
+		);
+	});
+	const pickTemplate = (key: TemplateKey) => {
+		const next = template === key ? null : key;
+		setTemplate(next);
+		if (next === "chat") {
+			setFolder("");
+			setTypingFolder(false);
+		}
+		ref.current?.focus();
+	};
 	return (
-		<main className="main main-empty">
-			<div className="empty">
-				<div className="empty-intro">
-					<img className="lockup-mark" src="/icons/jig-mark.svg" alt="" width={48} height={48} />
-					<h1>{t("noSessionTitle")}</h1>
-					<p>{t("noSessionBody")}</p>
+		<main className="main main-home">
+			<SidebarToggle className="home-menu" />
+			<div className="home">
+				<div className="home-intro">
+					<JigMark className="lockup-mark" size={40} />
+					<h1>{t("homeTitle")}</h1>
 				</div>
-				<div className="templates">
-					{templates.map(({ icon, key, needsFolder }) => (
-						<button
-							key={key}
-							type="button"
-							className="template-card"
-							aria-busy={key === "chat" && chat.busy ? "true" : undefined}
-							onClick={() =>
-								key === "chat"
-									? void chat.run()
-									: setTemplate({
-											name: freeName(t(`template_${key}`)),
-											responsibility: t(`template_${key}_role`),
-											needsFolder,
-										})
+				<div className="composer-box">
+					<textarea
+						ref={ref}
+						rows={2}
+						value={text}
+						placeholder={t("homePlaceholder")}
+						aria-label={t("homeTitle")}
+						onChange={(event) => setText(event.target.value)}
+						onKeyDown={(event) => {
+							if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+								event.preventDefault();
+								void start.run();
 							}
+						}}
+					/>
+					{typingFolder && (
+						<input
+							className="input folder-input"
+							value={folder}
+							placeholder={t("folderPath")}
+							aria-label={t("workingFolder")}
+							spellCheck={false}
+							onChange={(event) => setFolder(event.target.value)}
+						/>
+					)}
+					<div className="composer-bar">
+						<div className="composer-chips">
+							<Select
+								label={t("workingFolder")}
+								value={typingFolder ? OTHER_FOLDER : folder}
+								options={[
+									{ value: "", label: t("noFolder") },
+									{ value: OTHER_FOLDER, label: t("otherFolder") },
+									...recent.map((path) => ({
+										value: path,
+										label: shortPath(path),
+										group: t("recentFolders"),
+									})),
+								]}
+								onChange={(value) => {
+									setTypingFolder(value === OTHER_FOLDER);
+									setFolder(value === OTHER_FOLDER ? "" : value);
+								}}
+							/>
+							<ModelPicker {...model} onChange={(patch) => setModel((m) => ({ ...m, ...patch }))} />
+						</div>
+						<Button
+							className="send-button"
+							aria-label={t("send")}
+							title={t("send")}
+							busy={start.busy}
+							disabled={!text.trim() || missingFolder}
+							onClick={() => void start.run()}
+						>
+							<ArrowUpIcon />
+						</Button>
+					</div>
+				</div>
+				{missingFolder && (
+					<p className="hint" role="status">
+						{t("folderRequired")}
+					</p>
+				)}
+				<ErrorBox error={start.error} />
+				<div className="suggestions">
+					{TEMPLATES.map(({ key, icon }) => (
+						<Button
+							key={key}
+							className="suggestion"
+							aria-pressed={template === key}
+							onClick={() => pickTemplate(key)}
 						>
 							{icon}
-							<strong>{t(`template_${key}`)}</strong>
-							<span>{t(`template_${key}_body`)}</span>
-						</button>
+							{t(`template_${key}`)}
+						</Button>
 					))}
 				</div>
-				<Button variant="primary" onClick={() => setTemplate(null)}>
-					<PlusIcon /> {t("newSession")}
+				<Button variant="ghost" className="home-more" onClick={() => setDialog(true)}>
+					{t("moreOptions")}
 				</Button>
-				<ErrorBox error={chat.error} />
-				{template !== undefined && (
-					<NewSessionDialog
-						{...(template ? { template } : {})}
-						onClose={() => setTemplate(undefined)}
-					/>
-				)}
+				{dialog && <NewSessionDialog onClose={() => setDialog(false)} />}
 			</div>
 		</main>
 	);
@@ -416,7 +560,7 @@ export function SessionView() {
 	);
 	const transcript = useAppState((state) => state.transcript);
 	if (!selectedId || !session) {
-		return <EmptyMain />;
+		return <HomeView />;
 	}
 	return (
 		<main className="main">

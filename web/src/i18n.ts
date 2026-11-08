@@ -56,9 +56,6 @@ const zh = {
 	status_error: "出错",
 	status_needs_review: "待核对",
 	// session
-	noSessionTitle: "还没有打开会话",
-	noSessionBody:
-		"从左边选一个会话，或者从下面开始一个新的。每个会话有自己的职责、模型和权限；不选工作文件夹的会话就是聊天。",
 	chat: "聊天",
 	workingFolder: "工作文件夹",
 	model: "模型",
@@ -80,15 +77,43 @@ const zh = {
 	compact: "压缩上下文",
 	sessionSettings: "会话设置",
 	loadEarlier: "加载更早的记录",
-	newMessages: "有新消息",
 	emptyTranscript: "发一条消息开始。",
 	composerPlaceholder: "给 {name} 发消息（Enter 发送，Shift+Enter 换行）",
 	composerQueued: "会话在干活，这条消息会在工具调用之间送达",
 	queuedTitle: "排队中的消息",
 	you: "你",
 	thinkingLabel: "思考过程",
-	thinkingFor: "思考了 {s} 秒",
-	streaming: "正在回复…",
+	homeTitle: "要做点什么？",
+	homePlaceholder: "描述任务，Enter 开始，Shift+Enter 换行",
+	noFolder: "不用文件夹",
+	recentFolders: "最近用过",
+	otherFolder: "其他文件夹…",
+	folderPath: "文件夹路径，例如 ~/projects/demo",
+	queueSend: "排队发送",
+	justNow: "刚刚",
+	minutesAgo: "{n} 分钟",
+	hoursAgo: "{n} 小时",
+	daysAgo: "{n} 天",
+	act_read: "读取",
+	act_read_ing: "正在读取",
+	act_write: "写入",
+	act_write_ing: "正在写入",
+	act_edit: "编辑",
+	act_edit_ing: "正在编辑",
+	act_glob: "查找文件",
+	act_glob_ing: "正在查找文件",
+	act_grep: "搜索",
+	act_grep_ing: "正在搜索",
+	act_shell: "运行",
+	act_shell_ing: "正在运行",
+	act_shell_job: "查看后台任务",
+	act_shell_job_ing: "正在查看后台任务",
+	act_todo: "更新任务清单",
+	act_todo_ing: "正在更新任务清单",
+	act_ask_user: "提问",
+	act_ask_user_ing: "正在提问",
+	act_web_fetch: "抓取网页",
+	act_web_fetch_ing: "正在抓取网页",
 	// tool calls
 	tool_pending: "等待",
 	tool_waiting: "等你批准",
@@ -209,15 +234,12 @@ const zh = {
 	moreOptions: "更多选项",
 	folderRequired: "这个会话要在一个文件夹里工作，例如 ~/projects/demo",
 	template_code: "写代码",
-	template_code_body: "在一个项目文件夹里读代码、改代码、跑测试",
 	template_code_role:
 		"在工作文件夹里读代码、改代码，运行项目的检查和测试。改动前先看现有实现；改完说明改了什么、怎么验证的。",
 	template_docs: "整理资料",
-	template_docs_body: "把一个文件夹里的资料读完，整理成文档",
 	template_docs_role:
 		"阅读工作文件夹里的资料，按要求整理成结构清楚的文档；引用原文时注明出自哪个文件。",
 	template_chat: "聊天",
-	template_chat_body: "不读写文件，直接问答，点一下就开始",
 	defaultModelHelp: "新建会话时默认选这个服务商和模型；已有的会话不受影响。",
 	deleteProviderBody:
 		"删除自定义服务商 {name}？它的配置和钥匙串里的 API Key 都会删除，用它的会话将无法请求模型。",
@@ -329,9 +351,6 @@ const en: Record<MessageKey, string> = {
 	status_waiting: "Waiting for you",
 	status_error: "Error",
 	status_needs_review: "Needs review",
-	noSessionTitle: "No session is open",
-	noSessionBody:
-		"Each session has its own role, model and permissions. A session without a working folder is a chat.",
 	chat: "Chat",
 	workingFolder: "Working folder",
 	model: "Model",
@@ -353,15 +372,43 @@ const en: Record<MessageKey, string> = {
 	compact: "Compact context",
 	sessionSettings: "Session settings",
 	loadEarlier: "Load earlier messages",
-	newMessages: "New messages",
 	emptyTranscript: "Send a message to start.",
 	composerPlaceholder: "Message {name} (Enter to send, Shift+Enter for a new line)",
 	composerQueued: "The session is working; this message arrives between tool calls",
 	queuedTitle: "Queued messages",
 	you: "You",
 	thinkingLabel: "Thinking",
-	thinkingFor: "Thought for {s} s",
-	streaming: "Replying…",
+	homeTitle: "What do you want to work on?",
+	homePlaceholder: "Describe the task. Enter to start, Shift+Enter for a new line",
+	noFolder: "No folder",
+	recentFolders: "Recent",
+	otherFolder: "Another folder…",
+	folderPath: "Folder path, for example ~/projects/demo",
+	queueSend: "Queue message",
+	justNow: "now",
+	minutesAgo: "{n}m",
+	hoursAgo: "{n}h",
+	daysAgo: "{n}d",
+	act_read: "Read",
+	act_read_ing: "Reading",
+	act_write: "Wrote",
+	act_write_ing: "Writing",
+	act_edit: "Edited",
+	act_edit_ing: "Editing",
+	act_glob: "Listed files",
+	act_glob_ing: "Listing files",
+	act_grep: "Searched",
+	act_grep_ing: "Searching",
+	act_shell: "Ran",
+	act_shell_ing: "Running",
+	act_shell_job: "Checked job",
+	act_shell_job_ing: "Checking job",
+	act_todo: "Updated tasks",
+	act_todo_ing: "Updating tasks",
+	act_ask_user: "Asked",
+	act_ask_user_ing: "Asking",
+	act_web_fetch: "Fetched",
+	act_web_fetch_ing: "Fetching",
 	tool_pending: "Waiting",
 	tool_waiting: "Needs your approval",
 	tool_running: "Running",
@@ -481,15 +528,12 @@ const en: Record<MessageKey, string> = {
 	moreOptions: "More options",
 	folderRequired: "This session works in a folder, for example ~/projects/demo",
 	template_code: "Write code",
-	template_code_body: "Read, change and test code in a project folder",
 	template_code_role:
 		"Read and change code in the working folder, and run the project's checks and tests. Look at the existing code before changing it; afterwards, say what changed and how you checked it.",
 	template_docs: "Organize notes",
-	template_docs_body: "Read the material in a folder and turn it into documents",
 	template_docs_role:
 		"Read the material in the working folder and organize it into clearly structured documents as asked; when quoting, name the file it came from.",
 	template_chat: "Chat",
-	template_chat_body: "Questions and answers without files; starts with one click",
 	defaultModelHelp:
 		"New sessions start with this provider and model; existing sessions keep theirs.",
 	deleteProviderBody:
@@ -598,4 +642,19 @@ export function formatNumber(n: number): string {
 
 export function formatCost(n: number): string {
 	return n < 0.01 && n > 0 ? "<0.01" : n.toFixed(2);
+}
+
+/** How long ago something happened, short enough for a sidebar row: "5 分钟", "3h", "11月2日". */
+export function formatAgo(ms: number, now: number): string {
+	const minutes = Math.floor((now - ms) / 60_000);
+	if (minutes < 1) return t("justNow");
+	if (minutes < 60) return t("minutesAgo", { n: minutes });
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return t("hoursAgo", { n: hours });
+	const days = Math.floor(hours / 24);
+	if (days < 7) return t("daysAgo", { n: days });
+	return new Intl.DateTimeFormat(current === "zh" ? "zh-CN" : "en-US", {
+		month: "short",
+		day: "numeric",
+	}).format(ms);
 }

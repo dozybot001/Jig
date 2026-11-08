@@ -9,7 +9,8 @@ import {
 import { t, useLang } from "../i18n.ts";
 import { type ProviderSummary, setState, useAppState } from "../state.ts";
 import { ConfirmDialog, RulesEditor } from "./dialogs.tsx";
-import { ModelPicker } from "./session.tsx";
+import { JigMark } from "./icons.tsx";
+import { ModelPicker, SidebarToggle } from "./session.tsx";
 import { Button, ErrorBox, Select, Switch, Toggletip, useAction } from "./ui.tsx";
 
 export type SettingsTab = "general" | "providers" | "rules" | "about";
@@ -328,7 +329,7 @@ function About() {
 			</h2>
 			{/* Full lockup on the About page (spec 1.6), with a name that includes Tenon (1.7). */}
 			<div className="lockup" role="img" aria-label={t("lockupName")}>
-				<img className="lockup-mark" src="/icons/jig-mark.svg" alt="" width={22} height={22} />
+				<JigMark className="lockup-mark" size={22} />
 				<span className="lockup-word">
 					<span className="wordmark">Jig</span>
 					<img className="lockup-tenon" src="/icons/tenon-mark.svg" alt="" width={14} height={14} />
@@ -385,6 +386,7 @@ export function SettingsPage() {
 	return (
 		<main className="main settings-page" aria-label={t("settings")}>
 			<nav className="settings-nav" aria-label={t("settings")}>
+				<SidebarToggle />
 				<h1>{t("settings")}</h1>
 				{TABS.map((id) => (
 					<button

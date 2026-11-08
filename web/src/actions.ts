@@ -129,6 +129,7 @@ function connect(sessionId: string | null, after: number | null): void {
 		connectedOnce = true;
 	});
 	stream.addEventListener("reset", () => {
+		if (source !== stream) return;
 		void reloadSessions();
 		if (sessionId) void loadTranscript(sessionId);
 	});
@@ -213,18 +214,23 @@ function indexBy<T extends { id: string }>(items: T[]): Record<string, T> {
 
 async function loadTranscript(sessionId: string): Promise<number> {
 	const data = await api<Transcript>("GET", `/api/sessions/${sessionId}/transcript?limit=150`);
+	// A late answer for a session you have already left must not replace the open one.
 	setState((current) => ({
 		sessions: { ...current.sessions, [sessionId]: data.session },
-		transcript: {
-			sessionId,
-			entries: data.entries,
-			toolCalls: indexBy(data.toolCalls),
-			approvals: indexBy(data.approvals),
-			queue: data.queue,
-			olderCursor: data.olderCursor,
-			draft: null,
-			outputs: {},
-		},
+		...(current.selectedId === sessionId
+			? {
+					transcript: {
+						sessionId,
+						entries: data.entries,
+						toolCalls: indexBy(data.toolCalls),
+						approvals: indexBy(data.approvals),
+						queue: data.queue,
+						olderCursor: data.olderCursor,
+						draft: null,
+						outputs: {},
+					},
+				}
+			: {}),
 	}));
 	return data.session.eventSeq;
 }
@@ -329,18 +335,16 @@ export function freeName(base: string): string {
 }
 
 /** Starts a chat (a session without a working folder) with the default model, in one click. */
-export async function startChat(name: string): Promise<Session> {
-	const settings = getState().settings;
-	return createSession({
-		name: freeName(name),
-		kind: "task",
-		groupId: null,
-		cwd: null,
-		responsibility: "",
-		provider: settings?.defaultModel.provider ?? "deepseek",
-		model: settings?.defaultModel.model ?? "deepseek-v4-pro",
-		thinking: settings?.defaultModel.thinking ?? "medium",
-	});
+/**
+ * Starts a session from the home composer: creates it, sends the first message, then opens it, so a
+ * failure leaves you on the home page with your text still there.
+ */
+export async function startSession(input: NewSessionInput, text: string): Promise<Session> {
+	const session = await api<Session>("POST", "/api/sessions", input, { idempotent: true });
+	setState((current) => ({ sessions: { ...current.sessions, [session.id]: session } }));
+	await sendMessage(session.id, text);
+	await selectSession(session.id);
+	return session;
 }
 
 export async function toggleArchived(show: boolean): Promise<void> {

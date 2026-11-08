@@ -8,11 +8,11 @@ import {
 	updateSession,
 } from "../actions.ts";
 import { api } from "../api.ts";
-import { t, useLang } from "../i18n.ts";
+import { formatAgo, t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
 import { Snippet } from "./content.tsx";
 import { ConfirmDialog, GroupDialog, NewSessionDialog } from "./dialogs.tsx";
-import { FolderPlusIcon, GearIcon, PlusIcon } from "./icons.tsx";
+import { ComposeIcon, FolderPlusIcon, GearIcon, JigMark, SearchIcon } from "./icons.tsx";
 import { Button, Menu, Select } from "./ui.tsx";
 
 interface SearchResult {
@@ -24,19 +24,31 @@ function closeDrawer(): void {
 	document.querySelector(".app")?.classList.remove("sidebar-open");
 }
 
+/** Re-renders every minute so the times beside sessions stay current. */
+function useNow(): number {
+	const [now, setNow] = useState(() => Date.now());
+	useEffect(() => {
+		const timer = setInterval(() => setNow(Date.now()), 60_000);
+		return () => clearInterval(timer);
+	}, []);
+	return now;
+}
+
 function SessionRow({
 	session,
 	selected,
 	groups,
+	now,
 }: {
 	session: Session;
 	selected: boolean;
 	groups: Group[];
+	now: number;
 }) {
 	useLang();
 	const [moving, setMoving] = useState(false);
 	return (
-		<div style={{ position: "relative" }}>
+		<div className="session-item">
 			<button
 				type="button"
 				className="session-row"
@@ -61,9 +73,10 @@ function SessionRow({
 						{session.unread}
 					</span>
 				) : (
-					<span />
+					<span className="session-time" aria-hidden="true">
+						{formatAgo(session.lastActivityAt, now)}
+					</span>
 				)}
-				<span />
 			</button>
 			<span className="session-row-menu">
 				<Menu
@@ -148,15 +161,18 @@ function Search() {
 	};
 	return (
 		<div className="sidebar-search" ref={box}>
-			<input
-				className="input"
-				type="search"
-				placeholder={t("search")}
-				aria-label={t("search")}
-				value={query}
-				onChange={(event) => setQuery(event.target.value)}
-				onKeyDown={(event) => event.key === "Escape" && setQuery("")}
-			/>
+			<div className="search-field">
+				<SearchIcon />
+				<input
+					className="input"
+					type="search"
+					placeholder={t("search")}
+					aria-label={t("search")}
+					value={query}
+					onChange={(event) => setQuery(event.target.value)}
+					onKeyDown={(event) => event.key === "Escape" && setQuery("")}
+				/>
+			</div>
 			{result && (
 				<section className="search-results" aria-label={t("searchResults")}>
 					{result.sessions.length === 0 && result.hits.length === 0 && (
@@ -198,8 +214,9 @@ export function Sidebar() {
 	const view = useAppState((state) => state.view);
 	const showArchived = useAppState((state) => state.showArchived);
 	const hasArchived = useAppState((state) => state.hasArchived);
+	const now = useNow();
 	const [dialog, setDialog] = useState<
-		| { kind: "session"; groupId?: string | null }
+		| { kind: "session"; groupId: string | null }
 		| { kind: "group"; group?: Group }
 		| { kind: "deleteGroup"; group: Group }
 		| null
@@ -211,13 +228,23 @@ export function Sidebar() {
 	const byGroup = (groupId: string | null) =>
 		sortSessions(active.filter((s) => s.groupId === groupId));
 	const current = view === "session" ? selectedId : null;
+	const home = view === "session" && !selectedId;
+	const row = (session: Session) => (
+		<SessionRow
+			key={session.id}
+			session={session}
+			selected={session.id === current}
+			groups={groups}
+			now={now}
+		/>
+	);
 
 	return (
 		<nav className="sidebar" aria-label={t("sessions")}>
 			<div className="sidebar-top">
 				{/* The expanded sidebar carries the full lockup (spec 1.6); its name includes Tenon (1.7). */}
 				<span className="lockup" role="img" aria-label={t("lockupName")}>
-					<img className="lockup-mark" src="/icons/jig-mark.svg" alt="" width={22} height={22} />
+					<JigMark className="lockup-mark" size={22} />
 					<span className="lockup-word">
 						<span className="wordmark">Jig</span>
 						<img
@@ -229,26 +256,30 @@ export function Sidebar() {
 						/>
 					</span>
 				</span>
-				<span className="sidebar-actions">
-					<Button
-						variant="icon"
-						aria-label={t("newGroup")}
-						title={t("newGroup")}
-						onClick={() => setDialog({ kind: "group" })}
-					>
-						<FolderPlusIcon />
-					</Button>
-					<Button
-						variant="icon"
-						aria-label={t("newSession")}
-						title={t("newSession")}
-						onClick={() => setDialog({ kind: "session" })}
-					>
-						<PlusIcon />
-					</Button>
-				</span>
+				<Button
+					variant="icon"
+					aria-label={t("newGroup")}
+					title={t("newGroup")}
+					onClick={() => setDialog({ kind: "group" })}
+				>
+					<FolderPlusIcon />
+				</Button>
 			</div>
-			<Search />
+			<div className="sidebar-nav">
+				<button
+					type="button"
+					className="nav-row"
+					aria-current={home ? "page" : undefined}
+					onClick={() => {
+						closeDrawer();
+						void selectSession(null);
+					}}
+				>
+					<ComposeIcon />
+					{t("newSession")}
+				</button>
+				<Search />
+			</div>
 			<div className="sidebar-list">
 				{active.length === 0 && <p className="sidebar-empty">{t("emptySidebar")}</p>}
 				{groups.map((group) => (
@@ -271,31 +302,15 @@ export function Sidebar() {
 								]}
 							/>
 						</div>
-						{byGroup(group.id).map((session) => (
-							<SessionRow
-								key={session.id}
-								session={session}
-								selected={session.id === current}
-								groups={groups}
-							/>
-						))}
+						{byGroup(group.id).map(row)}
 					</section>
 				))}
 				{byGroup(null).length > 0 && (
-					<section aria-label={t("ungrouped")}>
-						{groups.length > 0 && (
-							<div className="group-heading">
-								<span>{t("ungrouped")}</span>
-							</div>
-						)}
-						{byGroup(null).map((session) => (
-							<SessionRow
-								key={session.id}
-								session={session}
-								selected={session.id === current}
-								groups={groups}
-							/>
-						))}
+					<section aria-label={groups.length > 0 ? t("ungrouped") : t("sessions")}>
+						<div className="group-heading">
+							<span>{groups.length > 0 ? t("ungrouped") : t("sessions")}</span>
+						</div>
+						{byGroup(null).map(row)}
 					</section>
 				)}
 				{hasArchived && (
@@ -307,32 +322,26 @@ export function Sidebar() {
 						>
 							{showArchived ? t("hideArchived") : t("showArchived")}
 						</Button>
-						{showArchived &&
-							archived.map((session) => (
-								<SessionRow
-									key={session.id}
-									session={session}
-									selected={session.id === current}
-									groups={groups}
-								/>
-							))}
+						{showArchived && archived.map(row)}
 					</>
 				)}
 			</div>
 			<div className="sidebar-bottom">
-				<Button
-					variant="ghost"
+				<button
+					type="button"
+					className="nav-row"
 					aria-current={view === "settings" ? "page" : undefined}
 					onClick={() => {
 						closeDrawer();
 						openSettings();
 					}}
 				>
-					<GearIcon /> {t("settings")}
-				</Button>
+					<GearIcon />
+					{t("settings")}
+				</button>
 			</div>
 			{dialog?.kind === "session" && (
-				<NewSessionDialog groupId={dialog.groupId ?? null} onClose={() => setDialog(null)} />
+				<NewSessionDialog groupId={dialog.groupId} onClose={() => setDialog(null)} />
 			)}
 			{dialog?.kind === "group" && (
 				<GroupDialog
