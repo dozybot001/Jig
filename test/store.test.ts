@@ -159,7 +159,7 @@ describe("transcript and events", () => {
 		assert.deepEqual(store.deliverQueue(session.id, user), []);
 		assert.throws(
 			() => store.updateQueued(session.id, q1.id, "late"),
-			(e) => code(e) === "conflict",
+			(e) => code(e) === "already-delivered",
 		);
 	});
 
@@ -193,7 +193,7 @@ describe("transcript and events", () => {
 		store.resolveApproval(approval.id, { answer: "A" });
 		assert.throws(
 			() => store.resolveApproval(approval.id, { answer: "B" }),
-			(e) => code(e) === "conflict",
+			(e) => code(e) === "already-answered",
 		);
 	});
 

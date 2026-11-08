@@ -14,7 +14,7 @@ import type {
 import { answerApproval, loadEarlier, markRead, toolCallFor } from "../actions.ts";
 import { t, useLang } from "../i18n.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
-import { Diff, Markdown } from "./content.tsx";
+import { Diff, Markdown, ScrollBlock } from "./content.tsx";
 import { Button, ErrorBox, useAction } from "./ui.tsx";
 
 function resultText(result: ToolResultMessage | undefined): string {
@@ -64,10 +64,14 @@ function PermissionCard({ approval }: { approval: Approval }) {
 			<p className="hint">
 				{approval.status === "cancelled"
 					? t("cancelled")
-					: decision
-						? t(`decided_${decision}`)
-						: ""}
-				{approval.response?.reason ? `：${approval.response.reason}` : ""}
+					: decision && approval.response?.reason
+						? t("decidedWithReason", {
+								decision: t(`decided_${decision}`),
+								reason: approval.response.reason,
+							})
+						: decision
+							? t(`decided_${decision}`)
+							: ""}
 			</p>
 		);
 	}
@@ -193,6 +197,10 @@ const ToolCard = memo(function ToolCard({
 		| null
 		| undefined;
 	const [open, setOpen] = useState(false);
+	// A card opened for an approval folds again once the approval is settled.
+	useEffect(() => {
+		if (!pending) setOpen(false);
+	}, [pending]);
 	return (
 		<div className="msg-assistant">
 			<details
@@ -211,11 +219,15 @@ const ToolCard = memo(function ToolCard({
 				</summary>
 				<div className="tool-detail">
 					<h3>{t("toolArguments")}</h3>
-					<pre className="code output">{JSON.stringify(call.arguments, null, 2)}</pre>
+					<ScrollBlock className="code output" label={t("toolArguments")}>
+						{JSON.stringify(call.arguments, null, 2)}
+					</ScrollBlock>
 					{status === "running" && output && (
 						<>
 							<h3>{t("toolOutput")}</h3>
-							<pre className="code output">{output}</pre>
+							<ScrollBlock className="code output" label={t("toolOutput")}>
+								{output}
+							</ScrollBlock>
 						</>
 					)}
 					{detail?.diff && (
@@ -227,7 +239,9 @@ const ToolCard = memo(function ToolCard({
 					{result && (
 						<>
 							<h3>{t("toolResult")}</h3>
-							<pre className="code output">{resultText(result)}</pre>
+							<ScrollBlock className="code output" label={t("toolResult")}>
+								{resultText(result)}
+							</ScrollBlock>
 						</>
 					)}
 				</div>
@@ -312,9 +326,8 @@ function EntryView({
 				typeof content === "string"
 					? content
 					: content.map((b) => (b.type === "text" ? b.text : "")).join("\n");
-			if (text.startsWith("[From Jig, not from the person]")) {
-				return <p className="notice">{text.replace("[From Jig, not from the person] ", "")}</p>;
-			}
+			// Jig's own notes to the model; the person sees the matching notice instead.
+			if (text.startsWith("[From Jig, not from the person]")) return null;
 			return (
 				<div className="msg-user">
 					<span className="visually-hidden">{t("you")}: </span>
@@ -338,7 +351,9 @@ function EntryView({
 			return (
 				<details className="card divider-card">
 					<summary>{t("instructionsUpdated")}</summary>
-					<pre className="code output">{entry.message.content}</pre>
+					<ScrollBlock className="code output" label={t("instructionsUpdated")}>
+						{entry.message.content}
+					</ScrollBlock>
 				</details>
 			);
 		case "compaction":
@@ -350,11 +365,31 @@ function EntryView({
 			);
 		case "notice": {
 			const notice = entry.notice;
-			return (
-				<p className={`notice ${notice.kind === "error" ? "notice-error" : ""}`}>
-					{t(`notice_${notice.kind}`, { text: notice.text ?? "" })}
-				</p>
-			);
+			const data = (notice.data ?? {}) as Record<string, string | number | null>;
+			let text: string;
+			if (notice.kind === "error") {
+				const code = String(data.code ?? "");
+				text =
+					code === "model-error"
+						? t("notice_error_model", { text: notice.text ?? "" })
+						: code === "compact-failed"
+							? t("notice_compact_failed", { text: notice.text ?? "" })
+							: code === "missing-api-key"
+								? t("err_missingKey", { provider: String(data.provider ?? "") })
+								: t("notice_error_internal");
+			} else if (notice.kind === "job_finished") {
+				text = t("notice_job_finished", {
+					job: String(data.job ?? ""),
+					command: String(data.command ?? ""),
+					exit:
+						data.exitCode === null || data.exitCode === undefined
+							? ""
+							: t("jobExit", { code: data.exitCode }),
+				});
+			} else {
+				text = t(`notice_${notice.kind}`, { text: notice.text ?? "" });
+			}
+			return <p className={`notice ${notice.kind === "error" ? "notice-error" : ""}`}>{text}</p>;
 		}
 	}
 }
@@ -467,7 +502,7 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 							setBehind(false);
 						}}
 					>
-						{t("newMessages")} ↓
+						{t("jumpToNew")} ↓
 					</Button>
 				)}
 			</div>

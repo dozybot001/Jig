@@ -838,7 +838,11 @@ export class Store {
 		return this.tx(() => {
 			const approval = this.getApproval(id);
 			if (approval.status !== "pending") {
-				throw conflict("This request has already been answered or withdrawn.");
+				throw conflict(
+					"This request has already been answered or withdrawn.",
+					undefined,
+					"already-answered",
+				);
 			}
 			this.#q(
 				"UPDATE approvals SET status = 'resolved', response = ?, resolved_at = ? WHERE id = ?",
@@ -906,7 +910,11 @@ export class Store {
 				"UPDATE queued_messages SET body = ?, updated_at = ? WHERE id = ? AND session_id = ?",
 			).run(JSON.stringify({ text }), Date.now(), id, sessionId);
 			if (result.changes === 0) {
-				throw conflict("This message was already delivered or withdrawn.");
+				throw conflict(
+					"This message was already delivered or withdrawn.",
+					undefined,
+					"already-delivered",
+				);
 			}
 			this.#emitQueue(sessionId);
 			return this.#queued(id);
@@ -920,7 +928,11 @@ export class Store {
 				sessionId,
 			);
 			if (result.changes === 0) {
-				throw conflict("This message was already delivered or withdrawn.");
+				throw conflict(
+					"This message was already delivered or withdrawn.",
+					undefined,
+					"already-delivered",
+				);
 			}
 			this.#emitQueue(sessionId);
 		});
@@ -1084,6 +1096,14 @@ export class Store {
 				this.#q(
 					"UPDATE sessions SET status = 'needs_review', status_detail = ?, updated_at = ? WHERE id = ?",
 				).run("Jig restarted while this session was working.", now, session.id);
+				this.appendEntry(session.id, {
+					role: "notice",
+					notice: {
+						kind: "restarted",
+						text: "Jig restarted while this session was working.",
+						timestamp: now,
+					},
+				});
 				this.#emitSession(session.id);
 			}
 			return affected.map((session) => session.id);

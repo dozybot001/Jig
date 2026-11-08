@@ -201,7 +201,10 @@ export function Sidebar() {
 	return (
 		<nav className="sidebar" aria-label={t("sessions")}>
 			<div className="sidebar-top">
-				<span className="wordmark">Jig</span>
+				<span className="lockup" role="img" aria-label={t("lockupName")}>
+					<span className="wordmark">Jig</span>
+					<img className="lockup-tenon" src="/icons/tenon-mark.svg" alt="" width={14} height={14} />
+				</span>
 				<div className="request-actions">
 					<Button
 						variant="icon"

@@ -28,8 +28,11 @@ export interface AppOptions {
 	build?: string | null;
 }
 
-const NOT_BUILT = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Jig</title></head>
-<body><p>The web interface has not been built yet. In the Jig folder, run: npm run build:web</p></body></html>`;
+const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Jig</title>
+<meta name="color-scheme" content="light dark"></head><body>
+<p>网页界面还没有构建。在 Jig 的目录运行 npm run build:web，然后刷新这个页面。</p>
+<p lang="en">The web interface has not been built yet. In the Jig folder, run npm run build:web, then reload this page.</p>
+</body></html>`;
 
 export function createApp(options: AppOptions): Hono<AppEnv> {
 	const log = options.log ?? ((line: string) => process.stderr.write(`${line}\n`));

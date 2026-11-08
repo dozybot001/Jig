@@ -161,7 +161,8 @@ export class Agents {
 		if (!trimmed) throw invalid("The message is empty.", "text");
 		if (text.length > MAX_MESSAGE_CHARS) throw invalid("The message is too long.", "text");
 		const session = this.#store.getSession(sessionId);
-		if (session.archivedAt !== null) throw conflict("This session is archived. Restore it first.");
+		if (session.archivedAt !== null)
+			throw conflict("This session is archived. Restore it first.", undefined, "session-archived");
 		if (this.isRunning(sessionId)) return { queued: this.#store.enqueue(sessionId, text) };
 		// The conversation moves on: calls left over from an interrupted run will not be run later.
 		this.#store.tx(() => {
@@ -182,10 +183,13 @@ export class Agents {
 	/** Picks up after a stop, an error or a restart, without a new message. */
 	continue(sessionId: string): void {
 		const session = this.#store.getSession(sessionId);
-		if (this.isRunning(sessionId)) throw conflict("This session is already working.");
-		if (session.archivedAt !== null) throw conflict("This session is archived. Restore it first.");
+		if (this.isRunning(sessionId))
+			throw conflict("This session is already working.", undefined, "session-busy");
+		if (session.archivedAt !== null)
+			throw conflict("This session is archived. Restore it first.", undefined, "session-archived");
 		const entries = this.#store.contextEntries(sessionId);
-		if (entries.length === 0) throw conflict("There is nothing to continue yet.");
+		if (entries.length === 0)
+			throw conflict("There is nothing to continue yet.", undefined, "nothing-to-continue");
 		this.#start(sessionId, { resume: true });
 	}
 
@@ -213,7 +217,8 @@ export class Agents {
 
 	/** Shortens the context now; the session must not be working. */
 	async compactNow(sessionId: string): Promise<void> {
-		if (this.isRunning(sessionId)) throw conflict("Wait until the session stops working.");
+		if (this.isRunning(sessionId))
+			throw conflict("Wait until the session stops working.", undefined, "session-busy");
 		const session = this.#store.getSession(sessionId);
 		const model = this.#requireModel(session);
 		const controller = new AbortController();
@@ -290,7 +295,7 @@ export class Agents {
 					}
 					endStatus = "error";
 					detail = final.errorMessage ?? "The model request failed.";
-					this.#notice(sessionId, "error", detail);
+					this.#notice(sessionId, "error", detail, { code: "model-error" });
 					break;
 				}
 				const calls = message.content.filter(
@@ -325,7 +330,12 @@ export class Agents {
 					: `Jig hit an internal error: ${(error as Error).message}`;
 			if (!(error instanceof JigError))
 				this.#log(`session ${sessionId}: ${(error as Error).stack ?? error}`);
-			this.#notice(sessionId, "error", detail);
+			// The code lets the interface explain the problem in the person's language.
+			const data: JsonObject =
+				error instanceof JigError
+					? { code: error.code, ...((error.details ?? {}) as JsonObject) }
+					: { code: "internal-error" };
+			this.#notice(sessionId, "error", detail, data);
 		} finally {
 			this.#store.live(sessionId, { type: "draftCleared" });
 			if (signal.aborted) endStatus = "idle";
@@ -621,7 +631,11 @@ export class Agents {
 				const notes = this.#notes.get(sessionId) ?? [];
 				notes.push(note);
 				this.#notes.set(sessionId, notes);
-				if (!this.isRunning(sessionId)) this.#notice(sessionId, "job_finished", note);
+				this.#notice(sessionId, "job_finished", note, {
+					job: job.id,
+					command: job.command,
+					exitCode: code ?? null,
+				});
 			});
 			this.#jobs.set(sessionId, jobs);
 		}
@@ -638,10 +652,12 @@ export class Agents {
 		return this.#store.deliverQueue(sessionId, userEntry).length > 0 || notes.length > 0;
 	}
 
-	#notice(sessionId: string, kind: Notice["kind"], text: string): void {
+	#notice(sessionId: string, kind: Notice["kind"], text: string, data?: JsonObject): void {
 		this.#store.appendEntry(sessionId, {
 			role: "notice",
-			notice: { kind, text, timestamp: Date.now() },
+			notice: data
+				? { kind, text, data, timestamp: Date.now() }
+				: { kind, text, timestamp: Date.now() },
 		});
 	}
 
@@ -732,11 +748,9 @@ export class Agents {
 			.trim();
 		if (summary.stopReason !== "stop" || !text) {
 			if (!signal.aborted)
-				this.#notice(
-					session.id,
-					"error",
-					`Could not shorten the context: ${summary.errorMessage ?? "the summary came back empty"}.`,
-				);
+				this.#notice(session.id, "error", summary.errorMessage ?? "The summary came back empty.", {
+					code: "compact-failed",
+				});
 			return false;
 		}
 		const remaining = entries.filter((entry) => entry.seq >= (firstKept as Entry).seq);

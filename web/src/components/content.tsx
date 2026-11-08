@@ -1,6 +1,7 @@
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { t } from "../i18n.ts";
 
 const SAFE_PROTOCOLS = /^(https?:|mailto:)/i;
 
@@ -41,12 +42,35 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
 	);
 });
 
+/**
+ * A scrolling block of code or output. It has no focusable content, so it takes focus itself and has a
+ * name, letting keyboard and screen-reader users scroll it (spec 18.6).
+ */
+export function ScrollBlock({
+	label,
+	className,
+	children,
+}: {
+	label: string;
+	className: string;
+	children: ReactNode;
+}) {
+	return (
+		// A named group, not a region: many output blocks would otherwise flood the landmark list.
+		// biome-ignore lint/a11y/useSemanticElements: <pre> keeps whitespace; a fieldset would not
+		// biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll area without focusable content must be focusable (spec 18.6)
+		<pre className={className} role="group" aria-label={label} tabIndex={0}>
+			{children}
+		</pre>
+	);
+}
+
 export function Diff({ patch }: { patch: string }) {
 	const lines = patch
 		.split("\n")
 		.filter((line) => !line.startsWith("Index:") && !line.startsWith("====="));
 	return (
-		<pre className="diff">
+		<ScrollBlock className="diff" label={t("diff")}>
 			{lines.map((line, index) => {
 				const kind = line.startsWith("@@")
 					? "hunk"
@@ -62,7 +86,7 @@ export function Diff({ patch }: { patch: string }) {
 					</div>
 				);
 			})}
-		</pre>
+		</ScrollBlock>
 	);
 }
 

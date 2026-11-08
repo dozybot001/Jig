@@ -329,6 +329,7 @@ export class ModelGateway {
 				"missing-api-key",
 				400,
 				`There is no API key for ${request.provider}. Add one in Settings, or run: jig key set ${request.provider}`,
+				{ provider: request.provider },
 			);
 		}
 		const context: Context = {

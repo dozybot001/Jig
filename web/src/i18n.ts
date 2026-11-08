@@ -72,7 +72,7 @@ const zh = {
 	thinking_max: "最高",
 	usage: "用量",
 	tokens: "{n} token",
-	cost: "\u0024{n}",
+	cost: "USD {n}",
 	contextUsed: "上下文 {used} / {total}",
 	continue: "继续",
 	continueHint: "从停下的地方接着跑。",
@@ -124,9 +124,9 @@ const zh = {
 	notice_interrupted: "已停止",
 	notice_error: "出错：{text}",
 	notice_model_changed: "换了模型：{text}",
-	notice_restarted: "Jig 重启过",
+	notice_restarted: "Jig 重启时这个会话在干活，已标为待核对。检查过后点「继续」接着运行。",
 	notice_compacted: "较早的记录已压成摘要",
-	notice_job_finished: "{text}",
+	notice_job_finished: "后台任务 {job}（{command}）结束了{exit}。",
 	instructionsUpdated: "说明文件有更新",
 	summaryTitle: "较早记录的摘要",
 	// dialogs
@@ -204,6 +204,57 @@ const zh = {
 	// errors
 	required: "必填",
 	nameTaken: "这个名称已经有会话在用了。",
+	err_network: "连不上 Jig 服务。确认 jig serve 还在运行，然后重试。",
+	err_signin: "登录已失效。在终端运行 jig open，用新链接打开。",
+	err_notFound: "要找的内容不存在，可能已被删除。刷新后再试。",
+	err_internal:
+		"Jig 内部出错了。重试一次；还不行的话，把请求编号和 jig serve 终端里的输出发给我们。",
+	err_invalid: "请求的内容不对，检查后再提交。",
+	err_field_name: "名称不能为空，最多 60 个字，不能含 @ 或控制字符。",
+	err_field_cwd: "工作文件夹要填已经存在的文件夹的绝对路径，可以用 ~/ 开头。",
+	err_field_text: "消息不能为空，也不能超过 10 万字。",
+	err_field_decision: "这类操作每次都要确认，只能允许一次。",
+	err_field_answer: "回答不能为空。",
+	err_field_options: "压缩阈值要填不小于 10000 的整数，或者留空。",
+	err_field_key: "密钥不能为空。",
+	err_field_id: "标识只能用小写字母、数字和短横线，最多 40 个，不能和内置服务商重名。",
+	err_field_baseUrl: "接口地址要以 http:// 或 https:// 开头。",
+	err_field_models: "模型名、上下文长度（至少 1000）和最长输出（不超过上下文长度）都要填。",
+	err_field_rules: "每条规则都要选效果和工具。",
+	err_field_model: "找不到这个服务商或模型。",
+	err_missingKey:
+		"没有 {provider} 的 API Key。在「设置 → 服务商与密钥」里填写，或在终端运行 jig key set {provider}。",
+	err_sessionBusy: "会话正在干活，等它停下再试。",
+	err_sessionArchived: "这个会话已归档，先恢复它。",
+	err_nothingToContinue: "会话里还没有可以接着做的内容。",
+	err_alreadyAnswered: "这项请求已经处理过或被撤销了。",
+	err_alreadyDelivered: "这条消息已经送达或被撤回了。",
+	err_unknown: "操作没有完成。重试一次；还不行的话，把请求编号发给我们。",
+	notice_error_model: "模型请求失败：{text}",
+	notice_error_internal: "Jig 内部出错了，详情在 jig serve 的终端输出里。",
+	notice_compact_failed: "压缩上下文失败：{text}",
+	jobExit: "，退出码 {code}",
+	jumpToNew: "跳到新消息",
+	decidedWithReason: "{decision}：{reason}",
+	infoAbout: "{label}的说明",
+	unsavedChanges: "有未保存的修改",
+	copyRequestId: "复制请求编号",
+	lockupName: "Jig，榫卯 Tenon AI 出品",
+	privacyPolicy: "隐私政策",
+	terms: "用户协议",
+	docVersion: "版本 {v} · {date}生效",
+	policyDate: "2026 年 11 月 8 日",
+	privacyPolicyBody: [
+		"Jig 是在你自己的电脑上运行的软件。榫卯 Tenon AI 不收集、不接收你在 Jig 里的任何数据，Jig 里没有统计、遥测或上报代码。",
+		"保存在你电脑上的数据：会话、消息、工具调用记录、审批和设置存在 Jig 的数据目录（默认 ~/.jig）里的数据库中；服务商的 API Key 存在系统钥匙串里；超长的命令输出存在数据目录的 tmp 文件夹里。这些数据一直保存，直到你删除。",
+		"发给第三方的数据：你为会话选的模型服务商会收到发给它的对话内容，包括会话读到的文件和命令输出，这部分适用该服务商的隐私政策。默认服务商 DeepSeek 在中国境内；你选境外服务商时，这些内容会发往境外。会话抓取网页时，网站会收到请求。",
+		"查询、导出与删除：你可以直接查看数据目录里的文件。删除某个服务商的 Key：在设置里删除，或运行 jig key delete；删除全部数据：停掉 jig serve 后删除数据目录。",
+		"联系我们：support@tenonai.cn。",
+	].join("\n\n"),
+	termsBody: [
+		"Jig 目前还没有公开发布，只供榫卯 Tenon AI 内部使用。v1 验收后会以开源许可证（MIT 或 Apache-2.0）发布，届时开源许可证就是 Jig 的用户协议。",
+		"Jig 会按你的批准读写文件、执行命令和访问网络。请为会话选择合适的工作文件夹和权限规则；删除文件、推送、发布等操作每次都会先问你。",
+	].join("\n\n"),
 };
 
 export type MessageKey = keyof typeof zh;
@@ -277,7 +328,7 @@ const en: Record<MessageKey, string> = {
 	thinking_max: "Max",
 	usage: "Usage",
 	tokens: "{n} tokens",
-	cost: "\u0024{n}",
+	cost: "USD {n}",
 	contextUsed: "Context {used} / {total}",
 	continue: "Continue",
 	continueHint: "Pick up where it stopped.",
@@ -327,9 +378,10 @@ const en: Record<MessageKey, string> = {
 	notice_interrupted: "Stopped",
 	notice_error: "Error: {text}",
 	notice_model_changed: "Model changed: {text}",
-	notice_restarted: "Jig restarted",
+	notice_restarted:
+		"Jig restarted while this session was working, so it is marked for review. Check it, then choose Continue.",
 	notice_compacted: "Earlier messages were summarized",
-	notice_job_finished: "{text}",
+	notice_job_finished: "Background job {job} ({command}) ended{exit}.",
 	instructionsUpdated: "Instruction files updated",
 	summaryTitle: "Summary of earlier messages",
 	name: "Name",
@@ -407,6 +459,64 @@ const en: Record<MessageKey, string> = {
 	feedback: "Feedback",
 	required: "Required",
 	nameTaken: "Another session already has this name.",
+	err_network:
+		"Cannot reach the Jig service. Check that jig serve is still running, then try again.",
+	err_signin: "Your sign-in has expired. Run jig open in a terminal and use the new link.",
+	err_notFound: "This no longer exists; it may have been deleted. Refresh and try again.",
+	err_internal:
+		"Something went wrong inside Jig. Try again; if it keeps failing, send us the request ID and the output in the jig serve terminal.",
+	err_invalid: "Something in the request is not valid. Check it and submit again.",
+	err_field_name:
+		"The name cannot be empty, can have at most 60 characters, and cannot contain @ or control characters.",
+	err_field_cwd:
+		"The working folder must be the absolute path of an existing folder; it may start with ~/.",
+	err_field_text: "The message cannot be empty or longer than 100,000 characters.",
+	err_field_decision:
+		"Operations like this need confirmation every time; they can only be allowed once.",
+	err_field_answer: "The answer cannot be empty.",
+	err_field_options:
+		"The compaction threshold must be a whole number of at least 10,000, or empty.",
+	err_field_key: "The key cannot be empty.",
+	err_field_id:
+		"The ID may use lowercase letters, digits and dashes, up to 40, and cannot match a built-in provider.",
+	err_field_baseUrl: "The base URL must start with http:// or https://.",
+	err_field_models:
+		"Fill in the model name, the context window (at least 1,000) and the max output (no larger than the context window).",
+	err_field_rules: "Every rule needs an effect and a tool.",
+	err_field_model: "This provider or model does not exist.",
+	err_missingKey:
+		"There is no API key for {provider}. Add one in Settings → Providers and keys, or run jig key set {provider} in a terminal.",
+	err_sessionBusy: "The session is working. Try again when it stops.",
+	err_sessionArchived: "This session is archived. Restore it first.",
+	err_nothingToContinue: "There is nothing in this session to continue yet.",
+	err_alreadyAnswered: "This request was already answered or withdrawn.",
+	err_alreadyDelivered: "This message was already delivered or withdrawn.",
+	err_unknown: "That did not work. Try again; if it keeps failing, send us the request ID.",
+	notice_error_model: "The model request failed: {text}",
+	notice_error_internal: "Something went wrong inside Jig; the jig serve terminal has the details.",
+	notice_compact_failed: "Could not compact the context: {text}",
+	jobExit: " with exit code {code}",
+	jumpToNew: "Jump to new messages",
+	decidedWithReason: "{decision}: {reason}",
+	infoAbout: "About {label}",
+	unsavedChanges: "Unsaved changes",
+	copyRequestId: "Copy request ID",
+	lockupName: "Jig, by Tenon AI",
+	privacyPolicy: "Privacy Policy",
+	terms: "Terms of Service",
+	docVersion: "Version {v} · effective {date}",
+	policyDate: "Nov 8, 2026",
+	privacyPolicyBody: [
+		"Jig runs on your own computer. Tenon AI does not collect or receive any of your data in Jig, and Jig contains no analytics, telemetry or reporting code.",
+		"Data kept on your computer: sessions, messages, tool call records, approvals and settings are stored in a database in Jig's data folder (~/.jig by default); provider API keys are stored in the system keychain; very long command output is stored in the tmp folder of the data folder. This data stays until you delete it.",
+		"Data sent to third parties: the model provider you choose for a session receives the conversation sent to it, including files the session read and command output; that provider's privacy policy applies. The default provider, DeepSeek, is in mainland China; if you choose a provider outside mainland China, this content goes abroad. When a session fetches a web page, that site receives the request.",
+		"Access, export and deletion: you can look at the files in the data folder directly. To delete a provider's key, delete it in Settings or run jig key delete; to delete everything, stop jig serve and delete the data folder.",
+		"Contact: support@tenonai.cn.",
+	].join("\n\n"),
+	termsBody: [
+		"Jig has not been released publicly yet and is for internal use at Tenon AI. After v1 is accepted it will be released under an open source license (MIT or Apache-2.0); that license will then be Jig's terms of service.",
+		"Jig reads and writes files, runs commands and goes online as you approve. Choose a suitable working folder and permission rules for each session; deleting files, pushing, publishing and similar operations always ask you first.",
+	].join("\n\n"),
 };
 
 const dictionaries: Record<Lang, Record<MessageKey, string>> = { zh, en };
@@ -451,11 +561,4 @@ export function formatNumber(n: number): string {
 
 export function formatCost(n: number): string {
 	return n < 0.01 && n > 0 ? "<0.01" : n.toFixed(2);
-}
-
-export function formatTime(ms: number): string {
-	return new Intl.DateTimeFormat(current === "zh" ? "zh-CN" : "en-US", {
-		hour: "2-digit",
-		minute: "2-digit",
-	}).format(ms);
 }

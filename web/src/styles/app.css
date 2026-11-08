@@ -1131,3 +1131,20 @@ body.scroll-locked {
 .sidebar-list {
 	--surface-bg: var(--bg-side);
 }
+
+.unsaved {
+	margin-right: auto;
+	align-self: center;
+}
+.policy {
+	padding: 0 12px 12px;
+	display: grid;
+	gap: 8px;
+	color: var(--text);
+}
+.policy p {
+	margin: 0;
+}
+.main-empty .btn {
+	margin-top: 8px;
+}

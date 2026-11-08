@@ -20,3 +20,4 @@
 - 内置多家模型服务商，默认使用 DeepSeek；也可以添加 OpenAI 兼容的服务商或本地模型。
 - `jig key set|delete|list` 管理 API Key，Key 只存在系统钥匙串里。
 - 设置：主题、语言、新会话的默认模型、默认权限规则、服务商与 API Key，以及「关于 Jig」页面。
+- 「关于 Jig」里可以打开隐私政策和用户协议；[数据清单](docs/data-inventory.md)列出 Jig 在你电脑上保存的数据和删除方法。

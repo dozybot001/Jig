@@ -12,7 +12,7 @@ import {
 } from "../actions.ts";
 import { formatCost, formatNumber, t, useLang } from "../i18n.ts";
 import { type ModelInfo, type TranscriptState, useAppState } from "../state.ts";
-import { SessionSettingsDialog } from "./dialogs.tsx";
+import { NewSessionDialog, SessionSettingsDialog } from "./dialogs.tsx";
 import { Transcript } from "./transcript.tsx";
 import { Button, ErrorBox, Menu, Select, useAction } from "./ui.tsx";
 
@@ -121,7 +121,6 @@ function SessionHeader({ session }: { session: Session }) {
 				<h1>{session.name}</h1>
 				<span className="session-meta">
 					{t(`status_${session.status}`)} · {session.cwd ?? t("chat")}
-					{session.statusDetail && session.status !== "idle" ? ` · ${session.statusDetail}` : ""}
 				</span>
 			</div>
 			<ModelPicker
@@ -307,6 +306,24 @@ function TodoPanel({ session }: { session: Session }) {
 	);
 }
 
+/** No session open: say why the area is empty and offer the one next step (spec 12.3). */
+function EmptyMain() {
+	useLang();
+	const [creating, setCreating] = useState(false);
+	return (
+		<main className="main main-empty">
+			<div>
+				<h1>{t("noSessionTitle")}</h1>
+				<p>{t("noSessionBody")}</p>
+				<Button variant="primary" onClick={() => setCreating(true)}>
+					{t("newSession")}
+				</Button>
+				{creating && <NewSessionDialog onClose={() => setCreating(false)} />}
+			</div>
+		</main>
+	);
+}
+
 export function SessionView() {
 	useLang();
 	const selectedId = useAppState((state) => state.selectedId);
@@ -315,14 +332,7 @@ export function SessionView() {
 	);
 	const transcript = useAppState((state) => state.transcript);
 	if (!selectedId || !session) {
-		return (
-			<main className="main main-empty">
-				<div>
-					<h1>{t("noSessionTitle")}</h1>
-					<p>{t("noSessionBody")}</p>
-				</div>
-			</main>
-		);
+		return <EmptyMain />;
 	}
 	return (
 		<main className="main">

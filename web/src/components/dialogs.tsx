@@ -20,13 +20,22 @@ import { ApiError } from "../api.ts";
 import { t, useLang } from "../i18n.ts";
 import { type ProviderSummary, useAppState } from "../state.ts";
 import { ModelPicker } from "./session.tsx";
-import { Button, Dialog, ErrorBox, Field, Select, Switch, useAction } from "./ui.tsx";
+import {
+	Button,
+	Dialog,
+	describeError,
+	ErrorBox,
+	Field,
+	Select,
+	Switch,
+	useAction,
+} from "./ui.tsx";
 
 const TOOLS = ["*", "read", "write", "edit", "glob", "grep", "shell", "web_fetch"];
 
 function fieldError(error: unknown, field: string): string | null {
 	if (!(error instanceof ApiError) || error.field !== field) return null;
-	return error.code === "conflict" && field === "name" ? t("nameTaken") : error.message;
+	return describeError(error);
 }
 
 function generalError(error: unknown, fields: string[]): unknown {
@@ -116,6 +125,8 @@ export function NewSessionDialog({
 	});
 	const nameId = useId();
 	const cwdId = useId();
+	const nameErrorId = useId();
+	const cwdErrorId = useId();
 	const create = useAction(async () => {
 		await createSession({
 			name,
@@ -146,13 +157,19 @@ export function NewSessionDialog({
 				</>
 			}
 		>
-			<Field label={t("name")} htmlFor={nameId} error={fieldError(create.error, "name")}>
+			<Field
+				label={t("name")}
+				htmlFor={nameId}
+				error={fieldError(create.error, "name")}
+				errorId={nameErrorId}
+			>
 				<input
 					id={nameId}
 					className="input"
 					value={name}
 					maxLength={60}
 					aria-invalid={fieldError(create.error, "name") ? "true" : undefined}
+					aria-describedby={fieldError(create.error, "name") ? nameErrorId : undefined}
 					onChange={(event) => setName(event.target.value)}
 				/>
 			</Field>
@@ -178,13 +195,19 @@ export function NewSessionDialog({
 					onChange={setGroup}
 				/>
 			</Field>
-			<Field label={t("workingFolder")} htmlFor={cwdId} error={fieldError(create.error, "cwd")}>
+			<Field
+				label={t("workingFolder")}
+				htmlFor={cwdId}
+				error={fieldError(create.error, "cwd")}
+				errorId={cwdErrorId}
+			>
 				<input
 					id={cwdId}
 					className="input"
 					value={cwd}
 					placeholder={t("folderPlaceholder")}
 					aria-invalid={fieldError(create.error, "cwd") ? "true" : undefined}
+					aria-describedby={fieldError(create.error, "cwd") ? cwdErrorId : undefined}
 					onChange={(event) => setCwd(event.target.value)}
 				/>
 			</Field>
@@ -227,6 +250,8 @@ export function SessionSettingsDialog({
 	const [rules, setRules] = useState(session.rules);
 	const nameId = useId();
 	const compactId = useId();
+	const nameErrorId = useId();
+	const compactErrorId = useId();
 	const save = useAction(async () => {
 		await updateSession(session.id, {
 			name,
@@ -237,6 +262,14 @@ export function SessionSettingsDialog({
 		});
 		onClose();
 	});
+	// The switch is saved with the form, so show when something differs from what is saved (spec 6.4).
+	const dirty =
+		name !== session.name ||
+		responsibility !== session.responsibility ||
+		group !== (session.groupId ?? "") ||
+		directEdits !== (session.options.directEdits ?? false) ||
+		compactAt !== (session.options.compactAt ? String(session.options.compactAt) : "") ||
+		JSON.stringify(rules) !== JSON.stringify(session.rules);
 	return (
 		<Dialog
 			title={t("sessionSettings")}
@@ -244,6 +277,11 @@ export function SessionSettingsDialog({
 			onClose={onClose}
 			footer={
 				<>
+					{dirty && (
+						<span className="hint unsaved" role="status">
+							{t("unsavedChanges")}
+						</span>
+					)}
 					<Button onClick={onClose}>{t("cancel")}</Button>
 					<Button variant="primary" busy={save.busy} onClick={() => void save.run()}>
 						{t("save")}
@@ -251,12 +289,19 @@ export function SessionSettingsDialog({
 				</>
 			}
 		>
-			<Field label={t("name")} htmlFor={nameId} error={fieldError(save.error, "name")}>
+			<Field
+				label={t("name")}
+				htmlFor={nameId}
+				error={fieldError(save.error, "name")}
+				errorId={nameErrorId}
+			>
 				<input
 					id={nameId}
 					className="input"
 					value={name}
 					maxLength={60}
+					aria-invalid={fieldError(save.error, "name") ? "true" : undefined}
+					aria-describedby={fieldError(save.error, "name") ? nameErrorId : undefined}
 					onChange={(event) => setName(event.target.value)}
 				/>
 			</Field>
@@ -292,11 +337,14 @@ export function SessionSettingsDialog({
 				htmlFor={compactId}
 				info={t("compactAtHelp")}
 				error={fieldError(save.error, "options")}
+				errorId={compactErrorId}
 			>
 				<input
 					id={compactId}
 					className="input"
 					inputMode="numeric"
+					aria-invalid={fieldError(save.error, "options") ? "true" : undefined}
+					aria-describedby={fieldError(save.error, "options") ? compactErrorId : undefined}
 					value={compactAt}
 					onChange={(event) => setCompactAt(event.target.value.replace(/[^\d]/g, ""))}
 				/>
@@ -579,7 +627,7 @@ function About() {
 		<div className="dialog-body" style={{ padding: 0 }}>
 			<div className="about-block">
 				{/* Wordmark with the Tenon endorsement mark at its top right (spec 1.2, 1.4); Jig's own logomark is still to be designed. */}
-				<div className="lockup" role="img" aria-label="Jig">
+				<div className="lockup" role="img" aria-label={t("lockupName")}>
 					<span className="wordmark lockup-word">Jig</span>
 					<img className="lockup-tenon" src="/icons/tenon-mark.svg" alt="" width={14} height={14} />
 				</div>
@@ -604,14 +652,28 @@ function About() {
 					</a>
 				</p>
 			</div>
-			<div className="about-block">
-				<h3>{t("privacy")}</h3>
-				<p>{t("privacyBody")}</p>
-			</div>
-			<div className="about-block">
-				<h3>{t("license")}</h3>
-				<p>{t("licenseBody")}</p>
-			</div>
+			<details className="card divider-card">
+				<summary>{t("privacyPolicy")}</summary>
+				<div className="policy">
+					<p className="hint">{t("docVersion", { v: "1.0", date: t("policyDate") })}</p>
+					{t("privacyPolicyBody")
+						.split("\n\n")
+						.map((paragraph) => (
+							<p key={paragraph.slice(0, 24)}>{paragraph}</p>
+						))}
+				</div>
+			</details>
+			<details className="card divider-card">
+				<summary>{t("terms")}</summary>
+				<div className="policy">
+					<p className="hint">{t("docVersion", { v: "1.0", date: t("policyDate") })}</p>
+					{t("termsBody")
+						.split("\n\n")
+						.map((paragraph) => (
+							<p key={paragraph.slice(0, 24)}>{paragraph}</p>
+						))}
+				</div>
+			</details>
 			<div className="about-block">
 				<h3>{t("feedback")}</h3>
 				<p>

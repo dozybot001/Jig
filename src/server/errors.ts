@@ -18,5 +18,6 @@ export const notFound = (what: string, id: string) =>
 export const invalid = (message: string, field?: string) =>
 	new JigError("invalid-request", 400, message, field ? { field } : undefined);
 
-export const conflict = (message: string, details?: Record<string, unknown>) =>
-	new JigError("conflict", 409, message, details);
+/** A request that does not fit the current state; `code` lets the interface explain it in either language. */
+export const conflict = (message: string, details?: Record<string, unknown>, code = "conflict") =>
+	new JigError(code, 409, message, details);

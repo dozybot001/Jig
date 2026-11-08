@@ -5,13 +5,22 @@ export class ApiError extends Error {
 	readonly code: string;
 	readonly requestId: string | undefined;
 	readonly field: string | undefined;
+	readonly provider: string | undefined;
 
-	constructor(status: number, code: string, message: string, requestId?: string, field?: string) {
+	constructor(
+		status: number,
+		code: string,
+		message: string,
+		requestId?: string,
+		field?: string,
+		provider?: string,
+	) {
 		super(message);
 		this.status = status;
 		this.code = code;
 		this.requestId = requestId;
 		this.field = field;
+		this.provider = provider;
 	}
 }
 
@@ -21,6 +30,7 @@ interface Problem {
 	detail?: string;
 	requestId?: string;
 	field?: string;
+	provider?: string;
 }
 
 export async function api<T = unknown>(
@@ -59,6 +69,7 @@ export async function api<T = unknown>(
 			problem.detail ?? problem.title ?? response.statusText,
 			problem.requestId ?? response.headers.get("X-Request-Id") ?? undefined,
 			problem.field,
+			problem.provider,
 		);
 	}
 	return (text ? JSON.parse(text) : undefined) as T;

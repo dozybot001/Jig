@@ -10,7 +10,7 @@ import {
 	useState,
 } from "react";
 import { ApiError } from "../api.ts";
-import { t } from "../i18n.ts";
+import { type MessageKey, t } from "../i18n.ts";
 
 /** Places a top-layer popover next to its trigger, flipping above when there is no room below (spec 5.9). */
 function place(popover: HTMLElement, trigger: HTMLElement, width?: number): void {
@@ -89,20 +89,68 @@ export function useAction<A extends unknown[]>(action: (...args: A) => Promise<u
 	return { run, busy, error, setError };
 }
 
+const FIELD_MESSAGES: Record<string, MessageKey> = {
+	name: "err_field_name",
+	cwd: "err_field_cwd",
+	text: "err_field_text",
+	decision: "err_field_decision",
+	answer: "err_field_answer",
+	options: "err_field_options",
+	key: "err_field_key",
+	id: "err_field_id",
+	baseUrl: "err_field_baseUrl",
+	models: "err_field_models",
+	rules: "err_field_rules",
+	model: "err_field_model",
+	provider: "err_field_model",
+};
+
+const CODE_MESSAGES: Record<string, MessageKey> = {
+	network: "err_network",
+	"sign-in-required": "err_signin",
+	"invalid-login-token": "err_signin",
+	"not-found": "err_notFound",
+	"internal-error": "err_internal",
+	"session-busy": "err_sessionBusy",
+	"session-archived": "err_sessionArchived",
+	"nothing-to-continue": "err_nothingToContinue",
+	"already-answered": "err_alreadyAnswered",
+	"already-delivered": "err_alreadyDelivered",
+};
+
+/** What went wrong and what to do, in the interface language (spec 4.1, 12.2); server text is a fallback. */
+export function describeError(error: unknown): string {
+	if (!(error instanceof ApiError)) return t("err_unknown");
+	if (error.code === "missing-api-key")
+		return t("err_missingKey", { provider: error.provider ?? "" });
+	if (error.code === "conflict" && error.field === "name") return t("nameTaken");
+	if (error.field && FIELD_MESSAGES[error.field])
+		return t(FIELD_MESSAGES[error.field] as MessageKey);
+	const known = CODE_MESSAGES[error.code];
+	if (known) return t(known);
+	if (error.status === 400 || error.status === 422) return t("err_invalid");
+	return t("err_unknown");
+}
+
 export function ErrorBox({ error }: { error: unknown }) {
+	const [copied, setCopied] = useState(false);
 	if (!error) return null;
-	const message =
-		error instanceof ApiError && error.code === "network"
-			? t("connectionLost")
-			: (error as Error).message;
 	const requestId = error instanceof ApiError ? error.requestId : undefined;
 	return (
 		<div className="error-box" role="alert">
 			<strong>{t("errorTitle")}</strong>
-			<span>{message}</span>
+			<span>{describeError(error)}</span>
 			{requestId && (
-				<span className="hint">
+				<span className="hint error-id">
 					{t("requestId")}: <code className="error-code">{requestId}</code>
+					<Button
+						variant="ghost"
+						onClick={() => {
+							void navigator.clipboard?.writeText(requestId).then(() => setCopied(true));
+						}}
+					>
+						{copied ? t("copied") : t("copyRequestId")}
+					</Button>
 				</span>
 			)}
 		</div>
@@ -186,7 +234,7 @@ export function Toggletip({ label, text }: { label: string; text: string }) {
 				ref={button}
 				type="button"
 				className="info-button"
-				aria-label={`${label} – ${t("more")}`}
+				aria-label={t("infoAbout", { label })}
 				aria-expanded={open}
 				aria-describedby={open ? id : undefined}
 				onClick={() => setOpen((value) => !value)}
@@ -519,6 +567,7 @@ export function Field({
 	info,
 	htmlFor,
 	labelId,
+	errorId,
 }: {
 	label: string;
 	children: ReactNode;
@@ -526,6 +575,8 @@ export function Field({
 	info?: string;
 	htmlFor?: string;
 	labelId?: string;
+	/** Give the input `aria-describedby={errorId}` so the error is read with it (spec 18.3). */
+	errorId?: string;
 }) {
 	return (
 		<div className="field">
@@ -536,7 +587,11 @@ export function Field({
 				{info && <Toggletip label={label} text={info} />}
 			</span>
 			{children}
-			{error && <span className="field-error">{error}</span>}
+			{error && (
+				<span id={errorId} className="field-error">
+					{error}
+				</span>
+			)}
 		</div>
 	);
 }
