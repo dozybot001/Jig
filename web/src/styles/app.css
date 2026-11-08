@@ -1620,8 +1620,8 @@ body.scroll-locked {
 	font-size: var(--fs-s);
 }
 
+/* Settings now live in dialogs: sections take the dialog's full width. */
 .settings-section {
-	max-width: 720px;
 	display: grid;
 	gap: 20px;
 }
@@ -1641,7 +1641,7 @@ body.scroll-locked {
 	gap: 8px;
 	align-items: center;
 	padding: 10px 0;
-	border-bottom: 1px solid var(--divider);
+	border-bottom: 1px solid var(--border);
 }
 .provider-key {
 	display: grid;
@@ -1689,8 +1689,7 @@ body.scroll-locked {
 
 /* About: lockup and version, two short paragraphs, then one list of the publisher's details. */
 .about {
-	max-width: 640px;
-	gap: 28px;
+	gap: 24px;
 }
 .about-head {
 	display: grid;
@@ -1711,7 +1710,7 @@ body.scroll-locked {
 }
 .about-list {
 	display: grid;
-	border: 1px solid var(--divider);
+	border: 1px solid var(--border);
 	border-radius: var(--radius-l);
 	overflow: hidden;
 }
@@ -1724,7 +1723,7 @@ body.scroll-locked {
 	min-height: 48px;
 	padding: 0 16px;
 	border: none;
-	border-top: 1px solid var(--divider);
+	border-top: 1px solid var(--border);
 	background: none;
 	color: var(--text);
 	font-size: var(--fs-m);
