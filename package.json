@@ -27,6 +27,8 @@
 		"@earendil-works/pi-ai": "1.5.0",
 		"@hono/node-server": "2.1.6",
 		"@napi-rs/keyring": "2.1.2",
-		"hono": "4.13.17"
+		"diff": "9.0.0",
+		"hono": "4.13.17",
+		"htmlparser2": "12.0.0"
 	}
 }

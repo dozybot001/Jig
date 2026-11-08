@@ -122,8 +122,8 @@ export interface PermissionRequest {
 	summary: string;
 	/** Must-confirm operations can only be allowed once (spec 21.2). */
 	mustConfirm: boolean;
-	/** The rule "allow and remember" would add; absent when remembering is not offered. */
-	rememberRule?: PermissionRule;
+	/** Rules "allow and remember" would add; absent when remembering is not offered. */
+	rememberRules?: PermissionRule[];
 	reason?: string;
 }
 
