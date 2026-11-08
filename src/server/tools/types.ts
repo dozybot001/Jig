@@ -1,0 +1,80 @@
+import type { ImageBlock, JsonObject, TextBlock } from "../../shared/messages.ts";
+import type { Session, Todo } from "../../shared/types.ts";
+import type { Subject } from "../permissions/engine.ts";
+import type { Jobs } from "./jobs.ts";
+import type { ReadState } from "./read-state.ts";
+
+export interface ToolResult {
+	content: (TextBlock | ImageBlock)[];
+	isError?: boolean;
+	/** Data for the interface only, such as a diff; never sent to the model. */
+	detail?: JsonObject;
+}
+
+export interface ToolContext {
+	session: Session;
+	signal: AbortSignal;
+	readState: ReadState;
+	jobs: Jobs;
+	/** Where long outputs are written; inside Jig's data directory. */
+	tmpDir: string;
+	acceptsImages: boolean;
+	version: string;
+	/** Live output for the interface while the tool runs. */
+	output(text: string): void;
+	setTodos(todos: Todo[]): void;
+	/** Asks the person a question in Jig and waits for the answer. */
+	ask(question: string, options?: string[]): Promise<string>;
+}
+
+export interface ToolDefinition {
+	name: string;
+	/** Jig's own wording (AGENTS.md: no text copied from other products). */
+	description: string;
+	/** JSON Schema of the arguments. */
+	parameters: JsonObject;
+	/** Read-only tools in one batch run in parallel; any other tool makes the batch sequential. */
+	readOnly: boolean;
+	/** Offered only to sessions with a working folder; chats get the rest. */
+	needsFolder: boolean;
+	/** What the call touches, for the permission check. Throws ToolInputError on bad arguments. */
+	subject(args: JsonObject, session: Session): Subject;
+	run(args: JsonObject, ctx: ToolContext): Promise<ToolResult>;
+}
+
+/** Bad arguments from the model; reported back to it as an error result. */
+export class ToolInputError extends Error {}
+
+export const text = (value: string): TextBlock => ({ type: "text", text: value });
+
+export function errorResult(message: string): ToolResult {
+	return { content: [text(message)], isError: true };
+}
+
+export function str(args: JsonObject, key: string, required: true): string;
+export function str(args: JsonObject, key: string, required?: false): string | undefined;
+export function str(args: JsonObject, key: string, required = false): string | undefined {
+	const value = args[key];
+	if (value === undefined || value === null) {
+		if (required) throw new ToolInputError(`Missing argument: ${key}.`);
+		return undefined;
+	}
+	if (typeof value !== "string") throw new ToolInputError(`${key} must be a string.`);
+	return value;
+}
+
+export function int(args: JsonObject, key: string, min: number, max: number): number | undefined {
+	const value = args[key];
+	if (value === undefined || value === null) return undefined;
+	if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
+		throw new ToolInputError(`${key} must be a whole number from ${min} to ${max}.`);
+	}
+	return value;
+}
+
+export function bool(args: JsonObject, key: string): boolean | undefined {
+	const value = args[key];
+	if (value === undefined || value === null) return undefined;
+	if (typeof value !== "boolean") throw new ToolInputError(`${key} must be true or false.`);
+	return value;
+}
