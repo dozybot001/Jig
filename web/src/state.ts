@@ -16,6 +16,14 @@ export interface Settings {
 	defaultRules: PermissionRule[];
 	theme: "system" | "light" | "dark";
 	language: "system" | "zh" | "en";
+	workspaces: Workspace[];
+}
+
+/** A saved working folder. */
+export interface Workspace {
+	id: string;
+	name: string;
+	path: string;
 }
 
 export interface ProviderSummary {
@@ -70,6 +78,8 @@ export interface AppState {
 	/** The main area shows a session, or the settings page. */
 	view: "session" | "settings";
 	settingsTab: "general" | "providers" | "rules" | "about";
+	/** A folder the home page should preselect, set when you open a workspace from the sidebar. */
+	homeFolder: string | null;
 }
 
 let state: AppState = {
@@ -89,6 +99,7 @@ let state: AppState = {
 	hasArchived: false,
 	view: "session",
 	settingsTab: "general",
+	homeFolder: null,
 };
 
 const listeners = new Set<() => void>();

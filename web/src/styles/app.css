@@ -346,6 +346,36 @@ a {
 	gap: 2px;
 	font-weight: 600;
 }
+.field-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.folder-box {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-height: 52px;
+	padding: 0 14px;
+	border: 1px dashed var(--control-strong);
+	border-radius: var(--radius);
+	color: var(--text-3);
+}
+.folder-box:focus-within {
+	border-style: solid;
+}
+.folder-box input {
+	flex: 1;
+	min-width: 0;
+	border: none;
+	outline: none;
+	background: transparent;
+	color: var(--text);
+}
+.folder-box input::placeholder {
+	color: var(--text-3);
+}
 .field-error {
 	color: var(--danger);
 	font-size: var(--fs-s);
@@ -772,6 +802,9 @@ body.scroll-locked {
 	width: 12px;
 	height: 12px;
 	color: var(--text-3);
+}
+.workspace-empty {
+	color: var(--text-2);
 }
 .session-row-editing {
 	grid-template-columns: 16px minmax(0, 1fr);
@@ -1376,10 +1409,6 @@ body.scroll-locked {
 }
 .composer-box textarea::placeholder {
 	color: var(--text-3);
-}
-.folder-input {
-	margin: 0 4px 4px;
-	width: calc(100% - 8px);
 }
 .composer-bar {
 	display: flex;

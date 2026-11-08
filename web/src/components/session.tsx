@@ -13,7 +13,7 @@ import {
 	withdrawQueued,
 } from "../actions.ts";
 import { formatCost, formatNumber, t, useLang } from "../i18n.ts";
-import { type ModelInfo, type TranscriptState, useAppState } from "../state.ts";
+import { type ModelInfo, setState, type TranscriptState, useAppState } from "../state.ts";
 import { NewSessionDialog } from "./dialogs.tsx";
 import {
 	ArrowUpIcon,
@@ -28,6 +28,7 @@ import {
 } from "./icons.tsx";
 import { Transcript } from "./transcript.tsx";
 import { Button, ErrorBox, Select, useAction } from "./ui.tsx";
+import { useWorkspaces, WorkspacePicker, workspaceLabel } from "./workspaces.tsx";
 
 export function useModels(provider: string): ModelInfo[] {
 	const models = useAppState((state) => state.models[provider]);
@@ -163,13 +164,10 @@ export function SidebarToggle({ className = "" }: { className?: string }) {
 	);
 }
 
-export function shortPath(path: string): string {
-	return path.replace(/^\/(Users|home)\/[^/]+(?=\/|$)/, "~");
-}
-
 /** The header names the session; its actions live in the composer and in the sidebar's row menu. */
 function SessionHeader({ session }: { session: Session }) {
 	useLang();
+	const workspaces = useWorkspaces();
 	const tokens =
 		session.usage.input + session.usage.output + session.usage.cacheRead + session.usage.cacheWrite;
 	return (
@@ -178,7 +176,8 @@ function SessionHeader({ session }: { session: Session }) {
 			<div className="session-title">
 				<h1>{session.name}</h1>
 				<span className="session-meta" title={session.cwd ?? undefined}>
-					{t(`status_${session.status}`)} · {session.cwd ? shortPath(session.cwd) : t("chat")} ·{" "}
+					{t(`status_${session.status}`)} ·{" "}
+					{session.cwd ? workspaceLabel(workspaces, session.cwd) : t("chat")} ·{" "}
 					{t("tokens", { n: formatNumber(tokens) })} ·{" "}
 					{t("cost", { n: formatCost(session.usage.cost) })}
 				</span>
@@ -296,14 +295,9 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 	const models = useModels(session.provider);
 	const info = models.find((m) => m.id === session.model);
 
-	const recent = useRecentFolders();
-	const [typingFolder, setTypingFolder] = useState(false);
-	const [folderDraft, setFolderDraft] = useState("");
-	// A folder makes it a code session, none makes it a chat; the switch applies from the next turn.
+	// A workspace makes it a code session, none makes it a chat; the switch applies from the next turn.
 	const switchFolder = useAction(async (cwd: string | null) => {
 		await updateSession(session.id, { cwd });
-		setTypingFolder(false);
-		setFolderDraft("");
 	});
 	const sendLabel = working ? t("queueSend") : t("send");
 	return (
@@ -333,38 +327,12 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 							}
 						}}
 					/>
-					{typingFolder && (
-						<input
-							className="input folder-input"
-							value={folderDraft}
-							placeholder={t("folderPath")}
-							aria-label={t("workingFolder")}
-							spellCheck={false}
-							onChange={(event) => setFolderDraft(event.target.value)}
-							onKeyDown={(event) => {
-								if (event.key === "Escape") setTypingFolder(false);
-								if (event.key === "Enter" && !event.nativeEvent.isComposing && folderDraft.trim()) {
-									event.preventDefault();
-									void switchFolder.run(folderDraft.trim());
-								}
-							}}
-						/>
-					)}
 					<div className="composer-bar">
 						<div className="composer-chips">
-							<Select
-								label={t("workingFolder")}
-								value={typingFolder ? OTHER_FOLDER : (session.cwd ?? "")}
-								options={folderOptions(recent, session.cwd)}
+							<WorkspacePicker
+								value={session.cwd}
 								busy={switchFolder.busy}
-								onChange={(value) => {
-									if (value === OTHER_FOLDER) {
-										setTypingFolder(true);
-										return;
-									}
-									setTypingFolder(false);
-									void switchFolder.run(value || null);
-								}}
+								onChange={(cwd) => void switchFolder.run(cwd)}
 							/>
 							<ModelPicker
 								provider={session.provider}
@@ -488,32 +456,6 @@ const TEMPLATES: { key: TemplateKey; icon: ReactNode }[] = [
 	{ key: "chat", icon: <ChatIcon /> },
 ];
 
-/** "Another folder…" in the folder choice; real choices are absolute or ~/ paths. */
-const OTHER_FOLDER = "other";
-
-/** Folders of recent sessions, newest first: the quick choices for a session's folder. */
-function useRecentFolders(): string[] {
-	const sessions = useAppState((state) => state.sessions);
-	return [
-		...new Set(
-			Object.values(sessions)
-				.sort((a, b) => b.lastActivityAt - a.lastActivityAt)
-				.map((session) => session.cwd)
-				.filter((cwd): cwd is string => Boolean(cwd)),
-		),
-	].slice(0, 5);
-}
-
-/** No folder (a chat), another folder, then recent folders (code). */
-function folderOptions(recent: string[], current: string | null) {
-	const list = current && !recent.includes(current) ? [current, ...recent] : recent;
-	return [
-		{ value: "", label: t("noFolder") },
-		{ value: OTHER_FOLDER, label: t("otherFolder") },
-		...list.map((path) => ({ value: path, label: shortPath(path), group: t("recentFolders") })),
-	];
-}
-
 /** A short session name from the first line of the first message; names may not hold @ or control characters. */
 function nameFrom(text: string): string {
 	const line = (text.trim().split("\n")[0] ?? "").replace(/[@\p{Cc}]/gu, "").trim();
@@ -528,10 +470,9 @@ function nameFrom(text: string): string {
 function HomeView() {
 	useLang();
 	const settings = useAppState((state) => state.settings);
-	const recent = useRecentFolders();
+	const homeFolder = useAppState((state) => state.homeFolder);
 	const [text, setText] = useState("");
-	const [folder, setFolder] = useState("");
-	const [typingFolder, setTypingFolder] = useState(false);
+	const [folder, setFolder] = useState<string | null>(null);
 	const [template, setTemplate] = useState<TemplateKey | null>(null);
 	const [model, setModel] = useState(
 		() =>
@@ -546,8 +487,15 @@ function HomeView() {
 	useEffect(() => {
 		ref.current?.focus();
 	}, [ref]);
+	// Opening a workspace from the sidebar lands here with that workspace chosen.
+	useEffect(() => {
+		if (!homeFolder) return;
+		setFolder(homeFolder);
+		setState({ homeFolder: null });
+		ref.current?.focus();
+	}, [homeFolder, ref]);
 	const role = template === "code" || template === "docs" ? template : null;
-	const missingFolder = role !== null && !folder.trim();
+	const missingFolder = role !== null && !folder;
 	const start = useAction(async () => {
 		const value = text.trim();
 		if (!value || missingFolder) return;
@@ -556,7 +504,7 @@ function HomeView() {
 				name: freeName(nameFrom(value) || t("template_chat")),
 				kind: "task",
 				groupId: null,
-				cwd: folder.trim() || null,
+				cwd: folder,
 				responsibility: role ? t(`template_${role}_role`) : "",
 				...model,
 			},
@@ -566,10 +514,7 @@ function HomeView() {
 	const pickTemplate = (key: TemplateKey) => {
 		const next = template === key ? null : key;
 		setTemplate(next);
-		if (next === "chat") {
-			setFolder("");
-			setTypingFolder(false);
-		}
+		if (next === "chat") setFolder(null);
 		ref.current?.focus();
 	};
 	return (
@@ -595,27 +540,9 @@ function HomeView() {
 							}
 						}}
 					/>
-					{typingFolder && (
-						<input
-							className="input folder-input"
-							value={folder}
-							placeholder={t("folderPath")}
-							aria-label={t("workingFolder")}
-							spellCheck={false}
-							onChange={(event) => setFolder(event.target.value)}
-						/>
-					)}
 					<div className="composer-bar">
 						<div className="composer-chips">
-							<Select
-								label={t("workingFolder")}
-								value={typingFolder ? OTHER_FOLDER : folder}
-								options={folderOptions(recent, null)}
-								onChange={(value) => {
-									setTypingFolder(value === OTHER_FOLDER);
-									setFolder(value === OTHER_FOLDER ? "" : value);
-								}}
-							/>
+							<WorkspacePicker value={folder} onChange={setFolder} />
 							<ModelPicker {...model} onChange={(patch) => setModel((m) => ({ ...m, ...patch }))} />
 						</div>
 						<div className="composer-actions">

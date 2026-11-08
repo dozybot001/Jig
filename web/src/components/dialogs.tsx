@@ -21,6 +21,7 @@ import {
 	Toggletip,
 	useAction,
 } from "./ui.tsx";
+import { WorkspacePicker } from "./workspaces.tsx";
 
 const TOOLS = ["*", "read", "write", "edit", "glob", "grep", "shell", "web_fetch"];
 
@@ -199,16 +200,8 @@ export function NewSessionDialog({
 					onChange={(event) => setResponsibility(event.target.value)}
 				/>
 			</Field>
-			<Field label={t("workingFolder")} htmlFor={ids.cwd} error={cwdError} errorId={ids.cwdError}>
-				<input
-					id={ids.cwd}
-					className="input"
-					value={cwd}
-					placeholder={t("folderPlaceholder")}
-					aria-invalid={cwdError ? "true" : undefined}
-					aria-describedby={cwdError ? ids.cwdError : undefined}
-					onChange={(event) => setCwd(event.target.value)}
-				/>
+			<Field label={t("workingFolder")} error={cwdError} errorId={ids.cwdError}>
+				<WorkspacePicker value={cwd || null} onChange={(path) => setCwd(path ?? "")} />
 			</Field>
 			<ModelPicker
 				{...model}

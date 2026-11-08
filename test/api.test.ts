@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { realpathSync } from "node:fs";
+import { realpathSync, rmSync } from "node:fs";
 import { describe, test } from "node:test";
+import { pickFolder } from "../src/server/folder-picker.ts";
 import { createApp } from "../src/server/http/app.ts";
 import { problemType } from "../src/server/http/problem.ts";
 import { newStore, tempDir } from "./helpers/store.ts";
@@ -140,6 +141,56 @@ describe("api: sessions", () => {
 });
 
 describe("api: groups, settings, search", () => {
+	test("workspaces are saved folders: checked when added, kept when their folder goes away", async () => {
+		const { call } = setup();
+		const folder = realpathSync(tempDir("jig-ws-"));
+		const saved = await call("PATCH", "/api/settings", {
+			workspaces: [{ id: "w1", name: "Jig", path: folder }],
+		});
+		assert.equal(saved.status, 200);
+		assert.deepEqual((await saved.json()).workspaces, [{ id: "w1", name: "Jig", path: folder }]);
+
+		const missing = await call("PATCH", "/api/settings", {
+			workspaces: [{ id: "w2", name: "Nope", path: "/no/such/folder" }],
+		});
+		assert.equal(missing.status, 400);
+		assert.equal((await missing.json()).field, "workspaces");
+		const twice = await call("PATCH", "/api/settings", {
+			workspaces: [
+				{ id: "w1", name: "Jig", path: folder },
+				{ id: "w3", name: "Jig again", path: folder },
+			],
+		});
+		assert.equal(twice.status, 400);
+
+		rmSync(folder, { recursive: true });
+		const renamed = await call("PATCH", "/api/settings", {
+			workspaces: [{ id: "w1", name: "Jig 旧目录", path: folder }],
+		});
+		assert.equal(renamed.status, 200);
+		assert.equal((await renamed.json()).workspaces[0].name, "Jig 旧目录");
+	});
+
+	test("the folder picker returns the chosen folder, null on cancel, and refuses off macOS", async () => {
+		assert.equal(
+			await pickFolder("darwin", async () => "/Users/me/Projects/demo/\n"),
+			"/Users/me/Projects/demo",
+		);
+		const cancelled = async () => {
+			throw Object.assign(new Error("Command failed"), { stderr: "User canceled. (-128)" });
+		};
+		assert.equal(await pickFolder("darwin", cancelled), null);
+		await assert.rejects(
+			pickFolder("linux", async () => "/x"),
+			/cannot open a folder picker/,
+		);
+
+		const { store } = newStore();
+		const app = createApp({ store, log: () => {}, pickFolder: async () => "/tmp/picked" });
+		const response = await app.request("/api/folders/pick", { method: "POST" });
+		assert.deepEqual(await response.json(), { path: "/tmp/picked" });
+	});
+
 	test("groups can be created, renamed and deleted", async () => {
 		const { call } = setup();
 		const group = await (await call("POST", "/api/groups", { name: "产品" })).json();

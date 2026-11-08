@@ -3,26 +3,30 @@ import type { Group, Session } from "../../../src/shared/types.ts";
 import {
 	deleteGroup,
 	openSettings,
+	saveSettings,
 	selectSession,
 	toggleArchived,
 	updateSession,
 } from "../actions.ts";
 import { api } from "../api.ts";
 import { formatAgo, t, useLang } from "../i18n.ts";
-import { useAppState } from "../state.ts";
+import { setState, useAppState, type Workspace } from "../state.ts";
 import { Snippet } from "./content.tsx";
 import { ConfirmDialog, GroupDialog, NewSessionDialog, SessionSettingsDialog } from "./dialogs.tsx";
 import {
 	ChatIcon,
 	CodeIcon,
 	ComposeIcon,
-	FolderPlusIcon,
+	FolderIcon,
 	GearIcon,
+	GroupPlusIcon,
 	JigMark,
 	PinIcon,
+	PlusIcon,
 	SearchIcon,
 } from "./icons.tsx";
 import { Button, describeError, Menu, useAction } from "./ui.tsx";
+import { shortPath, useWorkspaces, WorkspaceDialog } from "./workspaces.tsx";
 
 interface SearchResult {
 	sessions: Session[];
@@ -45,11 +49,21 @@ function useNow(): number {
 
 /**
  * Renaming in place: the row's name becomes a field. Enter or clicking away saves, Escape cancels.
- * The session keeps its id, so messages to it still arrive (blueprint 7.1).
+ * A renamed session keeps its id, so messages to it still arrive (blueprint 7.1).
  */
-function RenameRow({ session, onDone }: { session: Session; onDone: () => void }) {
+function InlineRename({
+	icon,
+	value: initial,
+	onSave,
+	onDone,
+}: {
+	icon: React.ReactNode;
+	value: string;
+	onSave: (name: string) => Promise<unknown>;
+	onDone: () => void;
+}) {
 	useLang();
-	const [value, setValue] = useState(session.name);
+	const [value, setValue] = useState(initial);
 	const input = useRef<HTMLInputElement>(null);
 	// Escape closes the field; the blur that follows must not save what was typed.
 	const cancelled = useRef(false);
@@ -59,13 +73,13 @@ function RenameRow({ session, onDone }: { session: Session; onDone: () => void }
 	}, []);
 	const save = useAction(async () => {
 		const name = value.trim();
-		if (name && name !== session.name) await updateSession(session.id, { name });
+		if (name && name !== initial) await onSave(name);
 		onDone();
 	});
 	return (
 		<div className="session-row session-row-editing">
 			<span className="session-icon" aria-hidden="true">
-				{session.cwd ? <CodeIcon /> : <ChatIcon />}
+				{icon}
 			</span>
 			<input
 				ref={input}
@@ -95,6 +109,111 @@ function RenameRow({ session, onDone }: { session: Session; onDone: () => void }
 				</span>
 			)}
 		</div>
+	);
+}
+
+/** A saved workspace: click to start a session there, double-click or the menu to rename. */
+function WorkspaceRow({ workspace, all }: { workspace: Workspace; all: Workspace[] }) {
+	useLang();
+	const [renaming, setRenaming] = useState(false);
+	return (
+		<div className="session-item">
+			{renaming ? (
+				<InlineRename
+					icon={<FolderIcon />}
+					value={workspace.name}
+					onSave={(name) =>
+						saveSettings({
+							workspaces: all.map((w) => (w.id === workspace.id ? { ...w, name } : w)),
+						})
+					}
+					onDone={() => setRenaming(false)}
+				/>
+			) : (
+				<button
+					type="button"
+					className="session-row"
+					title={workspace.path}
+					onClick={() => {
+						closeDrawer();
+						setState({ homeFolder: workspace.path });
+						void selectSession(null);
+					}}
+					onDoubleClick={() => setRenaming(true)}
+				>
+					<span className="session-icon" aria-hidden="true">
+						<FolderIcon />
+					</span>
+					<span className="session-name">
+						{workspace.name}
+						<span className="visually-hidden"> · {shortPath(workspace.path)}</span>
+					</span>
+				</button>
+			)}
+			{!renaming && (
+				<span className="session-row-menu">
+					<Menu
+						label={`${workspace.name} – ${t("more")}`}
+						items={[
+							{ label: t("rename"), onSelect: () => setRenaming(true) },
+							{
+								label: t("removeFromList"),
+								onSelect: () =>
+									void saveSettings({ workspaces: all.filter((w) => w.id !== workspace.id) }),
+							},
+						]}
+					/>
+				</span>
+			)}
+		</div>
+	);
+}
+
+/** Workspaces first in the sidebar, as Claude lists projects above recent work. */
+function Workspaces() {
+	useLang();
+	const workspaces = useWorkspaces();
+	const [creating, setCreating] = useState(false);
+	return (
+		<section aria-label={t("workspaces")}>
+			<div className="group-heading">
+				<span>{t("workspaces")}</span>
+				<Button
+					variant="icon"
+					aria-label={t("newWorkspace")}
+					title={t("newWorkspace")}
+					onClick={() => setCreating(true)}
+				>
+					<PlusIcon />
+				</Button>
+			</div>
+			{workspaces.length === 0 ? (
+				<button
+					type="button"
+					className="session-row workspace-empty"
+					onClick={() => setCreating(true)}
+				>
+					<span className="session-icon" aria-hidden="true">
+						<PlusIcon />
+					</span>
+					<span className="session-name">{t("addWorkspace")}</span>
+				</button>
+			) : (
+				workspaces.map((workspace) => (
+					<WorkspaceRow key={workspace.id} workspace={workspace} all={workspaces} />
+				))
+			)}
+			{creating && (
+				<WorkspaceDialog
+					onClose={() => setCreating(false)}
+					onCreated={(path) => {
+						closeDrawer();
+						setState({ homeFolder: path });
+						void selectSession(null);
+					}}
+				/>
+			)}
+		</section>
 	);
 }
 
@@ -131,7 +250,12 @@ function SessionRow({
 	return (
 		<div className="session-item">
 			{renaming ? (
-				<RenameRow session={session} onDone={() => setRenaming(false)} />
+				<InlineRename
+					icon={session.cwd ? <CodeIcon /> : <ChatIcon />}
+					value={session.name}
+					onSave={(name) => updateSession(session.id, { name })}
+					onDone={() => setRenaming(false)}
+				/>
 			) : (
 				<button
 					type="button"
@@ -344,7 +468,7 @@ export function Sidebar() {
 					title={t("newGroup")}
 					onClick={() => setDialog({ kind: "group" })}
 				>
-					<FolderPlusIcon />
+					<GroupPlusIcon />
 				</Button>
 			</div>
 			<div className="sidebar-nav">
@@ -362,6 +486,7 @@ export function Sidebar() {
 				<Search />
 			</div>
 			<div className="sidebar-list">
+				<Workspaces />
 				{active.length === 0 && <p className="sidebar-empty">{t("emptySidebar")}</p>}
 				{groups.map((group) => (
 					<section key={group.id} aria-label={group.name}>

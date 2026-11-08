@@ -102,6 +102,7 @@ const FIELD_MESSAGES: Record<string, MessageKey> = {
 	baseUrl: "err_field_baseUrl",
 	models: "err_field_models",
 	rules: "err_field_rules",
+	workspaces: "err_field_workspaces",
 	model: "err_field_model",
 	provider: "err_field_model",
 };
@@ -117,6 +118,8 @@ const CODE_MESSAGES: Record<string, MessageKey> = {
 	"nothing-to-continue": "err_nothingToContinue",
 	"already-answered": "err_alreadyAnswered",
 	"already-delivered": "err_alreadyDelivered",
+	"not-supported": "err_noPicker",
+	"picker-failed": "err_pickerFailed",
 };
 
 /** What went wrong and what to do, in the interface language (spec 4.1, 12.2); server text is a fallback. */

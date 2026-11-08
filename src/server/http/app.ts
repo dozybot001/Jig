@@ -26,6 +26,8 @@ export interface AppOptions {
 	webRoot?: string;
 	/** Short commit of the running code, shown as the build number (spec 2.2). */
 	build?: string | null;
+	/** Replaces the system folder picker; tests use it so they never open a window. */
+	pickFolder?: () => Promise<string | null>;
 }
 
 const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Jig</title>
@@ -56,6 +58,7 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 		api({
 			store,
 			...(gateway ? { checkModel: (p: string, m: string) => gateway.check(p, m) } : {}),
+			...(options.pickFolder ? { pickFolder: options.pickFolder } : {}),
 		}),
 	);
 	if (gateway) app.route("/api", providerRoutes(store, gateway));

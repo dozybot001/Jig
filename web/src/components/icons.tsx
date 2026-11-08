@@ -3,8 +3,9 @@ import {
 	ChevronRight,
 	Code,
 	FileText,
-	FolderPlus,
+	Folder,
 	Info,
+	ListPlus,
 	Menu,
 	MessageCircle,
 	Minimize2,
@@ -25,7 +26,9 @@ import {
 const props = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
 
 export const PlusIcon = () => <Plus {...props} />;
-export const FolderPlusIcon = () => <FolderPlus {...props} />;
+export const FolderIcon = () => <Folder {...props} />;
+/** New group: groups are lists of sessions, not folders. */
+export const GroupPlusIcon = () => <ListPlus {...props} />;
 export const GearIcon = () => <Settings {...props} />;
 export const MenuIcon = () => <Menu {...props} />;
 export const CodeIcon = () => <Code {...props} />;

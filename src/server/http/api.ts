@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import type { PermissionRule, Session, ThinkingLevel, Transcript } from "../../shared/types.ts";
 import { SESSION_KINDS, THINKING_LEVELS } from "../../shared/types.ts";
 import { invalid } from "../errors.ts";
+import { pickFolder } from "../folder-picker.ts";
 import type { SessionPatch, Store } from "../store.ts";
 import { idempotent } from "./idempotency.ts";
 import {
@@ -29,6 +30,13 @@ export interface DefaultModel {
 	thinking: ThinkingLevel;
 }
 
+/** A saved working folder, offered first when you pick a folder for a session. */
+export interface Workspace {
+	id: string;
+	name: string;
+	path: string;
+}
+
 export const SETTING_DEFAULTS = {
 	defaultModel: {
 		provider: "deepseek",
@@ -38,6 +46,7 @@ export const SETTING_DEFAULTS = {
 	defaultRules: [] as PermissionRule[],
 	theme: "system" as "system" | "light" | "dark",
 	language: "system" as "system" | "zh" | "en",
+	workspaces: [] as Workspace[],
 };
 
 export type Settings = typeof SETTING_DEFAULTS;
@@ -48,6 +57,7 @@ export function readSettings(store: Store): Settings {
 		defaultRules: store.getSetting("defaultRules", SETTING_DEFAULTS.defaultRules),
 		theme: store.getSetting("theme", SETTING_DEFAULTS.theme),
 		language: store.getSetting("language", SETTING_DEFAULTS.language),
+		workspaces: store.getSetting("workspaces", SETTING_DEFAULTS.workspaces),
 	};
 }
 
@@ -57,6 +67,8 @@ export type ModelCheck = (provider: string, model: string) => void;
 export interface ApiDeps {
 	store: Store;
 	checkModel?: ModelCheck;
+	/** Opens the system folder picker; replaced in tests so they never open a window. */
+	pickFolder?: () => Promise<string | null>;
 }
 
 const RULE_EFFECTS = ["allow", "ask", "deny"] as const;
@@ -72,6 +84,52 @@ export function parseRules(value: unknown[]): PermissionRule[] {
 		const pattern = optString(fields, "pattern", 1000);
 		if (!effect || !tool) throw invalid(`Rule ${index + 1} needs an effect and a tool.`, "rules");
 		return pattern ? { effect, tool, pattern } : { effect, tool };
+	});
+}
+
+const MAX_WORKSPACES = 50;
+
+/**
+ * Checks the saved workspaces. A new or moved one must point at an existing folder; one already saved
+ * with the same path is kept as it is, so a folder that has since gone away can still be renamed or
+ * removed.
+ */
+export function parseWorkspaces(value: unknown[], saved: Workspace[]): Workspace[] {
+	if (value.length > MAX_WORKSPACES) {
+		throw invalid(`Up to ${MAX_WORKSPACES} workspaces can be saved.`, "workspaces");
+	}
+	const known = new Map(saved.map((workspace) => [workspace.id, workspace]));
+	const paths = new Set<string>();
+	return value.map((item, index) => {
+		if (!item || typeof item !== "object" || Array.isArray(item)) {
+			throw invalid(`Workspace ${index + 1} must be an object.`, "workspaces");
+		}
+		const fields = item as Fields;
+		const id = reqString(fields, "id", 64);
+		if (!/^[\w-]+$/.test(id))
+			throw invalid(`Workspace ${index + 1} has an invalid id.`, "workspaces");
+		const name = reqString(fields, "name", 60).trim();
+		if (!name || /\p{Cc}/u.test(name)) {
+			throw invalid(
+				`Workspace ${index + 1} needs a name without control characters.`,
+				"workspaces",
+			);
+		}
+		const requested = reqString(fields, "path", 4096);
+		const previous = known.get(id);
+		let path: string;
+		if (previous && previous.path === requested) {
+			path = previous.path;
+		} else {
+			try {
+				path = resolveWorkingFolder(requested);
+			} catch (error) {
+				throw invalid((error as Error).message, "workspaces");
+			}
+		}
+		if (paths.has(path)) throw invalid(`${requested} is already a workspace.`, "workspaces");
+		paths.add(path);
+		return { id, name, path };
 	});
 }
 
@@ -98,6 +156,12 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 	// --- groups ---
 
 	app.get("/groups", (c) => c.json({ items: store.listGroups(), nextCursor: null }));
+
+	// The system folder picker, for choosing a workspace's folder (macOS; elsewhere a typed path).
+	app.post("/folders/pick", async (c) => {
+		const path = await (deps.pickFolder ?? (() => pickFolder()))();
+		return c.json({ path });
+	});
 
 	app.post("/groups", once, async (c) => {
 		const fields = await readJson(c);
@@ -286,6 +350,10 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		if (theme) store.setSetting("theme", theme);
 		const language = optEnum(fields, "language", ["system", "zh", "en"] as const);
 		if (language) store.setSetting("language", language);
+		const workspaces = optArray(fields, "workspaces");
+		if (workspaces) {
+			store.setSetting("workspaces", parseWorkspaces(workspaces, readSettings(store).workspaces));
+		}
 		return c.json(readSettings(store));
 	});
 
