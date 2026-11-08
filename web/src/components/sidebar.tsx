@@ -169,29 +169,32 @@ function SessionRow({
 					)}
 				</button>
 			)}
-			<span className="session-row-menu">
-				<Menu
-					label={`${session.name} – ${t("more")}`}
-					items={[
-						{
-							label: session.pinned ? t("unpin") : t("pin"),
-							onSelect: () => void updateSession(session.id, { pinned: !session.pinned }),
-						},
-						{ label: t("rename"), onSelect: () => setRenaming(true) },
-						{ label: t("sessionSettings"), onSelect: () => setSettingsOpen(true) },
-						...moves,
-						session.archivedAt
-							? {
-									label: t("unarchive"),
-									onSelect: () => void updateSession(session.id, { archived: false }),
-								}
-							: {
-									label: t("archive"),
-									onSelect: () => void updateSession(session.id, { archived: true }),
-								},
-					]}
-				/>
-			</span>
+			{/* While renaming, the field takes the whole row and the menu steps aside. */}
+			{!renaming && (
+				<span className="session-row-menu">
+					<Menu
+						label={`${session.name} – ${t("more")}`}
+						items={[
+							{
+								label: session.pinned ? t("unpin") : t("pin"),
+								onSelect: () => void updateSession(session.id, { pinned: !session.pinned }),
+							},
+							{ label: t("rename"), onSelect: () => setRenaming(true) },
+							{ label: t("sessionSettings"), onSelect: () => setSettingsOpen(true) },
+							...moves,
+							session.archivedAt
+								? {
+										label: t("unarchive"),
+										onSelect: () => void updateSession(session.id, { archived: false }),
+									}
+								: {
+										label: t("archive"),
+										onSelect: () => void updateSession(session.id, { archived: true }),
+									},
+						]}
+					/>
+				</span>
+			)}
 			{settingsOpen && (
 				<SessionSettingsDialog session={session} onClose={() => setSettingsOpen(false)} />
 			)}
