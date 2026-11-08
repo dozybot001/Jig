@@ -1504,45 +1504,68 @@ body.scroll-locked {
 	gap: 6px;
 	align-items: center;
 }
-.about-block {
+
+/* About: lockup and version, two short paragraphs, then one list of the publisher's details. */
+.about {
+	max-width: 640px;
+	gap: 28px;
+}
+.about-head {
 	display: grid;
-	gap: 4px;
-}
-.about-block h3 {
-	font-size: var(--fs-s);
-	font-weight: 600;
-	color: var(--text-3);
-}
-.about-block p {
-	margin: 0;
-}
-.publisher {
-	display: flex;
-	align-items: center;
 	gap: 8px;
 }
-.link-list {
-	display: grid;
+.about-version {
+	margin: 0;
+	color: var(--text-3);
+	font-size: var(--fs-s);
 }
-.link-row {
+.about-text {
+	display: grid;
+	gap: 12px;
+}
+.about-text p {
+	margin: 0;
+	line-height: 1.75;
+}
+.about-list {
+	display: grid;
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-l);
+	overflow: hidden;
+}
+.about-row {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 8px;
+	gap: 12px;
 	width: 100%;
-	min-height: 44px;
-	padding: 0 2px;
+	min-height: 48px;
+	padding: 0 16px;
 	border: none;
-	border-bottom: 1px solid var(--divider);
+	border-top: 1px solid var(--divider);
 	background: none;
 	color: var(--text);
+	font-size: var(--fs-m);
 	text-align: left;
+}
+.about-row:first-child {
+	border-top: none;
+}
+button.about-row {
 	cursor: pointer;
 }
 @media (hover: hover) {
-	.link-row:hover .chevron {
-		color: var(--text);
+	button.about-row:hover {
+		background: var(--hover);
 	}
+}
+.about-label {
+	color: var(--text-2);
+}
+.about-value {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
 }
 
 /* Scroll shadows (spec 9.7): a fade where more content lies beyond the edge. */

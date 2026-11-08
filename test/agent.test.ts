@@ -3,12 +3,13 @@ import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { SUMMARY_HEADING } from "../src/server/agent/context.ts";
+import { systemPrompt } from "../src/server/agent/prompt.ts";
 import { Agents } from "../src/server/agent/runner.ts";
 import { MemoryKeyStore } from "../src/server/keys.ts";
 import { ModelGateway } from "../src/server/model/gateway.ts";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "../src/server/model/testing.ts";
 import { PermissionEngine } from "../src/server/permissions/engine.ts";
-import type { Entry } from "../src/shared/types.ts";
+import type { Entry, Session } from "../src/shared/types.ts";
 import { newStore, tempDir } from "./helpers/store.ts";
 
 type Context = { messages: { role: string; content: unknown; toolsAdded?: { name: string }[] }[] };
@@ -289,5 +290,58 @@ describe("agent loop", () => {
 		await agents.whenIdle(session.id);
 		const tools = (contexts[0]?.messages[0]?.toolsAdded ?? []).map((tool) => tool.name).sort();
 		assert.deepEqual(tools, ["ask_user", "todo", "web_fetch"]);
+	});
+});
+
+describe("system prompt", () => {
+	const snapshot = (cwd: string | null) => ({
+		date: "2026-11-08",
+		platform: "test",
+		shell: "/bin/sh",
+		cwd,
+		git: null,
+		instructions: [],
+	});
+	const base = { name: "产品", responsibility: "负责 Jig 的产品设计。", cwd: "/tmp/demo" };
+
+	test("a standing session learns its role, its group and to keep lasting facts in files", () => {
+		const text = systemPrompt(
+			{ ...base, kind: "standing" } as Session,
+			snapshot("/tmp/demo"),
+			"Tenon",
+		);
+		assert.match(
+			text,
+			/^You are "产品", one of the agent sessions that make up the person's organization in Jig\./,
+		);
+		assert.match(text, /You belong to the group "Tenon"\./);
+		assert.match(text, /负责 Jig 的产品设计。/);
+		assert.match(text, /standing session: this role is yours for the long term/);
+		assert.match(text, /in files in your working folder/);
+		assert.match(text, /Stop for the person only for a decision that only they can make/);
+	});
+
+	test("a task session ends with a report; a chat without group or role mentions neither", () => {
+		const text = systemPrompt(
+			{ ...base, kind: "task", responsibility: "", cwd: null } as Session,
+			snapshot(null),
+		);
+		assert.match(text, /task session, opened for one job/);
+		assert.match(text, /the result \(done, given up or failed\)/);
+		assert.doesNotMatch(text, /You belong to the group/);
+		assert.doesNotMatch(text, /Your role, as the person wrote it/);
+		assert.match(text, /No working folder/);
+	});
+
+	test("the prompt sent with a turn names the session's group", async () => {
+		const { faux, store, agents, session, contexts, capture } = setup();
+		const group = store.createGroup("平台组");
+		store.updateSession(session.id, { groupId: group.id });
+		faux.setResponses([capture(fauxAssistantMessage("好的。"))]);
+		agents.send(session.id, "你好");
+		await agents.whenIdle(session.id);
+		// The model library hands the system prompt to the model as the first, "system" message.
+		const system = contexts[0]?.messages.find((message) => message.role === "system");
+		assert.match(String(system?.content ?? ""), /You belong to the group "平台组"\./);
 	});
 });

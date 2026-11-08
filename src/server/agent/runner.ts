@@ -365,7 +365,7 @@ export class Agents {
 					provider: session.provider,
 					model: model.id,
 					thinking: session.thinking,
-					systemPrompt: systemPrompt(session, snapshot),
+					systemPrompt: systemPrompt(session, snapshot, this.#groupName(session)),
 					messages: toModelMessages(this.#store.contextEntries(session.id)),
 					tools: specs(tools),
 					signal,
@@ -650,6 +650,12 @@ export class Agents {
 			this.#store.appendEntry(sessionId, userEntry(`[From Jig, not from the person] ${note}`));
 		}
 		return this.#store.deliverQueue(sessionId, userEntry).length > 0 || notes.length > 0;
+	}
+
+	/** The name of the session's group, for the system prompt. */
+	#groupName(session: Session): string | null {
+		if (!session.groupId) return null;
+		return this.#store.listGroups().find((group) => group.id === session.groupId)?.name ?? null;
 	}
 
 	#notice(sessionId: string, kind: Notice["kind"], text: string, data?: JsonObject): void {

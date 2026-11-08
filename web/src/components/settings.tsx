@@ -343,50 +343,61 @@ function About() {
 	useLang();
 	const health = useAppState((state) => state.health);
 	const [doc, setDoc] = useState<"privacy" | "terms" | null>(null);
-	const policy = (body: string) =>
+	const paragraphs = (body: string) =>
 		body.split("\n\n").map((paragraph) => <p key={paragraph.slice(0, 24)}>{paragraph}</p>);
 	return (
-		<section className="settings-section" aria-labelledby="settings-about">
+		<section className="settings-section about" aria-labelledby="settings-about">
 			<h2 id="settings-about" className="visually-hidden">
 				{t("about")}
 			</h2>
-			{/* Full lockup on the About page (spec 1.6), with a name that includes Tenon (1.7). */}
-			<div className="lockup" role="img" aria-label={t("lockupName")}>
-				<JigMark className="lockup-mark" size={22} />
-				<span className="lockup-word">
-					<span className="wordmark">Jig</span>
-					<img className="lockup-tenon" src="/icons/tenon-mark.svg" alt="" width={14} height={14} />
-				</span>
-			</div>
-			<p className="hint">
-				{t("version", { v: health?.version ?? "" })}
-				{health?.build ? ` · ${t("build", { b: health.build })}` : ""}
-			</p>
-			{policy(t("aboutBody"))}
-			<div className="about-block">
-				<h3>{t("publisher")}</h3>
-				<p className="publisher">
-					<img src="/icons/tenon-mark.svg" alt="" width={20} height={20} />
-					<strong>{t("publisherName")}</strong>
+			{/* In the order of spec 2.2: lockup, version, the text, publisher, website; then 2.3. */}
+			<div className="about-head">
+				{/* Full lockup on the About page (spec 1.6), with a name that includes Tenon (1.7). */}
+				<div className="lockup" role="img" aria-label={t("lockupName")}>
+					<JigMark className="lockup-mark" size={22} />
+					<span className="lockup-word">
+						<span className="wordmark">Jig</span>
+						<img
+							className="lockup-tenon"
+							src="/icons/tenon-mark.svg"
+							alt=""
+							width={14}
+							height={14}
+						/>
+					</span>
+				</div>
+				<p className="about-version">
+					{t("version", { v: health?.version ?? "" })}
+					{health?.build ? ` · ${t("build", { b: health.build })}` : ""}
 				</p>
 			</div>
-			<div className="about-block">
-				<h3>{t("website")}</h3>
-				<p>
+			<div className="about-text">{paragraphs(t("aboutBody"))}</div>
+			<div className="about-list">
+				<div className="about-row">
+					<span className="about-label">{t("publisher")}</span>
+					<span className="about-value">
+						<img src="/icons/tenon-mark.svg" alt="" width={18} height={18} />
+						<strong>{t("publisherName")}</strong>
+					</span>
+				</div>
+				<div className="about-row">
+					<span className="about-label">{t("website")}</span>
 					<a href="https://tenon.asia/" target="_blank" rel="noopener noreferrer">
 						tenon.asia
 					</a>
-				</p>
-			</div>
-			<div className="link-list">
-				<button type="button" className="link-row" onClick={() => setDoc("privacy")}>
+				</div>
+				<button type="button" className="about-row" onClick={() => setDoc("privacy")}>
 					{t("privacyPolicy")}
 					<ChevronIcon />
 				</button>
-				<button type="button" className="link-row" onClick={() => setDoc("terms")}>
+				<button type="button" className="about-row" onClick={() => setDoc("terms")}>
 					{t("terms")}
 					<ChevronIcon />
 				</button>
+				<div className="about-row">
+					<span className="about-label">{t("feedback")}</span>
+					<a href="mailto:support@tenonai.cn">support@tenonai.cn</a>
+				</div>
 			</div>
 			{doc && (
 				<Dialog
@@ -396,15 +407,9 @@ function About() {
 					footer={<Button onClick={() => setDoc(null)}>{t("close")}</Button>}
 				>
 					<p className="hint">{t("docVersion", { v: "1.0", date: t("policyDate") })}</p>
-					{policy(doc === "privacy" ? t("privacyPolicyBody") : t("termsBody"))}
+					{paragraphs(doc === "privacy" ? t("privacyPolicyBody") : t("termsBody"))}
 				</Dialog>
 			)}
-			<div className="about-block">
-				<h3>{t("feedback")}</h3>
-				<p>
-					<a href="mailto:support@tenonai.cn">support@tenonai.cn</a>
-				</p>
-			</div>
 		</section>
 	);
 }
