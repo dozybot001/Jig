@@ -2,7 +2,7 @@ import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { boot } from "./actions.ts";
 import { SessionView } from "./components/session.tsx";
-import { SettingsPage } from "./components/settings.tsx";
+import { SettingsDialogs } from "./components/settings.tsx";
 import { Sidebar, SidebarRail, useNarrow } from "./components/sidebar.tsx";
 import { Button } from "./components/ui.tsx";
 import { t, useLang } from "./i18n.ts";
@@ -14,7 +14,6 @@ function App() {
 	const phase = useAppState((state) => state.phase);
 	const failure = useAppState((state) => state.failure);
 	const connection = useAppState((state) => state.connection);
-	const view = useAppState((state) => state.view);
 	const collapsed = useAppState((state) => state.sidebarCollapsed);
 	const drawerOpen = useAppState((state) => state.drawerOpen);
 	const narrow = useNarrow();
@@ -75,7 +74,8 @@ function App() {
 						onClick={() => setState({ drawerOpen: false })}
 					/>
 				)}
-				{view === "settings" ? <SettingsPage /> : <SessionView />}
+				<SessionView />
+				<SettingsDialogs />
 			</div>
 		</>
 	);

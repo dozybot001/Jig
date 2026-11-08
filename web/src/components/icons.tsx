@@ -5,7 +5,9 @@ import {
 	FileText,
 	Folder,
 	Info,
+	KeyRound,
 	ListPlus,
+	Mail,
 	Menu,
 	MessageCircle,
 	Minimize2,
@@ -16,6 +18,7 @@ import {
 	Plus,
 	Search,
 	Settings,
+	SlidersHorizontal,
 	Square,
 	SquarePen,
 	X,
@@ -47,6 +50,9 @@ export const PlayIcon = () => <Play {...props} />;
 export const InfoIcon = () => <Info {...props} />;
 export const CloseIcon = () => <X {...props} />;
 export const ComposeIcon = () => <SquarePen {...props} />;
+export const KeyIcon = () => <KeyRound {...props} />;
+export const SlidersIcon = () => <SlidersHorizontal {...props} />;
+export const MailIcon = () => <Mail {...props} />;
 export const CollapseIcon = () => <PanelLeftClose {...props} />;
 export const ExpandIcon = () => <PanelLeftOpen {...props} />;
 

@@ -413,47 +413,124 @@ export function Select({
 	);
 }
 
-/** An actions menu behind a "…" button (APG menu button). */
+export interface MenuItem {
+	label: string;
+	onSelect: () => void;
+	/** Distinguishes items with the same label in different groups. */
+	id?: string;
+	danger?: boolean;
+	/** Set for a choice among options (menuitemradio); a check marks the current one. */
+	checked?: boolean;
+	icon?: ReactNode;
+}
+
+/** A menu entry: an item, a line between sections, or a labelled group of choices. */
+export type MenuEntry =
+	| MenuItem
+	| { separator: true; id: string }
+	| { group: string; items: MenuItem[] };
+
+function MenuItemButton({ item, close }: { item: MenuItem; close: () => void }) {
+	const onClick = (event: { stopPropagation(): void }) => {
+		event.stopPropagation();
+		close();
+		item.onSelect();
+	};
+	const content = (
+		<>
+			{item.icon}
+			<span className="menu-label">{item.label}</span>
+			{item.checked && (
+				<span className="menu-check" aria-hidden="true">
+					✓
+				</span>
+			)}
+		</>
+	);
+	if (item.checked !== undefined) {
+		return (
+			<button
+				type="button"
+				role="menuitemradio"
+				aria-checked={item.checked}
+				tabIndex={-1}
+				onClick={onClick}
+			>
+				{content}
+			</button>
+		);
+	}
+	return (
+		<button
+			type="button"
+			role="menuitem"
+			tabIndex={-1}
+			className={item.danger ? "menu-danger" : undefined}
+			onClick={onClick}
+		>
+			{content}
+		</button>
+	);
+}
+
+/**
+ * A menu behind a button (APG menu button): by default a "…" icon button, or a visible trigger such as
+ * the sidebar's settings row. It can be opened from outside (a keyboard shortcut) through `open`.
+ */
 export function Menu({
 	label,
 	items,
+	trigger,
+	open: controlled,
+	onOpenChange,
+	width = 200,
 }: {
 	label: string;
-	items: { label: string; onSelect: () => void; danger?: boolean }[];
+	items: MenuEntry[];
+	trigger?: { className: string; content: ReactNode; title?: string };
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
+	width?: number;
 }) {
-	const [open, setOpen] = useState(false);
-	const trigger = useRef<HTMLButtonElement>(null);
+	const [own, setOwn] = useState(false);
+	const open = controlled ?? own;
+	const setOpen = (next: boolean) => {
+		if (controlled === undefined) setOwn(next);
+		onOpenChange?.(next);
+	};
+	const button = useRef<HTMLButtonElement>(null);
 	const menu = useRef<HTMLDivElement>(null);
 	const id = useId();
 
 	useLayoutEffect(() => {
 		const element = menu.current;
-		if (!element || !trigger.current) return;
+		if (!element || !button.current) return;
 		if (open) {
 			element.showPopover?.();
-			place(element, trigger.current, 200);
-			(element.querySelector("[role=menuitem]") as HTMLElement | null)?.focus();
+			place(element, button.current, width);
+			(element.querySelector("[role^=menuitem]") as HTMLElement | null)?.focus();
 		} else if (element.matches(":popover-open")) {
 			element.hidePopover?.();
 		}
-	}, [open]);
+	}, [open, width]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: setOpen is rebuilt each render; the listener only needs to follow `open`
 	useEffect(() => {
 		if (!open) return;
 		const onDown = (event: MouseEvent) => {
 			const target = event.target as Node;
-			if (!menu.current?.contains(target) && !trigger.current?.contains(target)) setOpen(false);
+			if (!menu.current?.contains(target) && !button.current?.contains(target)) setOpen(false);
 		};
 		document.addEventListener("mousedown", onDown);
 		return () => document.removeEventListener("mousedown", onDown);
 	}, [open]);
 
 	const onKeyDown = (event: KeyboardEvent) => {
-		const entries = [...(menu.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? [])];
+		const entries = [...(menu.current?.querySelectorAll<HTMLElement>("[role^=menuitem]") ?? [])];
 		const index = entries.indexOf(document.activeElement as HTMLElement);
 		if (event.key === "Escape") {
 			setOpen(false);
-			trigger.current?.focus();
+			button.current?.focus();
 		} else if (event.key === "ArrowDown") {
 			event.preventDefault();
 			entries[(index + 1) % entries.length]?.focus();
@@ -464,41 +541,54 @@ export function Menu({
 			setOpen(false);
 		}
 	};
+	const close = () => setOpen(false);
 
 	return (
 		<>
 			<button
-				ref={trigger}
+				ref={button}
 				type="button"
-				className="btn btn-ghost btn-icon"
-				aria-label={label}
+				className={trigger?.className ?? "btn btn-ghost btn-icon"}
+				title={trigger?.title}
+				aria-label={trigger ? undefined : label}
 				aria-haspopup="menu"
 				aria-expanded={open}
 				aria-controls={id}
 				onClick={(event) => {
 					event.stopPropagation();
-					setOpen((value) => !value);
+					setOpen(!open);
 				}}
 			>
-				<span aria-hidden="true">⋯</span>
+				{trigger ? trigger.content : <span aria-hidden="true">⋯</span>}
 			</button>
-			<div ref={menu} id={id} role="menu" popover="manual" className="menu" onKeyDown={onKeyDown}>
-				{items.map((item) => (
-					<button
-						key={item.label}
-						type="button"
-						role="menuitem"
-						tabIndex={-1}
-						className={item.danger ? "menu-danger" : undefined}
-						onClick={(event) => {
-							event.stopPropagation();
-							setOpen(false);
-							item.onSelect();
-						}}
-					>
-						{item.label}
-					</button>
-				))}
+			<div
+				ref={menu}
+				id={id}
+				role="menu"
+				aria-label={label}
+				popover="manual"
+				className="menu"
+				onKeyDown={onKeyDown}
+			>
+				{items.map((entry) => {
+					if ("separator" in entry) {
+						return <hr key={entry.id} className="menu-separator" />;
+					}
+					if ("group" in entry) {
+						return (
+							// biome-ignore lint/a11y/useSemanticElements: a group of menu items is role="group" in the APG menu pattern; a fieldset does not belong in a menu
+							<div key={entry.group} role="group" aria-label={entry.group}>
+								<div className="menu-heading" aria-hidden="true">
+									{entry.group}
+								</div>
+								{entry.items.map((item) => (
+									<MenuItemButton key={item.id ?? item.label} item={item} close={close} />
+								))}
+							</div>
+						);
+					}
+					return <MenuItemButton key={entry.id ?? entry.label} item={entry} close={close} />;
+				})}
 			</div>
 		</>
 	);

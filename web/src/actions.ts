@@ -236,12 +236,13 @@ async function loadTranscript(sessionId: string): Promise<number> {
 }
 
 /** Shows the settings page in the main area (spec 10.5). */
-export function openSettings(tab: "general" | "providers" | "rules" | "about" = "general"): void {
-	setState({ view: "settings", settingsTab: tab });
+/** Opens a settings dialog over the conversation; the conversation stays where it is. */
+export function openSettings(dialog: "providers" | "defaults" | "about"): void {
+	setState({ settingsDialog: dialog });
 }
 
 export async function selectSession(sessionId: string | null): Promise<void> {
-	setState({ selectedId: sessionId, transcript: null, view: "session" });
+	setState({ selectedId: sessionId, transcript: null });
 	remember(LAST_SESSION, sessionId);
 	if (!sessionId) {
 		connect(null, null);

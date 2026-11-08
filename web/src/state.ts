@@ -76,8 +76,8 @@ export interface AppState {
 	/** True once any session is archived; the sidebar only offers "show archived" then. */
 	hasArchived: boolean;
 	/** The main area shows a session, or the settings page. */
-	view: "session" | "settings";
-	settingsTab: "general" | "providers" | "rules" | "about";
+	/** A settings dialog opened from the settings menu, over the conversation. */
+	settingsDialog: "providers" | "defaults" | "about" | null;
 	/** A folder the home page should preselect, set when you open a workspace from the sidebar. */
 	homeFolder: string | null;
 	/** Wide screens: the sidebar folded to a narrow rail (remembered in this browser). */
@@ -122,8 +122,7 @@ let state: AppState = {
 	transcript: null,
 	showArchived: false,
 	hasArchived: false,
-	view: "session",
-	settingsTab: "general",
+	settingsDialog: null,
 	homeFolder: null,
 	sidebarCollapsed: rememberedCollapse(),
 	drawerOpen: false,

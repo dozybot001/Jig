@@ -463,7 +463,7 @@ a {
 	overscroll-behavior: contain;
 }
 .listbox [role="option"],
-.menu [role="menuitem"] {
+.menu [role^="menuitem"] {
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -487,7 +487,7 @@ a {
 	margin-left: auto;
 }
 .listbox [role="option"].active,
-.menu [role="menuitem"]:focus-visible {
+.menu [role^="menuitem"]:focus-visible {
 	background: var(--hover);
 	outline: none;
 }
@@ -499,9 +499,27 @@ a {
 .menu-danger {
 	color: var(--danger);
 }
+.menu-label {
+	flex: 1;
+	min-width: 0;
+}
+.menu-check {
+	color: var(--text-2);
+}
+.menu-heading {
+	padding: 6px 10px 2px;
+	font-size: var(--fs-s);
+	color: var(--text-3);
+}
+.menu-separator {
+	height: 1px;
+	margin: 5px 6px;
+	border: none;
+	background: var(--divider);
+}
 @media (hover: hover) {
 	.listbox [role="option"]:hover,
-	.menu [role="menuitem"]:hover {
+	.menu [role^="menuitem"]:hover {
 		background: var(--hover);
 	}
 }
@@ -1602,61 +1620,6 @@ body.scroll-locked {
 	font-size: var(--fs-s);
 }
 
-/* --- settings page (spec 10.5): categories and content side by side, centred on the page --- */
-
-.settings-page {
-	display: block;
-	min-height: 0;
-	overflow-y: auto;
-	overscroll-behavior: contain;
-}
-.settings-layout {
-	display: grid;
-	grid-template-columns: 196px minmax(0, 1fr);
-	gap: 40px;
-	max-width: 980px;
-	margin: 0 auto;
-	padding: 32px 32px 56px;
-}
-.settings-nav {
-	position: sticky;
-	top: 32px;
-	align-self: start;
-	display: grid;
-	align-content: start;
-	gap: 2px;
-}
-.settings-nav h1 {
-	font-size: var(--fs-xl);
-	font-weight: 600;
-	padding: 0 10px 16px;
-}
-.settings-nav button {
-	position: relative;
-	min-height: 34px;
-	padding: 0 10px;
-	border: none;
-	border-radius: var(--radius);
-	background: none;
-	text-align: left;
-	cursor: pointer;
-	color: var(--text-2);
-	margin: 1px 0;
-}
-.settings-nav button[aria-current="page"] {
-	background: var(--selected);
-	color: var(--text);
-	font-weight: 600;
-}
-@media (hover: hover) {
-	.settings-nav button:not([aria-current="page"]):hover {
-		background: var(--hover);
-	}
-}
-.settings-content {
-	min-width: 0;
-	container-type: inline-size;
-}
 .settings-section {
 	max-width: 720px;
 	display: grid;
@@ -1665,31 +1628,6 @@ body.scroll-locked {
 .settings-section > h2 {
 	font-size: var(--fs-l);
 	font-weight: 600;
-}
-.setting-row {
-	display: grid;
-	grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
-	gap: 16px;
-	align-items: start;
-	padding-bottom: 20px;
-	border-bottom: 1px solid var(--divider);
-}
-.setting-row:last-child {
-	border-bottom: none;
-}
-.setting-label {
-	display: grid;
-	gap: 2px;
-	padding-top: 7px;
-}
-.setting-label strong {
-	display: inline-flex;
-	align-items: center;
-	gap: 2px;
-	font-weight: 600;
-}
-.setting-control {
-	max-width: 520px;
 }
 .provider-group > h3 {
 	font-size: var(--fs-s);
@@ -1817,17 +1755,6 @@ button.about-row {
 .dialog-body,
 .sidebar-list,
 .todo-panel,
-.settings-page {
-	background:
-		linear-gradient(var(--fade-bg, var(--bg)) 30%, transparent) center top / 100% 32px no-repeat
-		local,
-		linear-gradient(transparent, var(--fade-bg, var(--bg)) 70%) center bottom / 100% 32px no-repeat
-		local,
-		radial-gradient(farthest-side at 50% 0, #0000001f, transparent) center top / 100% 12px no-repeat
-		scroll,
-		radial-gradient(farthest-side at 50% 100%, #0000001f, transparent) center bottom / 100% 12px
-		no-repeat scroll;
-}
 .dialog-body {
 	--fade-bg: var(--surface);
 }
@@ -1878,25 +1805,6 @@ button.about-row {
 	.composer-bar .select-trigger {
 		max-width: 120px;
 	}
-	.settings-layout {
-		grid-template-columns: minmax(0, 1fr);
-		gap: 16px;
-		padding: 12px 16px 40px;
-	}
-	.settings-nav {
-		position: static;
-		border-bottom: 1px solid var(--divider);
-		grid-auto-flow: column;
-		overflow-x: auto;
-		padding-bottom: 12px;
-	}
-	.settings-nav h1 {
-		display: none;
-	}
-	.setting-row {
-		grid-template-columns: minmax(0, 1fr);
-		gap: 8px;
-	}
 }
 @media (min-width: 761px) {
 	.only-narrow {
@@ -1910,13 +1818,10 @@ button.about-row {
 	height: 16px;
 }
 
-/* A narrow settings column puts each label above its control. */
-@container (max-width: 600px) {
-	.setting-row {
-		grid-template-columns: minmax(0, 1fr);
-		gap: 8px;
-	}
-	.setting-label {
-		padding-top: 0;
-	}
+/* Placed last: more specific than the generic svg sizes above. */
+.menu [role^="menuitem"] svg {
+	width: 16px;
+	height: 16px;
+	flex: none;
+	color: var(--text-2);
 }

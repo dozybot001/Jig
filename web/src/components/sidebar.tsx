@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import type { Group, Session } from "../../../src/shared/types.ts";
 import {
 	deleteGroup,
-	openSettings,
 	saveSettings,
 	selectSession,
 	toggleArchived,
@@ -21,13 +20,13 @@ import {
 	ComposeIcon,
 	ExpandIcon,
 	FolderIcon,
-	GearIcon,
 	GroupPlusIcon,
 	JigMark,
 	PinIcon,
 	PlusIcon,
 	SearchIcon,
 } from "./icons.tsx";
+import { SettingsMenu } from "./settings.tsx";
 import { Button, describeError, Menu, useAction } from "./ui.tsx";
 import { shortPath, useWorkspaces, WorkspaceDialog } from "./workspaces.tsx";
 
@@ -428,7 +427,6 @@ function Search() {
  */
 export function SidebarRail() {
 	useLang();
-	const view = useAppState((state) => state.view);
 	const [creatingGroup, setCreatingGroup] = useState(false);
 	return (
 		<nav className="rail" aria-label={t("sessions")}>
@@ -476,15 +474,7 @@ export function SidebarRail() {
 				<SearchIcon />
 			</Button>
 			<span className="rail-spacer" />
-			<Button
-				variant="icon"
-				aria-label={t("settings")}
-				title={t("settings")}
-				aria-current={view === "settings" ? "page" : undefined}
-				onClick={() => openSettings()}
-			>
-				<GearIcon />
-			</Button>
+			<SettingsMenu variant="icon" />
 			{creatingGroup && <GroupDialog onClose={() => setCreatingGroup(false)} />}
 		</nav>
 	);
@@ -496,7 +486,6 @@ export function Sidebar() {
 	const sessions = useAppState((state) => state.sessions);
 	const groups = useAppState((state) => state.groups);
 	const selectedId = useAppState((state) => state.selectedId);
-	const view = useAppState((state) => state.view);
 	const showArchived = useAppState((state) => state.showArchived);
 	const hasArchived = useAppState((state) => state.hasArchived);
 	const now = useNow();
@@ -512,7 +501,7 @@ export function Sidebar() {
 	const archived = sortSessions(all.filter((s) => s.archivedAt !== null));
 	const byGroup = (groupId: string | null) =>
 		sortSessions(active.filter((s) => s.groupId === groupId));
-	const current = view === "session" ? selectedId : null;
+	const current = selectedId;
 	const row = (session: Session) => (
 		<SessionRow
 			key={session.id}
@@ -643,18 +632,7 @@ export function Sidebar() {
 				)}
 			</div>
 			<div className="sidebar-bottom">
-				<button
-					type="button"
-					className="nav-row"
-					aria-current={view === "settings" ? "page" : undefined}
-					onClick={() => {
-						closeDrawer();
-						openSettings();
-					}}
-				>
-					<GearIcon />
-					{t("settings")}
-				</button>
+				<SettingsMenu variant="row" />
 			</div>
 			{dialog?.kind === "session" && (
 				<NewSessionDialog groupId={dialog.groupId} onClose={() => setDialog(null)} />

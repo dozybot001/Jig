@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	deleteCustomProvider,
 	deleteKey,
+	openSettings,
 	saveCustomProvider,
 	saveKey,
 	saveSettings,
@@ -9,89 +10,18 @@ import {
 import { t, useLang } from "../i18n.ts";
 import { type ProviderSummary, setState, useAppState } from "../state.ts";
 import { ConfirmDialog, RulesEditor } from "./dialogs.tsx";
-import { ChevronIcon, JigMark, PlusIcon } from "./icons.tsx";
-import { ModelPicker, SidebarToggle } from "./session.tsx";
-import { Button, Dialog, ErrorBox, Select, Switch, Toggletip, useAction } from "./ui.tsx";
-
-export type SettingsTab = "general" | "providers" | "rules" | "about";
-
-const TABS: SettingsTab[] = ["general", "providers", "rules", "about"];
-const TAB_LABEL = {
-	general: "general",
-	providers: "providers",
-	rules: "defaultRules",
-	about: "about",
-} as const;
-
-function Row({
-	label,
-	info,
-	children,
-}: {
-	label: string;
-	info?: string;
-	children: React.ReactNode;
-}) {
-	return (
-		<div className="setting-row">
-			<div className="setting-label">
-				<strong>
-					{label}
-					{info && <Toggletip label={label} text={info} />}
-				</strong>
-			</div>
-			<div className="setting-control">{children}</div>
-		</div>
-	);
-}
-
-function General() {
-	useLang();
-	const settings = useAppState((state) => state.settings);
-	const save = useAction(saveSettings);
-	if (!settings) return null;
-	return (
-		<section className="settings-section" aria-labelledby="settings-general">
-			<h2 id="settings-general">{t("general")}</h2>
-			<Row label={t("theme")}>
-				<Select
-					label={t("theme")}
-					value={settings.theme}
-					busy={save.busy}
-					options={(["system", "light", "dark"] as const).map((v) => ({
-						value: v,
-						label: t(`theme_${v}`),
-					}))}
-					onChange={(value) => void save.run({ theme: value as typeof settings.theme })}
-				/>
-			</Row>
-			<Row label={t("language")}>
-				<Select
-					label={t("language")}
-					value={settings.language}
-					busy={save.busy}
-					options={[
-						{ value: "system", label: t("language_system") },
-						{ value: "zh", label: "简体中文" },
-						{ value: "en", label: "English" },
-					]}
-					onChange={(value) => void save.run({ language: value as typeof settings.language })}
-				/>
-			</Row>
-			<Row label={t("defaultModel")} info={t("defaultModelHelp")}>
-				<ModelPicker
-					{...settings.defaultModel}
-					layout="grid"
-					busy={save.busy}
-					onChange={(patch) =>
-						void save.run({ defaultModel: { ...settings.defaultModel, ...patch } })
-					}
-				/>
-			</Row>
-			<ErrorBox error={save.error} />
-		</section>
-	);
-}
+import {
+	ChevronIcon,
+	GearIcon,
+	InfoIcon,
+	JigMark,
+	KeyIcon,
+	MailIcon,
+	PlusIcon,
+	SlidersIcon,
+} from "./icons.tsx";
+import { ModelPicker } from "./session.tsx";
+import { Button, Dialog, ErrorBox, Field, Menu, type MenuEntry, Switch, useAction } from "./ui.tsx";
 
 function ProviderRow({ provider }: { provider: ProviderSummary }) {
 	useLang();
@@ -286,8 +216,7 @@ function Providers() {
 	const providers = useAppState((state) => state.providers);
 	const regions = ["cn", "custom", "global"] as const;
 	return (
-		<section className="settings-section" aria-labelledby="settings-providers">
-			<h2 id="settings-providers">{t("providers")}</h2>
+		<section className="settings-section" aria-label={t("providers")}>
 			<p className="hint">{t("keyHelp")}</p>
 			{regions.map((region) => {
 				const list = providers
@@ -308,34 +237,56 @@ function Providers() {
 	);
 }
 
-function Rules() {
+/** Defaults for new sessions: the model and the permission rules, saved together. */
+function DefaultsDialog({ onClose }: { onClose: () => void }) {
 	useLang();
 	const settings = useAppState((state) => state.settings);
+	const [model, setModel] = useState(settings?.defaultModel);
 	const [rules, setRules] = useState(settings?.defaultRules ?? []);
-	const save = useAction(saveSettings);
-	const dirty = JSON.stringify(rules) !== JSON.stringify(settings?.defaultRules ?? []);
+	const save = useAction(async () => {
+		await saveSettings({ ...(model ? { defaultModel: model } : {}), defaultRules: rules });
+		onClose();
+	});
+	const dirty =
+		JSON.stringify(model) !== JSON.stringify(settings?.defaultModel) ||
+		JSON.stringify(rules) !== JSON.stringify(settings?.defaultRules ?? []);
 	return (
-		<section className="settings-section" aria-labelledby="settings-rules">
-			<h2 id="settings-rules">{t("defaultRules")}</h2>
-			<p className="hint">{t("defaultRulesBody")}</p>
+		<Dialog
+			title={t("defaultsTitle")}
+			size="l"
+			onClose={onClose}
+			footer={
+				<>
+					{dirty && (
+						<span className="hint unsaved" role="status">
+							{t("unsavedChanges")}
+						</span>
+					)}
+					<Button onClick={onClose}>{t("cancel")}</Button>
+					<Button
+						variant="primary"
+						busy={save.busy}
+						disabled={!dirty}
+						onClick={() => void save.run()}
+					>
+						{t("save")}
+					</Button>
+				</>
+			}
+		>
+			{model && (
+				<Field label={t("defaultModel")} info={t("defaultModelHelp")}>
+					<ModelPicker
+						{...model}
+						layout="grid"
+						onChange={(patch) => setModel((current) => current && { ...current, ...patch })}
+					/>
+				</Field>
+			)}
 			<RulesEditor rules={rules} onChange={setRules} />
-			<div className="request-actions">
-				<Button
-					variant="primary"
-					busy={save.busy}
-					disabled={!dirty}
-					onClick={() => void save.run({ defaultRules: rules })}
-				>
-					{t("save")}
-				</Button>
-				{dirty && (
-					<span className="hint" role="status">
-						{t("unsavedChanges")}
-					</span>
-				)}
-			</div>
+			<p className="hint">{t("defaultRulesBody")}</p>
 			<ErrorBox error={save.error} />
-		</section>
+		</Dialog>
 	);
 }
 
@@ -414,35 +365,107 @@ function About() {
 	);
 }
 
-/** Settings as a page (spec 10.5, 2.1): categories on the left, the chosen one on the right. */
-export function SettingsPage() {
+/** The settings dialog that is open, if any; it covers the conversation without replacing it. */
+export function SettingsDialogs() {
 	useLang();
-	const tab = useAppState((state) => state.settingsTab);
+	const which = useAppState((state) => state.settingsDialog);
+	const close = () => setState({ settingsDialog: null });
+	if (which === "defaults") return <DefaultsDialog onClose={close} />;
+	if (which === "providers" || which === "about") {
+		return (
+			<Dialog
+				title={which === "providers" ? t("providers") : t("about")}
+				size="l"
+				onClose={close}
+				footer={<Button onClick={close}>{t("close")}</Button>}
+			>
+				{which === "providers" ? <Providers /> : <About />}
+			</Dialog>
+		);
+	}
+	return null;
+}
+
+/**
+ * The settings menu at the bottom of the sidebar (spec 10.3, 10.5): theme and language chosen right in
+ * the menu, the rest in dialogs over the conversation, so the conversation is never replaced.
+ * Cmd/Ctrl+, opens it, as in Claude.
+ */
+export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
+	useLang();
+	const settings = useAppState((state) => state.settings);
+	const [open, setOpen] = useState(false);
+	useEffect(() => {
+		const onKey = (event: KeyboardEvent) => {
+			if ((event.metaKey || event.ctrlKey) && event.key === ",") {
+				event.preventDefault();
+				setOpen(true);
+			}
+		};
+		document.addEventListener("keydown", onKey);
+		return () => document.removeEventListener("keydown", onKey);
+	}, []);
+	const save = (patch: Parameters<typeof saveSettings>[0]) =>
+		void saveSettings(patch).catch(() => {});
+	const theme = settings?.theme ?? "system";
+	const language = settings?.language ?? "system";
+	const items: MenuEntry[] = [
+		{
+			group: t("theme"),
+			items: (["system", "light", "dark"] as const).map((value) => ({
+				id: `theme-${value}`,
+				label: t(`theme_${value}`),
+				checked: theme === value,
+				onSelect: () => save({ theme: value }),
+			})),
+		},
+		{
+			group: t("language"),
+			items: [
+				{ id: "language-system", label: t("language_system"), value: "system" as const },
+				{ id: "language-zh", label: "简体中文", value: "zh" as const },
+				{ id: "language-en", label: "English", value: "en" as const },
+			].map(({ id, label, value }) => ({
+				id,
+				label,
+				checked: language === value,
+				onSelect: () => save({ language: value }),
+			})),
+		},
+		{ separator: true, id: "line-1" },
+		{ label: t("providersMenu"), icon: <KeyIcon />, onSelect: () => openSettings("providers") },
+		{ label: t("defaultsMenu"), icon: <SlidersIcon />, onSelect: () => openSettings("defaults") },
+		{ separator: true, id: "line-2" },
+		{ label: t("aboutMenu"), icon: <InfoIcon />, onSelect: () => openSettings("about") },
+		{
+			label: t("sendFeedback"),
+			icon: <MailIcon />,
+			onSelect: () => {
+				window.location.href = "mailto:support@tenonai.cn";
+			},
+		},
+	];
 	return (
-		<main className="main settings-page" aria-label={t("settings")}>
-			{/* Navigation and content sit together in the middle of the page; the whole page scrolls. */}
-			<div className="settings-layout">
-				<nav className="settings-nav" aria-label={t("settings")}>
-					<SidebarToggle />
-					<h1>{t("settings")}</h1>
-					{TABS.map((id) => (
-						<button
-							key={id}
-							type="button"
-							aria-current={tab === id ? "page" : undefined}
-							onClick={() => setState({ settingsTab: id })}
-						>
-							{t(TAB_LABEL[id])}
-						</button>
-					))}
-				</nav>
-				<div className="settings-content">
-					{tab === "general" && <General />}
-					{tab === "providers" && <Providers />}
-					{tab === "rules" && <Rules />}
-					{tab === "about" && <About />}
-				</div>
-			</div>
-		</main>
+		<Menu
+			label={t("settings")}
+			items={items}
+			open={open}
+			onOpenChange={setOpen}
+			width={240}
+			trigger={
+				variant === "row"
+					? {
+							className: "nav-row",
+							title: `${t("settings")}（⌘,）`,
+							content: (
+								<>
+									<GearIcon />
+									{t("settings")}
+								</>
+							),
+						}
+					: { className: "btn btn-ghost btn-icon", title: t("settings"), content: <GearIcon /> }
+			}
+		/>
 	);
 }
