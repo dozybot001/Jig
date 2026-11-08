@@ -94,8 +94,8 @@ export function RulesEditor({
 }
 
 /**
- * Name and role first, since they define the session; then the folder and the model. Kind and group
- * are less common and sit under "More options". The dialog fits without scrolling (spec 9.2).
+ * Name and role first, since they define the session; then the folder, the model, and kind and group
+ * side by side. Nothing is folded away, and the dialog fits without scrolling (spec 9.2).
  */
 export function NewSessionDialog({
 	onClose,
@@ -194,8 +194,7 @@ export function NewSessionDialog({
 				layout="grid"
 				onChange={(patch) => setModel((current) => ({ ...current, ...patch }))}
 			/>
-			<details className="more-options">
-				<summary>{t("moreOptions")}</summary>
+			<div className="field-row">
 				<Field label={t("kind")}>
 					<Select
 						label={t("kind")}
@@ -218,7 +217,7 @@ export function NewSessionDialog({
 						onChange={setGroup}
 					/>
 				</Field>
-			</details>
+			</div>
 			<ErrorBox error={generalError(create.error, ["name", "cwd"])} />
 		</Dialog>
 	);

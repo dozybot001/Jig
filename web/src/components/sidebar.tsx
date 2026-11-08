@@ -13,7 +13,7 @@ import { useAppState } from "../state.ts";
 import { Snippet } from "./content.tsx";
 import { ConfirmDialog, GroupDialog, NewSessionDialog } from "./dialogs.tsx";
 import { ComposeIcon, FolderPlusIcon, GearIcon, JigMark, SearchIcon } from "./icons.tsx";
-import { Button, Menu, Select } from "./ui.tsx";
+import { Button, Menu } from "./ui.tsx";
 
 interface SearchResult {
 	sessions: Session[];
@@ -46,7 +46,22 @@ function SessionRow({
 	now: number;
 }) {
 	useLang();
-	const [moving, setMoving] = useState(false);
+	const moves = [
+		...groups
+			.filter((group) => group.id !== session.groupId)
+			.map((group) => ({
+				label: t("moveTo", { name: group.name }),
+				onSelect: () => void updateSession(session.id, { groupId: group.id }),
+			})),
+		...(session.groupId
+			? [
+					{
+						label: t("removeFromGroup"),
+						onSelect: () => void updateSession(session.id, { groupId: null }),
+					},
+				]
+			: []),
+	];
 	return (
 		<div className="session-item">
 			<button
@@ -86,7 +101,7 @@ function SessionRow({
 							label: session.pinned ? t("unpin") : t("pin"),
 							onSelect: () => void updateSession(session.id, { pinned: !session.pinned }),
 						},
-						{ label: t("moveToGroup"), onSelect: () => setMoving(true) },
+						...moves,
 						session.archivedAt
 							? {
 									label: t("unarchive"),
@@ -99,22 +114,6 @@ function SessionRow({
 					]}
 				/>
 			</span>
-			{moving && (
-				<div className="field" style={{ padding: "4px 8px" }}>
-					<Select
-						label={t("moveToGroup")}
-						value={session.groupId ?? ""}
-						options={[
-							{ value: "", label: t("noGroup") },
-							...groups.map((g) => ({ value: g.id, label: g.name })),
-						]}
-						onChange={(value) => {
-							setMoving(false);
-							void updateSession(session.id, { groupId: value || null });
-						}}
-					/>
-				</div>
-			)}
 		</div>
 	);
 }
@@ -228,7 +227,6 @@ export function Sidebar() {
 	const byGroup = (groupId: string | null) =>
 		sortSessions(active.filter((s) => s.groupId === groupId));
 	const current = view === "session" ? selectedId : null;
-	const home = view === "session" && !selectedId;
 	const row = (session: Session) => (
 		<SessionRow
 			key={session.id}
@@ -269,7 +267,6 @@ export function Sidebar() {
 				<button
 					type="button"
 					className="nav-row"
-					aria-current={home ? "page" : undefined}
 					onClick={() => {
 						closeDrawer();
 						void selectSession(null);

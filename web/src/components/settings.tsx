@@ -9,9 +9,9 @@ import {
 import { t, useLang } from "../i18n.ts";
 import { type ProviderSummary, setState, useAppState } from "../state.ts";
 import { ConfirmDialog, RulesEditor } from "./dialogs.tsx";
-import { JigMark } from "./icons.tsx";
+import { ChevronIcon, JigMark, PlusIcon } from "./icons.tsx";
 import { ModelPicker, SidebarToggle } from "./session.tsx";
-import { Button, ErrorBox, Select, Switch, Toggletip, useAction } from "./ui.tsx";
+import { Button, Dialog, ErrorBox, Select, Switch, Toggletip, useAction } from "./ui.tsx";
 
 export type SettingsTab = "general" | "providers" | "rules" | "about";
 
@@ -181,6 +181,7 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
 	);
 }
 
+/** Adding an OpenAI-compatible provider opens its own dialog, so the page holds no folded form. */
 function CustomProviderForm() {
 	useLang();
 	const empty = {
@@ -192,6 +193,7 @@ function CustomProviderForm() {
 		maxTokens: "8192",
 		keyRequired: true,
 	};
+	const [open, setOpen] = useState(false);
 	const [form, setForm] = useState(empty);
 	const save = useAction(async () => {
 		await saveCustomProvider(form.id.trim(), {
@@ -207,6 +209,7 @@ function CustomProviderForm() {
 			],
 		});
 		setForm(empty);
+		setOpen(false);
 	});
 	const set = (key: keyof typeof form) => (event: { target: { value: string } }) =>
 		setForm({ ...form, [key]: event.target.value });
@@ -227,35 +230,54 @@ function CustomProviderForm() {
 		</label>
 	);
 	return (
-		<details className="card divider-card">
-			<summary>{t("addProvider")}</summary>
-			<div className="dialog-body">
-				{field("id", t("providerId"), "ollama")}
-				{field("name", t("name"), "Ollama")}
-				{field("baseUrl", t("baseUrl"), "http://127.0.0.1:11434/v1")}
-				{field("modelId", t("modelId"), "qwen3:8b")}
-				{field("contextWindow", t("contextWindow"))}
-				{field("maxTokens", t("maxOutput"))}
-				<Switch
-					checked={form.keyRequired}
-					onChange={(value) => setForm({ ...form, keyRequired: value })}
-					label={t("keyRequired")}
-				/>
-				<div>
-					<Button
-						variant="primary"
-						busy={save.busy}
-						disabled={
-							!form.id.trim() || !form.name.trim() || !form.baseUrl.trim() || !form.modelId.trim()
-						}
-						onClick={() => void save.run()}
-					>
-						{t("save")}
-					</Button>
-				</div>
-				<ErrorBox error={save.error} />
-			</div>
-		</details>
+		<div>
+			<Button onClick={() => setOpen(true)}>
+				<PlusIcon />
+				{t("addProvider")}
+			</Button>
+			{open && (
+				<Dialog
+					title={t("addProvider")}
+					size="m"
+					onClose={() => setOpen(false)}
+					footer={
+						<>
+							<Button onClick={() => setOpen(false)}>{t("cancel")}</Button>
+							<Button
+								variant="primary"
+								busy={save.busy}
+								disabled={
+									!form.id.trim() ||
+									!form.name.trim() ||
+									!form.baseUrl.trim() ||
+									!form.modelId.trim()
+								}
+								onClick={() => void save.run()}
+							>
+								{t("save")}
+							</Button>
+						</>
+					}
+				>
+					<div className="field-row">
+						{field("id", t("providerId"), "ollama")}
+						{field("name", t("name"), "Ollama")}
+					</div>
+					{field("baseUrl", t("baseUrl"), "http://127.0.0.1:11434/v1")}
+					{field("modelId", t("modelId"), "qwen3:8b")}
+					<div className="field-row">
+						{field("contextWindow", t("contextWindow"))}
+						{field("maxTokens", t("maxOutput"))}
+					</div>
+					<Switch
+						checked={form.keyRequired}
+						onChange={(value) => setForm({ ...form, keyRequired: value })}
+						label={t("keyRequired")}
+					/>
+					<ErrorBox error={save.error} />
+				</Dialog>
+			)}
+		</div>
 	);
 }
 
@@ -320,6 +342,7 @@ function Rules() {
 function About() {
 	useLang();
 	const health = useAppState((state) => state.health);
+	const [doc, setDoc] = useState<"privacy" | "terms" | null>(null);
 	const policy = (body: string) =>
 		body.split("\n\n").map((paragraph) => <p key={paragraph.slice(0, 24)}>{paragraph}</p>);
 	return (
@@ -355,20 +378,27 @@ function About() {
 					</a>
 				</p>
 			</div>
-			<details className="card divider-card">
-				<summary>{t("privacyPolicy")}</summary>
-				<div className="policy">
+			<div className="link-list">
+				<button type="button" className="link-row" onClick={() => setDoc("privacy")}>
+					{t("privacyPolicy")}
+					<ChevronIcon />
+				</button>
+				<button type="button" className="link-row" onClick={() => setDoc("terms")}>
+					{t("terms")}
+					<ChevronIcon />
+				</button>
+			</div>
+			{doc && (
+				<Dialog
+					title={doc === "privacy" ? t("privacyPolicy") : t("terms")}
+					size="l"
+					onClose={() => setDoc(null)}
+					footer={<Button onClick={() => setDoc(null)}>{t("close")}</Button>}
+				>
 					<p className="hint">{t("docVersion", { v: "1.0", date: t("policyDate") })}</p>
-					{policy(t("privacyPolicyBody"))}
-				</div>
-			</details>
-			<details className="card divider-card">
-				<summary>{t("terms")}</summary>
-				<div className="policy">
-					<p className="hint">{t("docVersion", { v: "1.0", date: t("policyDate") })}</p>
-					{policy(t("termsBody"))}
-				</div>
-			</details>
+					{policy(doc === "privacy" ? t("privacyPolicyBody") : t("termsBody"))}
+				</Dialog>
+			)}
 			<div className="about-block">
 				<h3>{t("feedback")}</h3>
 				<p>

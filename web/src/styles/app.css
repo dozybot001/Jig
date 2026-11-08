@@ -1,8 +1,9 @@
 /*
  * Jig's design tokens: a black, white and grey interface after the Codex app. Jig's colour is ink:
  * the mark, primary buttons, focus rings, switches and unread counts are near-black on light themes
- * and near-white on dark ones; links are underlined. Text contrast is at least 4.5:1 and control
- * boundaries 3:1 in both themes (spec 4.3).
+ * and near-white on dark ones; links are underlined. Text contrast is at least 4.5:1. Borders are
+ * deliberately faint (founder's call, 2026-11-08); fields are told apart by their fill, icon and
+ * placeholder, and a focused field gets a stronger border.
  * Four type sizes only: 12 (meta), 14 (body), 16 (titles), 22 (page titles and wordmark).
  */
 :root,
@@ -15,9 +16,10 @@
 	--surface-3: #e8e8e8;
 	--hover: #efefef;
 	--selected: #e6e6e6;
-	--divider: #e6e6e6;
-	--border: #d4d4d4;
-	--control: #8c8c8c;
+	--divider: #ececec;
+	--border: #e3e3e3;
+	--control: #dcdcdc;
+	--control-strong: #b5b5b5;
 	--text: #0d0d0d;
 	--text-2: #5d5d5d;
 	--text-3: #666666;
@@ -48,9 +50,10 @@
 	--surface-3: #343434;
 	--hover: #2a2a2a;
 	--selected: #303030;
-	--divider: #2c2c2c;
-	--border: #3d3d3d;
-	--control: #727272;
+	--divider: #262626;
+	--border: #323232;
+	--control: #363636;
+	--control-strong: #5c5c5c;
 	--text: #ececec;
 	--text-2: #b4b4b4;
 	--text-3: #9b9b9b;
@@ -280,6 +283,12 @@ a {
 .textarea::placeholder {
 	color: var(--text-3);
 }
+/* A focused field shows a stronger border instead of the ring other controls get. */
+.input:focus-visible,
+.textarea:focus-visible {
+	outline: none;
+	border-color: var(--control-strong);
+}
 .textarea {
 	resize: none;
 	field-sizing: content;
@@ -287,7 +296,12 @@ a {
 	line-height: 1.55;
 }
 .textarea-large {
-	min-height: 120px;
+	min-height: 96px;
+}
+.field-row {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
 }
 .input[aria-invalid="true"],
 .textarea[aria-invalid="true"] {
@@ -530,6 +544,9 @@ a {
 	align-content: start;
 	gap: 16px;
 }
+.dialog-body > p {
+	margin: 0;
+}
 .dialog-footer {
 	display: flex;
 	justify-content: flex-end;
@@ -590,20 +607,20 @@ body.scroll-locked {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	min-height: 52px;
-	padding: 10px 8px 6px 16px;
+	min-height: 60px;
+	padding: 16px 12px 12px 20px;
 }
 .sidebar-nav {
 	display: grid;
-	gap: 2px;
-	padding: 2px 8px 6px;
+	gap: 6px;
+	padding: 4px 10px 16px;
 }
 .nav-row {
 	display: flex;
 	align-items: center;
 	gap: 10px;
 	width: 100%;
-	min-height: 34px;
+	min-height: 36px;
 	padding: 0 10px;
 	border: none;
 	border-radius: var(--radius);
@@ -645,14 +662,19 @@ body.scroll-locked {
 	pointer-events: none;
 }
 .search-field .input {
-	min-height: 34px;
+	min-height: 36px;
 	padding-left: 34px;
+	border-color: transparent;
+	background: var(--hover);
+}
+.search-field .input:focus-visible {
+	border-color: var(--control);
 	background: var(--bg);
 }
 .sidebar-list {
 	overflow-y: auto;
 	overscroll-behavior: contain;
-	padding: 0 8px 8px;
+	padding: 0 10px 10px;
 }
 .sidebar-empty {
 	padding: 8px 10px;
@@ -660,14 +682,14 @@ body.scroll-locked {
 	font-size: var(--fs-s);
 }
 .sidebar-bottom {
-	padding: 6px 8px 10px;
+	padding: 8px 10px 14px;
 }
 .group-heading {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	min-height: 30px;
-	margin-top: 10px;
+	margin-top: 14px;
 	padding: 0 2px 0 10px;
 	font-size: var(--fs-s);
 	font-weight: 600;
@@ -691,8 +713,8 @@ body.scroll-locked {
 	align-items: center;
 	gap: 8px;
 	width: 100%;
-	min-height: 34px;
-	margin: 1px 0;
+	min-height: 36px;
+	margin: 2px 0;
 	padding: 0 10px;
 	border: none;
 	border-radius: var(--radius);
@@ -1239,14 +1261,6 @@ body.scroll-locked {
 .notice-error {
 	color: var(--danger);
 }
-.divider-card {
-	font-size: var(--fs-s);
-	color: var(--text-2);
-}
-.divider-card summary {
-	cursor: pointer;
-	padding: 10px 14px;
-}
 
 /* The composer: a rounded box with the model choice and a round send button inside (as in Codex). */
 .composer {
@@ -1270,7 +1284,7 @@ body.scroll-locked {
 	box-shadow: var(--lift);
 }
 .composer-box:focus-within {
-	border-color: var(--text-2);
+	border-color: var(--control-strong);
 }
 .composer-box textarea {
 	width: 100%;
@@ -1507,14 +1521,28 @@ body.scroll-locked {
 	align-items: center;
 	gap: 8px;
 }
-.policy {
-	padding: 0 14px 14px;
+.link-list {
 	display: grid;
-	gap: 8px;
-	color: var(--text);
 }
-.policy p {
-	margin: 0;
+.link-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	width: 100%;
+	min-height: 44px;
+	padding: 0 2px;
+	border: none;
+	border-bottom: 1px solid var(--divider);
+	background: none;
+	color: var(--text);
+	text-align: left;
+	cursor: pointer;
+}
+@media (hover: hover) {
+	.link-row:hover .chevron {
+		color: var(--text);
+	}
 }
 
 /* Scroll shadows (spec 9.7): a fade where more content lies beyond the edge. */
@@ -1561,6 +1589,9 @@ body.scroll-locked {
 	.model-grid {
 		grid-template-columns: 1fr 1fr;
 	}
+	.field-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
 	.session-header {
 		padding-left: 8px;
 	}
@@ -1600,19 +1631,6 @@ body.scroll-locked {
 	}
 }
 
-/* Placed last: these summaries are more specific than the generic ones above. */
-.more-options > summary {
-	cursor: pointer;
-	color: var(--text-2);
-	width: fit-content;
-	padding: 4px 0;
-}
-.more-options[open] > summary {
-	margin-bottom: 12px;
-}
-.more-options .field + .field {
-	margin-top: 16px;
-}
 .session-header .btn-icon svg,
 .sidebar-bottom .btn svg {
 	width: 16px;

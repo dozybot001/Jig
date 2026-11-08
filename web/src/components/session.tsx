@@ -280,7 +280,6 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 		setText("");
 	});
 	const stop = useAction(() => stopSession(session.id));
-	const hintId = `${session.id}-queued-hint`;
 	const sendLabel = working ? t("queueSend") : t("send");
 	return (
 		<div className="composer">
@@ -297,9 +296,10 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 						ref={ref}
 						rows={1}
 						value={text}
-						placeholder={t("composerPlaceholder", { name: session.name })}
+						placeholder={
+							working ? t("composerQueued") : t("composerPlaceholder", { name: session.name })
+						}
 						aria-label={t("composerPlaceholder", { name: session.name })}
-						aria-describedby={working ? hintId : undefined}
 						onChange={(event) => setText(event.target.value)}
 						onKeyDown={(event) => {
 							if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -342,11 +342,6 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 						)}
 					</div>
 				</div>
-				{working && (
-					<span id={hintId} className="hint">
-						{t("composerQueued")}
-					</span>
-				)}
 				<ErrorBox error={send.error ?? stop.error ?? change.error} />
 			</div>
 		</div>
