@@ -53,6 +53,18 @@ describe("api: sessions", () => {
 		assert.equal(list.nextCursor, null);
 	});
 
+	test("a session switches between chat and code by setting or clearing its folder", async () => {
+		const { call } = setup();
+		const session = await (await call("POST", "/api/sessions", { name: "改代码" })).json();
+		const folder = realpathSync(tempDir("jig-cwd-"));
+		const code = await (await call("PATCH", `/api/sessions/${session.id}`, { cwd: folder })).json();
+		assert.equal(code.cwd, folder);
+		const chat = await (await call("PATCH", `/api/sessions/${session.id}`, { cwd: null })).json();
+		assert.equal(chat.cwd, null);
+		const missing = await call("PATCH", `/api/sessions/${session.id}`, { cwd: "/no/such/folder" });
+		assert.equal(missing.status, 400);
+	});
+
 	test("errors are RFC 9457 problems with a request ID", async () => {
 		const { call } = setup();
 		await call("POST", "/api/sessions", { name: "A" });

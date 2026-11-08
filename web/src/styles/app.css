@@ -201,10 +201,10 @@ a {
 	justify-content: center;
 	gap: 6px;
 	min-height: 32px;
-	padding: 0 14px;
-	border-radius: 999px;
-	border: 1px solid var(--border);
-	background: var(--surface);
+	padding: 0 12px;
+	border-radius: var(--radius-s);
+	border: 1px solid transparent;
+	background: transparent;
 	color: var(--text);
 	font-size: var(--fs-m);
 	cursor: pointer;
@@ -462,7 +462,7 @@ a {
 	background: transparent;
 	color: var(--text-3);
 	cursor: pointer;
-	border-radius: 50%;
+	border-radius: var(--radius-s);
 }
 .info-button svg {
 	width: 15px;
@@ -709,7 +709,7 @@ body.scroll-locked {
 }
 .session-row {
 	display: grid;
-	grid-template-columns: 8px minmax(0, 1fr) auto;
+	grid-template-columns: 16px minmax(0, 1fr) auto auto;
 	align-items: center;
 	gap: 8px;
 	width: 100%;
@@ -731,6 +731,22 @@ body.scroll-locked {
 	.session-row:not([aria-current="true"]):hover {
 		background: var(--hover);
 	}
+}
+.session-icon {
+	position: relative;
+	display: inline-grid;
+	width: 16px;
+	height: 16px;
+	color: var(--text-3);
+}
+.session-icon svg {
+	width: 16px;
+	height: 16px;
+}
+.pin-icon {
+	width: 12px;
+	height: 12px;
+	color: var(--text-3);
 }
 .session-name {
 	overflow: hidden;
@@ -775,7 +791,7 @@ body.scroll-locked {
 	min-width: 18px;
 	height: 18px;
 	padding: 0 5px;
-	border-radius: 9px;
+	border-radius: 5px;
 	background: var(--accent);
 	color: var(--on-accent);
 	font-size: var(--fs-s);
@@ -804,6 +820,18 @@ body.scroll-locked {
 }
 .dot-idle {
 	background: transparent;
+}
+/* On a session row the status sits on the corner of the type icon. */
+.session-icon .dot {
+	position: absolute;
+	right: -3px;
+	bottom: -2px;
+	width: 8px;
+	height: 8px;
+	box-shadow: 0 0 0 2px var(--bg-side);
+}
+.session-icon .dot-idle {
+	display: none;
 }
 @keyframes pulse {
 	50% {
@@ -988,6 +1016,8 @@ body.scroll-locked {
 	position: sticky;
 	bottom: 8px;
 	margin: 0 auto;
+	border-color: var(--divider);
+	background: var(--surface);
 	box-shadow: var(--shadow);
 }
 .todo-panel {
@@ -1020,8 +1050,8 @@ body.scroll-locked {
 .msg-user {
 	justify-self: end;
 	max-width: 80%;
-	padding: 9px 16px;
-	border-radius: 20px;
+	padding: 9px 14px;
+	border-radius: var(--radius-l);
 	background: var(--user-bubble);
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
@@ -1279,7 +1309,7 @@ body.scroll-locked {
 	gap: 4px;
 	padding: 10px 10px 8px;
 	border: 1px solid var(--control);
-	border-radius: 24px;
+	border-radius: var(--radius-l);
 	background: var(--surface);
 	box-shadow: var(--lift);
 }
@@ -1329,9 +1359,27 @@ body.scroll-locked {
 	padding: 0 10px;
 	gap: 6px;
 	border-color: transparent;
-	border-radius: 999px;
+	border-radius: var(--radius-s);
 	background: transparent;
 	color: var(--text-2);
+}
+.context-pie {
+	flex: none;
+	width: 16px;
+	height: 16px;
+	margin: 0 8px 0 4px;
+	align-self: center;
+	border-radius: 50%;
+	background: conic-gradient(var(--text-2) calc(var(--p) * 1%), var(--surface-3) 0);
+	box-shadow: 0 0 0 1px var(--control-strong);
+}
+.context-pie-high {
+	background: conic-gradient(var(--warning) calc(var(--p) * 1%), var(--surface-3) 0);
+}
+.composer-bar .btn-icon {
+	width: 32px;
+	min-height: 32px;
+	align-self: center;
 }
 .send-button {
 	flex: none;
@@ -1340,7 +1388,7 @@ body.scroll-locked {
 	height: 34px;
 	padding: 0;
 	border: none;
-	border-radius: 50%;
+	border-radius: var(--radius-s);
 	background: var(--primary);
 	color: var(--on-primary);
 }

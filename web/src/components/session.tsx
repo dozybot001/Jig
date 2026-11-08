@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import type { Session, ThinkingLevel } from "../../../src/shared/types.ts";
 import {
 	compactSession,
@@ -14,18 +14,20 @@ import {
 } from "../actions.ts";
 import { formatCost, formatNumber, t, useLang } from "../i18n.ts";
 import { type ModelInfo, type TranscriptState, useAppState } from "../state.ts";
-import { NewSessionDialog, SessionSettingsDialog } from "./dialogs.tsx";
+import { NewSessionDialog } from "./dialogs.tsx";
 import {
 	ArrowUpIcon,
 	ChatIcon,
 	CodeIcon,
+	CompactIcon,
 	JigMark,
 	MenuIcon,
 	NotesIcon,
+	PlayIcon,
 	StopIcon,
 } from "./icons.tsx";
 import { Transcript } from "./transcript.tsx";
-import { Button, ErrorBox, Menu, Select, useAction } from "./ui.tsx";
+import { Button, ErrorBox, Select, useAction } from "./ui.tsx";
 
 export function useModels(provider: string): ModelInfo[] {
 	const models = useAppState((state) => state.models[provider]);
@@ -165,14 +167,9 @@ export function shortPath(path: string): string {
 	return path.replace(/^\/(Users|home)\/[^/]+(?=\/|$)/, "~");
 }
 
+/** The header names the session; its actions live in the composer and in the sidebar's row menu. */
 function SessionHeader({ session }: { session: Session }) {
 	useLang();
-	const models = useModels(session.provider);
-	const info = models.find((m) => m.id === session.model);
-	const [settingsOpen, setSettingsOpen] = useState(false);
-	const cont = useAction(() => continueSession(session.id));
-	const compact = useAction(() => compactSession(session.id));
-	const busy = session.status === "working" || session.status === "waiting";
 	const tokens =
 		session.usage.input + session.usage.output + session.usage.cacheRead + session.usage.cacheWrite;
 	return (
@@ -184,33 +181,33 @@ function SessionHeader({ session }: { session: Session }) {
 					{t(`status_${session.status}`)} · {session.cwd ? shortPath(session.cwd) : t("chat")} ·{" "}
 					{t("tokens", { n: formatNumber(tokens) })} ·{" "}
 					{t("cost", { n: formatCost(session.usage.cost) })}
-					{info &&
-						` · ${t("contextUsed", { used: formatNumber(session.contextTokens), total: formatNumber(info.contextWindow) })}`}
 				</span>
 			</div>
-			{!busy && (session.status === "needs_review" || session.status === "error") && (
-				<Button
-					variant="primary"
-					busy={cont.busy}
-					onClick={() => void cont.run()}
-					title={t("continueHint")}
-				>
-					{t("continue")}
-				</Button>
-			)}
-			<Menu
-				label={t("more")}
-				items={[
-					{ label: t("sessionSettings"), onSelect: () => setSettingsOpen(true) },
-					...(busy ? [] : [{ label: t("compact"), onSelect: () => void compact.run() }]),
-					...(busy ? [] : [{ label: t("continue"), onSelect: () => void cont.run() }]),
-				]}
-			/>
-			<ErrorBox error={cont.error ?? compact.error} />
-			{settingsOpen && (
-				<SessionSettingsDialog session={session} onClose={() => setSettingsOpen(false)} />
-			)}
 		</header>
+	);
+}
+
+/** How full the context is, as a small pie next to the send button. */
+function ContextPie({ used, total }: { used: number; total: number }) {
+	useLang();
+	const percent = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+	const label = t("contextPercent", {
+		p: percent,
+		used: formatNumber(used),
+		total: formatNumber(total),
+	});
+	return (
+		// biome-ignore lint/a11y/useSemanticElements: a native <meter> cannot be drawn as a pie; the role carries the same meaning
+		<span
+			className={percent >= 80 ? "context-pie context-pie-high" : "context-pie"}
+			role="meter"
+			aria-valuemin={0}
+			aria-valuemax={100}
+			aria-valuenow={percent}
+			aria-label={label}
+			title={label}
+			style={{ "--p": percent } as CSSProperties}
+		/>
 	);
 }
 
@@ -280,6 +277,11 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 		setText("");
 	});
 	const stop = useAction(() => stopSession(session.id));
+	const cont = useAction(() => continueSession(session.id));
+	const compact = useAction(() => compactSession(session.id));
+	const models = useModels(session.provider);
+	const info = models.find((m) => m.id === session.model);
+	const stuck = !working && (session.status === "needs_review" || session.status === "error");
 	const sendLabel = working ? t("queueSend") : t("send");
 	return (
 		<div className="composer">
@@ -318,6 +320,29 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 								onChange={(patch) => void change.run(patch)}
 							/>
 						</div>
+						{!working && session.contextTokens > 0 && (
+							<Button
+								variant="icon"
+								aria-label={t("compact")}
+								title={t("compact")}
+								busy={compact.busy}
+								onClick={() => void compact.run()}
+							>
+								<CompactIcon />
+							</Button>
+						)}
+						{stuck && (
+							<Button
+								variant="icon"
+								aria-label={t("continue")}
+								title={t("continueHint")}
+								busy={cont.busy}
+								onClick={() => void cont.run()}
+							>
+								<PlayIcon />
+							</Button>
+						)}
+						{info && <ContextPie used={session.contextTokens} total={info.contextWindow} />}
 						{working && !text.trim() ? (
 							<Button
 								className="send-button"
@@ -342,7 +367,7 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 						)}
 					</div>
 				</div>
-				<ErrorBox error={send.error ?? stop.error ?? change.error} />
+				<ErrorBox error={send.error ?? stop.error ?? change.error ?? cont.error ?? compact.error} />
 			</div>
 		</div>
 	);

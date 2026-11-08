@@ -125,3 +125,29 @@ export function JigMark({ className, size }: { className?: string; size: number 
 		</svg>
 	);
 }
+
+export function PinIcon() {
+	return (
+		<svg {...base} className="pin-icon" aria-hidden="true">
+			<path d="M9.5 2.5 13.5 6.5 10.8 7.8 8.2 10.4 8 13 3 8l2.6-.2 2.6-2.6z" />
+			<path d="M5.5 10.5 2.5 13.5" />
+		</svg>
+	);
+}
+
+/** Two arrows pointing inward: make the context smaller. */
+export function CompactIcon() {
+	return (
+		<svg {...base} aria-hidden="true">
+			<path d="M3 6h3V3M13 6h-3V3M3 10h3v3M13 10h-3v3" />
+		</svg>
+	);
+}
+
+export function PlayIcon() {
+	return (
+		<svg {...base} aria-hidden="true">
+			<path d="M5 3.5v9l7-4.5z" />
+		</svg>
+	);
+}

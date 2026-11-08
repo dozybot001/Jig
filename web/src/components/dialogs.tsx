@@ -235,20 +235,27 @@ export function SessionSettingsDialog({
 	const [name, setName] = useState(session.name);
 	const [responsibility, setResponsibility] = useState(session.responsibility);
 	const [group, setGroup] = useState(session.groupId ?? "");
+	const [mode, setMode] = useState<"chat" | "code">(session.cwd ? "code" : "chat");
+	const [folder, setFolder] = useState(session.cwd ?? "");
 	const [directEdits, setDirectEdits] = useState(session.options.directEdits ?? false);
 	const [compactAt, setCompactAt] = useState(
 		session.options.compactAt ? String(session.options.compactAt) : "",
 	);
 	const [rules, setRules] = useState(session.rules);
 	const nameId = useId();
+	const folderId = useId();
+	const folderErrorId = useId();
 	const compactId = useId();
 	const nameErrorId = useId();
 	const compactErrorId = useId();
+	const cwd = mode === "code" ? folder.trim() : null;
+	const cwdChanged = cwd !== session.cwd;
 	const save = useAction(async () => {
 		await updateSession(session.id, {
 			name,
 			responsibility,
 			groupId: group || null,
+			...(cwdChanged ? { cwd } : {}),
 			rules,
 			options: { directEdits, compactAt: compactAt.trim() ? Number(compactAt) : null },
 		});
@@ -259,6 +266,7 @@ export function SessionSettingsDialog({
 		name !== session.name ||
 		responsibility !== session.responsibility ||
 		group !== (session.groupId ?? "") ||
+		cwdChanged ||
 		directEdits !== (session.options.directEdits ?? false) ||
 		compactAt !== (session.options.compactAt ? String(session.options.compactAt) : "") ||
 		JSON.stringify(rules) !== JSON.stringify(session.rules);
@@ -275,7 +283,12 @@ export function SessionSettingsDialog({
 						</span>
 					)}
 					<Button onClick={onClose}>{t("cancel")}</Button>
-					<Button variant="primary" busy={save.busy} onClick={() => void save.run()}>
+					<Button
+						variant="primary"
+						busy={save.busy}
+						disabled={mode === "code" && !folder.trim()}
+						onClick={() => void save.run()}
+					>
 						{t("save")}
 					</Button>
 				</>
@@ -308,6 +321,36 @@ export function SessionSettingsDialog({
 					onChange={setGroup}
 				/>
 			</Field>
+			<Field label={t("mode")} info={t("modeHelp")}>
+				<Select
+					label={t("mode")}
+					value={mode}
+					options={[
+						{ value: "chat", label: t("mode_chat") },
+						{ value: "code", label: t("mode_code") },
+					]}
+					onChange={(value) => setMode(value as "chat" | "code")}
+				/>
+			</Field>
+			{mode === "code" && (
+				<Field
+					label={t("workingFolder")}
+					htmlFor={folderId}
+					error={fieldError(save.error, "cwd")}
+					errorId={folderErrorId}
+				>
+					<input
+						id={folderId}
+						className="input"
+						value={folder}
+						placeholder={t("folderPath")}
+						spellCheck={false}
+						aria-invalid={fieldError(save.error, "cwd") ? "true" : undefined}
+						aria-describedby={fieldError(save.error, "cwd") ? folderErrorId : undefined}
+						onChange={(event) => setFolder(event.target.value)}
+					/>
+				</Field>
+			)}
 			<Field label={t("responsibility")}>
 				<textarea
 					className="textarea"
@@ -316,7 +359,7 @@ export function SessionSettingsDialog({
 					onChange={(event) => setResponsibility(event.target.value)}
 				/>
 			</Field>
-			{session.cwd && (
+			{mode === "code" && (
 				<Switch
 					checked={directEdits}
 					onChange={setDirectEdits}
@@ -342,7 +385,60 @@ export function SessionSettingsDialog({
 				/>
 			</Field>
 			<RulesEditor rules={rules} onChange={setRules} />
-			<ErrorBox error={generalError(save.error, ["name", "options"])} />
+			<ErrorBox error={generalError(save.error, ["name", "options", "cwd"])} />
+		</Dialog>
+	);
+}
+
+/** Renaming keeps the session's id, so messages and links to it still arrive (blueprint 7.1). */
+export function RenameDialog({ session, onClose }: { session: Session; onClose: () => void }) {
+	useLang();
+	const [name, setName] = useState(session.name);
+	const id = useId();
+	const errorId = useId();
+	const save = useAction(async () => {
+		await updateSession(session.id, { name });
+		onClose();
+	});
+	const error = fieldError(save.error, "name");
+	return (
+		<Dialog
+			title={t("rename")}
+			size="s"
+			onClose={onClose}
+			footer={
+				<>
+					<Button onClick={onClose}>{t("cancel")}</Button>
+					<Button
+						variant="primary"
+						busy={save.busy}
+						disabled={!name.trim() || name === session.name}
+						onClick={() => void save.run()}
+					>
+						{t("save")}
+					</Button>
+				</>
+			}
+		>
+			<Field label={t("name")} htmlFor={id} error={error} errorId={errorId}>
+				<input
+					id={id}
+					className="input"
+					value={name}
+					maxLength={60}
+					autoFocus
+					aria-invalid={error ? "true" : undefined}
+					aria-describedby={error ? errorId : undefined}
+					onChange={(event) => setName(event.target.value)}
+					onKeyDown={(event) => {
+						if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+							event.preventDefault();
+							void save.run();
+						}
+					}}
+				/>
+			</Field>
+			<ErrorBox error={generalError(save.error, ["name"])} />
 		</Dialog>
 	);
 }

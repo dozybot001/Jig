@@ -304,6 +304,8 @@ export async function createSession(input: NewSessionInput): Promise<Session> {
 export type SessionPatch = Partial<{
 	name: string;
 	groupId: string | null;
+	/** A folder makes it a code session; null makes it a chat. */
+	cwd: string | null;
 	responsibility: string;
 	provider: string;
 	model: string;

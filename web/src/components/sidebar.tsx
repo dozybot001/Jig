@@ -11,8 +11,23 @@ import { api } from "../api.ts";
 import { formatAgo, t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
 import { Snippet } from "./content.tsx";
-import { ConfirmDialog, GroupDialog, NewSessionDialog } from "./dialogs.tsx";
-import { ComposeIcon, FolderPlusIcon, GearIcon, JigMark, SearchIcon } from "./icons.tsx";
+import {
+	ConfirmDialog,
+	GroupDialog,
+	NewSessionDialog,
+	RenameDialog,
+	SessionSettingsDialog,
+} from "./dialogs.tsx";
+import {
+	ChatIcon,
+	CodeIcon,
+	ComposeIcon,
+	FolderPlusIcon,
+	GearIcon,
+	JigMark,
+	PinIcon,
+	SearchIcon,
+} from "./icons.tsx";
 import { Button, Menu } from "./ui.tsx";
 
 interface SearchResult {
@@ -46,6 +61,7 @@ function SessionRow({
 	now: number;
 }) {
 	useLang();
+	const [dialog, setDialog] = useState<"rename" | "settings" | null>(null);
 	const moves = [
 		...groups
 			.filter((group) => group.id !== session.groupId)
@@ -73,16 +89,21 @@ function SessionRow({
 					void selectSession(session.id);
 				}}
 			>
-				<span className={`dot dot-${session.status}`} aria-hidden="true" />
+				{/* Chat or code (with a folder), with the status as a dot on the icon's corner. */}
+				<span className="session-icon" aria-hidden="true">
+					{session.cwd ? <CodeIcon /> : <ChatIcon />}
+					<span className={`dot dot-${session.status}`} />
+				</span>
 				<span className="session-name">
 					{session.name}
 					<span className="visually-hidden">
 						{" "}
-						· {t(`status_${session.status}`)}
+						· {session.cwd ? t("mode_code") : t("mode_chat")} · {t(`status_${session.status}`)}
 						{session.pinned ? ` · ${t("pinned")}` : ""}
 						{session.unread > 0 ? ` · ${t("unread", { n: session.unread })}` : ""}
 					</span>
 				</span>
+				{session.pinned && <PinIcon />}
 				{session.unread > 0 ? (
 					<span className="badge" aria-hidden="true">
 						{session.unread}
@@ -101,6 +122,8 @@ function SessionRow({
 							label: session.pinned ? t("unpin") : t("pin"),
 							onSelect: () => void updateSession(session.id, { pinned: !session.pinned }),
 						},
+						{ label: t("rename"), onSelect: () => setDialog("rename") },
+						{ label: t("sessionSettings"), onSelect: () => setDialog("settings") },
 						...moves,
 						session.archivedAt
 							? {
@@ -114,6 +137,10 @@ function SessionRow({
 					]}
 				/>
 			</span>
+			{dialog === "rename" && <RenameDialog session={session} onClose={() => setDialog(null)} />}
+			{dialog === "settings" && (
+				<SessionSettingsDialog session={session} onClose={() => setDialog(null)} />
+			)}
 		</div>
 	);
 }

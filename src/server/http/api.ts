@@ -160,6 +160,8 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		if (name !== undefined) patch.name = name;
 		const groupId = optNullableString(fields, "groupId", 100);
 		if (groupId !== undefined) patch.groupId = groupId;
+		const cwd = optNullableString(fields, "cwd", 4096);
+		if (cwd !== undefined) patch.cwd = cwd ? resolveWorkingFolder(cwd) : null;
 		const responsibility = optString(fields, "responsibility", 20_000);
 		if (responsibility !== undefined) patch.responsibility = responsibility;
 		const provider = optString(fields, "provider", 100);

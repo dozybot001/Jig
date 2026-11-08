@@ -44,6 +44,8 @@ export interface NewSession {
 export interface SessionPatch {
 	name?: string;
 	groupId?: string | null;
+	/** A folder makes it a code session; null makes it a chat (blueprint, principle 1). */
+	cwd?: string | null;
 	responsibility?: string;
 	provider?: string;
 	model?: string;
@@ -527,6 +529,7 @@ export class Store {
 				if (patch.groupId !== null) this.getGroup(patch.groupId);
 				set("group_id", patch.groupId);
 			}
+			if (patch.cwd !== undefined) set("cwd", patch.cwd);
 			if (patch.responsibility !== undefined) set("responsibility", patch.responsibility);
 			if (patch.provider !== undefined) set("provider", patch.provider);
 			if (patch.model !== undefined) set("model", patch.model);

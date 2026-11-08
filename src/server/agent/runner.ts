@@ -679,6 +679,22 @@ export class Agents {
 			this.#store.setContextSnapshot(session.id, snapshot);
 			return snapshot;
 		}
+		// A session switched between chat and code gets a fresh environment: folder, git status and files.
+		if (saved.cwd !== session.cwd) {
+			const snapshot = takeSnapshot(session, this.#home);
+			this.#store.setContextSnapshot(session.id, snapshot);
+			this.#store.appendEntry(session.id, {
+				role: "system",
+				message: {
+					role: "system",
+					content: session.cwd
+						? `The working folder is now ${session.cwd}. File and shell tools work there.`
+						: "This session no longer has a working folder. It is a chat now, without file or shell tools.",
+					timestamp: Date.now(),
+				},
+			});
+			return snapshot;
+		}
 		const updates: string[] = [];
 		const date = today();
 		if (date !== saved.date) updates.push(`Today's date is now ${date}.`);

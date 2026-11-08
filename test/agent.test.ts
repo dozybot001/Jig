@@ -291,6 +291,26 @@ describe("agent loop", () => {
 		const tools = (contexts[0]?.messages[0]?.toolsAdded ?? []).map((tool) => tool.name).sort();
 		assert.deepEqual(tools, ["ask_user", "todo", "web_fetch"]);
 	});
+
+	test("a chat switched to code gets file tools and a note about its folder", async () => {
+		const { faux, store, agents, session, contexts, capture } = setup({ cwd: false });
+		faux.setResponses([capture(fauxAssistantMessage("hi")), capture(fauxAssistantMessage("ok"))]);
+		agents.send(session.id, "hi");
+		await agents.whenIdle(session.id);
+		const folder = realpathSync(tempDir("jig-cwd-"));
+		store.updateSession(session.id, { cwd: folder });
+		agents.send(session.id, "now with files");
+		await agents.whenIdle(session.id);
+		const tools = (contexts[1]?.messages[0]?.toolsAdded ?? []).map((tool) => tool.name);
+		assert.ok(tools.includes("read") && tools.includes("shell"));
+		assert.ok(textOf(contexts[1]?.messages[0]).includes(`Working folder: ${folder}`));
+		const { entries } = store.listEntries(session.id, { limit: 50 });
+		assert.ok(
+			entries.some(
+				(entry) => entry.role === "system" && /working folder is now/.test(textOf(entry)),
+			),
+		);
+	});
 });
 
 describe("system prompt", () => {
