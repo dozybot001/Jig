@@ -161,3 +161,70 @@ describe("api: groups, settings, search", () => {
 		assert.deepEqual(result, { sessions: [], hits: [] });
 	});
 });
+
+describe("api: providers and keys", () => {
+	async function providerSetup() {
+		const { MemoryKeyStore } = await import("../src/server/keys.ts");
+		const { ModelGateway } = await import("../src/server/model/gateway.ts");
+		const { store } = newStore();
+		const keys = new MemoryKeyStore();
+		const gateway = new ModelGateway({ keys, version: "0.0.0" });
+		const app = createApp({ store, gateway, log: () => {} });
+		const call = async (method: string, path: string, body?: unknown): Promise<TestResponse> =>
+			app.request(path, {
+				method,
+				...(body === undefined
+					? {}
+					: { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+			});
+		return { store, keys, gateway, call };
+	}
+
+	test("keys go to the key store and are never returned", async () => {
+		const { keys, call } = await providerSetup();
+		assert.equal(
+			(await call("PUT", "/api/providers/deepseek/key", { key: " sk-abc " })).status,
+			204,
+		);
+		assert.equal(await keys.get("deepseek"), "sk-abc");
+		const list = await (await call("GET", "/api/providers")).json();
+		const deepseek = list.items.find((p: { id: string }) => p.id === "deepseek");
+		assert.equal(deepseek.hasKey, true);
+		assert.ok(!JSON.stringify(list).includes("sk-abc"));
+		assert.equal((await call("DELETE", "/api/providers/deepseek/key")).status, 204);
+		assert.equal(await keys.get("deepseek"), null);
+		assert.equal((await call("PUT", "/api/providers/nope/key", { key: "x" })).status, 404);
+	});
+
+	test("custom OpenAI-compatible providers can be added, used for sessions and removed", async () => {
+		const { store, call } = await providerSetup();
+		const body = {
+			name: "Local Ollama",
+			baseUrl: "http://127.0.0.1:11434/v1/",
+			keyRequired: false,
+			models: [{ id: "qwen3:8b", contextWindow: 32768, maxTokens: 8192 }],
+		};
+		const created = await call("PUT", "/api/providers/ollama", body);
+		assert.equal(created.status, 201);
+		assert.equal((await created.json()).region, "custom");
+		assert.equal(store.listCustomProviders()[0]?.baseUrl, "http://127.0.0.1:11434/v1");
+		const session = await call("POST", "/api/sessions", {
+			name: "local",
+			provider: "ollama",
+			model: "qwen3:8b",
+		});
+		assert.equal(session.status, 201);
+		const models = await (await call("GET", "/api/providers/ollama/models")).json();
+		assert.equal(models.items[0].id, "qwen3:8b");
+		assert.equal((await call("PUT", "/api/providers/deepseek", body)).status, 400);
+		assert.equal((await call("PUT", "/api/providers/bad", { ...body, models: [] })).status, 400);
+		assert.equal((await call("DELETE", "/api/providers/ollama")).status, 204);
+		assert.deepEqual(store.listCustomProviders(), []);
+		const unknownModel = await call("POST", "/api/sessions", {
+			name: "x",
+			provider: "ollama",
+			model: "qwen3:8b",
+		});
+		assert.equal(unknownModel.status, 400);
+	});
+});

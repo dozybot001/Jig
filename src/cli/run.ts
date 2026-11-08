@@ -8,10 +8,7 @@ export interface Command {
 	run(args: string[], io: CliIo): Promise<number>;
 }
 
-/** Commands are added here as each milestone step implements them. */
-const commands: Command[] = [];
-
-function helpText(io: CliIo): string {
+function helpText(io: CliIo, commands: Command[]): string {
 	const bold = (s: string) => paint("bold", s, io.stdout, io.env);
 	const lines = [`${NAME} ${VERSION}`, "", `${bold("Usage:")} ${NAME} <command> [options]`];
 	if (commands.length > 0) {
@@ -39,7 +36,7 @@ function versionText(json: boolean): string {
 	return `${NAME} ${VERSION}\n${PUBLISHER} · ${WEBSITE}\n`;
 }
 
-export async function run(argv: string[], io: CliIo): Promise<number> {
+export async function run(argv: string[], io: CliIo, commands: Command[] = []): Promise<number> {
 	const first = argv[0];
 	const command =
 		first && !first.startsWith("-") ? commands.find((c) => c.name === first) : undefined;
@@ -67,7 +64,7 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
 			return EXIT_OK;
 		}
 		if (values.json) throw new UsageError("--json needs --version or a command");
-		io.stdout.write(helpText(io));
+		io.stdout.write(helpText(io, commands));
 		return EXIT_OK;
 	} catch (error) {
 		return report(error, io);

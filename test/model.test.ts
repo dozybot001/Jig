@@ -1,0 +1,136 @@
+import assert from "node:assert/strict";
+import { createServer, type IncomingHttpHeaders } from "node:http";
+import type { AddressInfo } from "node:net";
+import { describe, test } from "node:test";
+import { JigError } from "../src/server/errors.ts";
+import { MemoryKeyStore } from "../src/server/keys.ts";
+import { ModelGateway } from "../src/server/model/gateway.ts";
+import { fauxAssistantMessage, fauxProvider } from "../src/server/model/testing.ts";
+
+const base = { thinking: "off" as const, systemPrompt: "You are a test.", tools: [] };
+
+describe("model gateway", () => {
+	test("built-in catalog: Chinese providers are marked, account-login providers are hidden", () => {
+		const gateway = new ModelGateway({ keys: new MemoryKeyStore(), version: "0.0.0" });
+		const deepseek = gateway.provider("deepseek");
+		assert.equal(deepseek?.region, "cn");
+		assert.equal(gateway.provider("openai-codex"), undefined);
+		assert.equal(gateway.provider("github-copilot"), undefined);
+		const pro = gateway.model("deepseek", "deepseek-v4-pro");
+		assert.ok(pro && pro.contextWindow >= 1_000_000);
+		assert.ok(pro.cost.input > 0);
+		assert.throws(
+			() => gateway.check("deepseek", "nope"),
+			(e) => e instanceof JigError,
+		);
+		assert.throws(
+			() => gateway.check("nope", "x"),
+			(e) => e instanceof JigError,
+		);
+	});
+
+	test("streams drafts and resolves with the final message", async () => {
+		const faux = fauxProvider();
+		const gateway = new ModelGateway({
+			keys: new MemoryKeyStore({ [faux.provider.id]: "test-key" }),
+			version: "0.0.0",
+			providers: [faux.provider],
+		});
+		faux.setResponses([fauxAssistantMessage("你好，世界")]);
+		const drafts: string[] = [];
+		const final = await gateway.stream(
+			{
+				...base,
+				provider: faux.provider.id,
+				model: faux.getModel().id,
+				messages: [{ role: "user", content: "hi", timestamp: Date.now() }],
+			},
+			(draft) => {
+				const block = draft.content[0];
+				if (block?.type === "text") drafts.push(block.text);
+			},
+		);
+		assert.equal(final.stopReason, "stop");
+		assert.deepEqual(final.content, [{ type: "text", text: "你好，世界" }]);
+		assert.ok(drafts.length > 0);
+	});
+
+	test("refuses to call a provider without a key in the key store", async () => {
+		const faux = fauxProvider();
+		const gateway = new ModelGateway({
+			keys: new MemoryKeyStore(),
+			version: "0.0.0",
+			providers: [faux.provider],
+		});
+		await assert.rejects(
+			gateway.stream({
+				...base,
+				provider: faux.provider.id,
+				model: faux.getModel().id,
+				messages: [{ role: "user", content: "hi", timestamp: 1 }],
+			}),
+			(e) => e instanceof JigError && e.code === "missing-api-key",
+		);
+	});
+
+	test("an OpenAI-compatible endpoint gets jig's User-Agent, the stored key and no attribution", async () => {
+		const seen: IncomingHttpHeaders[] = [];
+		const server = createServer((req, res) => {
+			seen.push(req.headers);
+			req.resume();
+			req.on("end", () => {
+				res.writeHead(200, { "Content-Type": "text/event-stream" });
+				const chunk = (body: object) => res.write(`data: ${JSON.stringify(body)}\n\n`);
+				const meta = { id: "c1", object: "chat.completion.chunk", created: 0, model: "local" };
+				chunk({
+					...meta,
+					choices: [
+						{ index: 0, delta: { role: "assistant", content: "pong" }, finish_reason: null },
+					],
+				});
+				chunk({
+					...meta,
+					choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+					usage: { prompt_tokens: 7, completion_tokens: 1, total_tokens: 8 },
+				});
+				res.end("data: [DONE]\n\n");
+			});
+		});
+		await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+		const { port } = server.address() as AddressInfo;
+		try {
+			const gateway = new ModelGateway({
+				keys: new MemoryKeyStore({ local: "sk-local-test" }),
+				version: "9.9.9",
+				providers: [],
+				custom: [
+					{
+						id: "local",
+						name: "Local",
+						baseUrl: `http://127.0.0.1:${port}/v1`,
+						keyRequired: true,
+						models: [{ id: "local", contextWindow: 32_000, maxTokens: 4_000 }],
+					},
+				],
+			});
+			const final = await gateway.stream({
+				...base,
+				provider: "local",
+				model: "local",
+				messages: [{ role: "user", content: "ping", timestamp: 1 }],
+			});
+			assert.equal(final.stopReason, "stop", final.errorMessage);
+			assert.deepEqual(final.content, [{ type: "text", text: "pong" }]);
+			assert.equal(final.usage.input, 7);
+			const headers = seen[0];
+			assert.ok(headers);
+			assert.equal(headers["user-agent"], "jig/9.9.9");
+			assert.equal(headers.authorization, "Bearer sk-local-test");
+			for (const name of ["http-referer", "x-title", "x-openrouter-categories"]) {
+				assert.equal(headers[name], undefined, name);
+			}
+		} finally {
+			server.close();
+		}
+	});
+});

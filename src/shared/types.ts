@@ -2,7 +2,7 @@ import type { EntryBody, JsonObject } from "./messages.ts";
 
 export type SessionKind = "standing" | "task";
 export type SessionStatus = "idle" | "working" | "waiting" | "error" | "needs_review";
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 export const SESSION_KINDS: readonly SessionKind[] = ["standing", "task"];
 export const THINKING_LEVELS: readonly ThinkingLevel[] = [
@@ -12,6 +12,7 @@ export const THINKING_LEVELS: readonly ThinkingLevel[] = [
 	"medium",
 	"high",
 	"xhigh",
+	"max",
 ];
 
 export type RuleEffect = "allow" | "ask" | "deny";

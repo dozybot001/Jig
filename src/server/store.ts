@@ -26,6 +26,7 @@ import { type Db, json, transaction } from "./db/database.ts";
 import { conflict, invalid, notFound } from "./errors.ts";
 import type { BusEvent, EventBus } from "./events.ts";
 import { newId } from "./ids.ts";
+import type { CustomProviderConfig } from "./model/gateway.ts";
 
 export interface NewSession {
 	name: string;
@@ -962,6 +963,26 @@ export class Store {
 		this.#q(
 			"INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
 		).run(key, JSON.stringify(value));
+	}
+
+	// --- custom model providers (their keys stay in the keychain) ---
+
+	listCustomProviders(): CustomProviderConfig[] {
+		const rows = this.#q("SELECT config FROM providers ORDER BY id").all() as { config: string }[];
+		return rows.map((row) => JSON.parse(row.config) as CustomProviderConfig);
+	}
+
+	saveCustomProvider(config: CustomProviderConfig): void {
+		const now = Date.now();
+		this.#q(
+			`INSERT INTO providers (id, name, config, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT (id) DO UPDATE SET name = excluded.name, config = excluded.config,
+				updated_at = excluded.updated_at`,
+		).run(config.id, config.name, JSON.stringify(config), now, now);
+	}
+
+	deleteCustomProvider(id: string): boolean {
+		return this.#q("DELETE FROM providers WHERE id = ?").run(id).changes > 0;
 	}
 
 	// --- search ---
