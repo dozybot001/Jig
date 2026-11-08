@@ -362,7 +362,7 @@ function About() {
 				{t("version", { v: health?.version ?? "" })}
 				{health?.build ? ` · ${t("build", { b: health.build })}` : ""}
 			</p>
-			<p>{t("aboutBody")}</p>
+			{policy(t("aboutBody"))}
 			<div className="about-block">
 				<h3>{t("publisher")}</h3>
 				<p className="publisher">
