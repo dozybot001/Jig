@@ -1,0 +1,26 @@
+{
+	"name": "jig",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Your personal AI-native workbench",
+	"license": "UNLICENSED",
+	"author": "Tenon AI (https://tenon.asia/)",
+	"homepage": "https://tenon.asia/",
+	"type": "module",
+	"engines": {
+		"node": ">=24"
+	},
+	"bin": {
+		"jig": "./src/cli/main.ts"
+	},
+	"scripts": {
+		"check": "biome check . && tsc --noEmit -p . && npm test",
+		"test": "node --test \"test/**/*.test.ts\"",
+		"format": "biome check --write ."
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.6.6",
+		"@types/node": "24.19.2",
+		"typescript": "7.0.2"
+	}
+}
