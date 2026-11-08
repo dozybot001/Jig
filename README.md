@@ -6,11 +6,16 @@ AI 原生指一个人和一组 Agent 会话一起工作：除了你自己，团�
 
 ## 状态
 
-开发中，还不能使用。现在做第一个里程碑 M1：Agent 循环、工具、模型切换、权限、会话与分组和电脑端网页界面。要做什么、不做什么见[产品蓝图](docs/blueprint.md)，M1 的做法见 [M1 实现计划](docs/m1-plan.md)。
+开发中，还没有发布版本。第一个里程碑 M1 的功能已经写完，正在验收：Agent 循环、工具、模型切换、权限、会话与分组，以及电脑端网页界面。要做什么、不做什么见[产品蓝图](docs/blueprint.md)，M1 的做法见 [M1 实现计划](docs/m1-plan.md)。
 
 ## 安装与快速开始
 
-尚未发布。M1 完成后在这里写从源码运行的步骤。
+目前只能从源码运行。需要 macOS、Node.js 24 或更高版本和 ripgrep（`brew install ripgrep`）。
+
+1. 在仓库目录安装依赖，并构建网页界面：`npm install`，然后 `npm run build:web`。
+2. 让 `jig` 命令可用：`npm link`。
+3. 存入一个模型服务商的 API Key（默认服务商是 DeepSeek）：`jig key set deepseek`。Key 只存进系统钥匙串。
+4. 启动服务：`jig serve`，然后用它打印的链接打开网页界面。以后需要新的登录链接，运行 `jig open`。
 
 ## 隐私
 

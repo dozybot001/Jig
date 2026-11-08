@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,6 +37,19 @@ interface ServeFile {
 }
 
 const serveFile = (home: string) => join(home, "serve.json");
+
+/** The short commit of a source checkout; null when Jig does not run from a git checkout. */
+function shortCommit(): string | null {
+	try {
+		return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+			cwd: fileURLToPath(new URL("../..", import.meta.url)),
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "ignore"],
+		}).trim();
+	} catch {
+		return null;
+	}
+}
 
 export function openBrowser(url: string): void {
 	const [command, args] =
@@ -104,6 +117,7 @@ export function serveCommand(): Command {
 				log,
 				security: { port },
 				webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
+				build: shortCommit(),
 			});
 
 			const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port });

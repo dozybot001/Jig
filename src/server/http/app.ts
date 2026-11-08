@@ -24,6 +24,8 @@ export interface AppOptions {
 	security?: { port: number };
 	/** The built web interface (`web/dist`). */
 	webRoot?: string;
+	/** Short commit of the running code, shown as the build number (spec 2.2). */
+	build?: string | null;
 }
 
 const NOT_BUILT = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Jig</title></head>
@@ -43,7 +45,9 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 		app.use("*", requireBrowser(store, options.security.port));
 		app.route("/api", authRoutes(store, options.security.port));
 	}
-	app.get("/api/health", (c) => c.json({ ok: true, version: VERSION }));
+	app.get("/api/health", (c) =>
+		c.json({ ok: true, version: VERSION, build: options.build ?? null }),
+	);
 	app.route(
 		"/api",
 		api({
@@ -57,7 +61,8 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 
 	const root = options.webRoot;
 	if (root && existsSync(join(root, "index.html"))) {
-		const index = readFileSync(join(root, "index.html"), "utf8");
+		// Read per request, so a rebuilt interface (npm run watch:web) is served without a restart.
+		const index = () => readFileSync(join(root, "index.html"), "utf8");
 		app.use("/assets/*", async (c, next) => {
 			await next();
 			// Built assets have content hashes in their names, so they can be cached for good.
@@ -69,7 +74,7 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 		app.get("*", (c) => {
 			if (c.req.path.startsWith("/api/")) return c.notFound();
 			c.header("Cache-Control", "no-cache");
-			return c.html(index);
+			return c.html(index());
 		});
 	} else {
 		app.get("/", (c) => c.html(NOT_BUILT));

@@ -14,14 +14,24 @@
 		"jig": "./src/cli/main.ts"
 	},
 	"scripts": {
-		"check": "biome check . && tsc --noEmit -p . && npm test",
+		"check": "biome check . && tsc --noEmit -p . && tsc --noEmit -p web && npm test",
 		"test": "node --test \"test/**/*.test.ts\"",
-		"format": "biome check --write ."
+		"format": "biome check --write .",
+		"build:web": "vite build --config web/vite.config.ts",
+		"watch:web": "vite build --config web/vite.config.ts --watch"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.6.6",
 		"@types/node": "24.19.2",
-		"typescript": "7.0.2"
+		"@types/react": "19.3.0",
+		"@types/react-dom": "19.3.0",
+		"@vitejs/plugin-react": "6.2.1",
+		"react": "19.3.1",
+		"react-dom": "19.3.1",
+		"react-markdown": "10.1.0",
+		"remark-gfm": "4.0.1",
+		"typescript": "7.0.2",
+		"vite": "8.3.6"
 	},
 	"dependencies": {
 		"@earendil-works/pi-ai": "1.5.0",

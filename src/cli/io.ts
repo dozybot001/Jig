@@ -26,7 +26,7 @@ export const EXIT_USAGE = 2;
 export class UsageError extends Error {}
 
 /** clig.dev and spec 20.5: no ANSI colors when NO_COLOR is non-empty or the stream is not a terminal. */
-export function useColor(stream: OutStream, env: CliIo["env"]): boolean {
+export function wantsColor(stream: OutStream, env: CliIo["env"]): boolean {
 	if (env.NO_COLOR) return false;
 	if (env.TERM === "dumb") return false;
 	return stream.isTTY === true;
@@ -83,5 +83,5 @@ export function paint(
 	stream: OutStream,
 	env: CliIo["env"],
 ): string {
-	return useColor(stream, env) ? styleText(format, text, { validateStream: false }) : text;
+	return wantsColor(stream, env) ? styleText(format, text, { validateStream: false }) : text;
 }
