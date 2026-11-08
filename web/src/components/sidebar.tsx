@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Group, Session } from "../../../src/shared/types.ts";
 import {
 	deleteGroup,
+	exportSession,
 	saveSettings,
 	selectSession,
 	toggleArchived,
@@ -27,7 +28,7 @@ import {
 	SearchIcon,
 } from "./icons.tsx";
 import { SettingsMenu } from "./settings.tsx";
-import { Button, describeError, Menu, useAction } from "./ui.tsx";
+import { Button, describeError, ErrorBox, Menu, useAction } from "./ui.tsx";
 import { shortPath, useWorkspaces, WorkspaceDialog } from "./workspaces.tsx";
 
 interface SearchResult {
@@ -238,6 +239,7 @@ function SessionRow({
 	useLang();
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [renaming, setRenaming] = useState(false);
+	const download = useAction(() => exportSession(session));
 	const moves = [
 		...groups
 			.filter((group) => group.id !== session.groupId)
@@ -312,6 +314,7 @@ function SessionRow({
 							},
 							{ label: t("rename"), onSelect: () => setRenaming(true) },
 							{ label: t("sessionSettings"), onSelect: () => setSettingsOpen(true) },
+							{ label: t("exportMarkdown"), onSelect: () => void download.run() },
 							...moves,
 							session.archivedAt
 								? {
@@ -328,6 +331,16 @@ function SessionRow({
 			)}
 			{settingsOpen && (
 				<SessionSettingsDialog session={session} onClose={() => setSettingsOpen(false)} />
+			)}
+			{download.busy && (
+				<p className="hint row-error" role="status">
+					{t("exporting")}
+				</p>
+			)}
+			{download.error !== null && (
+				<div className="row-error">
+					<ErrorBox error={download.error} />
+				</div>
 			)}
 		</div>
 	);

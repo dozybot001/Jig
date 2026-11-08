@@ -690,6 +690,15 @@ export class Store {
 		return { entries, olderCursor: more ? (entries[0]?.seq ?? null) : null };
 	}
 
+	/** Every entry, oldest first; the Markdown export needs the whole transcript, not one page. */
+	allEntries(sessionId: string): Entry[] {
+		this.getSession(sessionId);
+		const rows = this.#q("SELECT * FROM messages WHERE session_id = ? ORDER BY seq").all(
+			sessionId,
+		) as unknown as EntryRow[];
+		return rows.map(toEntry);
+	}
+
 	/** Entries the model sees: everything since the latest compaction, plus that compaction's summary. */
 	contextEntries(sessionId: string): Entry[] {
 		const latest = this.#q(
@@ -783,6 +792,14 @@ export class Store {
 		const rows = this.db
 			.prepare(`SELECT * FROM tool_calls WHERE message_id IN (${placeholders}) ORDER BY id`)
 			.all(...messageIds) as unknown as ToolCallRow[];
+		return rows.map(toToolCall);
+	}
+
+	/** Every call in the session, oldest first; used by the Markdown export. */
+	toolCallsForSession(sessionId: string): ToolCallView[] {
+		const rows = this.#q(
+			"SELECT * FROM tool_calls WHERE session_id = ? ORDER BY created_at, id",
+		).all(sessionId) as unknown as ToolCallRow[];
 		return rows.map(toToolCall);
 	}
 

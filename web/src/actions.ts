@@ -13,8 +13,8 @@ import type {
 	ToolCallView,
 	Transcript,
 } from "../../src/shared/types.ts";
-import { ApiError, all, api } from "./api.ts";
-import { setLang, systemLang } from "./i18n.ts";
+import { ApiError, all, api, downloadFile } from "./api.ts";
+import { getLang, setLang, systemLang } from "./i18n.ts";
 import {
 	getState,
 	type ModelInfo,
@@ -325,6 +325,30 @@ export async function updateSession(sessionId: string, patch: SessionPatch): Pro
 		setState({ hasArchived: archived.items.length > 0 });
 	}
 	return session;
+}
+
+/** Saves the whole session as a Markdown file, named by the server. */
+export async function exportSession(session: Session): Promise<void> {
+	const { blob, filename } = await downloadFile(
+		`/api/sessions/${session.id}/export.md?lang=${getLang()}`,
+	);
+	const url = URL.createObjectURL(blob);
+	try {
+		const link = document.createElement("a");
+		link.href = url;
+		link.download = filename ?? fallbackFilename(session.name);
+		document.body.append(link);
+		link.click();
+		link.remove();
+	} finally {
+		// The browser needs the URL until the download has started.
+		setTimeout(() => URL.revokeObjectURL(url), 1000);
+	}
+}
+
+function fallbackFilename(name: string): string {
+	const base = name.replace(/[\\/:*?"<>|]/g, "-").trim() || "session";
+	return `${base}.md`;
 }
 
 /** A name not used by any loaded session: "聊天", then "聊天 2", "聊天 3"… */

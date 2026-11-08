@@ -55,24 +55,54 @@ export async function api<T = unknown>(
 	}
 	if (response.status === 204) return undefined as T;
 	const text = await response.text();
-	if (!response.ok) {
-		let problem: Problem = {};
-		try {
-			problem = JSON.parse(text) as Problem;
-		} catch {
-			// Not a problem document; fall back to the status line.
-		}
-		const code = problem.type?.split("/").pop() ?? "error";
-		throw new ApiError(
-			response.status,
-			code,
-			problem.detail ?? problem.title ?? response.statusText,
-			problem.requestId ?? response.headers.get("X-Request-Id") ?? undefined,
-			problem.field,
-			problem.provider,
-		);
-	}
+	if (!response.ok) throw toApiError(response, text);
 	return (text ? JSON.parse(text) : undefined) as T;
+}
+
+function toApiError(response: Response, text: string): ApiError {
+	let problem: Problem = {};
+	try {
+		problem = JSON.parse(text) as Problem;
+	} catch {
+		// Not a problem document; fall back to the status line.
+	}
+	const code = problem.type?.split("/").pop() ?? "error";
+	return new ApiError(
+		response.status,
+		code,
+		problem.detail ?? problem.title ?? response.statusText,
+		problem.requestId ?? response.headers.get("X-Request-Id") ?? undefined,
+		problem.field,
+		problem.provider,
+	);
+}
+
+/** Fetches a file the interface saves, such as a Markdown export. */
+export async function downloadFile(path: string): Promise<{ blob: Blob; filename: string | null }> {
+	let response: Response;
+	try {
+		response = await fetch(path, { credentials: "same-origin" });
+	} catch {
+		throw new ApiError(0, "network", "network");
+	}
+	if (!response.ok) throw toApiError(response, await response.text());
+	return {
+		blob: await response.blob(),
+		filename: filenameFrom(response.headers.get("Content-Disposition")),
+	};
+}
+
+/** Prefers the UTF-8 file name (RFC 5987); falls back to the plain ASCII one. */
+function filenameFrom(header: string | null): string | null {
+	const extended = /filename\*=UTF-8''([^;]+)/i.exec(header ?? "");
+	if (extended?.[1]) {
+		try {
+			return decodeURIComponent(extended[1]);
+		} catch {
+			// A broken header is no reason to fail the download.
+		}
+	}
+	return /filename="([^"]+)"/i.exec(header ?? "")?.[1] ?? null;
 }
 
 /** Follows `nextCursor` until a paginated list is complete. */

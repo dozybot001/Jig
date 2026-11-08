@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import type { PermissionRule, Session, ThinkingLevel, Transcript } from "../../shared/types.ts";
 import { SESSION_KINDS, THINKING_LEVELS } from "../../shared/types.ts";
 import { invalid } from "../errors.ts";
+import { type ExportLanguage, exportFileName, sessionMarkdown } from "../export.ts";
 import { pickFolder } from "../folder-picker.ts";
 import type { SessionPatch, Store } from "../store.ts";
 import { idempotent } from "./idempotency.ts";
@@ -146,6 +147,20 @@ export function resolveWorkingFolder(path: string): string {
 	}
 	if (!statSync(real).isDirectory()) throw invalid(`${path} is not a folder.`, "cwd");
 	return real;
+}
+
+/** `filename` for old clients, `filename*` for the real name (RFC 6266 and 5987). */
+function contentDisposition(filename: string): string {
+	const ascii = filename
+		.replace(/[^\x20-\x7e]/g, "")
+		.replace(/["\\]/g, "_")
+		.trim();
+	const fallback = ascii || "jig-session.md";
+	const encoded = encodeURIComponent(filename).replace(
+		/['()*]/g,
+		(character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+	);
+	return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }
 
 export function api(deps: ApiDeps): Hono<AppEnv> {
@@ -300,6 +315,29 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			};
 		});
 		return c.json(transcript);
+	});
+
+	// The whole session as one Markdown file. The language comes from the interface; without it the
+	// saved interface language is used, and a system setting falls back to Chinese.
+	app.get("/sessions/:id/export.md", (c) => {
+		const session = store.getSession(c.req.param("id"));
+		const requested = c.req.query("lang");
+		if (requested !== undefined && requested !== "zh" && requested !== "en") {
+			throw invalid("lang must be zh or en.", "lang");
+		}
+		const saved = readSettings(store).language;
+		const language: ExportLanguage = requested ?? (saved === "en" ? "en" : "zh");
+		const groupName = session.groupId ? store.getGroup(session.groupId).name : null;
+		const markdown = sessionMarkdown({
+			session,
+			groupName,
+			entries: store.allEntries(session.id),
+			toolCalls: store.toolCallsForSession(session.id),
+			language,
+		});
+		c.header("Content-Type", "text/markdown; charset=utf-8");
+		c.header("Content-Disposition", contentDisposition(exportFileName(session.name)));
+		return c.body(markdown);
 	});
 
 	app.get("/sessions/:id/queue", (c) => {
