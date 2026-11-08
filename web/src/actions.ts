@@ -80,10 +80,11 @@ export async function boot(): Promise<void> {
 		const health = await api<{ version: string; build?: string }>("GET", "/api/health");
 		const settings = await api<Settings>("GET", "/api/settings");
 		applyAppearance(settings);
-		const [groups, sessions, providers] = await Promise.all([
+		const [groups, sessions, providers, archived] = await Promise.all([
 			all<Group>("/api/groups"),
 			all<Session>("/api/sessions"),
 			all<ProviderSummary>("/api/providers"),
+			api<{ items: Session[] }>("GET", "/api/sessions?archived=true&limit=1"),
 		]);
 		setState({
 			phase: "ready",
@@ -92,6 +93,7 @@ export async function boot(): Promise<void> {
 			groups,
 			sessions: Object.fromEntries(sessions.map((s) => [s.id, s])),
 			providers,
+			hasArchived: archived.items.length > 0,
 		});
 		const last = recall(LAST_SESSION);
 		if (last && getState().sessions[last]) await selectSession(last);
@@ -227,8 +229,13 @@ async function loadTranscript(sessionId: string): Promise<number> {
 	return data.session.eventSeq;
 }
 
+/** Shows the settings page in the main area (spec 10.5). */
+export function openSettings(tab: "general" | "providers" | "rules" | "about" = "general"): void {
+	setState({ view: "settings", settingsTab: tab });
+}
+
 export async function selectSession(sessionId: string | null): Promise<void> {
-	setState({ selectedId: sessionId, transcript: null });
+	setState({ selectedId: sessionId, transcript: null, view: "session" });
 	remember(LAST_SESSION, sessionId);
 	if (!sessionId) {
 		connect(null, null);
@@ -304,7 +311,36 @@ export type SessionPatch = Partial<{
 export async function updateSession(sessionId: string, patch: SessionPatch): Promise<Session> {
 	const session = await api<Session>("PATCH", `/api/sessions/${sessionId}`, patch);
 	setState((current) => ({ sessions: { ...current.sessions, [session.id]: session } }));
+	if (patch.archived !== undefined) {
+		const archived = await api<{ items: Session[] }>("GET", "/api/sessions?archived=true&limit=1");
+		setState({ hasArchived: archived.items.length > 0 });
+	}
 	return session;
+}
+
+/** A name not used by any loaded session: "聊天", then "聊天 2", "聊天 3"… */
+export function freeName(base: string): string {
+	const taken = new Set(Object.values(getState().sessions).map((s) => s.name.toLowerCase()));
+	if (!taken.has(base.toLowerCase())) return base;
+	for (let n = 2; ; n++) {
+		const name = `${base} ${n}`;
+		if (!taken.has(name.toLowerCase())) return name;
+	}
+}
+
+/** Starts a chat (a session without a working folder) with the default model, in one click. */
+export async function startChat(name: string): Promise<Session> {
+	const settings = getState().settings;
+	return createSession({
+		name: freeName(name),
+		kind: "task",
+		groupId: null,
+		cwd: null,
+		responsibility: "",
+		provider: settings?.defaultModel.provider ?? "deepseek",
+		model: settings?.defaultModel.model ?? "deepseek-v4-pro",
+		thinking: settings?.defaultModel.thinking ?? "medium",
+	});
 }
 
 export async function toggleArchived(show: boolean): Promise<void> {

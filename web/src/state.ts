@@ -65,12 +65,18 @@ export interface AppState {
 	selectedId: string | null;
 	transcript: TranscriptState | null;
 	showArchived: boolean;
+	/** True once any session is archived; the sidebar only offers "show archived" then. */
+	hasArchived: boolean;
+	/** The main area shows a session, or the settings page. */
+	view: "session" | "settings";
+	settingsTab: "general" | "providers" | "rules" | "about";
 }
 
 let state: AppState = {
 	phase: "loading",
 	failure: null,
-	connection: "connecting",
+	// Only a stream that was open and then dropped shows the reconnecting banner.
+	connection: "open",
 	health: null,
 	settings: null,
 	groups: [],
@@ -80,6 +86,9 @@ let state: AppState = {
 	selectedId: null,
 	transcript: null,
 	showArchived: false,
+	hasArchived: false,
+	view: "session",
+	settingsTab: "general",
 };
 
 const listeners = new Set<() => void>();

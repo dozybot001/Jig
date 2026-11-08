@@ -56,8 +56,9 @@ const zh = {
 	status_error: "出错",
 	status_needs_review: "待核对",
 	// session
-	noSessionTitle: "选一个会话，或新建一个",
-	noSessionBody: "每个会话有自己的职责、模型和权限。没选工作文件夹的会话就是聊天。",
+	noSessionTitle: "还没有打开会话",
+	noSessionBody:
+		"从左边选一个会话，或者从下面开始一个新的。每个会话有自己的职责、模型和权限；不选工作文件夹的会话就是聊天。",
 	chat: "聊天",
 	workingFolder: "工作文件夹",
 	model: "模型",
@@ -204,6 +205,23 @@ const zh = {
 	// errors
 	required: "必填",
 	nameTaken: "这个名称已经有会话在用了。",
+	pinned: "已置顶",
+	moreOptions: "更多选项",
+	folderRequired: "这个会话要在一个文件夹里工作，例如 ~/projects/demo",
+	template_code: "写代码",
+	template_code_body: "在一个项目文件夹里读代码、改代码、跑测试",
+	template_code_role:
+		"在工作文件夹里读代码、改代码，运行项目的检查和测试。改动前先看现有实现；改完说明改了什么、怎么验证的。",
+	template_docs: "整理资料",
+	template_docs_body: "把一个文件夹里的资料读完，整理成文档",
+	template_docs_role:
+		"阅读工作文件夹里的资料，按要求整理成结构清楚的文档；引用原文时注明出自哪个文件。",
+	template_chat: "聊天",
+	template_chat_body: "不读写文件，直接问答，点一下就开始",
+	defaultModelHelp: "新建会话时默认选这个服务商和模型；已有的会话不受影响。",
+	deleteProviderBody:
+		"删除自定义服务商 {name}？它的配置和钥匙串里的 API Key 都会删除，用它的会话将无法请求模型。",
+	defaultRulesBody: "新建会话时复制这些规则；之后每个会话可以单独改。",
 	err_network: "连不上 Jig 服务。确认 jig serve 还在运行，然后重试。",
 	err_signin: "登录已失效。在终端运行 jig open，用新链接打开。",
 	err_notFound: "要找的内容不存在，可能已被删除。刷新后再试。",
@@ -311,7 +329,7 @@ const en: Record<MessageKey, string> = {
 	status_waiting: "Waiting for you",
 	status_error: "Error",
 	status_needs_review: "Needs review",
-	noSessionTitle: "Pick a session, or start one",
+	noSessionTitle: "No session is open",
 	noSessionBody:
 		"Each session has its own role, model and permissions. A session without a working folder is a chat.",
 	chat: "Chat",
@@ -459,6 +477,25 @@ const en: Record<MessageKey, string> = {
 	feedback: "Feedback",
 	required: "Required",
 	nameTaken: "Another session already has this name.",
+	pinned: "Pinned",
+	moreOptions: "More options",
+	folderRequired: "This session works in a folder, for example ~/projects/demo",
+	template_code: "Write code",
+	template_code_body: "Read, change and test code in a project folder",
+	template_code_role:
+		"Read and change code in the working folder, and run the project's checks and tests. Look at the existing code before changing it; afterwards, say what changed and how you checked it.",
+	template_docs: "Organize notes",
+	template_docs_body: "Read the material in a folder and turn it into documents",
+	template_docs_role:
+		"Read the material in the working folder and organize it into clearly structured documents as asked; when quoting, name the file it came from.",
+	template_chat: "Chat",
+	template_chat_body: "Questions and answers without files; starts with one click",
+	defaultModelHelp:
+		"New sessions start with this provider and model; existing sessions keep theirs.",
+	deleteProviderBody:
+		"Delete the custom provider {name}? Its settings and its API key in the keychain are removed, and sessions using it will not be able to reach the model.",
+	defaultRulesBody:
+		"New sessions get a copy of these rules; each session can change its own afterwards.",
 	err_network:
 		"Cannot reach the Jig service. Check that jig serve is still running, then try again.",
 	err_signin: "Your sign-in has expired. Run jig open in a terminal and use the new link.",

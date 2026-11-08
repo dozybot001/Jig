@@ -84,7 +84,7 @@ function PermissionCard({ approval }: { approval: Approval }) {
 		.join(", ");
 	return (
 		<section className="card request-card" aria-label={t("approvalTitle")}>
-			<h3>{request.mustConfirm ? t("mustConfirmTitle") : t("approvalTitle")}</h3>
+			<h2>{request.mustConfirm ? t("mustConfirmTitle") : t("approvalTitle")}</h2>
 			<pre className="code">
 				{request.tool === "shell" ? request.summary : `${request.tool}: ${request.summary}`}
 			</pre>
@@ -143,7 +143,7 @@ function QuestionCard({ approval }: { approval: Approval }) {
 	}
 	return (
 		<section className="card request-card" aria-label={t("questionTitle")}>
-			<h3>{t("questionTitle")}</h3>
+			<h2>{t("questionTitle")}</h2>
 			<div>{request.question}</div>
 			{request.options && (
 				<div className="request-actions">
@@ -218,13 +218,13 @@ const ToolCard = memo(function ToolCard({
 					</span>
 				</summary>
 				<div className="tool-detail">
-					<h3>{t("toolArguments")}</h3>
+					<h2>{t("toolArguments")}</h2>
 					<ScrollBlock className="code output" label={t("toolArguments")}>
 						{JSON.stringify(call.arguments, null, 2)}
 					</ScrollBlock>
 					{status === "running" && output && (
 						<>
-							<h3>{t("toolOutput")}</h3>
+							<h2>{t("toolOutput")}</h2>
 							<ScrollBlock className="code output" label={t("toolOutput")}>
 								{output}
 							</ScrollBlock>
@@ -232,13 +232,13 @@ const ToolCard = memo(function ToolCard({
 					)}
 					{detail?.diff && (
 						<>
-							<h3>{t("diff")}</h3>
+							<h2>{t("diff")}</h2>
 							<Diff patch={detail.diff} />
 						</>
 					)}
 					{result && (
 						<>
-							<h3>{t("toolResult")}</h3>
+							<h2>{t("toolResult")}</h2>
 							<ScrollBlock className="code output" label={t("toolResult")}>
 								{resultText(result)}
 							</ScrollBlock>

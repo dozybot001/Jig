@@ -489,7 +489,7 @@ export function Menu({
 						type="button"
 						role="menuitem"
 						tabIndex={-1}
-						style={item.danger ? { color: "var(--danger)" } : undefined}
+						className={item.danger ? "menu-danger" : undefined}
 						onClick={(event) => {
 							event.stopPropagation();
 							setOpen(false);
