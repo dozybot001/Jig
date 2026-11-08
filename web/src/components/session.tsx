@@ -1,5 +1,11 @@
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
-import type { Session, ThinkingLevel } from "../../../src/shared/types.ts";
+import {
+	PERMISSION_MODES,
+	type PermissionMode,
+	permissionModeOf,
+	type Session,
+	type ThinkingLevel,
+} from "../../../src/shared/types.ts";
 import {
 	compactSession,
 	continueSession,
@@ -18,6 +24,7 @@ import { NewSessionDialog } from "./dialogs.tsx";
 import {
 	ArrowUpIcon,
 	ChatIcon,
+	ChevronIcon,
 	CodeIcon,
 	CompactIcon,
 	JigMark,
@@ -25,6 +32,10 @@ import {
 	NotesIcon,
 	PlayIcon,
 	StopIcon,
+	TodoActiveIcon,
+	TodoDoneIcon,
+	TodoIcon,
+	TodoPendingIcon,
 } from "./icons.tsx";
 import { Transcript } from "./transcript.tsx";
 import { Button, ErrorBox, Select, useAction } from "./ui.tsx";
@@ -340,20 +351,19 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 								busy={change.busy}
 								onChange={(patch) => void change.run(patch)}
 							/>
-							{session.cwd && (
-								<Select
-									label={t("directEdits")}
-									value={session.options.directEdits ? "direct" : "ask"}
-									options={[
-										{ value: "ask", label: t("editsAsk") },
-										{ value: "direct", label: t("editsDirect") },
-									]}
-									busy={change.busy}
-									onChange={(value) =>
-										void change.run({ options: { directEdits: value === "direct" } })
-									}
-								/>
-							)}
+							<Select
+								label={t("permissionMode")}
+								value={permissionModeOf(session.options)}
+								options={PERMISSION_MODES.map((mode) => ({
+									value: mode,
+									label: t(`perm_${mode}`),
+									hint: t(`perm_${mode}_hint`),
+								}))}
+								busy={change.busy}
+								onChange={(value) =>
+									void change.run({ options: { permissionMode: value as PermissionMode } })
+								}
+							/>
 						</div>
 						<div className="composer-actions">
 							{!working && session.contextTokens > 0 && (
@@ -419,26 +429,44 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 	);
 }
 
-function TodoPanel({ session }: { session: Session }) {
-	if (session.todos.length === 0) return null;
-	const marks = { pending: "○", in_progress: "◐", done: "●" } as const;
+const TODO_MARKS = {
+	pending: <TodoPendingIcon />,
+	in_progress: <TodoActiveIcon />,
+	done: <TodoDoneIcon />,
+} as const;
+
+/**
+ * The session's task list as a card floating at the transcript's top right, so it never narrows the
+ * conversation. Folded, it shows the progress and the task under way; opened, every task.
+ */
+function TodoCard({ session }: { session: Session }) {
+	useLang();
+	const [open, setOpen] = useState(false);
+	const listId = useId();
+	const todos = session.todos;
+	if (todos.length === 0) return null;
+	const done = todos.filter((todo) => todo.status === "done").length;
+	const current = todos.find((todo) => todo.status === "in_progress");
 	return (
-		<aside className="todo-panel" aria-label="todo">
-			<ol>
-				{session.todos
+		<aside className={open ? "todo-card open" : "todo-card"} aria-label={t("todoTitle")}>
+			<button
+				type="button"
+				className="todo-toggle"
+				aria-expanded={open}
+				aria-controls={listId}
+				onClick={() => setOpen(!open)}
+			>
+				<TodoIcon />
+				<span className="todo-count">{t("todoProgress", { done, total: todos.length })}</span>
+				{!open && current && <span className="todo-current">{current.text}</span>}
+				<ChevronIcon />
+			</button>
+			<ol id={listId} className="todo-list" hidden={!open}>
+				{todos
 					.map((todo, position) => ({ ...todo, key: `todo-${position}` }))
 					.map((todo) => (
-						<li
-							key={todo.key}
-							className={
-								todo.status === "done"
-									? "todo-done"
-									: todo.status === "in_progress"
-										? "todo-active"
-										: ""
-							}
-						>
-							<span aria-hidden="true">{marks[todo.status]}</span>
+						<li key={todo.key} className={`todo-${todo.status}`}>
+							{TODO_MARKS[todo.status]}
 							<span>{todo.text}</span>
 						</li>
 					))}
@@ -605,7 +633,7 @@ export function SessionView() {
 				) : (
 					<p className="notice">{t("loading")}</p>
 				)}
-				<TodoPanel session={session} />
+				<TodoCard session={session} />
 			</div>
 			{transcript && transcript.sessionId === session.id && (
 				<Composer session={session} transcript={transcript} />

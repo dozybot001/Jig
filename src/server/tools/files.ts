@@ -8,6 +8,7 @@ import { countOccurrences, findUnique } from "./match.ts";
 import { MAX_BYTES, MAX_LINES } from "./process.ts";
 import {
 	bool,
+	CONFIRM_ARGUMENT,
 	errorResult,
 	int,
 	str,
@@ -164,6 +165,7 @@ export const writeTool: ToolDefinition = {
 		properties: {
 			path: { type: "string", description: "The file to write." },
 			content: { type: "string", description: "The complete new content." },
+			confirm: CONFIRM_ARGUMENT,
 		},
 		required: ["path", "content"],
 		additionalProperties: false,
@@ -208,6 +210,7 @@ export const editTool: ToolDefinition = {
 			old_text: { type: "string", description: "The text to replace, copied from the file." },
 			new_text: { type: "string", description: "The text to put in its place." },
 			replace_all: { type: "boolean", description: "Replace every occurrence of old_text." },
+			confirm: CONFIRM_ARGUMENT,
 		},
 		required: ["path", "old_text", "new_text"],
 		additionalProperties: false,

@@ -1,5 +1,11 @@
 import { dirname } from "node:path";
-import type { PermissionRequest, PermissionRule, RuleEffect, Session } from "../../shared/types.ts";
+import {
+	type PermissionRequest,
+	type PermissionRule,
+	permissionModeOf,
+	type RuleEffect,
+	type Session,
+} from "../../shared/types.ts";
 import { isInside, isSecretPath, pathMatches, resolvePath, secretLocations } from "./paths.ts";
 import {
 	isReadOnly,
@@ -46,18 +52,36 @@ export class PermissionEngine {
 		this.#secrets = secretLocations(jigHome);
 	}
 
-	decide(subject: Subject, session: Session): Decision {
+	/**
+	 * `flagged` is the model's own judgment, through the `confirm` argument: in the automatic mode a
+	 * flagged call is asked about, others run. Must-confirm operations, explicit "ask" rules and commands
+	 * Jig cannot read are asked about in every mode.
+	 */
+	decide(subject: Subject, session: Session, flagged = false): Decision {
 		switch (subject.kind) {
 			case "none":
 				return { effect: "allow" };
 			case "read":
 			case "write":
-				return this.#files(subject, session);
+				return this.#files(subject, session, flagged);
 			case "command":
-				return this.#command(subject, session);
+				return this.#command(subject, session, flagged);
 			case "url":
-				return this.#url(subject, session);
+				return this.#url(subject, session, flagged);
 		}
+	}
+
+	/** An approval Jig asks for only by default; the session's mode settles it. */
+	#byDefault(
+		session: Session,
+		flagged: boolean,
+		tool: string,
+		summary: string,
+		remember?: PermissionRule[],
+	): Decision {
+		const mode = permissionModeOf(session.options);
+		if (mode === "skip" || (mode === "auto" && !flagged)) return { effect: "allow" };
+		return this.#ask(tool, summary, undefined, remember);
 	}
 
 	#rulesFor(
@@ -73,7 +97,11 @@ export class PermissionEngine {
 		return strongest(effects);
 	}
 
-	#files(subject: Extract<Subject, { kind: "read" | "write" }>, session: Session): Decision {
+	#files(
+		subject: Extract<Subject, { kind: "read" | "write" }>,
+		session: Session,
+		flagged: boolean,
+	): Decision {
 		const cwd = session.cwd;
 		for (const path of subject.paths) {
 			if (isSecretPath(path, this.#secrets)) {
@@ -101,10 +129,8 @@ export class PermissionEngine {
 				);
 			}
 			if (effects.includes("ask")) return this.#ask(subject.tool, subject.summary);
-			if (session.options.directEdits || effects.every((effect) => effect === "allow")) {
-				return { effect: "allow" };
-			}
-			return this.#ask(subject.tool, subject.summary, undefined, [
+			if (effects.every((effect) => effect === "allow")) return { effect: "allow" };
+			return this.#byDefault(session, flagged, subject.tool, subject.summary, [
 				{ effect: "allow", tool: subject.tool, pattern: "**" },
 			]);
 		}
@@ -118,15 +144,20 @@ export class PermissionEngine {
 		const folders = [
 			...new Set(needed.map((path) => (subject.tool === "read" ? dirname(path) : path))),
 		];
-		return this.#ask(
+		return this.#byDefault(
+			session,
+			flagged,
 			subject.tool,
 			subject.summary,
-			undefined,
 			folders.map((pattern) => ({ effect: "allow" as const, tool: subject.tool, pattern })),
 		);
 	}
 
-	#command(subject: Extract<Subject, { kind: "command" }>, session: Session): Decision {
+	#command(
+		subject: Extract<Subject, { kind: "command" }>,
+		session: Session,
+		flagged: boolean,
+	): Decision {
 		const cwd = session.cwd;
 		const parsed = parseShell(subject.command);
 		const commands: string[][] = [];
@@ -174,25 +205,27 @@ export class PermissionEngine {
 		if (!understood || dynamic) return this.#ask(subject.tool, subject.command);
 
 		const pending: string[][] = [];
-		let mustAsk = redirectTargets.length > 0;
+		let ruleAsks = false;
 		for (const argv of commands) {
 			const rule = ruleFor(argv);
-			if (rule === "ask") mustAsk = true;
+			if (rule === "ask") ruleAsks = true;
 			if (rule === "allow") continue;
 			if (rule === null && this.#readOnlyHere(argv, cwd)) continue;
 			pending.push(argv);
 		}
-		if (!mustAsk && pending.length === 0) return { effect: "allow" };
+		if (ruleAsks) return this.#ask(subject.tool, subject.command);
+		if (redirectTargets.length === 0 && pending.length === 0) return { effect: "allow" };
 		const remember = [...new Set(pending.map(rememberPrefix))].map((pattern) => ({
 			effect: "allow" as const,
 			tool: subject.tool,
 			pattern,
 		}));
-		return this.#ask(
+		return this.#byDefault(
+			session,
+			flagged,
 			subject.tool,
 			subject.command,
-			undefined,
-			mustAsk && pending.length === 0 ? undefined : remember,
+			pending.length === 0 ? undefined : remember,
 		);
 	}
 
@@ -204,7 +237,7 @@ export class PermissionEngine {
 		});
 	}
 
-	#url(subject: Extract<Subject, { kind: "url" }>, session: Session): Decision {
+	#url(subject: Extract<Subject, { kind: "url" }>, session: Session, flagged: boolean): Decision {
 		let host: string;
 		try {
 			host = new URL(subject.url).hostname.toLowerCase();
@@ -220,12 +253,10 @@ export class PermissionEngine {
 		if (rule === "deny")
 			return { effect: "deny", reason: `A rule in this session refuses ${host}.` };
 		if (rule === "allow") return { effect: "allow" };
-		return this.#ask(
-			subject.tool,
-			subject.url,
-			undefined,
-			rule === "ask" ? undefined : [{ effect: "allow", tool: subject.tool, pattern: host }],
-		);
+		if (rule === "ask") return this.#ask(subject.tool, subject.url);
+		return this.#byDefault(session, flagged, subject.tool, subject.url, [
+			{ effect: "allow", tool: subject.tool, pattern: host },
+		]);
 	}
 
 	#ask(tool: string, summary: string, mustConfirm?: string, remember?: PermissionRule[]): Decision {

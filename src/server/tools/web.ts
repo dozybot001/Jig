@@ -3,7 +3,15 @@ import http from "node:http";
 import https from "node:https";
 import { BlockList, isIP } from "node:net";
 import { htmlToMarkdown } from "./html.ts";
-import { errorResult, int, str, type ToolDefinition, type ToolResult, text } from "./types.ts";
+import {
+	CONFIRM_ARGUMENT,
+	errorResult,
+	int,
+	str,
+	type ToolDefinition,
+	type ToolResult,
+	text,
+} from "./types.ts";
 
 const MAX_BODY = 5 * 1024 * 1024;
 const MAX_REDIRECTS = 10;
@@ -177,6 +185,7 @@ export const webFetchTool: ToolDefinition = {
 				maximum: 200_000,
 				description: "How much text to return; default 50000.",
 			},
+			confirm: CONFIRM_ARGUMENT,
 		},
 		required: ["url"],
 		additionalProperties: false,

@@ -23,8 +23,9 @@
 	--text: #0d0d0d;
 	--text-2: #5d5d5d;
 	--text-3: #666666;
-	--primary: #0d0d0d;
-	--on-primary: #ffffff;
+	--primary: #e6e6e6;
+	--primary-hover: #dadada;
+	--on-primary: #0d0d0d;
 	--accent: #0d0d0d;
 	--on-accent: #ffffff;
 	--accent-soft: #e6e6e6;
@@ -58,8 +59,9 @@
 	--text: #ececec;
 	--text-2: #b4b4b4;
 	--text-3: #9b9b9b;
-	--primary: #ececec;
-	--on-primary: #121212;
+	--primary: #383838;
+	--primary-hover: #444444;
+	--on-primary: #f2f2f2;
 	--accent: #ececec;
 	--on-accent: #121212;
 	--accent-soft: #3a3a3a;
@@ -282,9 +284,9 @@ a {
 		color: var(--text);
 	}
 	.btn-primary:not(:disabled):hover {
-		background: var(--primary);
+		background: var(--primary-hover);
+		border-color: var(--primary-hover);
 		color: var(--on-primary);
-		opacity: 0.85;
 	}
 }
 @keyframes spin {
@@ -490,6 +492,17 @@ a {
 .menu [role^="menuitem"]:focus-visible {
 	background: var(--hover);
 	outline: none;
+}
+.listbox .option-text {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	padding: 3px 0;
+}
+.listbox .option-hint {
+	font-size: var(--fs-s);
+	font-weight: 400;
+	color: var(--text-3);
 }
 .listbox .group-label {
 	padding: 6px 10px 2px;
@@ -950,7 +963,7 @@ body.scroll-locked {
 	.group-heading:not(:hover, :focus-within) .btn-icon:not(.heading-add) {
 		opacity: 0;
 	}
-	.session-item:is(:hover, :focus-within) :is(.session-time, .badge) {
+	.session-item:is(:hover, :focus-within) :is(.session-time, .badge, .row-dot) {
 		visibility: hidden;
 	}
 }
@@ -996,17 +1009,11 @@ body.scroll-locked {
 .dot-idle {
 	background: transparent;
 }
-/* On a session row the status sits on the corner of the type icon. */
-.session-icon .dot {
-	position: absolute;
-	right: -3px;
-	bottom: -2px;
-	width: 8px;
-	height: 8px;
-	box-shadow: 0 0 0 2px var(--bg-side);
-}
-.session-icon .dot-idle {
-	display: none;
+/* On a session row the status is a small dot on the right, where the time otherwise is. */
+.row-dot {
+	width: 6px;
+	height: 6px;
+	margin: 0 5px;
 }
 @keyframes pulse {
 	50% {
@@ -1055,6 +1062,8 @@ body.scroll-locked {
 
 .main {
 	display: grid;
+	/* The column never grows with its content, so a long title cannot push the page sideways. */
+	grid-template-columns: minmax(0, 1fr);
 	grid-template-rows: auto minmax(0, 1fr) auto;
 	min-width: 0;
 	min-height: 0;
@@ -1171,8 +1180,9 @@ body.scroll-locked {
 	font-size: var(--fs-s);
 }
 .session-body {
+	position: relative;
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-columns: minmax(0, 1fr);
 	min-height: 160px;
 }
 .transcript {
@@ -1185,6 +1195,8 @@ body.scroll-locked {
 	max-width: 760px;
 	margin: 0 auto;
 	display: grid;
+	/* One column that never grows past the transcript: long lines wrap or scroll in their own block. */
+	grid-template-columns: minmax(0, 1fr);
 	gap: 14px;
 }
 .new-messages {
@@ -1194,32 +1206,6 @@ body.scroll-locked {
 	border-color: var(--divider);
 	background: var(--surface);
 	box-shadow: var(--shadow);
-}
-.todo-panel {
-	width: 240px;
-	padding: 12px 16px;
-	overflow-y: auto;
-	overscroll-behavior: contain;
-	font-size: var(--fs-s);
-}
-.todo-panel ol {
-	list-style: none;
-	margin: 0;
-	padding: 0;
-	display: grid;
-	gap: 8px;
-}
-.todo-panel li {
-	display: grid;
-	grid-template-columns: 18px 1fr;
-	gap: 6px;
-}
-.todo-done {
-	color: var(--text-3);
-	text-decoration: line-through;
-}
-.todo-active {
-	font-weight: 600;
 }
 
 .msg-user {
@@ -1233,12 +1219,23 @@ body.scroll-locked {
 }
 .msg-assistant {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 6px;
 	min-width: 0;
 }
-.draft {
+.step-group {
 	display: grid;
-	gap: 14px;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 2px;
+}
+/* The steps of an opened run, indented under its line. */
+.step-list {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 2px;
+	margin: 2px 0 4px 5px;
+	padding-left: 14px;
+	border-left: 2px solid var(--divider);
 }
 /* Consecutive steps sit close together, like one list of activity. */
 .msg-tool + .msg-tool {
@@ -1312,6 +1309,11 @@ body.scroll-locked {
 	flex: none;
 	font-weight: 600;
 }
+/* A run's counts can be long; they wrap instead of pushing the line wider than the transcript. */
+.activity-count {
+	flex: 0 1 auto;
+	min-width: 0;
+}
 .chevron {
 	flex: none;
 	width: 12px;
@@ -1377,6 +1379,7 @@ body.scroll-locked {
 }
 .tool-detail {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 8px;
 	margin: 4px 0 6px;
 	padding: 10px 12px 12px;
@@ -1397,6 +1400,7 @@ body.scroll-locked {
 	color: var(--text-2);
 	font-size: var(--fs-s);
 	white-space: pre-wrap;
+	overflow-wrap: anywhere;
 }
 .note-body {
 	margin: 4px 0;
@@ -1439,15 +1443,39 @@ body.scroll-locked {
 	min-width: 0;
 }
 .request-card {
-	padding: 14px 16px;
 	display: grid;
-	gap: 10px;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 12px;
+	padding: 14px 16px 16px;
 	border-color: var(--border);
-	box-shadow: var(--lift);
 }
-.request-card h2 {
+.request-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.request-head svg {
+	flex: none;
+	color: var(--warning);
+}
+.request-head h2 {
 	font-size: var(--fs-m);
 	font-weight: 600;
+}
+.request-code {
+	max-height: 180px;
+	overflow: auto;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+/* The model's suggested answers read as choices, not as plain text. */
+.question-option {
+	border-color: var(--control);
+}
+.request-always {
+	max-width: 320px;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 .request-actions {
 	display: flex;
@@ -1749,11 +1777,102 @@ button.about-row {
 	gap: 8px;
 }
 
+/* The task list floats over the transcript's top right and never narrows it. */
+.todo-card {
+	position: absolute;
+	top: 8px;
+	right: 16px;
+	z-index: 5;
+	max-width: calc(100% - 32px);
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-l);
+	background: var(--surface);
+	box-shadow: var(--shadow);
+	font-size: var(--fs-s);
+}
+.todo-card.open {
+	width: min(340px, calc(100% - 32px));
+}
+.todo-toggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	min-height: 32px;
+	padding: 4px 10px;
+	border: none;
+	border-radius: inherit;
+	background: none;
+	color: var(--text-2);
+	font: inherit;
+	cursor: pointer;
+}
+.todo-card .todo-toggle > svg {
+	flex: none;
+}
+.todo-count {
+	flex: none;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+.todo-current {
+	min-width: 0;
+	max-width: 220px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text);
+}
+.todo-card .todo-toggle svg.chevron {
+	margin-left: auto;
+	transform: rotate(90deg);
+}
+.todo-card.open .todo-toggle svg.chevron {
+	transform: rotate(-90deg);
+}
+@media (hover: hover) {
+	.todo-toggle:hover {
+		color: var(--text);
+	}
+}
+.todo-card ol {
+	list-style: none;
+	margin: 0;
+	padding: 2px 12px 12px;
+	display: grid;
+	gap: 8px;
+	max-height: min(50dvh, 420px);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+.todo-card ol[hidden] {
+	display: none;
+}
+.todo-card li {
+	display: grid;
+	grid-template-columns: 14px minmax(0, 1fr);
+	gap: 8px;
+	overflow-wrap: anywhere;
+}
+.todo-card .todo-list svg {
+	margin-top: 2px;
+	color: var(--text-3);
+}
+.todo-done {
+	color: var(--text-3);
+	text-decoration: line-through;
+}
+.todo-in_progress {
+	font-weight: 600;
+}
+.todo-card .todo-in_progress > svg {
+	color: var(--text);
+}
+
 /* Scroll shadows (spec 9.7): a fade where more content lies beyond the edge. */
 .transcript,
 .dialog-body,
 .sidebar-list,
-.todo-panel,
 .dialog-body {
 	--fade-bg: var(--surface);
 }
@@ -1776,7 +1895,7 @@ button.about-row {
 		z-index: 20;
 		box-shadow: var(--shadow);
 	}
-	.todo-panel {
+	.todo-current {
 		display: none;
 	}
 	.model-grid {

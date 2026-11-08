@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { startCommand } from "./process.ts";
 import {
 	bool,
+	CONFIRM_ARGUMENT,
 	errorResult,
 	int,
 	str,
@@ -23,6 +24,7 @@ export const shellTool: ToolDefinition = {
 			command: { type: "string", description: "The command line to run." },
 			timeout_seconds: { type: "integer", minimum: 1, maximum: MAX_TIMEOUT },
 			background: { type: "boolean", description: "Start the command and return at once." },
+			confirm: CONFIRM_ARGUMENT,
 		},
 		required: ["command"],
 		additionalProperties: false,

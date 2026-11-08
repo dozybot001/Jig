@@ -276,10 +276,9 @@ function SessionRow({
 					}}
 					onDoubleClick={() => setRenaming(true)}
 				>
-					{/* Chat or code (with a folder), with the status as a dot on the icon's corner. */}
+					{/* Chat or code (with a workspace). */}
 					<span className="session-icon" aria-hidden="true">
 						{session.cwd ? <CodeIcon /> : <ChatIcon />}
-						<span className={`dot dot-${session.status}`} />
 					</span>
 					<span className="session-name">
 						{session.name}
@@ -291,10 +290,13 @@ function SessionRow({
 						</span>
 					</span>
 					{session.pinned && <PinIcon />}
+					{/* On the right: unread count, else a small status dot while it is busy, else the time. */}
 					{session.unread > 0 ? (
 						<span className="badge" aria-hidden="true">
 							{session.unread}
 						</span>
+					) : session.status !== "idle" ? (
+						<span className={`dot row-dot dot-${session.status}`} aria-hidden="true" />
 					) : (
 						<span className="session-time" aria-hidden="true">
 							{formatAgo(session.lastActivityAt, now)}

@@ -27,6 +27,16 @@ export interface ToolContext {
 	ask(question: string, options?: string[]): Promise<string>;
 }
 
+/**
+ * The model's way to ask for a person's approval in the automatic mode. Offered on tools that change
+ * things or reach out: write, edit, shell and web_fetch.
+ */
+export const CONFIRM_ARGUMENT = {
+	type: "boolean",
+	description:
+		"Ask the person before this runs. Set it when the call is risky, destructive or hard to undo.",
+} as const;
+
 export interface ToolDefinition {
 	name: string;
 	/** Jig's own wording (AGENTS.md: no text copied from other products). */

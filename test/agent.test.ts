@@ -283,6 +283,47 @@ describe("agent loop", () => {
 		assert.equal(readFileSync(join(cwd, "AGENTS.md"), "utf8"), "Always answer in prose.\n");
 	});
 
+	test("a changed approval mode arrives as an update; the prompt stays the same", async () => {
+		const { faux, store, agents, session, contexts, capture } = setup();
+		faux.setResponses([capture(fauxAssistantMessage("ok")), capture(fauxAssistantMessage("ok"))]);
+		agents.send(session.id, "hi");
+		await agents.whenIdle(session.id);
+		const system = textOf(contexts[0]?.messages[0]);
+		assert.match(system, /Approval mode is manual/);
+		store.updateSession(session.id, { options: { permissionMode: "skip" } });
+		agents.send(session.id, "again");
+		await agents.whenIdle(session.id);
+		assert.equal(textOf(contexts[1]?.messages[0]), system);
+		const updates = store
+			.listEntries(session.id, { limit: 50 })
+			.entries.filter((e) => e.role === "system");
+		assert.equal(updates.length, 1);
+		assert.match(textOf(updates[0]), /Approval mode is skip/);
+	});
+
+	test("a task list left unchanged for many calls gets a reminder; a finished one does not", async () => {
+		const globs = (prefix: string) =>
+			Array.from({ length: 12 }, (_, i) =>
+				fauxToolCall("glob", { pattern: "*.txt" }, { id: `${prefix}${i}` }),
+			);
+		const reminder = /task list has not changed in the last 12 tool calls/;
+		const { faux, store, agents, session, contexts, capture } = setup();
+		store.setTodos(session.id, [
+			{ text: "Read the files", status: "done" },
+			{ text: "Fix the bug", status: "in_progress" },
+		]);
+		faux.setResponses([toolUse(...globs("a")), capture(fauxAssistantMessage("done"))]);
+		agents.send(session.id, "go");
+		await agents.whenIdle(session.id);
+		assert.match(textOf(contexts[0]?.messages.at(-1)), reminder);
+
+		store.setTodos(session.id, [{ text: "Fix the bug", status: "done" }]);
+		faux.setResponses([toolUse(...globs("b")), capture(fauxAssistantMessage("done"))]);
+		agents.send(session.id, "check again");
+		await agents.whenIdle(session.id);
+		assert.doesNotMatch(textOf(contexts[1]?.messages.at(-1)), reminder);
+	});
+
 	test("a chat without a working folder is offered no file or shell tools", async () => {
 		const { faux, agents, session, contexts, capture } = setup({ cwd: false });
 		faux.setResponses([capture(fauxAssistantMessage("hi"))]);
@@ -321,6 +362,7 @@ describe("system prompt", () => {
 		cwd,
 		git: null,
 		instructions: [],
+		permissionMode: "auto" as const,
 	});
 	const base = { name: "产品", responsibility: "负责 Jig 的产品设计。", cwd: "/tmp/demo" };
 
@@ -339,6 +381,7 @@ describe("system prompt", () => {
 		assert.match(text, /standing session: this role is yours for the long term/);
 		assert.match(text, /in files in your working folder/);
 		assert.match(text, /Stop for the person only for a decision that only they can make/);
+		assert.match(text, /Approval mode is automatic.*set "confirm": true/);
 	});
 
 	test("a task session ends with a report; a chat without group or role mentions neither", () => {

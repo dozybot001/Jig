@@ -27,8 +27,22 @@ export interface PermissionRule {
 export interface SessionOptions {
 	/** Compact when the context reaches this many tokens; null uses the default. */
 	compactAt?: number | null;
-	/** Let write and edit change files inside the working folder without asking. */
+	/** Before 0.1: let write and edit change files without asking. Read as the automatic mode. */
 	directEdits?: boolean;
+	/**
+	 * How approvals work: auto (Jig runs calls unless the model marks one with confirm), manual
+	 * (edits and commands that are not read-only are asked about) or skip. Operations that must be
+	 * confirmed (spec 21.2) are asked about in every mode.
+	 */
+	permissionMode?: PermissionMode;
+}
+
+export const PERMISSION_MODES = ["auto", "manual", "skip"] as const;
+export type PermissionMode = (typeof PERMISSION_MODES)[number];
+
+/** The session's approval mode; sessions from before the modes read direct edits as automatic. */
+export function permissionModeOf(options: SessionOptions): PermissionMode {
+	return options.permissionMode ?? (options.directEdits ? "auto" : "manual");
 }
 
 export interface Todo {

@@ -264,6 +264,8 @@ export function Toggletip({ label, text }: { label: string; text: string }) {
 export interface Option {
 	value: string;
 	label: string;
+	/** A second, quieter line in the list that says what the choice does. */
+	hint?: string;
 	group?: string;
 }
 
@@ -404,7 +406,14 @@ export function Select({
 							onClick={() => choose(index)}
 							onMouseMove={() => setActive(index)}
 						>
-							{option.label}
+							{option.hint ? (
+								<span className="option-text">
+									<span>{option.label}</span>
+									<span className="option-hint">{option.hint}</span>
+								</span>
+							) : (
+								option.label
+							)}
 						</div>,
 					];
 				})}

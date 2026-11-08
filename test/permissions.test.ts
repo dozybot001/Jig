@@ -230,16 +230,12 @@ describe("file permissions", () => {
 		assert.equal(write(join(homedir(), ".aws", "credentials")).effect, "deny");
 	});
 
-	test("writes ask, unless direct edits are on; outside the folder they must be confirmed", () => {
+	test("in the manual mode writes ask; outside the folder they must be confirmed", () => {
 		assert.deepEqual(askOf(write(join(cwd, "a.ts")))?.rememberRules, [
 			{ effect: "allow", tool: "write", pattern: "**" },
 		]);
-		assert.equal(
-			write(join(cwd, "a.ts"), session({ options: { directEdits: true } })).effect,
-			"allow",
-		);
 		const outside = askOf(
-			write(join(outsideDir, "a.ts"), session({ options: { directEdits: true } })),
+			write(join(outsideDir, "a.ts"), session({ options: { permissionMode: "skip" } })),
 		);
 		assert.ok(outside?.mustConfirm);
 	});
@@ -261,8 +257,68 @@ describe("file permissions", () => {
 			summary: "link/f.txt",
 		};
 		assert.ok(
-			askOf(engine.decide(engineSubject, session({ options: { directEdits: true } })))?.mustConfirm,
+			askOf(engine.decide(engineSubject, session({ options: { permissionMode: "skip" } })))
+				?.mustConfirm,
 		);
+	});
+});
+
+describe("permission modes", () => {
+	const auto = session({ options: { permissionMode: "auto" } });
+	const manual = session({ options: { permissionMode: "manual" } });
+	const skip = session({ options: { permissionMode: "skip" } });
+	const edit = (s: Session, flagged = false, path = join(cwd, "a.ts")) =>
+		engine.decide({ kind: "write", tool: "edit", paths: [path], summary: path }, s, flagged);
+	const run = (command: string, s: Session, flagged = false) =>
+		engine.decide({ kind: "command", tool: "shell", command }, s, flagged);
+	const fetchUrl = (s: Session, flagged = false) =>
+		engine.decide({ kind: "url", tool: "web_fetch", url: "https://example.com/a" }, s, flagged);
+
+	test("auto runs edits, commands and requests unless the model asks for approval", () => {
+		assert.equal(edit(auto).effect, "allow");
+		assert.equal(run("npm install", auto).effect, "allow");
+		assert.equal(fetchUrl(auto).effect, "allow");
+		askOf(edit(auto, true));
+		askOf(run("npm install", auto, true));
+		askOf(fetchUrl(auto, true));
+	});
+
+	test("manual asks whether or not the model does", () => {
+		askOf(edit(manual));
+		askOf(run("npm install", manual));
+		askOf(fetchUrl(manual));
+		assert.equal(run("ls", manual).effect, "allow");
+	});
+
+	test("skip runs without asking, even when the model asks", () => {
+		assert.equal(edit(skip, true).effect, "allow");
+		assert.equal(run("npm install", skip, true).effect, "allow");
+		assert.equal(fetchUrl(skip, true).effect, "allow");
+	});
+
+	test("must-confirm operations, ask rules and unreadable commands ask in every mode", () => {
+		const npmAsks: PermissionRule[] = [{ effect: "ask", tool: "shell", pattern: "npm" }];
+		for (const s of [auto, skip]) {
+			assert.ok(askOf(run("git push", s))?.mustConfirm);
+			assert.ok(askOf(run("rm -rf build", s))?.mustConfirm);
+			assert.ok(askOf(edit(s, false, join(outsideDir, "a.ts")))?.mustConfirm);
+			askOf(run("echo $(whoami)", s));
+			askOf(run("npm install", { ...s, rules: npmAsks }));
+		}
+	});
+
+	test("credential locations stay refused in every mode", () => {
+		const key = join(homedir(), ".ssh", "id_ed25519");
+		const decision = engine.decide(
+			{ kind: "read", tool: "read", paths: [key], summary: key },
+			skip,
+		);
+		assert.equal(decision.effect, "deny");
+	});
+
+	test("sessions from before the modes read direct edits as automatic", () => {
+		assert.equal(edit(session({ options: { directEdits: true } })).effect, "allow");
+		askOf(edit(session()));
 	});
 });
 

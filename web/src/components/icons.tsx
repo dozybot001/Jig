@@ -1,15 +1,20 @@
 import {
 	ArrowUp,
 	ChevronRight,
+	Circle,
+	CircleCheck,
+	CircleDot,
 	Code,
 	FileText,
 	Folder,
 	Info,
 	KeyRound,
 	ListPlus,
+	ListTodo,
 	Mail,
 	Menu,
 	MessageCircle,
+	MessageCircleQuestion,
 	Minimize2,
 	PanelLeftClose,
 	PanelLeftOpen,
@@ -18,6 +23,7 @@ import {
 	Plus,
 	Search,
 	Settings,
+	ShieldAlert,
 	SlidersHorizontal,
 	Square,
 	SquarePen,
@@ -51,10 +57,17 @@ export const InfoIcon = () => <Info {...props} />;
 export const CloseIcon = () => <X {...props} />;
 export const ComposeIcon = () => <SquarePen {...props} />;
 export const KeyIcon = () => <KeyRound {...props} />;
+export const ShieldIcon = () => <ShieldAlert {...props} />;
+export const QuestionIcon = () => <MessageCircleQuestion {...props} />;
 export const SlidersIcon = () => <SlidersHorizontal {...props} />;
 export const MailIcon = () => <Mail {...props} />;
 export const CollapseIcon = () => <PanelLeftClose {...props} />;
 export const ExpandIcon = () => <PanelLeftOpen {...props} />;
+export const TodoIcon = () => <ListTodo {...props} />;
+/** Task states in the task list: to do, under way, done. */
+export const TodoPendingIcon = () => <Circle {...props} size={14} />;
+export const TodoActiveIcon = () => <CircleDot {...props} size={14} />;
+export const TodoDoneIcon = () => <CircleCheck {...props} size={14} />;
 
 /**
  * Jig's mark: three parallel strokes forming a J. Drawn in the text colour, so it is ink on light

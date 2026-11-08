@@ -7,15 +7,16 @@ import type {
 	ToolCallBlock,
 	ToolResultMessage,
 } from "../../shared/messages.ts";
-import type {
-	Approval,
-	ApprovalDecision,
-	Entry,
-	QueuedMessage,
-	Session,
-	SessionStatus,
-	ToolCallView,
-	UsageTotals,
+import {
+	type Approval,
+	type ApprovalDecision,
+	type Entry,
+	permissionModeOf,
+	type QueuedMessage,
+	type Session,
+	type SessionStatus,
+	type ToolCallView,
+	type UsageTotals,
 } from "../../shared/types.ts";
 import { conflict, invalid, JigError } from "../errors.ts";
 import type { ModelGateway, ModelInfo } from "../model/gateway.ts";
@@ -37,6 +38,7 @@ import {
 	transcriptForSummary,
 } from "./context.ts";
 import {
+	APPROVAL_MODE,
 	type ContextSnapshot,
 	loadInstructions,
 	renderInstructions,
@@ -70,6 +72,8 @@ const KEEP_RECENT_TOKENS = 20_000;
 const MAX_COMPACT_AT = 200_000;
 const MAX_MESSAGE_CHARS = 100_000;
 const MAX_STEPS = 500;
+/** After this many tool calls without a change to a task list that still has open tasks, Jig reminds the model. */
+const TODO_REMINDER_AFTER = 12;
 
 const userEntry = (text: string): EntryBody => ({
 	role: "user",
@@ -134,6 +138,8 @@ export class Agents {
 	readonly #jobs = new Map<string, Jobs>();
 	/** Messages from Jig itself (such as "a background job ended") waiting to reach the model. */
 	readonly #notes = new Map<string, string[]>();
+	/** Tool calls since each session last changed its task list. */
+	readonly #sinceTodo = new Map<string, number>();
 
 	constructor(options: AgentsOptions) {
 		this.#store = options.store;
@@ -316,6 +322,7 @@ export class Agents {
 					}),
 				);
 				await this.#runCalls(sessionId, rows, calls, live);
+				this.#remindTodos(sessionId, calls);
 				if (signal.aborted) {
 					this.#notice(sessionId, "interrupted", "Stopped by the person.");
 					break;
@@ -432,7 +439,9 @@ export class Agents {
 			const session = this.#store.getSession(sessionId);
 			let decision: ReturnType<PermissionEngine["decide"]>;
 			try {
-				decision = this.#permissions.decide(tool.subject(row.args, session), session);
+				// In the automatic mode the model asks for a person's approval itself, with `confirm`.
+				const flagged = (row.args as { confirm?: unknown }).confirm === true;
+				decision = this.#permissions.decide(tool.subject(row.args, session), session, flagged);
 			} catch (error) {
 				const message =
 					error instanceof ToolInputError
@@ -628,9 +637,7 @@ export class Agents {
 			jobs = new Jobs((job) => {
 				const code = job.finished?.exitCode;
 				const note = `Background job ${job.id} (${job.command}) ended${code === null || code === undefined ? "" : ` with exit code ${code}`}. Use shell_job to read its output.`;
-				const notes = this.#notes.get(sessionId) ?? [];
-				notes.push(note);
-				this.#notes.set(sessionId, notes);
+				this.#note(sessionId, note);
 				this.#notice(sessionId, "job_finished", note, {
 					job: job.id,
 					command: job.command,
@@ -640,6 +647,34 @@ export class Agents {
 			this.#jobs.set(sessionId, jobs);
 		}
 		return jobs;
+	}
+
+	#note(sessionId: string, note: string): void {
+		const notes = this.#notes.get(sessionId) ?? [];
+		notes.push(note);
+		this.#notes.set(sessionId, notes);
+	}
+
+	/**
+	 * Models tend to write a task list once and then forget it, so the list the person sees falls behind.
+	 * After many calls without a change while tasks are still open, Jig reminds the model to update it.
+	 */
+	#remindTodos(sessionId: string, calls: ToolCallBlock[]): void {
+		if (calls.some((call) => call.name === "todo")) {
+			this.#sinceTodo.delete(sessionId);
+			return;
+		}
+		const count = (this.#sinceTodo.get(sessionId) ?? 0) + calls.length;
+		const open = this.#store.getSession(sessionId).todos.some((todo) => todo.status !== "done");
+		if (count < TODO_REMINDER_AFTER || !open) {
+			this.#sinceTodo.set(sessionId, count);
+			return;
+		}
+		this.#sinceTodo.delete(sessionId);
+		this.#note(
+			sessionId,
+			`Your task list has not changed in the last ${count} tool calls. If it no longer matches the work, update it with the todo tool.`,
+		);
 	}
 
 	/** Moves queued messages and Jig's notes into the transcript; true if anything arrived. */
@@ -707,12 +742,22 @@ export class Agents {
 					: "The instruction files were removed.",
 			);
 		}
-		if (updates.length === 0) return saved;
+		const mode = permissionModeOf(session.options);
+		if (saved.permissionMode && saved.permissionMode !== mode) {
+			updates.push(`The person changed the approval mode. ${APPROVAL_MODE[mode]}`);
+		}
+		if (updates.length === 0) {
+			if (saved.permissionMode) return saved;
+			// A snapshot from before the modes learns the mode quietly; the prompt already states it.
+			const next = { ...saved, permissionMode: mode };
+			this.#store.setContextSnapshot(session.id, next);
+			return next;
+		}
 		this.#store.appendEntry(session.id, {
 			role: "system",
 			message: { role: "system", content: updates.join("\n\n"), timestamp: Date.now() },
 		});
-		const next = { ...saved, date, instructions: current };
+		const next = { ...saved, date, instructions: current, permissionMode: mode };
 		this.#store.setContextSnapshot(session.id, next);
 		// The prompt keeps the old snapshot so it stays cacheable; the update above carries the change.
 		return { ...saved };

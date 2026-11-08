@@ -4,6 +4,7 @@ import type {
 	ApprovalDecision,
 	Entry,
 	Group,
+	PermissionMode,
 	PermissionRule,
 	QueuedMessage,
 	Session,
@@ -312,7 +313,7 @@ export type SessionPatch = Partial<{
 	model: string;
 	thinking: ThinkingLevel;
 	rules: PermissionRule[];
-	options: { compactAt?: number | null; directEdits?: boolean };
+	options: { compactAt?: number | null; permissionMode?: PermissionMode };
 	pinned: boolean;
 	archived: boolean;
 }>;

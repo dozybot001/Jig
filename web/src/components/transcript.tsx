@@ -15,7 +15,7 @@ import { answerApproval, loadEarlier, markRead, toolCallFor } from "../actions.t
 import { t, useLang } from "../i18n.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
 import { Diff, Markdown, ScrollBlock } from "./content.tsx";
-import { ChevronIcon } from "./icons.tsx";
+import { ChevronIcon, QuestionIcon, ShieldIcon } from "./icons.tsx";
 import { Button, ErrorBox, useAction } from "./ui.tsx";
 
 function resultText(result: ToolResultMessage | undefined): string {
@@ -107,8 +107,11 @@ function PermissionCard({ approval }: { approval: Approval }) {
 		.join(", ");
 	return (
 		<section className="card request-card" aria-label={t("approvalTitle")}>
-			<h2>{request.mustConfirm ? t("mustConfirmTitle") : t("approvalTitle")}</h2>
-			<pre className="code">
+			<div className="request-head">
+				<ShieldIcon />
+				<h2>{request.mustConfirm ? t("mustConfirmTitle") : t("approvalTitle")}</h2>
+			</div>
+			<pre className="code request-code">
 				{request.tool === "shell" ? request.summary : `${request.tool}: ${request.summary}`}
 			</pre>
 			{request.mustConfirm && request.reason && (
@@ -124,17 +127,19 @@ function PermissionCard({ approval }: { approval: Approval }) {
 					onKeyDown={(event) => event.key === "Enter" && void action.run("deny")}
 				/>
 			)}
+			{/* Allow, always allow (the rule is in the label), decline: in Claude's order. */}
 			<div className="request-actions">
 				<Button variant="primary" busy={action.busy} onClick={() => void action.run("allow_once")}>
 					{t("approve")}
 				</Button>
 				{rules && (
 					<Button
+						className="request-always"
 						busy={action.busy}
 						onClick={() => void action.run("allow_always")}
 						title={t("rememberAs", { rules })}
 					>
-						{t("approveRemember")}
+						{t("approveAlways", { rules })}
 					</Button>
 				)}
 				<Button
@@ -142,10 +147,9 @@ function PermissionCard({ approval }: { approval: Approval }) {
 					busy={action.busy}
 					onClick={() => (denying ? void action.run("deny") : setDenying(true))}
 				>
-					{t("deny")}
+					{denying ? t("confirmDeny") : t("deny")}
 				</Button>
 			</div>
-			{rules && <p className="hint">{t("rememberAs", { rules })}</p>}
 			<ErrorBox error={action.error} />
 		</section>
 	);
@@ -166,12 +170,20 @@ function QuestionCard({ approval }: { approval: Approval }) {
 	}
 	return (
 		<section className="card request-card" aria-label={t("questionTitle")}>
-			<h2>{t("questionTitle")}</h2>
+			<div className="request-head">
+				<QuestionIcon />
+				<h2>{t("questionTitle")}</h2>
+			</div>
 			<div>{request.question}</div>
 			{request.options && (
 				<div className="request-actions">
 					{request.options.map((option) => (
-						<Button key={option} busy={action.busy} onClick={() => void action.run(option)}>
+						<Button
+							key={option}
+							className="question-option"
+							busy={action.busy}
+							onClick={() => void action.run(option)}
+						>
 							{option}
 						</Button>
 					))}
@@ -220,10 +232,6 @@ const ToolCard = memo(function ToolCard({
 		| null
 		| undefined;
 	const [open, setOpen] = useState(false);
-	// A card opened for an approval folds again once the approval is settled.
-	useEffect(() => {
-		if (!pending) setOpen(false);
-	}, [pending]);
 	const running = status === "running";
 	const verb = isToolVerb(call.name)
 		? t(running ? `act_${call.name}_ing` : `act_${call.name}`)
@@ -231,62 +239,65 @@ const ToolCard = memo(function ToolCard({
 	const flagged = status !== "running" && status !== "done";
 	return (
 		<div className="msg-assistant msg-tool">
-			<details
-				className="activity tool-card"
-				open={open || pending}
-				onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
-			>
-				<summary>
-					<span className={running ? "activity-verb shimmer" : "activity-verb"}>{verb}</span>
-					<span className="tool-summary">{callSummary(call)}</span>
-					{detail?.diff && (
-						<span className="tool-stat">
-							<span className="stat-add" aria-hidden="true">
-								+{detail.added ?? 0}
-							</span>{" "}
-							<span className="stat-del" aria-hidden="true">
-								−{detail.removed ?? 0}
+			{/* While the person is asked, the request card alone says what the call wants to do. */}
+			{!pending && (
+				<details
+					className="activity tool-card"
+					open={open}
+					onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
+				>
+					<summary>
+						<span className={running ? "activity-verb shimmer" : "activity-verb"}>{verb}</span>
+						<span className="tool-summary">{callSummary(call)}</span>
+						{detail?.diff && (
+							<span className="tool-stat">
+								<span className="stat-add" aria-hidden="true">
+									+{detail.added ?? 0}
+								</span>{" "}
+								<span className="stat-del" aria-hidden="true">
+									−{detail.removed ?? 0}
+								</span>
+								<span className="visually-hidden">
+									{t("linesAdded", { n: detail.added ?? 0 })}{" "}
+									{t("linesRemoved", { n: detail.removed ?? 0 })}
+								</span>
 							</span>
-							<span className="visually-hidden">
-								{t("linesAdded", { n: detail.added ?? 0 })}{" "}
-								{t("linesRemoved", { n: detail.removed ?? 0 })}
-							</span>
-						</span>
-					)}
-					{flagged && (
-						<span className={`tool-state tool-state-${status}`}>{t(`tool_${status}`)}</span>
-					)}
-					<ChevronIcon />
-				</summary>
-				<div className="tool-detail">
-					<h2>{t("toolArguments")}</h2>
-					<ScrollBlock className="code output" label={t("toolArguments")}>
-						{JSON.stringify(call.arguments, null, 2)}
-					</ScrollBlock>
-					{status === "running" && output && (
-						<>
-							<h2>{t("toolOutput")}</h2>
-							<ScrollBlock className="code output" label={t("toolOutput")}>
-								{output}
-							</ScrollBlock>
-						</>
-					)}
-					{detail?.diff && (
-						<>
-							<h2>{t("diff")}</h2>
-							<Diff patch={detail.diff} />
-						</>
-					)}
-					{result && (
-						<>
-							<h2>{t("toolResult")}</h2>
-							<ScrollBlock className="code output" label={t("toolResult")}>
-								{resultText(result)}
-							</ScrollBlock>
-						</>
-					)}
-				</div>
-			</details>
+						)}
+						{flagged && (
+							<span className={`tool-state tool-state-${status}`}>{t(`tool_${status}`)}</span>
+						)}
+						<ChevronIcon />
+					</summary>
+					<div className="tool-detail">
+						<h2>{t("toolArguments")}</h2>
+						<ScrollBlock className="code output" label={t("toolArguments")}>
+							{JSON.stringify(call.arguments, null, 2)}
+						</ScrollBlock>
+						{status === "running" && output && (
+							<>
+								<h2>{t("toolOutput")}</h2>
+								<ScrollBlock className="code output" label={t("toolOutput")}>
+									{output}
+								</ScrollBlock>
+							</>
+						)}
+						{detail?.diff && (
+							<>
+								<h2>{t("diff")}</h2>
+								<Diff patch={detail.diff} />
+							</>
+						)}
+						{result && (
+							<>
+								<h2>{t("toolResult")}</h2>
+								<ScrollBlock className="code output" label={t("toolResult")}>
+									{resultText(result)}
+								</ScrollBlock>
+							</>
+						)}
+					</div>
+				</details>
+			)}
 			{approvals.map((approval) =>
 				approval.kind === "permission" ? (
 					<PermissionCard key={approval.id} approval={approval} />
@@ -298,119 +309,247 @@ const ToolCard = memo(function ToolCard({
 	);
 });
 
-function AssistantBlocks({
-	message,
-	entryId,
+const JIG_NOTE = "[From Jig, not from the person]";
+
+/** One step of a turn's work: a thought, a tool call, or a note Jig added to the context. */
+type Step =
+	| { kind: "thinking"; key: string; text: string; live: boolean }
+	| { kind: "tool"; key: string; block: ToolCallBlock; entryId: string | null }
+	| { kind: "note"; key: string; entry: Entry };
+
+/** What the transcript shows, in order: messages, the assistant's text, and runs of steps. */
+type Item =
+	| { kind: "entry"; key: string; entry: Entry }
+	| { kind: "text"; key: string; text: string }
+	| { kind: "steps"; key: string; steps: Step[]; live: boolean; alone: boolean };
+
+function userText(entry: Extract<Entry, { role: "user" }>): string {
+	const content = entry.message.content;
+	return typeof content === "string"
+		? content
+		: content.map((b) => (b.type === "text" ? b.text : "")).join("\n");
+}
+
+/**
+ * Turns the transcript into items. Consecutive thoughts and tool calls between two pieces of text form
+ * one run, shown folded so the conversation stays readable. A call waiting for the person is taken out
+ * of its run, so an approval is never hidden.
+ */
+function buildItems(transcript: TranscriptState, working: boolean): Item[] {
+	const items: Item[] = [];
+	let run: Step[] = [];
+	const flush = (live = false) => {
+		const first = run[0];
+		if (first) items.push({ kind: "steps", key: first.key, steps: run, live, alone: false });
+		run = [];
+	};
+	const blocks = (message: AssistantMessage, entryId: string | null, live: boolean) => {
+		message.content.forEach((block, position) => {
+			const key = `${entryId ?? "draft"}:${position}`;
+			if (block.type === "thinking") {
+				const last = position === message.content.length - 1;
+				if (block.thinking.trim()) {
+					run.push({ kind: "thinking", key, text: block.thinking, live: live && last });
+				}
+			} else if (block.type === "text") {
+				if (!block.text.trim()) return;
+				flush();
+				items.push({ kind: "text", key, text: block.text });
+			} else {
+				const view = entryId ? toolCallFor(transcript.toolCalls, entryId, block.id) : undefined;
+				const waiting =
+					view !== undefined &&
+					Object.values(transcript.approvals).some(
+						(a) => a.toolCallId === view.id && a.status === "pending",
+					);
+				const step: Step = { kind: "tool", key: block.id, block, entryId };
+				if (!waiting) {
+					run.push(step);
+					return;
+				}
+				flush();
+				items.push({ kind: "steps", key: block.id, steps: [step], live: false, alone: true });
+			}
+		});
+	};
+	for (const entry of transcript.entries) {
+		if (entry.role === "assistant") blocks(entry.message, entry.id, false);
+		else if (entry.role === "system" || entry.role === "compaction") {
+			run.push({ kind: "note", key: entry.id, entry });
+		} else if (entry.role === "user" && userText(entry).startsWith(JIG_NOTE)) {
+			// Jig's own notes to the model are not shown and do not split a run.
+		} else if (entry.role !== "toolResult") {
+			flush();
+			items.push({ kind: "entry", key: entry.id, entry });
+		}
+	}
+	if (transcript.draft) blocks(transcript.draft, null, true);
+	flush(working);
+	return items;
+}
+
+const SUMMARY_KINDS = ["read", "edit", "write", "search", "shell", "web"] as const;
+type SummaryKind = (typeof SUMMARY_KINDS)[number];
+
+function summaryKind(tool: string): SummaryKind | null {
+	if (tool === "read" || tool === "edit" || tool === "write") return tool;
+	if (tool === "grep" || tool === "glob") return "search";
+	if (tool === "shell" || tool === "shell_job") return "shell";
+	if (tool === "web_fetch") return "web";
+	return null;
+}
+
+function failed(
+	step: Step,
+	transcript: TranscriptState,
+	results: Map<string, ToolResultMessage>,
+): boolean {
+	if (step.kind !== "tool") return false;
+	const view = step.entryId
+		? toolCallFor(transcript.toolCalls, step.entryId, step.block.id)
+		: undefined;
+	const status = view?.status ?? (results.get(step.block.id)?.isError ? "error" : "done");
+	return status === "error" || status === "denied";
+}
+
+/** "读取 6 个文件，运行 4 条命令，编辑 2 处": what a run did, counted by kind. */
+function summarize(steps: Step[]): string {
+	const counts = new Map<SummaryKind, number>();
+	let thoughts = 0;
+	let others = 0;
+	for (const step of steps) {
+		if (step.kind === "thinking") thoughts++;
+		else if (step.kind === "note") others++;
+		else {
+			const kind = summaryKind(step.block.name);
+			if (kind) counts.set(kind, (counts.get(kind) ?? 0) + 1);
+			else others++;
+		}
+	}
+	const parts = SUMMARY_KINDS.filter((kind) => counts.has(kind)).map((kind) => {
+		const n = counts.get(kind) ?? 0;
+		return t(n === 1 ? `sum_${kind}_one` : `sum_${kind}`, { n });
+	});
+	if (others > 0) parts.push(t(others === 1 ? "sum_other_one" : "sum_other", { n: others }));
+	if (parts.length === 0) {
+		parts.push(t(thoughts === 1 ? "sum_think_one" : "sum_think", { n: thoughts }));
+	}
+	return parts.join(t("listSeparator"));
+}
+
+function StepView({
+	step,
 	transcript,
 	results,
-	live,
 }: {
-	message: AssistantMessage;
-	entryId: string | null;
+	step: Step;
 	transcript: TranscriptState;
 	results: Map<string, ToolResultMessage>;
-	live: boolean;
 }) {
+	if (step.kind === "thinking") return <Thinking text={step.text} live={step.live} />;
+	if (step.kind === "note") return <NoteStep entry={step.entry} />;
+	const view = step.entryId
+		? toolCallFor(transcript.toolCalls, step.entryId, step.block.id)
+		: undefined;
+	const approvals = view
+		? Object.values(transcript.approvals).filter((a) => a.toolCallId === view.id)
+		: [];
 	return (
-		<>
-			{message.content
-				.map((block, position) => ({
-					block,
-					key: `${entryId ?? "draft"}:${position}`,
-					last: position === message.content.length - 1,
-				}))
-				.map(({ block, key, last }) => {
-					if (block.type === "thinking") {
-						if (!block.thinking.trim()) return null;
-						return <Thinking key={key} text={block.thinking} live={live && last} />;
-					}
-					if (block.type === "text") {
-						if (!block.text.trim()) return null;
-						return (
-							<div key={key} className="msg-assistant">
-								<Markdown text={block.text} />
-							</div>
-						);
-					}
-					const view = entryId ? toolCallFor(transcript.toolCalls, entryId, block.id) : undefined;
-					const approvals = view
-						? Object.values(transcript.approvals).filter((a) => a.toolCallId === view.id)
-						: [];
-					return (
-						<ToolCard
-							key={block.id}
-							call={block}
-							view={view}
-							result={results.get(block.id)}
-							approvals={approvals}
-							output={view ? transcript.outputs[view.id] : undefined}
-						/>
-					);
-				})}
-		</>
+		<ToolCard
+			call={step.block}
+			view={view}
+			result={results.get(step.block.id)}
+			approvals={approvals}
+			output={view ? transcript.outputs[view.id] : undefined}
+		/>
 	);
 }
 
-function EntryView({
-	entry,
+/**
+ * A run of steps folded into one line that counts what was done; open it to see every step. While the
+ * session is still working on it, the latest step stays visible under the line.
+ */
+function StepGroup({
+	steps,
+	live,
 	transcript,
 	results,
 }: {
-	entry: Entry;
+	steps: Step[];
+	live: boolean;
 	transcript: TranscriptState;
 	results: Map<string, ToolResultMessage>;
 }) {
+	useLang();
+	const [open, setOpen] = useState(false);
+	const errors = steps.filter((step) => failed(step, transcript, results)).length;
+	const last = steps[steps.length - 1];
+	return (
+		<div className="step-group">
+			<details
+				className="activity"
+				open={open}
+				onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
+			>
+				<summary>
+					<span className="activity-verb activity-count">{summarize(steps)}</span>
+					{errors > 0 && (
+						<span className="tool-state tool-state-error">{t("stepsFailed", { n: errors })}</span>
+					)}
+					<ChevronIcon />
+				</summary>
+				<div className="step-list">
+					{steps.map((step) => (
+						<StepView key={step.key} step={step} transcript={transcript} results={results} />
+					))}
+				</div>
+			</details>
+			{live && !open && last && <StepView step={last} transcript={transcript} results={results} />}
+		</div>
+	);
+}
+
+/** Jig's notes in the context: changed instruction files, or the summary of compacted history. */
+function NoteStep({ entry }: { entry: Entry }) {
+	useLang();
+	if (entry.role === "system") {
+		return (
+			<details className="activity">
+				<summary>
+					<span className="activity-verb">{t("instructionsUpdated")}</span>
+					<ChevronIcon />
+				</summary>
+				<ScrollBlock className="code output note-body" label={t("instructionsUpdated")}>
+					{entry.message.content}
+				</ScrollBlock>
+			</details>
+		);
+	}
+	if (entry.role === "compaction") {
+		return (
+			<details className="activity">
+				<summary>
+					<span className="activity-verb">{t("summaryTitle")}</span>
+					<ChevronIcon />
+				</summary>
+				<div className="tool-detail">
+					<Markdown text={entry.compaction.summary} />
+				</div>
+			</details>
+		);
+	}
+	return null;
+}
+
+/** A message from the person, or a notice from Jig. */
+function EntryView({ entry }: { entry: Entry }) {
 	switch (entry.role) {
-		case "user": {
-			const content = entry.message.content;
-			const text =
-				typeof content === "string"
-					? content
-					: content.map((b) => (b.type === "text" ? b.text : "")).join("\n");
-			// Jig's own notes to the model; the person sees the matching notice instead.
-			if (text.startsWith("[From Jig, not from the person]")) return null;
+		case "user":
 			return (
 				<div className="msg-user">
 					<span className="visually-hidden">{t("you")}: </span>
-					{text}
+					{userText(entry)}
 				</div>
-			);
-		}
-		case "assistant":
-			return (
-				<AssistantBlocks
-					message={entry.message}
-					entryId={entry.id}
-					transcript={transcript}
-					results={results}
-					live={false}
-				/>
-			);
-		case "toolResult":
-			return null;
-		case "system":
-			return (
-				<details className="activity">
-					<summary>
-						<span className="activity-verb">{t("instructionsUpdated")}</span>
-						<ChevronIcon />
-					</summary>
-					<ScrollBlock className="code output note-body" label={t("instructionsUpdated")}>
-						{entry.message.content}
-					</ScrollBlock>
-				</details>
-			);
-		case "compaction":
-			return (
-				<details className="activity">
-					<summary>
-						<span className="activity-verb">{t("summaryTitle")}</span>
-						<ChevronIcon />
-					</summary>
-					<div className="tool-detail">
-						<Markdown text={entry.compaction.summary} />
-					</div>
-				</details>
 			);
 		case "notice": {
 			const notice = entry.notice;
@@ -440,6 +579,8 @@ function EntryView({
 			}
 			return <p className={`notice ${notice.kind === "error" ? "notice-error" : ""}`}>{text}</p>;
 		}
+		default:
+			return null;
 	}
 }
 
@@ -459,6 +600,7 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 	for (const entry of transcript.entries) {
 		if (entry.role === "toolResult") results.set(entry.message.toolCallId, entry.message);
 	}
+	const items = buildItems(transcript, session?.status === "working");
 	const freeApprovals = Object.values(transcript.approvals).filter(
 		(a) => !a.toolCallId && a.status === "pending",
 	);
@@ -524,20 +666,32 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 				{transcript.entries.length === 0 && !transcript.draft && (
 					<p className="notice">{t("emptyTranscript")}</p>
 				)}
-				{transcript.entries.map((entry) => (
-					<EntryView key={entry.id} entry={entry} transcript={transcript} results={results} />
-				))}
-				{transcript.draft && (
-					<div className="draft" aria-busy="true">
-						<AssistantBlocks
-							message={transcript.draft}
-							entryId={null}
+				{items.map((item) => {
+					if (item.kind === "entry") return <EntryView key={item.key} entry={item.entry} />;
+					if (item.kind === "text") {
+						return (
+							<div key={item.key} className="msg-assistant">
+								<Markdown text={item.text} />
+							</div>
+						);
+					}
+					const only = item.steps[0];
+					// A single step, or one waiting for the person, shows as itself.
+					if (only && (item.alone || item.steps.length === 1)) {
+						return (
+							<StepView key={item.key} step={only} transcript={transcript} results={results} />
+						);
+					}
+					return (
+						<StepGroup
+							key={item.key}
+							steps={item.steps}
+							live={item.live}
 							transcript={transcript}
 							results={results}
-							live
 						/>
-					</div>
-				)}
+					);
+				})}
 				{freeApprovals.map((approval) => (
 					<QuestionCard key={approval.id} approval={approval} />
 				))}

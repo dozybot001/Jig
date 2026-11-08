@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { Hono } from "hono";
 import type { PermissionRule, Session, ThinkingLevel, Transcript } from "../../shared/types.ts";
-import { SESSION_KINDS, THINKING_LEVELS } from "../../shared/types.ts";
+import { PERMISSION_MODES, SESSION_KINDS, THINKING_LEVELS } from "../../shared/types.ts";
 import { invalid } from "../errors.ts";
 import { type ExportLanguage, exportFileName, sessionMarkdown } from "../export.ts";
 import { pickFolder } from "../folder-picker.ts";
@@ -225,6 +225,7 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			model,
 			thinking: optEnum(fields, "thinking", THINKING_LEVELS) ?? settings.defaultModel.thinking,
 			rules: settings.defaultRules,
+			options: { permissionMode: "auto" },
 		});
 		return c.json(session, 201);
 	});
@@ -265,10 +266,10 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			) {
 				throw invalid("compactAt must be a whole number of at least 10000, or null.", "options");
 			}
-			const directEdits = optBoolean(options, "directEdits");
+			const permissionMode = optEnum(options, "permissionMode", PERMISSION_MODES);
 			patch.options = {
 				...(compactAt !== undefined ? { compactAt: compactAt as number | null } : {}),
-				...(directEdits !== undefined ? { directEdits } : {}),
+				...(permissionMode !== undefined ? { permissionMode } : {}),
 			};
 		}
 		const pinned = optBoolean(fields, "pinned");
