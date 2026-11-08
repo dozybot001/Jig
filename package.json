@@ -2,7 +2,7 @@
 	"name": "jig",
 	"version": "0.0.0",
 	"private": true,
-	"description": "Your personal AI-native workbench",
+	"description": "An AI-native multi-agent workbench",
 	"license": "UNLICENSED",
 	"author": "Tenon AI (https://tenon.asia/)",
 	"homepage": "https://tenon.asia/",
