@@ -138,7 +138,8 @@ describe("agent loop", () => {
 			{ effect: "allow", tool: "shell", pattern: "touch" },
 		]);
 		const confirm = store.pendingApprovals(session.id)[0];
-		assert.equal((confirm?.request as { mustConfirm: boolean }).mustConfirm, true);
+		assert.ok(confirm);
+		assert.equal((confirm.request as { mustConfirm: boolean }).mustConfirm, true);
 		assert.throws(
 			() => agents.answer(confirm?.id as string, { decision: "allow_always" }),
 			/only be allowed once/,
