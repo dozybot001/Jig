@@ -113,7 +113,7 @@ export interface CompactionRecord {
 
 /** A line in the transcript for the person only; never sent to the model. */
 export interface Notice {
-	kind: "interrupted" | "model_changed" | "restarted" | "error" | "compacted";
+	kind: "interrupted" | "model_changed" | "restarted" | "error" | "compacted" | "job_finished";
 	text?: string;
 	data?: JsonObject;
 	timestamp: number;

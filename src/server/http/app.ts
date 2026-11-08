@@ -1,6 +1,8 @@
 import { Hono } from "hono";
+import type { Agents } from "../agent/runner.ts";
 import type { ModelGateway } from "../model/gateway.ts";
 import type { Store } from "../store.ts";
+import { agentRoutes } from "./agents.ts";
 import { api } from "./api.ts";
 import { type AppEnv, errorHandler, problemResponse, requestId, titleFor } from "./problem.ts";
 import { providerRoutes } from "./providers.ts";
@@ -8,6 +10,7 @@ import { providerRoutes } from "./providers.ts";
 export interface AppOptions {
 	store: Store;
 	gateway?: ModelGateway;
+	agents?: Agents;
 	log?: (line: string) => void;
 }
 
@@ -26,5 +29,6 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 		}),
 	);
 	if (gateway) app.route("/api", providerRoutes(store, gateway));
+	if (options.agents) app.route("/api", agentRoutes(store, options.agents, log));
 	return app;
 }

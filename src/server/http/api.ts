@@ -195,7 +195,20 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		const archived = optBoolean(fields, "archived");
 		if (archived !== undefined) patch.archived = archived;
 		if (optBoolean(fields, "read") === true) patch.read = true;
-		return c.json(store.updateSession(id, patch));
+		const before = store.getSession(id);
+		const updated = store.updateSession(id, patch);
+		if (updated.provider !== before.provider || updated.model !== before.model) {
+			store.appendEntry(id, {
+				role: "notice",
+				notice: {
+					kind: "model_changed",
+					text: `${before.provider}/${before.model} → ${updated.provider}/${updated.model}`,
+					timestamp: Date.now(),
+				},
+			});
+			return c.json(store.getSession(id));
+		}
+		return c.json(updated);
 	});
 
 	app.get("/sessions/:id/transcript", (c) => {
