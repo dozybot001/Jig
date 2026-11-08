@@ -1,26 +1,49 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
+import { VERSION } from "../../shared/version.ts";
 import type { Agents } from "../agent/runner.ts";
+import type { EventBus } from "../events.ts";
 import type { ModelGateway } from "../model/gateway.ts";
 import type { Store } from "../store.ts";
 import { agentRoutes } from "./agents.ts";
 import { api } from "./api.ts";
+import { DraftCache, eventRoutes } from "./events.ts";
 import { type AppEnv, errorHandler, problemResponse, requestId, titleFor } from "./problem.ts";
 import { providerRoutes } from "./providers.ts";
+import { authRoutes, localOnly, requireBrowser, securityHeaders } from "./security.ts";
 
 export interface AppOptions {
 	store: Store;
 	gateway?: ModelGateway;
 	agents?: Agents;
+	bus?: EventBus;
 	log?: (line: string) => void;
+	/** Turns on the Host, Origin and sign-in checks for this port. Tests of the API alone leave it out. */
+	security?: { port: number };
+	/** The built web interface (`web/dist`). */
+	webRoot?: string;
 }
+
+const NOT_BUILT = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Jig</title></head>
+<body><p>The web interface has not been built yet. In the Jig folder, run: npm run build:web</p></body></html>`;
 
 export function createApp(options: AppOptions): Hono<AppEnv> {
 	const log = options.log ?? ((line: string) => process.stderr.write(`${line}\n`));
-	const { store, gateway } = options;
+	const { store, gateway, agents, bus } = options;
 	const app = new Hono<AppEnv>();
 	app.use("*", requestId());
+	app.use("*", securityHeaders());
 	app.onError(errorHandler(log));
 	app.notFound((c) => problemResponse(c, 404, "not-found", titleFor(404), "No such endpoint."));
+
+	if (options.security) {
+		app.use("*", localOnly(options.security.port));
+		app.use("*", requireBrowser(store, options.security.port));
+		app.route("/api", authRoutes(store, options.security.port));
+	}
+	app.get("/api/health", (c) => c.json({ ok: true, version: VERSION }));
 	app.route(
 		"/api",
 		api({
@@ -29,6 +52,27 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 		}),
 	);
 	if (gateway) app.route("/api", providerRoutes(store, gateway));
-	if (options.agents) app.route("/api", agentRoutes(store, options.agents, log));
+	if (agents) app.route("/api", agentRoutes(store, agents, log));
+	if (bus) app.route("/api", eventRoutes(store, bus, new DraftCache(bus)));
+
+	const root = options.webRoot;
+	if (root && existsSync(join(root, "index.html"))) {
+		const index = readFileSync(join(root, "index.html"), "utf8");
+		app.use("/assets/*", async (c, next) => {
+			await next();
+			// Built assets have content hashes in their names, so they can be cached for good.
+			if (c.res.status === 200) {
+				c.res.headers.set("Cache-Control", "public, max-age=31536000, immutable");
+			}
+		});
+		app.use("*", serveStatic({ root }));
+		app.get("*", (c) => {
+			if (c.req.path.startsWith("/api/")) return c.notFound();
+			c.header("Cache-Control", "no-cache");
+			return c.html(index);
+		});
+	} else {
+		app.get("/", (c) => c.html(NOT_BUILT));
+	}
 	return app;
 }

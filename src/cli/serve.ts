@@ -1,0 +1,194 @@
+import { spawn } from "node:child_process";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
+import { VERSION } from "../shared/version.ts";
+import { type CliIo, EXIT_ERROR, EXIT_OK, UsageError } from "./io.ts";
+import type { Command } from "./run.ts";
+
+export const DEFAULT_PORT = 4777;
+const EVENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+const SERVE_HELP = `Usage: jig serve [options]
+
+Start Jig's local service. It listens on 127.0.0.1 only, keeps running while
+the browser is closed, and prints a one-time link to open the web interface.
+
+Options:
+  -p, --port <n>  Port to listen on (default ${DEFAULT_PORT})
+      --open      Open the link in the default browser
+  -h, --help      Show this help
+`;
+
+const OPEN_HELP = `Usage: jig open [options]
+
+Open the web interface of the running Jig service with a new one-time link.
+
+Options:
+      --print  Print the link instead of opening a browser
+  -h, --help   Show this help
+`;
+
+interface ServeFile {
+	port: number;
+	pid: number;
+	startedAt: number;
+}
+
+const serveFile = (home: string) => join(home, "serve.json");
+
+export function openBrowser(url: string): void {
+	const [command, args] =
+		process.platform === "darwin"
+			? ["open", [url]]
+			: process.platform === "win32"
+				? ["cmd", ["/c", "start", "", url]]
+				: ["xdg-open", [url]];
+	spawn(command as string, args as string[], { detached: true, stdio: "ignore" }).unref();
+}
+
+export function serveCommand(): Command {
+	return {
+		name: "serve",
+		summary: "Start Jig's local service",
+		async run(args: string[], io: CliIo): Promise<number> {
+			const { values } = parseArgs({
+				args,
+				options: {
+					port: { type: "string", short: "p" },
+					open: { type: "boolean" },
+					help: { type: "boolean", short: "h" },
+				},
+				strict: true,
+			});
+			if (values.help) {
+				io.stdout.write(SERVE_HELP);
+				return EXIT_OK;
+			}
+			const port = values.port === undefined ? DEFAULT_PORT : Number(values.port);
+			if (!Number.isInteger(port) || port < 1 || port > 65535) {
+				throw new UsageError("--port must be a whole number from 1 to 65535");
+			}
+
+			const { openRuntime } = await import("../server/runtime.ts");
+			const { serve } = await import("@hono/node-server");
+			const { Agents } = await import("../server/agent/runner.ts");
+			const { PermissionEngine } = await import("../server/permissions/engine.ts");
+			const { createApp } = await import("../server/http/app.ts");
+			const { issueLoginToken } = await import("../server/http/security.ts");
+
+			const runtime = openRuntime({ env: io.env });
+			const { store, bus, gateway, home } = runtime;
+			const stuck = store.recoverAfterRestart();
+			if (stuck.length > 0) {
+				io.stderr.write(
+					`${stuck.length} session(s) were working when Jig last stopped. They are marked for review; nothing was redone.\n`,
+				);
+			}
+			store.pruneEvents(Date.now() - EVENT_RETENTION_MS);
+			const log = (line: string) => io.stderr.write(`${line}\n`);
+			const agents = new Agents({
+				store,
+				gateway,
+				permissions: new PermissionEngine(home),
+				home,
+				version: VERSION,
+				log,
+			});
+			const app = createApp({
+				store,
+				gateway,
+				agents,
+				bus,
+				log,
+				security: { port },
+				webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
+			});
+
+			const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port });
+			const started = await new Promise<boolean>((resolve) => {
+				server.once("listening", () => resolve(true));
+				server.once("error", (error: NodeJS.ErrnoException) => {
+					io.stderr.write(
+						error.code === "EADDRINUSE"
+							? `jig: port ${port} is in use. Is Jig already running? Try 'jig open', or pick another port with --port.\n`
+							: `jig: could not start: ${error.message}\n`,
+					);
+					resolve(false);
+				});
+			});
+			if (!started) {
+				runtime.close();
+				return EXIT_ERROR;
+			}
+			const info: ServeFile = { port, pid: process.pid, startedAt: Date.now() };
+			writeFileSync(serveFile(home), JSON.stringify(info), { mode: 0o600 });
+
+			const url = `http://127.0.0.1:${port}/#t=${issueLoginToken(store)}`;
+			io.stdout.write(
+				`Jig ${VERSION} is running at http://127.0.0.1:${port}/\nSign in with this link (works once, within 10 minutes):\n${url}\nStop with Ctrl-C. For a new link later, run: jig open\n`,
+			);
+			if (values.open) openBrowser(url);
+
+			return await new Promise<number>((resolve) => {
+				const stop = () => {
+					io.stderr.write("Stopping Jig…\n");
+					agents.shutdown();
+					server.close();
+					rmSync(serveFile(home), { force: true });
+					runtime.close();
+					resolve(EXIT_OK);
+				};
+				process.once("SIGINT", stop);
+				process.once("SIGTERM", stop);
+			});
+		},
+	};
+}
+
+export function openCommand(): Command {
+	return {
+		name: "open",
+		summary: "Open the web interface with a new sign-in link",
+		async run(args: string[], io: CliIo): Promise<number> {
+			const { values } = parseArgs({
+				args,
+				options: { print: { type: "boolean" }, help: { type: "boolean", short: "h" } },
+				strict: true,
+			});
+			if (values.help) {
+				io.stdout.write(OPEN_HELP);
+				return EXIT_OK;
+			}
+			const { jigHome } = await import("../server/paths.ts");
+			const home = jigHome(io.env);
+			let info: ServeFile;
+			try {
+				info = JSON.parse(readFileSync(serveFile(home), "utf8")) as ServeFile;
+				process.kill(info.pid, 0);
+			} catch {
+				io.stderr.write("jig: Jig is not running. Start it with: jig serve\n");
+				return EXIT_ERROR;
+			}
+			const { openDatabase } = await import("../server/db/database.ts");
+			const { EventBus } = await import("../server/events.ts");
+			const { Store } = await import("../server/store.ts");
+			const { dbPath } = await import("../server/paths.ts");
+			const { issueLoginToken } = await import("../server/http/security.ts");
+			const db = openDatabase(dbPath(home));
+			try {
+				const url = `http://127.0.0.1:${info.port}/#t=${issueLoginToken(new Store(db, new EventBus()))}`;
+				if (values.print) {
+					io.stdout.write(`${url}\n`);
+				} else {
+					openBrowser(url);
+					io.stdout.write(`Opened Jig in the browser (http://127.0.0.1:${info.port}/).\n`);
+				}
+				return EXIT_OK;
+			} finally {
+				db.close();
+			}
+		},
+	};
+}

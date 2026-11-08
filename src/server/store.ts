@@ -985,6 +985,43 @@ export class Store {
 		return this.#q("DELETE FROM providers WHERE id = ?").run(id).changes > 0;
 	}
 
+	// --- sign-in tokens (only hashes are stored) ---
+
+	saveAuthToken(hash: string, kind: "login" | "browser", expiresAt: number): void {
+		this.#q("INSERT INTO auth_tokens (hash, kind, expires_at, created_at) VALUES (?, ?, ?, ?)").run(
+			hash,
+			kind,
+			expiresAt,
+			Date.now(),
+		);
+	}
+
+	/** Removes a one-time login token and says whether it was valid; a token works only once. */
+	consumeLoginToken(hash: string): boolean {
+		const row = this.#q(
+			"DELETE FROM auth_tokens WHERE hash = ? AND kind = 'login' AND expires_at > ? RETURNING hash",
+		).get(hash, Date.now());
+		return row !== undefined;
+	}
+
+	/** Checks a browser token and extends it; returns false when unknown or expired. */
+	touchBrowserToken(hash: string, extendTo: number): boolean {
+		const now = Date.now();
+		const result = this.#q(
+			`UPDATE auth_tokens SET last_used_at = ?, expires_at = MAX(expires_at, ?)
+			WHERE hash = ? AND kind = 'browser' AND expires_at > ?`,
+		).run(now, extendTo, hash, now);
+		return result.changes > 0;
+	}
+
+	deleteAuthToken(hash: string): void {
+		this.#q("DELETE FROM auth_tokens WHERE hash = ?").run(hash);
+	}
+
+	pruneAuthTokens(): void {
+		this.#q("DELETE FROM auth_tokens WHERE expires_at <= ?").run(Date.now());
+	}
+
 	// --- search ---
 
 	search(query: string, limit = 20): { sessions: Session[]; hits: SearchHit[] } {
