@@ -420,25 +420,28 @@ export function SettingsPage() {
 	const tab = useAppState((state) => state.settingsTab);
 	return (
 		<main className="main settings-page" aria-label={t("settings")}>
-			<nav className="settings-nav" aria-label={t("settings")}>
-				<SidebarToggle />
-				<h1>{t("settings")}</h1>
-				{TABS.map((id) => (
-					<button
-						key={id}
-						type="button"
-						aria-current={tab === id ? "page" : undefined}
-						onClick={() => setState({ settingsTab: id })}
-					>
-						{t(TAB_LABEL[id])}
-					</button>
-				))}
-			</nav>
-			<div className="settings-content">
-				{tab === "general" && <General />}
-				{tab === "providers" && <Providers />}
-				{tab === "rules" && <Rules />}
-				{tab === "about" && <About />}
+			{/* Navigation and content sit together in the middle of the page; the whole page scrolls. */}
+			<div className="settings-layout">
+				<nav className="settings-nav" aria-label={t("settings")}>
+					<SidebarToggle />
+					<h1>{t("settings")}</h1>
+					{TABS.map((id) => (
+						<button
+							key={id}
+							type="button"
+							aria-current={tab === id ? "page" : undefined}
+							onClick={() => setState({ settingsTab: id })}
+						>
+							{t(TAB_LABEL[id])}
+						</button>
+					))}
+				</nav>
+				<div className="settings-content">
+					{tab === "general" && <General />}
+					{tab === "providers" && <Providers />}
+					{tab === "rules" && <Rules />}
+					{tab === "about" && <About />}
+				</div>
 			</div>
 		</main>
 	);

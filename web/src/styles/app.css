@@ -1602,17 +1602,26 @@ body.scroll-locked {
 	font-size: var(--fs-s);
 }
 
-/* --- settings page (spec 10.5): categories on the left, content on the right --- */
+/* --- settings page (spec 10.5): categories and content side by side, centred on the page --- */
 
 .settings-page {
-	display: grid;
-	grid-template-columns: 210px minmax(0, 1fr);
-	grid-template-rows: minmax(0, 1fr);
+	display: block;
 	min-height: 0;
-	overflow: hidden;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+.settings-layout {
+	display: grid;
+	grid-template-columns: 196px minmax(0, 1fr);
+	gap: 40px;
+	max-width: 980px;
+	margin: 0 auto;
+	padding: 32px 32px 56px;
 }
 .settings-nav {
-	padding: 22px 10px;
+	position: sticky;
+	top: 32px;
+	align-self: start;
 	display: grid;
 	align-content: start;
 	gap: 2px;
@@ -1645,9 +1654,7 @@ body.scroll-locked {
 	}
 }
 .settings-content {
-	overflow-y: auto;
-	overscroll-behavior: contain;
-	padding: 28px 32px 48px;
+	min-width: 0;
 	container-type: inline-size;
 }
 .settings-section {
@@ -1810,7 +1817,7 @@ button.about-row {
 .dialog-body,
 .sidebar-list,
 .todo-panel,
-.settings-content {
+.settings-page {
 	background:
 		linear-gradient(var(--fade-bg, var(--bg)) 30%, transparent) center top / 100% 32px no-repeat
 		local,
@@ -1871,15 +1878,17 @@ button.about-row {
 	.composer-bar .select-trigger {
 		max-width: 120px;
 	}
-	.settings-page {
+	.settings-layout {
 		grid-template-columns: minmax(0, 1fr);
-		grid-template-rows: auto minmax(0, 1fr);
+		gap: 16px;
+		padding: 12px 16px 40px;
 	}
 	.settings-nav {
+		position: static;
 		border-bottom: 1px solid var(--divider);
 		grid-auto-flow: column;
 		overflow-x: auto;
-		padding: 12px;
+		padding-bottom: 12px;
 	}
 	.settings-nav h1 {
 		display: none;
@@ -1887,9 +1896,6 @@ button.about-row {
 	.setting-row {
 		grid-template-columns: minmax(0, 1fr);
 		gap: 8px;
-	}
-	.settings-content {
-		padding: 20px 16px 40px;
 	}
 }
 @media (min-width: 761px) {
