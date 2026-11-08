@@ -18,6 +18,7 @@ Jig 不收集任何数据。会话、消息和产物都存在你自己的电脑�
 
 - [产品蓝图](docs/blueprint.md)：为什么做、做什么、不做什么、怎么验收
 - [M1 实现计划](docs/m1-plan.md)
+- [可借鉴的开源项目](docs/prior-art.md)
 - [开发约定](AGENTS.md)
 
 ## 许可证
