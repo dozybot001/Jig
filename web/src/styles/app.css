@@ -773,6 +773,26 @@ body.scroll-locked {
 	height: 12px;
 	color: var(--text-3);
 }
+.session-row-editing {
+	grid-template-columns: 16px minmax(0, 1fr);
+	cursor: default;
+	background: var(--selected);
+}
+.row-input {
+	min-width: 0;
+	height: 26px;
+	padding: 0 6px;
+	border: 1px solid var(--control-strong);
+	border-radius: 6px;
+	background: var(--surface);
+	color: var(--text);
+	font: inherit;
+	outline: none;
+}
+.row-error {
+	grid-column: 1 / -1;
+	padding: 0 0 6px 24px;
+}
 .session-name {
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -1575,11 +1595,43 @@ body.scroll-locked {
 	gap: 6px;
 	margin-top: 8px;
 }
+.rules {
+	display: grid;
+	gap: 8px;
+}
+.rules-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.rules-list {
+	display: grid;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-l);
+	overflow: hidden;
+}
+.rules-empty {
+	margin: 0;
+	padding: 14px 16px;
+	color: var(--text-3);
+}
 .rule-row {
 	display: grid;
-	grid-template-columns: 110px 120px minmax(0, 1fr) auto;
+	grid-template-columns: 96px 128px minmax(0, 1fr) var(--cell);
 	gap: 6px;
 	align-items: center;
+	padding: 8px 8px 8px 10px;
+	border-top: 1px solid var(--border);
+}
+.rule-row:first-child {
+	border-top: none;
+}
+.rule-row .select-trigger,
+.rule-row .input {
+	min-height: 32px;
+	border-color: transparent;
+	background: var(--surface-2);
 }
 
 /* About: lockup and version, two short paragraphs, then one list of the publisher's details. */
@@ -1685,9 +1737,15 @@ button.about-row {
 	.todo-panel {
 		display: none;
 	}
-	.rule-row,
 	.model-grid {
 		grid-template-columns: 1fr 1fr;
+	}
+	.rule-row {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--cell);
+	}
+	.rule-row .input {
+		grid-column: 1 / -1;
+		order: 1;
 	}
 	.field-row {
 		grid-template-columns: minmax(0, 1fr);

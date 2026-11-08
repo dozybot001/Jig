@@ -9,8 +9,18 @@ import { createGroup, createSession, renameGroup, updateSession } from "../actio
 import { ApiError } from "../api.ts";
 import { t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
+import { CloseIcon, PlusIcon } from "./icons.tsx";
 import { ModelPicker } from "./session.tsx";
-import { Button, Dialog, describeError, ErrorBox, Field, Select, useAction } from "./ui.tsx";
+import {
+	Button,
+	Dialog,
+	describeError,
+	ErrorBox,
+	Field,
+	Select,
+	Toggletip,
+	useAction,
+} from "./ui.tsx";
 
 const TOOLS = ["*", "read", "write", "edit", "glob", "grep", "shell", "web_fetch"];
 
@@ -24,6 +34,10 @@ function generalError(error: unknown, fields: string[]): unknown {
 	return error;
 }
 
+/**
+ * Permission rules as one list: the heading and "Add rule" on a line, then a row per rule (effect,
+ * tool, optional scope, delete). An empty list says what happens without rules.
+ */
 export function RulesEditor({
 	rules,
 	onChange,
@@ -32,55 +46,71 @@ export function RulesEditor({
 	onChange: (rules: PermissionRule[]) => void;
 }) {
 	useLang();
+	const headingId = useId();
 	const update = (index: number, patch: Partial<PermissionRule>) =>
 		onChange(rules.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)));
 	return (
-		<div className="field">
-			<Field label={t("rules")} info={t("rulesHelp")}>
-				{rules.length === 0 && <span className="hint">{t("noRules")}</span>}
-			</Field>
-			{rules.map((rule, index) => (
-				// biome-ignore lint/suspicious/noArrayIndexKey: rules have no identity besides their position
-				<div key={index} className="rule-row">
-					<Select
-						label={t("effect_allow")}
-						value={rule.effect}
-						options={(["allow", "ask", "deny"] as const).map((e) => ({
-							value: e,
-							label: t(`effect_${e}`),
-						}))}
-						onChange={(value) => update(index, { effect: value as PermissionRule["effect"] })}
-					/>
-					<Select
-						label={t("tool")}
-						value={rule.tool}
-						options={TOOLS.map((tool) => ({ value: tool, label: tool }))}
-						onChange={(value) => update(index, { tool: value })}
-					/>
-					<input
-						className="input"
-						aria-label={t("pattern")}
-						placeholder={t("pattern")}
-						value={rule.pattern ?? ""}
-						onChange={(event) => {
-							const pattern = event.target.value;
-							const { pattern: _drop, ...rest } = rule;
-							onChange(
-								rules.map((r, i) => (i === index ? (pattern ? { ...rest, pattern } : rest) : r)),
-							);
-						}}
-					/>
-					<Button onClick={() => onChange(rules.filter((_, i) => i !== index))}>
-						{t("delete")}
-					</Button>
-				</div>
-			))}
-			<div>
+		<section className="rules" aria-labelledby={headingId}>
+			<div className="rules-head">
+				<span className="field-label">
+					<span id={headingId}>{t("rules")}</span>
+					<Toggletip label={t("rules")} text={t("rulesHelp")} />
+				</span>
 				<Button onClick={() => onChange([...rules, { effect: "allow", tool: "shell" }])}>
+					<PlusIcon />
 					{t("addRule")}
 				</Button>
 			</div>
-		</div>
+			<div className="rules-list">
+				{rules.length === 0 ? (
+					<p className="rules-empty">{t("noRules")}</p>
+				) : (
+					rules.map((rule, index) => (
+						// biome-ignore lint/suspicious/noArrayIndexKey: rules have no identity besides their position
+						<div key={index} className="rule-row">
+							<Select
+								label={t("effect")}
+								value={rule.effect}
+								options={(["allow", "ask", "deny"] as const).map((e) => ({
+									value: e,
+									label: t(`effect_${e}`),
+								}))}
+								onChange={(value) => update(index, { effect: value as PermissionRule["effect"] })}
+							/>
+							<Select
+								label={t("tool")}
+								value={rule.tool}
+								options={TOOLS.map((tool) => ({ value: tool, label: tool }))}
+								onChange={(value) => update(index, { tool: value })}
+							/>
+							<input
+								className="input"
+								aria-label={t("pattern")}
+								placeholder={t("pattern")}
+								value={rule.pattern ?? ""}
+								onChange={(event) => {
+									const pattern = event.target.value;
+									const { pattern: _drop, ...rest } = rule;
+									onChange(
+										rules.map((r, i) =>
+											i === index ? (pattern ? { ...rest, pattern } : rest) : r,
+										),
+									);
+								}}
+							/>
+							<Button
+								variant="icon"
+								aria-label={t("deleteRule")}
+								title={t("deleteRule")}
+								onClick={() => onChange(rules.filter((_, i) => i !== index))}
+							>
+								<CloseIcon />
+							</Button>
+						</div>
+					))
+				)}
+			</div>
+		</section>
 	);
 }
 
@@ -215,9 +245,8 @@ export function NewSessionDialog({
 }
 
 /**
- * The settings people rarely change: permission rules and the compaction threshold. The common ones
- * sit where they are used: name, role and group in the row menu; folder, model and edits in the
- * composer.
+ * Session settings: the role, permission rules and the compaction threshold. The rest sits where it
+ * is used: name and group in the row menu; folder, model and edits in the composer.
  */
 export function SessionSettingsDialog({
 	session,
@@ -227,20 +256,24 @@ export function SessionSettingsDialog({
 	onClose: () => void;
 }) {
 	useLang();
+	const [responsibility, setResponsibility] = useState(session.responsibility);
 	const [compactAt, setCompactAt] = useState(
 		session.options.compactAt ? String(session.options.compactAt) : "",
 	);
 	const [rules, setRules] = useState(session.rules);
+	const roleId = useId();
 	const compactId = useId();
 	const compactErrorId = useId();
 	const save = useAction(async () => {
 		await updateSession(session.id, {
+			responsibility,
 			rules,
 			options: { compactAt: compactAt.trim() ? Number(compactAt) : null },
 		});
 		onClose();
 	});
 	const dirty =
+		responsibility !== session.responsibility ||
 		compactAt !== (session.options.compactAt ? String(session.options.compactAt) : "") ||
 		JSON.stringify(rules) !== JSON.stringify(session.rules);
 	return (
@@ -262,6 +295,15 @@ export function SessionSettingsDialog({
 				</>
 			}
 		>
+			<Field label={t("responsibility")} htmlFor={roleId}>
+				<textarea
+					id={roleId}
+					className="textarea textarea-large"
+					placeholder={t("responsibilityPlaceholder")}
+					value={responsibility}
+					onChange={(event) => setResponsibility(event.target.value)}
+				/>
+			</Field>
 			<RulesEditor rules={rules} onChange={setRules} />
 			<Field
 				label={t("compactAt")}
@@ -281,99 +323,6 @@ export function SessionSettingsDialog({
 				/>
 			</Field>
 			<ErrorBox error={generalError(save.error, ["options"])} />
-		</Dialog>
-	);
-}
-
-/** The session's role, edited on its own from the row menu. */
-export function RoleDialog({ session, onClose }: { session: Session; onClose: () => void }) {
-	useLang();
-	const [text, setText] = useState(session.responsibility);
-	const save = useAction(async () => {
-		await updateSession(session.id, { responsibility: text });
-		onClose();
-	});
-	return (
-		<Dialog
-			title={t("responsibility")}
-			size="m"
-			onClose={onClose}
-			footer={
-				<>
-					<Button onClick={onClose}>{t("cancel")}</Button>
-					<Button
-						variant="primary"
-						busy={save.busy}
-						disabled={text === session.responsibility}
-						onClick={() => void save.run()}
-					>
-						{t("save")}
-					</Button>
-				</>
-			}
-		>
-			<textarea
-				className="textarea textarea-large"
-				aria-label={t("responsibility")}
-				placeholder={t("responsibilityPlaceholder")}
-				value={text}
-				autoFocus
-				onChange={(event) => setText(event.target.value)}
-			/>
-			<ErrorBox error={save.error} />
-		</Dialog>
-	);
-}
-
-/** Renaming keeps the session's id, so messages and links to it still arrive (blueprint 7.1). */
-export function RenameDialog({ session, onClose }: { session: Session; onClose: () => void }) {
-	useLang();
-	const [name, setName] = useState(session.name);
-	const id = useId();
-	const errorId = useId();
-	const save = useAction(async () => {
-		await updateSession(session.id, { name });
-		onClose();
-	});
-	const error = fieldError(save.error, "name");
-	return (
-		<Dialog
-			title={t("rename")}
-			size="s"
-			onClose={onClose}
-			footer={
-				<>
-					<Button onClick={onClose}>{t("cancel")}</Button>
-					<Button
-						variant="primary"
-						busy={save.busy}
-						disabled={!name.trim() || name === session.name}
-						onClick={() => void save.run()}
-					>
-						{t("save")}
-					</Button>
-				</>
-			}
-		>
-			<Field label={t("name")} htmlFor={id} error={error} errorId={errorId}>
-				<input
-					id={id}
-					className="input"
-					value={name}
-					maxLength={60}
-					autoFocus
-					aria-invalid={error ? "true" : undefined}
-					aria-describedby={error ? errorId : undefined}
-					onChange={(event) => setName(event.target.value)}
-					onKeyDown={(event) => {
-						if (event.key === "Enter" && !event.nativeEvent.isComposing) {
-							event.preventDefault();
-							void save.run();
-						}
-					}}
-				/>
-			</Field>
-			<ErrorBox error={generalError(save.error, ["name"])} />
 		</Dialog>
 	);
 }

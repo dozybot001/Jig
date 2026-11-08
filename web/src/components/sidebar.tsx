@@ -11,14 +11,7 @@ import { api } from "../api.ts";
 import { formatAgo, t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
 import { Snippet } from "./content.tsx";
-import {
-	ConfirmDialog,
-	GroupDialog,
-	NewSessionDialog,
-	RenameDialog,
-	RoleDialog,
-	SessionSettingsDialog,
-} from "./dialogs.tsx";
+import { ConfirmDialog, GroupDialog, NewSessionDialog, SessionSettingsDialog } from "./dialogs.tsx";
 import {
 	ChatIcon,
 	CodeIcon,
@@ -29,7 +22,7 @@ import {
 	PinIcon,
 	SearchIcon,
 } from "./icons.tsx";
-import { Button, Menu } from "./ui.tsx";
+import { Button, describeError, Menu, useAction } from "./ui.tsx";
 
 interface SearchResult {
 	sessions: Session[];
@@ -50,6 +43,61 @@ function useNow(): number {
 	return now;
 }
 
+/**
+ * Renaming in place: the row's name becomes a field. Enter or clicking away saves, Escape cancels.
+ * The session keeps its id, so messages to it still arrive (blueprint 7.1).
+ */
+function RenameRow({ session, onDone }: { session: Session; onDone: () => void }) {
+	useLang();
+	const [value, setValue] = useState(session.name);
+	const input = useRef<HTMLInputElement>(null);
+	// Escape closes the field; the blur that follows must not save what was typed.
+	const cancelled = useRef(false);
+	useEffect(() => {
+		input.current?.focus();
+		input.current?.select();
+	}, []);
+	const save = useAction(async () => {
+		const name = value.trim();
+		if (name && name !== session.name) await updateSession(session.id, { name });
+		onDone();
+	});
+	return (
+		<div className="session-row session-row-editing">
+			<span className="session-icon" aria-hidden="true">
+				{session.cwd ? <CodeIcon /> : <ChatIcon />}
+			</span>
+			<input
+				ref={input}
+				className="row-input"
+				value={value}
+				maxLength={60}
+				aria-label={t("rename")}
+				aria-invalid={save.error ? "true" : undefined}
+				onChange={(event) => setValue(event.target.value)}
+				onKeyDown={(event) => {
+					if (event.key === "Escape") {
+						cancelled.current = true;
+						onDone();
+					}
+					if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+						event.preventDefault();
+						void save.run();
+					}
+				}}
+				onBlur={() => {
+					if (!cancelled.current && !save.busy) void save.run();
+				}}
+			/>
+			{save.error !== null && save.error !== undefined && (
+				<span className="field-error row-error" role="alert">
+					{describeError(save.error)}
+				</span>
+			)}
+		</div>
+	);
+}
+
 function SessionRow({
 	session,
 	selected,
@@ -62,7 +110,8 @@ function SessionRow({
 	now: number;
 }) {
 	useLang();
-	const [dialog, setDialog] = useState<"rename" | "role" | "settings" | null>(null);
+	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [renaming, setRenaming] = useState(false);
 	const moves = [
 		...groups
 			.filter((group) => group.id !== session.groupId)
@@ -81,40 +130,45 @@ function SessionRow({
 	];
 	return (
 		<div className="session-item">
-			<button
-				type="button"
-				className="session-row"
-				aria-current={selected ? "true" : undefined}
-				onClick={() => {
-					closeDrawer();
-					void selectSession(session.id);
-				}}
-			>
-				{/* Chat or code (with a folder), with the status as a dot on the icon's corner. */}
-				<span className="session-icon" aria-hidden="true">
-					{session.cwd ? <CodeIcon /> : <ChatIcon />}
-					<span className={`dot dot-${session.status}`} />
-				</span>
-				<span className="session-name">
-					{session.name}
-					<span className="visually-hidden">
-						{" "}
-						· {session.cwd ? t("mode_code") : t("mode_chat")} · {t(`status_${session.status}`)}
-						{session.pinned ? ` · ${t("pinned")}` : ""}
-						{session.unread > 0 ? ` · ${t("unread", { n: session.unread })}` : ""}
+			{renaming ? (
+				<RenameRow session={session} onDone={() => setRenaming(false)} />
+			) : (
+				<button
+					type="button"
+					className="session-row"
+					aria-current={selected ? "true" : undefined}
+					onClick={() => {
+						closeDrawer();
+						void selectSession(session.id);
+					}}
+					onDoubleClick={() => setRenaming(true)}
+				>
+					{/* Chat or code (with a folder), with the status as a dot on the icon's corner. */}
+					<span className="session-icon" aria-hidden="true">
+						{session.cwd ? <CodeIcon /> : <ChatIcon />}
+						<span className={`dot dot-${session.status}`} />
 					</span>
-				</span>
-				{session.pinned && <PinIcon />}
-				{session.unread > 0 ? (
-					<span className="badge" aria-hidden="true">
-						{session.unread}
+					<span className="session-name">
+						{session.name}
+						<span className="visually-hidden">
+							{" "}
+							· {session.cwd ? t("mode_code") : t("mode_chat")} · {t(`status_${session.status}`)}
+							{session.pinned ? ` · ${t("pinned")}` : ""}
+							{session.unread > 0 ? ` · ${t("unread", { n: session.unread })}` : ""}
+						</span>
 					</span>
-				) : (
-					<span className="session-time" aria-hidden="true">
-						{formatAgo(session.lastActivityAt, now)}
-					</span>
-				)}
-			</button>
+					{session.pinned && <PinIcon />}
+					{session.unread > 0 ? (
+						<span className="badge" aria-hidden="true">
+							{session.unread}
+						</span>
+					) : (
+						<span className="session-time" aria-hidden="true">
+							{formatAgo(session.lastActivityAt, now)}
+						</span>
+					)}
+				</button>
+			)}
 			<span className="session-row-menu">
 				<Menu
 					label={`${session.name} – ${t("more")}`}
@@ -123,10 +177,9 @@ function SessionRow({
 							label: session.pinned ? t("unpin") : t("pin"),
 							onSelect: () => void updateSession(session.id, { pinned: !session.pinned }),
 						},
-						{ label: t("rename"), onSelect: () => setDialog("rename") },
-						{ label: t("responsibility"), onSelect: () => setDialog("role") },
+						{ label: t("rename"), onSelect: () => setRenaming(true) },
+						{ label: t("sessionSettings"), onSelect: () => setSettingsOpen(true) },
 						...moves,
-						{ label: t("sessionSettings"), onSelect: () => setDialog("settings") },
 						session.archivedAt
 							? {
 									label: t("unarchive"),
@@ -139,10 +192,8 @@ function SessionRow({
 					]}
 				/>
 			</span>
-			{dialog === "rename" && <RenameDialog session={session} onClose={() => setDialog(null)} />}
-			{dialog === "role" && <RoleDialog session={session} onClose={() => setDialog(null)} />}
-			{dialog === "settings" && (
-				<SessionSettingsDialog session={session} onClose={() => setDialog(null)} />
+			{settingsOpen && (
+				<SessionSettingsDialog session={session} onClose={() => setSettingsOpen(false)} />
 			)}
 		</div>
 	);
