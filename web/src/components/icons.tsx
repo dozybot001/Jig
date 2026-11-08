@@ -15,7 +15,6 @@ import {
 	Search,
 	Settings,
 	Square,
-	SquarePen,
 	X,
 } from "lucide-react";
 
@@ -36,7 +35,6 @@ export const NotesIcon = () => <FileText {...props} />;
 export const ChatIcon = () => <MessageCircle {...props} />;
 export const ArrowUpIcon = () => <ArrowUp {...props} strokeWidth={2} />;
 export const StopIcon = () => <Square {...props} fill="currentColor" />;
-export const ComposeIcon = () => <SquarePen {...props} />;
 export const SearchIcon = () => <Search {...props} />;
 export const ChevronIcon = () => <ChevronRight {...props} size={14} className="chevron" />;
 export const PinIcon = () => <Pin {...props} size={13} className="pin-icon" />;

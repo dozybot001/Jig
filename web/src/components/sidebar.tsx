@@ -16,7 +16,6 @@ import { ConfirmDialog, GroupDialog, NewSessionDialog, SessionSettingsDialog } f
 import {
 	ChatIcon,
 	CodeIcon,
-	ComposeIcon,
 	FolderIcon,
 	GearIcon,
 	GroupPlusIcon,
@@ -180,6 +179,7 @@ function Workspaces() {
 				<span>{t("workspaces")}</span>
 				<Button
 					variant="icon"
+					className="heading-add"
 					aria-label={t("newWorkspace")}
 					title={t("newWorkspace")}
 					onClick={() => setCreating(true)}
@@ -188,16 +188,7 @@ function Workspaces() {
 				</Button>
 			</div>
 			{workspaces.length === 0 ? (
-				<button
-					type="button"
-					className="session-row workspace-empty"
-					onClick={() => setCreating(true)}
-				>
-					<span className="session-icon" aria-hidden="true">
-						<PlusIcon />
-					</span>
-					<span className="session-name">{t("addWorkspace")}</span>
-				</button>
+				<p className="empty-box">{t("noWorkspaces")}</p>
 			) : (
 				workspaces.map((workspace) => (
 					<WorkspaceRow key={workspace.id} workspace={workspace} all={workspaces} />
@@ -449,7 +440,16 @@ export function Sidebar() {
 		<nav className="sidebar" aria-label={t("sessions")}>
 			<div className="sidebar-top">
 				{/* The expanded sidebar carries the full lockup (spec 1.6); its name includes Tenon (1.7). */}
-				<span className="lockup" role="img" aria-label={t("lockupName")}>
+				<button
+					type="button"
+					className="lockup lockup-button"
+					aria-label={`${t("lockupName")}，${t("goHome")}`}
+					title={t("goHome")}
+					onClick={() => {
+						closeDrawer();
+						void selectSession(null);
+					}}
+				>
 					<JigMark className="lockup-mark" size={22} />
 					<span className="lockup-word">
 						<span className="wordmark">Jig</span>
@@ -461,33 +461,17 @@ export function Sidebar() {
 							height={14}
 						/>
 					</span>
-				</span>
-				<Button
-					variant="icon"
-					aria-label={t("newGroup")}
-					title={t("newGroup")}
-					onClick={() => setDialog({ kind: "group" })}
-				>
-					<GroupPlusIcon />
-				</Button>
+				</button>
 			</div>
 			<div className="sidebar-nav">
-				<button
-					type="button"
-					className="nav-row"
-					onClick={() => {
-						closeDrawer();
-						void selectSession(null);
-					}}
-				>
-					<ComposeIcon />
-					{t("newSession")}
+				<button type="button" className="nav-row" onClick={() => setDialog({ kind: "group" })}>
+					<GroupPlusIcon />
+					{t("newGroup")}
 				</button>
 				<Search />
 			</div>
 			<div className="sidebar-list">
 				<Workspaces />
-				{active.length === 0 && <p className="sidebar-empty">{t("emptySidebar")}</p>}
 				{groups.map((group) => (
 					<section key={group.id} aria-label={group.name}>
 						<div className="group-heading">
@@ -508,15 +492,35 @@ export function Sidebar() {
 								]}
 							/>
 						</div>
-						{byGroup(group.id).map(row)}
+						{byGroup(group.id).length === 0 ? (
+							<p className="empty-box">{t("emptyGroup")}</p>
+						) : (
+							byGroup(group.id).map(row)
+						)}
 					</section>
 				))}
-				{byGroup(null).length > 0 && (
+				{(byGroup(null).length > 0 || groups.length === 0) && (
 					<section aria-label={groups.length > 0 ? t("ungrouped") : t("sessions")}>
 						<div className="group-heading">
 							<span>{groups.length > 0 ? t("ungrouped") : t("sessions")}</span>
+							<Button
+								variant="icon"
+								className="heading-add"
+								aria-label={t("newSession")}
+								title={t("newSession")}
+								onClick={() => {
+									closeDrawer();
+									void selectSession(null);
+								}}
+							>
+								<PlusIcon />
+							</Button>
 						</div>
-						{byGroup(null).map(row)}
+						{byGroup(null).length === 0 ? (
+							<p className="empty-box">{t("emptySidebar")}</p>
+						) : (
+							byGroup(null).map(row)
+						)}
 					</section>
 				)}
 				{hasArchived && (

@@ -731,10 +731,29 @@ body.scroll-locked {
 	overscroll-behavior: contain;
 	padding: 0 10px 10px;
 }
-.sidebar-empty {
-	padding: 8px 10px;
-	color: var(--text-2);
+/* Empty sections show a dashed box, as Claude does for an empty folder list. */
+.empty-box {
+	margin: 2px 0 6px;
+	padding: 10px 12px;
+	border: 1px dashed var(--control-strong);
+	border-radius: var(--radius);
+	color: var(--text-3);
 	font-size: var(--fs-s);
+}
+.lockup-button {
+	margin: -4px -6px;
+	padding: 4px 6px;
+	border: none;
+	border-radius: var(--radius-s);
+	background: none;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+@media (hover: hover) {
+	.lockup-button:hover {
+		background: var(--hover);
+	}
 }
 .sidebar-bottom {
 	padding: 8px 10px 14px;
@@ -803,9 +822,6 @@ body.scroll-locked {
 	height: 12px;
 	color: var(--text-3);
 }
-.workspace-empty {
-	color: var(--text-2);
-}
 .session-row-editing {
 	grid-template-columns: 16px minmax(0, 1fr);
 	cursor: default;
@@ -850,7 +866,7 @@ body.scroll-locked {
 /* With a mouse, a row's menu shows on hover or focus, in place of its time (as in Codex). */
 @media (hover: hover) {
 	.session-item:not(:hover, :focus-within) .session-row-menu,
-	.group-heading:not(:hover, :focus-within) .btn-icon {
+	.group-heading:not(:hover, :focus-within) .btn-icon:not(.heading-add) {
 		opacity: 0;
 	}
 	.session-item:is(:hover, :focus-within) :is(.session-time, .badge) {
