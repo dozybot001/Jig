@@ -11,6 +11,7 @@ import {
 } from "react";
 import { ApiError } from "../api.ts";
 import { type MessageKey, t } from "../i18n.ts";
+import { CloseIcon, InfoIcon } from "./icons.tsx";
 
 /** Places a top-layer popover next to its trigger, flipping above when there is no room below (spec 5.9). */
 function place(popover: HTMLElement, trigger: HTMLElement, width?: number): void {
@@ -248,11 +249,7 @@ export function Toggletip({ label, text }: { label: string; text: string }) {
 					hover.current = false;
 				}}
 			>
-				<svg viewBox="0 0 16 16" aria-hidden="true">
-					<circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" strokeWidth="1.3" />
-					<path d="M8 7.2v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-					<circle cx="8" cy="4.9" r="0.85" fill="currentColor" />
-				</svg>
+				<InfoIcon />
 			</button>
 			<div ref={pop} id={id} popover="manual" className="toggletip" role="tooltip">
 				{text}
@@ -549,7 +546,7 @@ export function Dialog({
 				<div className="dialog-header">
 					<h2 id={titleId}>{title}</h2>
 					<Button variant="icon" aria-label={t("close")} onClick={onClose}>
-						<span aria-hidden="true">✕</span>
+						<CloseIcon />
 					</Button>
 				</div>
 				{tabs}

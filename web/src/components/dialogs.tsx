@@ -10,16 +10,7 @@ import { ApiError } from "../api.ts";
 import { t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
 import { ModelPicker } from "./session.tsx";
-import {
-	Button,
-	Dialog,
-	describeError,
-	ErrorBox,
-	Field,
-	Select,
-	Switch,
-	useAction,
-} from "./ui.tsx";
+import { Button, Dialog, describeError, ErrorBox, Field, Select, useAction } from "./ui.tsx";
 
 const TOOLS = ["*", "read", "write", "edit", "glob", "grep", "shell", "web_fetch"];
 
@@ -223,6 +214,11 @@ export function NewSessionDialog({
 	);
 }
 
+/**
+ * The settings people rarely change: permission rules and the compaction threshold. The common ones
+ * sit where they are used: name, role and group in the row menu; folder, model and edits in the
+ * composer.
+ */
 export function SessionSettingsDialog({
 	session,
 	onClose,
@@ -231,43 +227,20 @@ export function SessionSettingsDialog({
 	onClose: () => void;
 }) {
 	useLang();
-	const groups = useAppState((state) => state.groups);
-	const [name, setName] = useState(session.name);
-	const [responsibility, setResponsibility] = useState(session.responsibility);
-	const [group, setGroup] = useState(session.groupId ?? "");
-	const [mode, setMode] = useState<"chat" | "code">(session.cwd ? "code" : "chat");
-	const [folder, setFolder] = useState(session.cwd ?? "");
-	const [directEdits, setDirectEdits] = useState(session.options.directEdits ?? false);
 	const [compactAt, setCompactAt] = useState(
 		session.options.compactAt ? String(session.options.compactAt) : "",
 	);
 	const [rules, setRules] = useState(session.rules);
-	const nameId = useId();
-	const folderId = useId();
-	const folderErrorId = useId();
 	const compactId = useId();
-	const nameErrorId = useId();
 	const compactErrorId = useId();
-	const cwd = mode === "code" ? folder.trim() : null;
-	const cwdChanged = cwd !== session.cwd;
 	const save = useAction(async () => {
 		await updateSession(session.id, {
-			name,
-			responsibility,
-			groupId: group || null,
-			...(cwdChanged ? { cwd } : {}),
 			rules,
-			options: { directEdits, compactAt: compactAt.trim() ? Number(compactAt) : null },
+			options: { compactAt: compactAt.trim() ? Number(compactAt) : null },
 		});
 		onClose();
 	});
-	// The switch is saved with the form, so show when something differs from what is saved (spec 6.4).
 	const dirty =
-		name !== session.name ||
-		responsibility !== session.responsibility ||
-		group !== (session.groupId ?? "") ||
-		cwdChanged ||
-		directEdits !== (session.options.directEdits ?? false) ||
 		compactAt !== (session.options.compactAt ? String(session.options.compactAt) : "") ||
 		JSON.stringify(rules) !== JSON.stringify(session.rules);
 	return (
@@ -283,90 +256,13 @@ export function SessionSettingsDialog({
 						</span>
 					)}
 					<Button onClick={onClose}>{t("cancel")}</Button>
-					<Button
-						variant="primary"
-						busy={save.busy}
-						disabled={mode === "code" && !folder.trim()}
-						onClick={() => void save.run()}
-					>
+					<Button variant="primary" busy={save.busy} onClick={() => void save.run()}>
 						{t("save")}
 					</Button>
 				</>
 			}
 		>
-			<Field
-				label={t("name")}
-				htmlFor={nameId}
-				error={fieldError(save.error, "name")}
-				errorId={nameErrorId}
-			>
-				<input
-					id={nameId}
-					className="input"
-					value={name}
-					maxLength={60}
-					aria-invalid={fieldError(save.error, "name") ? "true" : undefined}
-					aria-describedby={fieldError(save.error, "name") ? nameErrorId : undefined}
-					onChange={(event) => setName(event.target.value)}
-				/>
-			</Field>
-			<Field label={t("group")}>
-				<Select
-					label={t("group")}
-					value={group}
-					options={[
-						{ value: "", label: t("noGroup") },
-						...groups.map((g) => ({ value: g.id, label: g.name })),
-					]}
-					onChange={setGroup}
-				/>
-			</Field>
-			<Field label={t("mode")} info={t("modeHelp")}>
-				<Select
-					label={t("mode")}
-					value={mode}
-					options={[
-						{ value: "chat", label: t("mode_chat") },
-						{ value: "code", label: t("mode_code") },
-					]}
-					onChange={(value) => setMode(value as "chat" | "code")}
-				/>
-			</Field>
-			{mode === "code" && (
-				<Field
-					label={t("workingFolder")}
-					htmlFor={folderId}
-					error={fieldError(save.error, "cwd")}
-					errorId={folderErrorId}
-				>
-					<input
-						id={folderId}
-						className="input"
-						value={folder}
-						placeholder={t("folderPath")}
-						spellCheck={false}
-						aria-invalid={fieldError(save.error, "cwd") ? "true" : undefined}
-						aria-describedby={fieldError(save.error, "cwd") ? folderErrorId : undefined}
-						onChange={(event) => setFolder(event.target.value)}
-					/>
-				</Field>
-			)}
-			<Field label={t("responsibility")}>
-				<textarea
-					className="textarea"
-					aria-label={t("responsibility")}
-					value={responsibility}
-					onChange={(event) => setResponsibility(event.target.value)}
-				/>
-			</Field>
-			{mode === "code" && (
-				<Switch
-					checked={directEdits}
-					onChange={setDirectEdits}
-					label={t("directEdits")}
-					info={t("directEditsHelp")}
-				/>
-			)}
+			<RulesEditor rules={rules} onChange={setRules} />
 			<Field
 				label={t("compactAt")}
 				htmlFor={compactId}
@@ -384,8 +280,47 @@ export function SessionSettingsDialog({
 					onChange={(event) => setCompactAt(event.target.value.replace(/[^\d]/g, ""))}
 				/>
 			</Field>
-			<RulesEditor rules={rules} onChange={setRules} />
-			<ErrorBox error={generalError(save.error, ["name", "options", "cwd"])} />
+			<ErrorBox error={generalError(save.error, ["options"])} />
+		</Dialog>
+	);
+}
+
+/** The session's role, edited on its own from the row menu. */
+export function RoleDialog({ session, onClose }: { session: Session; onClose: () => void }) {
+	useLang();
+	const [text, setText] = useState(session.responsibility);
+	const save = useAction(async () => {
+		await updateSession(session.id, { responsibility: text });
+		onClose();
+	});
+	return (
+		<Dialog
+			title={t("responsibility")}
+			size="m"
+			onClose={onClose}
+			footer={
+				<>
+					<Button onClick={onClose}>{t("cancel")}</Button>
+					<Button
+						variant="primary"
+						busy={save.busy}
+						disabled={text === session.responsibility}
+						onClick={() => void save.run()}
+					>
+						{t("save")}
+					</Button>
+				</>
+			}
+		>
+			<textarea
+				className="textarea textarea-large"
+				aria-label={t("responsibility")}
+				placeholder={t("responsibilityPlaceholder")}
+				value={text}
+				autoFocus
+				onChange={(event) => setText(event.target.value)}
+			/>
+			<ErrorBox error={save.error} />
 		</Dialog>
 	);
 }

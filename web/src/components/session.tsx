@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import type { Session, ThinkingLevel } from "../../../src/shared/types.ts";
 import {
 	compactSession,
@@ -187,7 +187,7 @@ function SessionHeader({ session }: { session: Session }) {
 	);
 }
 
-/** How full the context is, as a small pie next to the send button. */
+/** How full the context is: a small pie next to the send button, drawn like the other line icons. */
 function ContextPie({ used, total }: { used: number; total: number }) {
 	useLang();
 	const percent = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
@@ -196,6 +196,9 @@ function ContextPie({ used, total }: { used: number; total: number }) {
 		used: formatNumber(used),
 		total: formatNumber(total),
 	});
+	const angle = ((percent / 100) * 360 - 90) * (Math.PI / 180);
+	const x = 12 + 6 * Math.cos(angle);
+	const y = 12 + 6 * Math.sin(angle);
 	return (
 		// biome-ignore lint/a11y/useSemanticElements: a native <meter> cannot be drawn as a pie; the role carries the same meaning
 		<span
@@ -206,8 +209,19 @@ function ContextPie({ used, total }: { used: number; total: number }) {
 			aria-valuenow={percent}
 			aria-label={label}
 			title={label}
-			style={{ "--p": percent } as CSSProperties}
-		/>
+		>
+			<svg viewBox="0 0 24 24" width={16} height={16} aria-hidden="true">
+				<circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
+				{percent >= 100 ? (
+					<circle cx="12" cy="12" r="6" fill="currentColor" />
+				) : percent > 0 ? (
+					<path
+						d={`M12 12V6A6 6 0 ${percent > 50 ? 1 : 0} 1 ${x.toFixed(2)} ${y.toFixed(2)}Z`}
+						fill="currentColor"
+					/>
+				) : null}
+			</svg>
+		</span>
 	);
 }
 
@@ -281,7 +295,16 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 	const compact = useAction(() => compactSession(session.id));
 	const models = useModels(session.provider);
 	const info = models.find((m) => m.id === session.model);
-	const stuck = !working && (session.status === "needs_review" || session.status === "error");
+
+	const recent = useRecentFolders();
+	const [typingFolder, setTypingFolder] = useState(false);
+	const [folderDraft, setFolderDraft] = useState("");
+	// A folder makes it a code session, none makes it a chat; the switch applies from the next turn.
+	const switchFolder = useAction(async (cwd: string | null) => {
+		await updateSession(session.id, { cwd });
+		setTypingFolder(false);
+		setFolderDraft("");
+	});
 	const sendLabel = working ? t("queueSend") : t("send");
 	return (
 		<div className="composer">
@@ -310,8 +333,39 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 							}
 						}}
 					/>
+					{typingFolder && (
+						<input
+							className="input folder-input"
+							value={folderDraft}
+							placeholder={t("folderPath")}
+							aria-label={t("workingFolder")}
+							spellCheck={false}
+							onChange={(event) => setFolderDraft(event.target.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Escape") setTypingFolder(false);
+								if (event.key === "Enter" && !event.nativeEvent.isComposing && folderDraft.trim()) {
+									event.preventDefault();
+									void switchFolder.run(folderDraft.trim());
+								}
+							}}
+						/>
+					)}
 					<div className="composer-bar">
 						<div className="composer-chips">
+							<Select
+								label={t("workingFolder")}
+								value={typingFolder ? OTHER_FOLDER : (session.cwd ?? "")}
+								options={folderOptions(recent, session.cwd)}
+								busy={switchFolder.busy}
+								onChange={(value) => {
+									if (value === OTHER_FOLDER) {
+										setTypingFolder(true);
+										return;
+									}
+									setTypingFolder(false);
+									void switchFolder.run(value || null);
+								}}
+							/>
 							<ModelPicker
 								provider={session.provider}
 								model={session.model}
@@ -319,55 +373,80 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 								busy={change.busy}
 								onChange={(patch) => void change.run(patch)}
 							/>
+							{session.cwd && (
+								<Select
+									label={t("directEdits")}
+									value={session.options.directEdits ? "direct" : "ask"}
+									options={[
+										{ value: "ask", label: t("editsAsk") },
+										{ value: "direct", label: t("editsDirect") },
+									]}
+									busy={change.busy}
+									onChange={(value) =>
+										void change.run({ options: { directEdits: value === "direct" } })
+									}
+								/>
+							)}
 						</div>
-						{!working && session.contextTokens > 0 && (
-							<Button
-								variant="icon"
-								aria-label={t("compact")}
-								title={t("compact")}
-								busy={compact.busy}
-								onClick={() => void compact.run()}
-							>
-								<CompactIcon />
-							</Button>
-						)}
-						{stuck && (
-							<Button
-								variant="icon"
-								aria-label={t("continue")}
-								title={t("continueHint")}
-								busy={cont.busy}
-								onClick={() => void cont.run()}
-							>
-								<PlayIcon />
-							</Button>
-						)}
-						{info && <ContextPie used={session.contextTokens} total={info.contextWindow} />}
-						{working && !text.trim() ? (
-							<Button
-								className="send-button"
-								aria-label={t("stop")}
-								title={t("stop")}
-								busy={stop.busy}
-								onClick={() => void stop.run()}
-							>
-								<StopIcon />
-							</Button>
-						) : (
-							<Button
-								className="send-button"
-								aria-label={sendLabel}
-								title={sendLabel}
-								busy={send.busy}
-								disabled={!text.trim()}
-								onClick={() => void send.run()}
-							>
-								<ArrowUpIcon />
-							</Button>
-						)}
+						<div className="composer-actions">
+							{!working && session.contextTokens > 0 && (
+								<Button
+									variant="icon"
+									aria-label={t("compact")}
+									title={t("compact")}
+									busy={compact.busy}
+									onClick={() => void compact.run()}
+								>
+									<CompactIcon />
+								</Button>
+							)}
+							{!working && (
+								<Button
+									variant="icon"
+									aria-label={t("continue")}
+									title={t("continueHint")}
+									busy={cont.busy}
+									onClick={() => void cont.run()}
+								>
+									<PlayIcon />
+								</Button>
+							)}
+							{info && <ContextPie used={session.contextTokens} total={info.contextWindow} />}
+							{working && !text.trim() ? (
+								<Button
+									className="send-button"
+									aria-label={t("stop")}
+									title={t("stop")}
+									busy={stop.busy}
+									onClick={() => void stop.run()}
+								>
+									<StopIcon />
+								</Button>
+							) : (
+								<Button
+									className="send-button"
+									aria-label={sendLabel}
+									title={sendLabel}
+									busy={send.busy}
+									disabled={!text.trim()}
+									onClick={() => void send.run()}
+								>
+									<ArrowUpIcon />
+								</Button>
+							)}
+						</div>
 					</div>
 				</div>
-				<ErrorBox error={send.error ?? stop.error ?? change.error ?? cont.error ?? compact.error} />
+				<ErrorBox
+					error={
+						send.error ??
+						stop.error ??
+						change.error ??
+						cont.error ??
+						compact.error ??
+						switchFolder.error
+					}
+				/>
 			</div>
 		</div>
 	);
@@ -412,6 +491,29 @@ const TEMPLATES: { key: TemplateKey; icon: ReactNode }[] = [
 /** "Another folder…" in the folder choice; real choices are absolute or ~/ paths. */
 const OTHER_FOLDER = "other";
 
+/** Folders of recent sessions, newest first: the quick choices for a session's folder. */
+function useRecentFolders(): string[] {
+	const sessions = useAppState((state) => state.sessions);
+	return [
+		...new Set(
+			Object.values(sessions)
+				.sort((a, b) => b.lastActivityAt - a.lastActivityAt)
+				.map((session) => session.cwd)
+				.filter((cwd): cwd is string => Boolean(cwd)),
+		),
+	].slice(0, 5);
+}
+
+/** No folder (a chat), another folder, then recent folders (code). */
+function folderOptions(recent: string[], current: string | null) {
+	const list = current && !recent.includes(current) ? [current, ...recent] : recent;
+	return [
+		{ value: "", label: t("noFolder") },
+		{ value: OTHER_FOLDER, label: t("otherFolder") },
+		...list.map((path) => ({ value: path, label: shortPath(path), group: t("recentFolders") })),
+	];
+}
+
 /** A short session name from the first line of the first message; names may not hold @ or control characters. */
 function nameFrom(text: string): string {
 	const line = (text.trim().split("\n")[0] ?? "").replace(/[@\p{Cc}]/gu, "").trim();
@@ -426,7 +528,7 @@ function nameFrom(text: string): string {
 function HomeView() {
 	useLang();
 	const settings = useAppState((state) => state.settings);
-	const sessions = useAppState((state) => state.sessions);
+	const recent = useRecentFolders();
 	const [text, setText] = useState("");
 	const [folder, setFolder] = useState("");
 	const [typingFolder, setTypingFolder] = useState(false);
@@ -444,14 +546,6 @@ function HomeView() {
 	useEffect(() => {
 		ref.current?.focus();
 	}, [ref]);
-	const recent = [
-		...new Set(
-			Object.values(sessions)
-				.sort((a, b) => b.lastActivityAt - a.lastActivityAt)
-				.map((session) => session.cwd)
-				.filter((cwd): cwd is string => Boolean(cwd)),
-		),
-	].slice(0, 5);
 	const role = template === "code" || template === "docs" ? template : null;
 	const missingFolder = role !== null && !folder.trim();
 	const start = useAction(async () => {
@@ -516,15 +610,7 @@ function HomeView() {
 							<Select
 								label={t("workingFolder")}
 								value={typingFolder ? OTHER_FOLDER : folder}
-								options={[
-									{ value: "", label: t("noFolder") },
-									{ value: OTHER_FOLDER, label: t("otherFolder") },
-									...recent.map((path) => ({
-										value: path,
-										label: shortPath(path),
-										group: t("recentFolders"),
-									})),
-								]}
+								options={folderOptions(recent, null)}
 								onChange={(value) => {
 									setTypingFolder(value === OTHER_FOLDER);
 									setFolder(value === OTHER_FOLDER ? "" : value);
@@ -532,16 +618,18 @@ function HomeView() {
 							/>
 							<ModelPicker {...model} onChange={(patch) => setModel((m) => ({ ...m, ...patch }))} />
 						</div>
-						<Button
-							className="send-button"
-							aria-label={t("send")}
-							title={t("send")}
-							busy={start.busy}
-							disabled={!text.trim() || missingFolder}
-							onClick={() => void start.run()}
-						>
-							<ArrowUpIcon />
-						</Button>
+						<div className="composer-actions">
+							<Button
+								className="send-button"
+								aria-label={t("send")}
+								title={t("send")}
+								busy={start.busy}
+								disabled={!text.trim() || missingFolder}
+								onClick={() => void start.run()}
+							>
+								<ArrowUpIcon />
+							</Button>
+						</div>
 					</div>
 				</div>
 				{missingFolder && (

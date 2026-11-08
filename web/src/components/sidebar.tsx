@@ -16,6 +16,7 @@ import {
 	GroupDialog,
 	NewSessionDialog,
 	RenameDialog,
+	RoleDialog,
 	SessionSettingsDialog,
 } from "./dialogs.tsx";
 import {
@@ -61,7 +62,7 @@ function SessionRow({
 	now: number;
 }) {
 	useLang();
-	const [dialog, setDialog] = useState<"rename" | "settings" | null>(null);
+	const [dialog, setDialog] = useState<"rename" | "role" | "settings" | null>(null);
 	const moves = [
 		...groups
 			.filter((group) => group.id !== session.groupId)
@@ -123,8 +124,9 @@ function SessionRow({
 							onSelect: () => void updateSession(session.id, { pinned: !session.pinned }),
 						},
 						{ label: t("rename"), onSelect: () => setDialog("rename") },
-						{ label: t("sessionSettings"), onSelect: () => setDialog("settings") },
+						{ label: t("responsibility"), onSelect: () => setDialog("role") },
 						...moves,
+						{ label: t("sessionSettings"), onSelect: () => setDialog("settings") },
 						session.archivedAt
 							? {
 									label: t("unarchive"),
@@ -138,6 +140,7 @@ function SessionRow({
 				/>
 			</span>
 			{dialog === "rename" && <RenameDialog session={session} onClose={() => setDialog(null)} />}
+			{dialog === "role" && <RoleDialog session={session} onClose={() => setDialog(null)} />}
 			{dialog === "settings" && (
 				<SessionSettingsDialog session={session} onClose={() => setDialog(null)} />
 			)}
