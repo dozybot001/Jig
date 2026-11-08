@@ -1108,3 +1108,26 @@ body.scroll-locked {
 	align-items: center;
 	gap: 8px;
 }
+
+/* Scroll shadows (spec 9.7): a fade at the bottom while more content is below, and at the top while
+   there is content above. The covers scroll with the content; the shadows stay with the box. */
+.transcript,
+.dialog-body,
+.sidebar-list,
+.todo-panel {
+	background:
+		linear-gradient(var(--surface-bg, var(--bg)) 30%, transparent) center top / 100% 32px no-repeat
+		local,
+		linear-gradient(transparent, var(--surface-bg, var(--bg)) 70%) center bottom / 100% 32px
+		no-repeat local,
+		radial-gradient(farthest-side at 50% 0, #0000001f, transparent) center top / 100% 12px no-repeat
+		scroll,
+		radial-gradient(farthest-side at 50% 100%, #0000001f, transparent) center bottom / 100% 12px
+		no-repeat scroll;
+}
+.dialog-body {
+	--surface-bg: var(--surface);
+}
+.sidebar-list {
+	--surface-bg: var(--bg-side);
+}

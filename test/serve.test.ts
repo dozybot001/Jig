@@ -54,6 +54,9 @@ describe("jig serve", () => {
 			const cookie = (exchange.headers.get("set-cookie") ?? "").split(";")[0] as string;
 			const sessions = await fetch(`${base}/api/sessions`, { headers: { Cookie: cookie } });
 			assert.equal(sessions.status, 200);
+			// An open event stream must not keep the service from stopping.
+			const stream = await fetch(`${base}/api/events`, { headers: { Cookie: cookie } });
+			assert.equal(stream.status, 200);
 		} finally {
 			const exited = new Promise<number | null>((resolve) =>
 				child.on("exit", (code) => resolve(code)),

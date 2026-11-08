@@ -150,6 +150,8 @@ export function serveCommand(): Command {
 					io.stderr.write("Stopping Jig…\n");
 					agents.shutdown();
 					server.close();
+					// Open event streams would keep the process alive; end them too.
+					if ("closeAllConnections" in server) server.closeAllConnections();
 					rmSync(serveFile(home), { force: true });
 					runtime.close();
 					resolve(EXIT_OK);
