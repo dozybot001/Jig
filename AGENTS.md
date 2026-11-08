@@ -3,7 +3,7 @@
 - 先读[产品蓝图](docs/blueprint.md)：需求、设计和里程碑以它为准；需求有变时先改蓝图，并在文末记修改记录。当前里程碑的实现计划见 [M1 实现计划](docs/m1-plan.md)。
 - 产品规范以 `~/memory/tenon-product-standard.md` 为准，开工前先读（22.1）；会话分工按 `~/memory/tenon-sessions.md`，Jig 的仓库归 Jig 的产品会话负责。产品需求和设计在产品会话里和创始人直接打磨；要创始人决定或操作的其他事发给总办（4.4）。
 - 直接在 main 上开发和提交，不建功能分支和 worktree。`origin` 一次 `git push` 同时推到 Gitee（`dozybot/jig`）和 GitHub（`dozybot001/Jig`）。两边都是私有仓库，v1 验收后才开源；推送前不改可见性。
-- 一句话定义待创始人定稿（蓝图第一节）。定稿后 README 首句、页面元信息和关于页第一句只用这一句（规范 1.8）。
+- 一句话定义：「个人的 AI 原生工作台」 / "Your personal AI-native workbench"（2026-11-08 定稿）。README 首句、页面元信息和关于页第一句只用这一句，不另写（规范 1.8）。
 
 ## 技术栈
 
