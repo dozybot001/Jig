@@ -9,12 +9,15 @@ import {
 	Menu,
 	MessageCircle,
 	Minimize2,
+	PanelLeftClose,
+	PanelLeftOpen,
 	Pin,
 	Play,
 	Plus,
 	Search,
 	Settings,
 	Square,
+	SquarePen,
 	X,
 } from "lucide-react";
 
@@ -43,6 +46,9 @@ export const CompactIcon = () => <Minimize2 {...props} />;
 export const PlayIcon = () => <Play {...props} />;
 export const InfoIcon = () => <Info {...props} />;
 export const CloseIcon = () => <X {...props} />;
+export const ComposeIcon = () => <SquarePen {...props} />;
+export const CollapseIcon = () => <PanelLeftClose {...props} />;
+export const ExpandIcon = () => <PanelLeftOpen {...props} />;
 
 /**
  * Jig's mark: three parallel strokes forming a J. Drawn in the text colour, so it is ink on light

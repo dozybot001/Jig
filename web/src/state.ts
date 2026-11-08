@@ -80,6 +80,31 @@ export interface AppState {
 	settingsTab: "general" | "providers" | "rules" | "about";
 	/** A folder the home page should preselect, set when you open a workspace from the sidebar. */
 	homeFolder: string | null;
+	/** Wide screens: the sidebar folded to a narrow rail (remembered in this browser). */
+	sidebarCollapsed: boolean;
+	/** Narrow screens: the sidebar drawer is open. */
+	drawerOpen: boolean;
+}
+
+const SIDEBAR_KEY = "jig.sidebar";
+
+function rememberedCollapse(): boolean {
+	try {
+		return localStorage.getItem(SIDEBAR_KEY) === "collapsed";
+	} catch {
+		return false;
+	}
+}
+
+/** Folds or unfolds the sidebar on wide screens, and remembers it in this browser only. */
+export function setSidebarCollapsed(collapsed: boolean): void {
+	setState({ sidebarCollapsed: collapsed });
+	try {
+		if (collapsed) localStorage.setItem(SIDEBAR_KEY, "collapsed");
+		else localStorage.removeItem(SIDEBAR_KEY);
+	} catch {
+		// Storage can be unavailable (private windows); the choice then lasts for this page only.
+	}
 }
 
 let state: AppState = {
@@ -100,6 +125,8 @@ let state: AppState = {
 	view: "session",
 	settingsTab: "general",
 	homeFolder: null,
+	sidebarCollapsed: rememberedCollapse(),
+	drawerOpen: false,
 };
 
 const listeners = new Set<() => void>();

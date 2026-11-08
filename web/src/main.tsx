@@ -1,12 +1,12 @@
-import { StrictMode } from "react";
+import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { boot } from "./actions.ts";
 import { SessionView } from "./components/session.tsx";
 import { SettingsPage } from "./components/settings.tsx";
-import { Sidebar } from "./components/sidebar.tsx";
+import { Sidebar, SidebarRail, useNarrow } from "./components/sidebar.tsx";
 import { Button } from "./components/ui.tsx";
 import { t, useLang } from "./i18n.ts";
-import { useAppState } from "./state.ts";
+import { setState, useAppState } from "./state.ts";
 import "./styles/app.css";
 
 function App() {
@@ -15,6 +15,18 @@ function App() {
 	const failure = useAppState((state) => state.failure);
 	const connection = useAppState((state) => state.connection);
 	const view = useAppState((state) => state.view);
+	const collapsed = useAppState((state) => state.sidebarCollapsed);
+	const drawerOpen = useAppState((state) => state.drawerOpen);
+	const narrow = useNarrow();
+	// The drawer closes with Escape, like a dialog.
+	useEffect(() => {
+		if (!drawerOpen) return;
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key === "Escape") setState({ drawerOpen: false });
+		};
+		document.addEventListener("keydown", onKey);
+		return () => document.removeEventListener("keydown", onKey);
+	}, [drawerOpen]);
 	if (phase === "loading") {
 		return (
 			<div className="center-page" aria-busy="true">
@@ -52,8 +64,17 @@ function App() {
 					{t("connectionLost")}
 				</div>
 			)}
-			<div className="app">
-				<Sidebar />
+			<div
+				className={`app${!narrow && collapsed ? " app-collapsed" : ""}${narrow && drawerOpen ? " sidebar-open" : ""}`}
+			>
+				{!narrow && collapsed ? <SidebarRail /> : <Sidebar />}
+				{narrow && drawerOpen && (
+					<div
+						className="drawer-backdrop"
+						aria-hidden="true"
+						onClick={() => setState({ drawerOpen: false })}
+					/>
+				)}
 				{view === "settings" ? <SettingsPage /> : <SessionView />}
 			</div>
 		</>

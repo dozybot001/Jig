@@ -148,7 +148,6 @@ export function ModelPicker({
 	);
 }
 
-/** A home-relative path, so the header stays short: /Users/me/Jig → ~/Jig. */
 /** On narrow screens the sidebar is a drawer; this opens it. */
 export function SidebarToggle({ className = "" }: { className?: string }) {
 	useLang();
@@ -156,8 +155,8 @@ export function SidebarToggle({ className = "" }: { className?: string }) {
 		<Button
 			variant="icon"
 			className={`only-narrow ${className}`.trim()}
-			aria-label={t("sessions")}
-			onClick={() => document.querySelector(".app")?.classList.toggle("sidebar-open")}
+			aria-label={t("openSidebar")}
+			onClick={() => setState({ drawerOpen: true })}
 		>
 			<MenuIcon />
 		</Button>

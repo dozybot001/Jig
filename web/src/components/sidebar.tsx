@@ -10,12 +10,16 @@ import {
 } from "../actions.ts";
 import { api } from "../api.ts";
 import { formatAgo, t, useLang } from "../i18n.ts";
-import { setState, useAppState, type Workspace } from "../state.ts";
+import { setSidebarCollapsed, setState, useAppState, type Workspace } from "../state.ts";
 import { Snippet } from "./content.tsx";
 import { ConfirmDialog, GroupDialog, NewSessionDialog, SessionSettingsDialog } from "./dialogs.tsx";
 import {
 	ChatIcon,
+	CloseIcon,
 	CodeIcon,
+	CollapseIcon,
+	ComposeIcon,
+	ExpandIcon,
 	FolderIcon,
 	GearIcon,
 	GroupPlusIcon,
@@ -33,7 +37,20 @@ interface SearchResult {
 }
 
 function closeDrawer(): void {
-	document.querySelector(".app")?.classList.remove("sidebar-open");
+	setState({ drawerOpen: false });
+}
+
+/** True on narrow screens, where the sidebar is a drawer instead of a column. */
+export function useNarrow(): boolean {
+	const query = "(max-width: 760px)";
+	const [narrow, setNarrow] = useState(() => window.matchMedia(query).matches);
+	useEffect(() => {
+		const list = window.matchMedia(query);
+		const change = () => setNarrow(list.matches);
+		list.addEventListener("change", change);
+		return () => list.removeEventListener("change", change);
+	}, []);
+	return narrow;
 }
 
 /** Re-renders every minute so the times beside sessions stay current. */
@@ -404,8 +421,78 @@ function Search() {
 	);
 }
 
+/**
+ * The folded sidebar on wide screens, as in ChatGPT and Yew: Jig's graphic on top (it turns into the
+ * open button under the pointer), then the main actions as icons, settings at the bottom (spec 1.6:
+ * a collapsed navigation shows the product graphic only).
+ */
+export function SidebarRail() {
+	useLang();
+	const view = useAppState((state) => state.view);
+	const [creatingGroup, setCreatingGroup] = useState(false);
+	return (
+		<nav className="rail" aria-label={t("sessions")}>
+			<button
+				type="button"
+				className="rail-brand"
+				aria-label={t("expandSidebar")}
+				title={t("expandSidebar")}
+				onClick={() => setSidebarCollapsed(false)}
+			>
+				<span className="rail-mark">
+					<JigMark size={22} />
+				</span>
+				<span className="rail-open">
+					<ExpandIcon />
+				</span>
+			</button>
+			<Button
+				variant="icon"
+				aria-label={t("newSession")}
+				title={t("newSession")}
+				onClick={() => void selectSession(null)}
+			>
+				<ComposeIcon />
+			</Button>
+			<Button
+				variant="icon"
+				aria-label={t("newGroup")}
+				title={t("newGroup")}
+				onClick={() => setCreatingGroup(true)}
+			>
+				<GroupPlusIcon />
+			</Button>
+			<Button
+				variant="icon"
+				aria-label={t("search")}
+				title={t("search")}
+				onClick={() => {
+					setSidebarCollapsed(false);
+					requestAnimationFrame(() =>
+						document.querySelector<HTMLInputElement>(".sidebar-search input")?.focus(),
+					);
+				}}
+			>
+				<SearchIcon />
+			</Button>
+			<span className="rail-spacer" />
+			<Button
+				variant="icon"
+				aria-label={t("settings")}
+				title={t("settings")}
+				aria-current={view === "settings" ? "page" : undefined}
+				onClick={() => openSettings()}
+			>
+				<GearIcon />
+			</Button>
+			{creatingGroup && <GroupDialog onClose={() => setCreatingGroup(false)} />}
+		</nav>
+	);
+}
+
 export function Sidebar() {
 	useLang();
+	const narrow = useNarrow();
 	const sessions = useAppState((state) => state.sessions);
 	const groups = useAppState((state) => state.groups);
 	const selectedId = useAppState((state) => state.selectedId);
@@ -462,6 +549,25 @@ export function Sidebar() {
 						/>
 					</span>
 				</button>
+				{narrow ? (
+					<Button
+						variant="icon"
+						aria-label={t("closeSidebar")}
+						title={t("closeSidebar")}
+						onClick={closeDrawer}
+					>
+						<CloseIcon />
+					</Button>
+				) : (
+					<Button
+						variant="icon"
+						aria-label={t("collapseSidebar")}
+						title={t("collapseSidebar")}
+						onClick={() => setSidebarCollapsed(true)}
+					>
+						<CollapseIcon />
+					</Button>
+				)}
 			</div>
 			<div className="sidebar-nav">
 				<button type="button" className="nav-row" onClick={() => setDialog({ kind: "group" })}>
