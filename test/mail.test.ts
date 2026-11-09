@@ -71,6 +71,29 @@ describe("schema", () => {
 	});
 });
 
+describe("migration 4", () => {
+	test("what was always allowed for organize_sessions stays limited to organizing in manage_jig", () => {
+		const db = new DatabaseSync(join(tempDir(), "jig.db"));
+		for (const sql of migrations.slice(0, 3)) db.exec(sql);
+		db.prepare(
+			`INSERT INTO sessions (id, name, kind, provider, model, rules, last_activity_at, created_at, updated_at)
+			VALUES ('s1', '总办', 'standing', 'deepseek', 'deepseek-v4-pro', ?, 1, 1, 1)`,
+		).run(
+			JSON.stringify([
+				{ effect: "allow", tool: "organize_sessions" },
+				{ effect: "allow", tool: "shell", pattern: "npm test" },
+			]),
+		);
+		db.exec(migrations[3] as string);
+		const row = db.prepare("SELECT rules FROM sessions WHERE id = 's1'").get() as { rules: string };
+		assert.deepEqual(JSON.parse(row.rules), [
+			{ effect: "allow", tool: "manage_jig", pattern: "organize" },
+			{ effect: "allow", tool: "shell", pattern: "npm test" },
+		]);
+		db.close();
+	});
+});
+
 describe("sending letters", () => {
 	test("a letter is stored, counted against the sender's quota and handed on for delivery", () => {
 		const { store, events, post, queued, make } = setup();
@@ -90,7 +113,7 @@ describe("sending letters", () => {
 		);
 	});
 
-	test("letters go by id only, never to the sender itself or to an archived session", () => {
+	test("letters go by id or name, never to the sender itself or to an archived session", () => {
 		const { store, post, make } = setup();
 		const a = make("产品会话");
 		const b = make("平台组");
@@ -98,8 +121,13 @@ describe("sending letters", () => {
 			code(() => post.send({ kind: "session", session: a }, letter(a))),
 			"invalid-request",
 		);
+		// Names are unique, so a session can write to one without looking up its id first.
 		assert.equal(
-			code(() => post.send({ kind: "session", session: a }, { ...letter(b), to: "平台组" })),
+			post.send({ kind: "session", session: a }, { ...letter(b), to: "平台组" }).toSession,
+			b.id,
+		);
+		assert.equal(
+			code(() => post.send({ kind: "session", session: a }, { ...letter(b), to: "没有这个会话" })),
 			"invalid-request",
 		);
 		store.updateSession(b.id, { archived: true });
@@ -111,6 +139,29 @@ describe("sending letters", () => {
 			code(() => post.send({ kind: "session", session: a }, { ...letter(b), summary: "  " })),
 			"invalid-request",
 		);
+	});
+
+	test("a report to a session whose request is open answers it without a letter id", () => {
+		const { store, post, make } = setup();
+		const a = make("产品会话");
+		const b = make("平台组");
+		const request = post.send({ kind: "session", session: a }, letter(b));
+		post.mail.setLetterStatus(request.id, "delivered");
+		const notice = post.send(
+			{ kind: "session", session: b },
+			{ to: a.id, kind: "notice", summary: "在看了" },
+		);
+		// A notice in between is not the answer: the request stays open.
+		assert.equal(notice.replyTo, null);
+		assert.equal(post.mail.getLetter(request.id).status, "delivered");
+		const report = post.send(
+			{ kind: "session", session: b },
+			{ to: a.id, kind: "report", summary: "清单没问题" },
+		);
+		assert.equal(report.replyTo, request.id);
+		assert.equal(report.threadId, request.threadId);
+		assert.equal(post.mail.getLetter(request.id).status, "done");
+		assert.ok(store);
 	});
 
 	test("the summary is one line; a reply joins the thread of the letter it answers", () => {
@@ -463,6 +514,24 @@ describe("decision cards", () => {
 		assert.equal(short.reversible, "");
 		assert.equal(short.after, "");
 		assert.equal(post.updateCard(main, short.number, { title: "先发 0.2.1 吗？" }).undoable, true);
+	});
+
+	test("a card answers the one session whose request is open with the poster", () => {
+		const { store, post, make } = setup();
+		const main = make("总办");
+		const product = make("产品会话");
+		const ui = make("UI");
+		store.setSetting("mainSessionId", main.id);
+		const ask = (from: Session) => {
+			const sent = post.send({ kind: "session", session: from }, letter(main));
+			post.mail.setLetterStatus(sent.id, "delivered");
+		};
+		ask(product);
+		assert.equal(post.postCard(main, fields).requestedBy, product.id);
+		// With requests from two sessions open, Jig cannot tell: the card is the poster's own question.
+		ask(ui);
+		assert.equal(post.postCard(main, fields).requestedBy, main.id);
+		assert.equal(post.postCard(main, { ...fields, requestedBy: "UI" }).requestedBy, ui.id);
 	});
 
 	test("the person's decision goes to the requester and the main conversation, and into the log file", () => {

@@ -262,7 +262,15 @@ export type ConfirmReason =
 	| "credentials"
 	| "write-credentials"
 	| "admin"
-	| "write-outside";
+	| "write-outside"
+	// manage_jig changes that widen what a session may do (blueprint 6.2, item 10)
+	| "widen-permission"
+	| "change-folder"
+	| "open-letters"
+	| "raise-quota"
+	| "grant-rights"
+	| "change-main"
+	| "decision-log";
 
 export interface PermissionRequest {
 	tool: string;
@@ -280,16 +288,43 @@ export interface PermissionRequest {
 	description?: string;
 	/** The change an edit or write would make, as a unified patch, so the person sees it first. */
 	diff?: string;
-	/** The changes organize_sessions would make, with names in place of ids, for the interface to word. */
-	organize?: OrganizeStep[];
+	/** The changes manage_jig would make, with names in place of ids, for the interface to word. */
+	changes?: ChangeStep[];
 }
 
-/** One change organize_sessions would make, as the person reads it on the permission card. */
-export type OrganizeStep =
-	| { action: "rename_session"; from: string; to: string }
+/**
+ * One change manage_jig makes, as the person reads it on the permission card and in the changed
+ * session: names in place of ids, settings as codes the interface words in its language.
+ */
+export type ChangeStep =
 	| { action: "create_team"; name: string }
 	| { action: "rename_team"; from: string; to: string }
-	| { action: "move_to_team"; sessions: string[]; team: string | null };
+	| {
+			action: "create_session";
+			name: string;
+			folder: string | null;
+			model: string;
+			team: string | null;
+			role: string;
+	  }
+	| { action: "rename_session"; from: string; to: string }
+	| { action: "move_to_team"; sessions: string[]; team: string | null }
+	| { action: "set_role"; session: string; role: string }
+	| { action: "set_model"; session: string; from: string; to: string }
+	| { action: "set_folder"; session: string; from: string | null; to: string | null }
+	| { action: "set_permission"; session: string; from: PermissionMode; to: PermissionMode }
+	| { action: "set_receive"; session: string; from: ReceivePolicy; to: ReceivePolicy }
+	| { action: "set_letter_quota"; session: string; from: number; to: number }
+	| { action: "set_right"; session: string; right: "cards" | "manage"; on: boolean }
+	| { action: "pin"; session: string; on: boolean }
+	| { action: "archive"; session: string; on: boolean }
+	| { action: "set_main"; from: string | null; to: string | null }
+	| { action: "set_default_model"; from: string; to: string }
+	| { action: "set_decision_log"; from: string | null; to: string | null }
+	| { action: "add_workspace"; folder: string }
+	| { action: "remove_workspace"; folder: string }
+	| { action: "set_theme"; to: "system" | "light" | "dark" }
+	| { action: "set_language"; to: "system" | "zh" | "en" };
 
 /** One question a session asks the person with ask_user; a card holds up to four. */
 export interface Question {

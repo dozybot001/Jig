@@ -19,8 +19,8 @@ import {
 } from "../../../src/shared/messages.ts";
 import {
 	type Approval,
+	type ChangeStep,
 	type Entry,
-	type OrganizeStep,
 	type PermissionRequest,
 	type Question,
 	type QuestionRequest,
@@ -68,6 +68,7 @@ function callSummary(call: ToolCallBlock, recipient: string | null): string {
 		case "todo":
 		case "list_sessions":
 		case "list_cards":
+		case "manage_jig":
 			return "";
 	}
 	const asked = askedQuestion(args);
@@ -101,6 +102,7 @@ const TOOL_VERBS = [
 	"update_card",
 	"withdraw_card",
 	"list_cards",
+	"manage_jig",
 ] as const;
 
 function isToolVerb(name: string): name is (typeof TOOL_VERBS)[number] {
@@ -143,6 +145,11 @@ function permissionHeadline(request: PermissionRequest): string {
 			.join(t("listSeparator"));
 	}
 	if (request.reason) return request.reason;
+	// manage_jig: organizing, or changing settings; widening shows its reasons above.
+	const scope = request.rememberRules?.[0]?.pattern;
+	if (request.tool === "manage_jig" && (scope === "organize" || scope === "configure")) {
+		return t(`manage_${scope}`);
+	}
 	// A task session is named in the line itself; there is no command or file to show under it.
 	if (request.tool === "open_session") {
 		return t("ask_open_session_named", { name: t("quoted", { s: request.summary }) });
@@ -151,22 +158,97 @@ function permissionHeadline(request: PermissionRequest): string {
 	return hasMessage(key) ? t(key) : request.tool;
 }
 
-/** One change organize_sessions would make, in the person's language. */
-function organizeText(step: OrganizeStep): string {
+const clip = (text: string, max = 80) => {
+	const flat = text.replace(/\s+/g, " ").trim();
+	return [...flat].length > max ? `${[...flat].slice(0, max).join("")}…` : flat;
+};
+
+/** One change manage_jig makes, in the person's language, for permission cards and the trace notice. */
+export function changeText(step: ChangeStep): string {
 	const quoted = (name: string) => t("quoted", { s: name });
+	const folder = (path: string | null) => (path === null ? t("change_no_folder") : path);
 	switch (step.action) {
-		case "rename_session":
-			return t("organize_rename_session", { from: quoted(step.from), to: quoted(step.to) });
 		case "create_team":
-			return t("organize_create_team", { name: quoted(step.name) });
+			return t("change_create_team", { name: quoted(step.name) });
 		case "rename_team":
-			return t("organize_rename_team", { from: quoted(step.from), to: quoted(step.to) });
+			return t("change_rename_team", { from: quoted(step.from), to: quoted(step.to) });
+		case "create_session": {
+			const details = [
+				t("change_detail_model", { model: step.model }),
+				t("change_detail_folder", { folder: folder(step.folder) }),
+				...(step.team ? [t("change_detail_team", { team: quoted(step.team) })] : []),
+				...(step.role ? [t("change_detail_role", { role: clip(step.role) })] : []),
+			].join(t("listSeparator"));
+			return t("change_create_session", { name: quoted(step.name), details });
+		}
+		case "rename_session":
+			return t("change_rename_session", { from: quoted(step.from), to: quoted(step.to) });
 		case "move_to_team": {
 			const sessions = step.sessions.map(quoted).join(t("enumSeparator"));
 			return step.team === null
-				? t("organize_leave_team", { sessions })
-				: t("organize_move_to_team", { sessions, team: quoted(step.team) });
+				? t("change_leave_team", { sessions })
+				: t("change_move_to_team", { sessions, team: quoted(step.team) });
 		}
+		case "set_role":
+			return t("change_set_role", { session: quoted(step.session), role: clip(step.role) });
+		case "set_model":
+			return t("change_set_model", { session: quoted(step.session), from: step.from, to: step.to });
+		case "set_folder":
+			return t("change_set_folder", {
+				session: quoted(step.session),
+				from: folder(step.from),
+				to: folder(step.to),
+			});
+		case "set_permission":
+			return t("change_set_permission", {
+				session: quoted(step.session),
+				from: t(`perm_${step.from}`),
+				to: t(`perm_${step.to}`),
+			});
+		case "set_receive":
+			return t("change_set_receive", {
+				session: quoted(step.session),
+				from: t(`receive_${step.from}`),
+				to: t(`receive_${step.to}`),
+			});
+		case "set_letter_quota":
+			return t("change_set_letter_quota", {
+				session: quoted(step.session),
+				from: step.from,
+				to: step.to,
+			});
+		case "set_right":
+			return t(step.on ? "change_right_on" : "change_right_off", {
+				session: quoted(step.session),
+				right: t(`right_${step.right}`),
+			});
+		case "pin":
+			return t(step.on ? "change_pin_on" : "change_pin_off", { session: quoted(step.session) });
+		case "archive":
+			return t(step.on ? "change_archive_on" : "change_archive_off", {
+				session: quoted(step.session),
+			});
+		case "set_main":
+			if (step.to === null) return t("change_clear_main", { from: quoted(step.from ?? "") });
+			return step.from === null
+				? t("change_set_main_first", { to: quoted(step.to) })
+				: t("change_set_main", { from: quoted(step.from), to: quoted(step.to) });
+		case "set_default_model":
+			return t("change_set_default_model", { from: step.from, to: step.to });
+		case "set_decision_log":
+			return step.to === null
+				? t("change_clear_decision_log")
+				: t("change_set_decision_log", { to: step.to });
+		case "add_workspace":
+			return t("change_add_workspace", { folder: step.folder });
+		case "remove_workspace":
+			return t("change_remove_workspace", { folder: step.folder });
+		case "set_theme":
+			return t("change_set_theme", { to: t(`theme_${step.to}`) });
+		case "set_language":
+			return t("change_set_language", {
+				to: step.to === "system" ? t("language_system") : step.to === "zh" ? "中文" : "English",
+			});
 	}
 }
 
@@ -228,11 +310,11 @@ export function PermissionCard({ approval, session }: { approval: Approval; sess
 					{request.description}
 				</Capped>
 			)}
-			{request.tool === "open_session" ? null : request.organize ? (
+			{request.tool === "open_session" ? null : request.changes ? (
 				<ul className="request-list">
-					{request.organize.map((step, index) => (
+					{request.changes.map((step, index) => (
 						// biome-ignore lint/suspicious/noArrayIndexKey: the changes are fixed and in order
-						<li key={index}>{organizeText(step)}</li>
+						<li key={index}>{changeText(step)}</li>
 					))}
 				</ul>
 			) : (
@@ -940,6 +1022,12 @@ function EntryView({ entry }: { entry: Entry }) {
 						data.exitCode === null || data.exitCode === undefined
 							? ""
 							: t("jobExit", { code: data.exitCode }),
+				});
+			} else if (notice.kind === "changed") {
+				const steps = (notice.data?.steps ?? []) as unknown as ChangeStep[];
+				text = t("notice_changed", {
+					by: String(data.by ?? ""),
+					changes: steps.map(changeText).join(t("clauseSeparator")),
 				});
 			} else {
 				text = t(`notice_${notice.kind}`, { text: notice.text ?? "" });

@@ -25,8 +25,18 @@ export type Subject =
 	| { kind: "write"; tool: string; paths: string[]; summary: string }
 	| { kind: "command"; tool: string; command: string }
 	| { kind: "url"; tool: string; url: string }
-	/** Something that is neither a file, a command nor a URL, such as opening a session. */
-	| { kind: "act"; tool: string; summary: string };
+	/**
+	 * Something that is neither a file, a command nor a URL, such as opening a session. `scope` names
+	 * what "always allow" remembers; `always` asks in every mode; `reasons` make it must-confirm.
+	 */
+	| {
+			kind: "act";
+			tool: string;
+			summary: string;
+			scope?: string;
+			always?: boolean;
+			reasons?: ConfirmReason[];
+	  };
 
 export type Decision =
 	| { effect: "allow" }
@@ -266,13 +276,25 @@ export class PermissionEngine {
 	}
 
 	#act(subject: Extract<Subject, { kind: "act" }>, session: Session, flagged: boolean): Decision {
-		const rule = this.#rulesFor(session, subject.tool, () => true);
+		const rule = this.#rulesFor(
+			session,
+			subject.tool,
+			(r) => !r.pattern || r.pattern === subject.scope,
+		);
 		if (rule === "deny") return { effect: "deny", reason: "A rule in this session refuses this." };
+		if (subject.reasons && subject.reasons.length > 0) {
+			return this.#ask(subject.tool, subject.summary, subject.reasons);
+		}
 		if (rule === "allow") return { effect: "allow" };
-		if (rule === "ask") return this.#ask(subject.tool, subject.summary);
-		return this.#byDefault(session, flagged, subject.tool, subject.summary, [
-			{ effect: "allow", tool: subject.tool },
-		]);
+		const remember: PermissionRule[] = [
+			subject.scope
+				? { effect: "allow", tool: subject.tool, pattern: subject.scope }
+				: { effect: "allow", tool: subject.tool },
+		];
+		if (rule === "ask" || subject.always) {
+			return this.#ask(subject.tool, subject.summary, undefined, remember);
+		}
+		return this.#byDefault(session, flagged, subject.tool, subject.summary, remember);
 	}
 
 	#ask(

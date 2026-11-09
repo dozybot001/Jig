@@ -27,6 +27,7 @@ import {
 import { conflict, invalid, JigError } from "../errors.ts";
 import { decisionRef, letterRef, letterText } from "../mail/envelope.ts";
 import { BODY_MAX, PostOffice, reasonText, SUMMARY_MAX } from "../mail/post.ts";
+import { Manager } from "../manage.ts";
 import type { ModelGateway, ModelInfo } from "../model/gateway.ts";
 import { resolveWorkingFolder } from "../paths.ts";
 import type { PermissionEngine } from "../permissions/engine.ts";
@@ -37,9 +38,9 @@ import { settleAnswer } from "../tools/misc.ts";
 import { ReadState } from "../tools/read-state.ts";
 import { ALL_TOOLS, specs, toolsFor } from "../tools/registry.ts";
 import {
+	type Lookup,
 	type MailContext,
 	type OpenInput,
-	type OrganizeChange,
 	type Roles,
 	type ToolContext,
 	type ToolDefinition,
@@ -228,6 +229,7 @@ export class Agents {
 	readonly #turns = new Map<string, { sent: Letter[]; read: Map<string, number> }>();
 	/** Sessions the person stopped: letters wait until the person writes to them or continues them. */
 	readonly #paused = new Set<string>();
+	readonly #manager: Manager;
 	/** A session's or team's name by id, for what the person reads on permission cards. */
 	readonly #names = (id: string): string | null => {
 		const session = this.post.sessionName(id);
@@ -253,6 +255,17 @@ export class Agents {
 		this.post = options.post ?? new PostOffice(options.store, this.#log);
 		this.#waitMs = options.waitMs ?? WAIT_MS;
 		this.post.setHooks({ queued: (letter) => this.#onQueued(letter) });
+		this.#manager = new Manager({
+			store: this.#store,
+			mainId: () => this.post.mainSessionId(),
+			modelExists: (provider, model) => Boolean(this.#gateway.model(provider, model)),
+			onArchived: (id) => this.archived(id),
+		});
+	}
+
+	/** What tools may look up while Jig checks a call of `session`. */
+	#lookup(session: Session): Lookup {
+		return { name: this.#names, plan: (args) => this.#manager.plan(session, args) };
 	}
 
 	isRunning(sessionId: string): boolean {
@@ -700,7 +713,7 @@ export class Agents {
 			try {
 				// In the automatic mode the model asks for a person's approval itself, with `confirm`.
 				const flagged = (row.args as { confirm?: unknown }).confirm === true;
-				const subject = tool.subject(row.args, session, this.#names);
+				const subject = tool.subject(row.args, session, this.#lookup(session));
 				decision = this.#permissions.decide(subject, session, flagged);
 			} catch (error) {
 				const message =
@@ -725,7 +738,10 @@ export class Agents {
 					toolCallId: row.id,
 					kind: "permission",
 					// What the call is for and what it would change, so the person decides on what they see.
-					request: { ...decision.request, ...tool.preview?.(row.args, session, this.#names) },
+					request: {
+						...decision.request,
+						...tool.preview?.(row.args, session, this.#lookup(session)),
+					},
 				});
 				const answer = await this.#waitFor(sessionId, approval.id, live);
 				if (!answer || answer.decision === "deny" || answer.decision === undefined) {
@@ -894,79 +910,18 @@ export class Agents {
 			wait: (letter) => this.#awaitReply(sessionId, letter, live, callId),
 			open: (input) => this.#openChild(this.#store.getSession(sessionId), input),
 			finish: (outcome) => this.#store.setOutcome(sessionId, outcome),
-			organize: (changes) => this.#organize(this.#store.getSession(sessionId), changes),
-		};
-	}
-
-	/**
-	 * Renames sessions and teams, creates teams and moves sessions between them, for the main conversation
-	 * and the sessions the person allowed (blueprint 6.4). Every change is checked and applied in one
-	 * transaction, so a bad one leaves everything as it was. Folders, models, permissions and receive
-	 * policies are the person's and cannot be changed here.
-	 */
-	#organize(by: Session, changes: OrganizeChange[]): string[] {
-		if (!this.post.canOrganize(by)) {
-			throw conflict(
-				"Only the main conversation, or a session the person allowed, can organize sessions.",
-				undefined,
-				"not-allowed",
-			);
-		}
-		const session = (id: string): Session => {
-			let found: Session;
-			try {
-				found = this.#store.getSession(id);
-			} catch {
-				throw invalid(`There is no session with the id ${id}.`, "session");
-			}
-			if (found.archivedAt !== null) throw invalid(`"${found.name}" is archived.`, "session");
-			return found;
-		};
-		const team = (ref: string) => {
-			const groups = this.#store.listGroups();
-			const byId = groups.find((group) => group.id === ref);
-			if (byId) return byId;
-			const named = groups.filter((group) => group.name === ref);
-			if (named.length > 1)
-				throw invalid(`Several teams are called "${ref}"; give its id.`, "team");
-			if (!named[0]) throw invalid(`There is no team "${ref}"; create it first.`, "team");
-			return named[0];
-		};
-		return this.#store.tx(() => {
-			const done: string[] = [];
-			for (const change of changes) {
-				if (change.action === "rename_session") {
-					const target = session(change.session);
-					const name = validateSessionName(change.name);
-					if (name === target.name) continue;
-					// A name chosen on purpose is not replaced by Jig's automatic one.
-					this.#store.updateSession(target.id, { name, options: { autoName: false } });
-					done.push(`Renamed "${target.name}" to "${name}".`);
-				} else if (change.action === "create_team") {
-					const group = this.#store.createGroup(change.name);
-					done.push(`Created the team "${group.name}" (id ${group.id}).`);
-				} else if (change.action === "rename_team") {
-					const group = team(change.team);
-					const renamed = this.#store.updateGroup(group.id, { name: change.name });
-					if (renamed.name !== group.name) {
-						done.push(`Renamed the team "${group.name}" to "${renamed.name}".`);
-					}
-				} else {
-					const group = change.team === null ? null : team(change.team);
-					for (const id of change.sessions) {
-						const target = session(id);
-						if (target.groupId === (group?.id ?? null)) continue;
-						this.#store.updateSession(target.id, { groupId: group?.id ?? null });
-						done.push(
-							group
-								? `Moved "${target.name}" into the team "${group.name}".`
-								: `Took "${target.name}" out of its team.`,
-						);
-					}
+			manage: (args) => {
+				const by = this.#store.getSession(sessionId);
+				if (!this.post.canOrganize(by)) {
+					throw conflict(
+						"Only the main conversation, or a session the person allowed, can manage Jig.",
+						undefined,
+						"not-allowed",
+					);
 				}
-			}
-			return done;
-		});
+				return this.#manager.apply(by, args);
+			},
+		};
 	}
 
 	/** Notes a letter the session sent in this turn, for what Jig sends on its behalf at the end. */

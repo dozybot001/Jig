@@ -1,5 +1,5 @@
 import type { DecisionRef, LetterRef } from "../../shared/messages.ts";
-import type { Card, Letter, Session } from "../../shared/types.ts";
+import { type Card, type Letter, permissionModeOf, type Session } from "../../shared/types.ts";
 
 /** Attribute values stay on one line and cannot close the tag they sit in. */
 const attr = (value: string) => value.replace(/["\n\r<>]/g, " ");
@@ -132,6 +132,14 @@ export function directoryLine(
 	const kind = `${session.kind} ${session.cwd ? `code (${session.cwd})` : "chat"}`;
 	const parts = [session.id, session.name, kind, session.status];
 	if (marks.group) parts.push(`group: ${marks.group}`);
+	parts.push(`model: ${session.provider}/${session.model}`);
+	parts.push(`permission: ${permissionModeOf(session.options)}`);
+	const options = session.options;
+	if (options.receive && options.receive !== "accept") parts.push(`receives: ${options.receive}`);
+	if (options.letterQuota) parts.push(`letter quota: ${options.letterQuota}`);
+	if (options.canPostCards) parts.push("can post cards");
+	if (options.canOrganize) parts.push("can manage Jig");
+	if (session.pinned) parts.push("pinned");
 	if (marks.main) parts.push("the main conversation");
 	if (marks.you) parts.push("you");
 	if (marks.parentName) parts.push(`opened by ${marks.parentName}`);

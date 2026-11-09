@@ -10,6 +10,7 @@ import {
 	type Session,
 } from "../../shared/types.ts";
 import { conflict, invalid, JigError } from "../errors.ts";
+import { readSettings, type Settings } from "../settings.ts";
 import type { Store } from "../store.ts";
 import { type CardFields, MailStore } from "./store.ts";
 
@@ -188,6 +189,11 @@ export class PostOffice {
 	}
 
 	/** The main conversation, if one is set and still there. */
+	/** Jig's settings, for what list_sessions shows. */
+	settings(): Settings {
+		return readSettings(this.#store);
+	}
+
 	mainSessionId(): string | null {
 		const id = this.#store.getSetting<string | null>("mainSessionId", null);
 		if (!id) return null;
@@ -246,12 +252,8 @@ export class PostOffice {
 			throw invalid(`The summary can be at most ${SUMMARY_MAX} characters.`, "summary");
 		}
 		const body = limited(out.body, "body", BODY_MAX, false);
-		let to: Session;
-		try {
-			to = this.#store.getSession(out.to);
-		} catch {
-			throw invalid(`There is no session with the id ${out.to}.`, "to");
-		}
+		const to = this.#find(out.to);
+		if (!to) throw invalid(`There is no session "${out.to}".`, "to");
 		const from = sender.kind === "session" ? sender.session.id : null;
 		if (from === to.id) throw invalid("A session cannot send a letter to itself.", "to");
 		if (to.archivedAt !== null) {
@@ -264,6 +266,19 @@ export class PostOffice {
 		if (out.kind === "decision") this.#checkRelay(sender, out.decision);
 		let threadId: string | null = null;
 		let repliedTo: Letter | null = null;
+		// A report to a session whose request is open with the sender answers it: Jig links them, so the
+		// session need not carry letter ids (blueprint principle 8).
+		const answering =
+			!out.replyTo && out.kind === "report" && from !== null
+				? this.mail
+						.openRequests(from)
+						.filter((request) => request.fromSession === to.id)
+						.at(-1)
+				: undefined;
+		if (answering) {
+			repliedTo = answering;
+			threadId = answering.threadId;
+		}
 		if (out.replyTo) {
 			try {
 				repliedTo = this.mail.getLetter(out.replyTo);
@@ -464,7 +479,9 @@ export class PostOffice {
 	postCard(session: Session, input: CardInput): Card {
 		this.#requireMaintainer(session);
 		const fields = this.#cardFields(input, null);
-		const requestedBy = input.requestedBy ? this.#sessionId(input.requestedBy) : session.id;
+		const requestedBy = input.requestedBy
+			? this.#sessionId(input.requestedBy)
+			: (this.#asker(session) ?? session.id);
 		return this.#store.tx(() => {
 			const card = this.mail.addCard(session.id, requestedBy, fields);
 			for (const number of input.replaces ?? []) {
@@ -613,12 +630,33 @@ export class PostOffice {
 	}
 
 	#sessionId(id: unknown): string {
-		if (typeof id !== "string") throw invalid("A session id must be text.", "sessions");
+		if (typeof id !== "string") throw invalid("A session must be named by name or id.", "sessions");
+		const found = this.#find(id);
+		if (!found) throw invalid(`There is no session "${id}".`, "sessions");
+		return found.id;
+	}
+
+	/** A session by id or by its name (names are unique). */
+	#find(ref: string): Session | undefined {
 		try {
-			return this.#store.getSession(id).id;
+			return this.#store.getSession(ref);
 		} catch {
-			throw invalid(`There is no session with the id ${id}.`, "sessions");
+			return this.#store.findSessionByName(ref);
 		}
+	}
+
+	/**
+	 * The session whose open request a card most likely answers: the only other session with a request
+	 * open with the poster. With none or several, the card is the poster's own question.
+	 */
+	#asker(session: Session): string | null {
+		const askers = new Set(
+			this.mail
+				.openRequests(session.id)
+				.map((request) => request.fromSession)
+				.filter((id): id is string => id !== null && id !== session.id),
+		);
+		return askers.size === 1 ? ([...askers][0] as string) : null;
 	}
 
 	/** Checks a card's six points; on update, missing fields keep the card's current values. */

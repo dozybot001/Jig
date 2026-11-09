@@ -996,9 +996,11 @@ export function describeRule(rule: PermissionRule): string {
 							? t("ruleFetch", { p: pattern })
 							: rule.tool === "read" && pattern
 								? t("ruleRead", { p: pattern })
-								: !pattern && hasMessage(`ask_${rule.tool}`)
-									? t(`ask_${rule.tool}` as MessageKey)
-									: `${rule.tool}${pattern ? ` ${pattern}` : ""}`;
+								: rule.tool === "manage_jig" && (pattern === "organize" || pattern === "configure")
+									? t(`manage_${pattern}`)
+									: !pattern && hasMessage(`ask_${rule.tool}`)
+										? t(`ask_${rule.tool}` as MessageKey)
+										: `${rule.tool}${pattern ? ` ${pattern}` : ""}`;
 	if (rule.effect === "deny") return t("ruleDeny", { rule: what });
 	if (rule.effect === "ask") return t("ruleAsk", { rule: what });
 	return what;

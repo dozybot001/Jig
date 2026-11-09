@@ -1,5 +1,5 @@
-import type { CardOption, Letter, OrganizeStep, TaskOutcome } from "../../shared/types.ts";
-import { TASK_OUTCOMES } from "../../shared/types.ts";
+import type { CardOption, Letter, TaskOutcome } from "../../shared/types.ts";
+import { TASK_OUTCOMES, THINKING_LEVELS } from "../../shared/types.ts";
 import { JigError } from "../errors.ts";
 import { decisionReport, directoryLine, neutralize } from "../mail/envelope.ts";
 import { type CardInput, reasonText } from "../mail/post.ts";
@@ -8,8 +8,8 @@ import {
 	CONFIRM_ARGUMENT,
 	errorResult,
 	int,
+	type Lookup,
 	type MailContext,
-	type OrganizeChange,
 	str,
 	type ToolDefinition,
 	ToolInputError,
@@ -136,7 +136,7 @@ function letterDetail(mail: MailContext, letter: Letter) {
 export const listSessionsTool: ToolDefinition = {
 	name: "list_sessions",
 	description:
-		"List the sessions that can receive letters (id, name, kind, status, team, and the first line of each role) and the teams. Letters are addressed by id.",
+		"List the sessions (id, name, kind, status, team, model, permission mode and the first line of each role), the teams and Jig's settings.",
 	parameters: { type: "object", properties: {}, additionalProperties: false },
 	readOnly: true,
 	needsFolder: false,
@@ -156,10 +156,18 @@ export const listSessionsTool: ToolDefinition = {
 			}),
 		);
 		const teams = [...groups].map(([id, name]) => `- ${id} · ${name}`);
+		const settings = post.settings();
+		const workspaces = settings.workspaces.map((workspace) => workspace.path).join(", ");
+		const jig = [
+			`- default model: ${settings.defaultModel.provider}/${settings.defaultModel.model} (${settings.defaultModel.thinking})`,
+			`- decision log: ${settings.decisionLog ?? "none"}`,
+			`- workspaces: ${workspaces || "none"}`,
+			`- theme: ${settings.theme}; language: ${settings.language}`,
+		];
 		return {
 			content: [
 				text(
-					`Sessions (id · name · kind · status):\n${lines.join("\n")}\n\nTeams (id · name):\n${teams.length > 0 ? teams.join("\n") : "(none)"}`,
+					`Sessions (id · name · kind · status · …):\n${lines.join("\n")}\n\nTeams (id · name):\n${teams.length > 0 ? teams.join("\n") : "(none)"}\n\nSettings:\n${jig.join("\n")}`,
 				),
 			],
 		};
@@ -169,18 +177,22 @@ export const listSessionsTool: ToolDefinition = {
 export const sendLetterTool: ToolDefinition = {
 	name: "send_letter",
 	description:
-		"Send a letter to another session by its id. A notice is for information; a request asks the recipient to do or answer something, and its final reply comes back to you as a letter; a report gives the result of something you were asked. When you answer a letter, give its id as reply_to. With wait, this call waits until the recipient replies to this letter or finishes its turn (at most 30 minutes) and returns its answer. Write the summary so it makes sense on its own, and do not write only to acknowledge or thank.",
+		"Send a letter to another session. A notice is for information; a request asks the recipient to do or answer something, and its final reply comes back to you as a letter; a report gives the result of something you were asked. With wait, this call waits until the recipient replies to this letter or finishes its turn (at most 30 minutes) and returns its answer. Do not write only to acknowledge or thank.",
 	parameters: {
 		type: "object",
 		properties: {
-			to: { type: "string", description: "The recipient's session id, from list_sessions." },
+			to: { type: "string", description: "The recipient, by name or id." },
 			kind: { type: "string", enum: ["notice", "request", "report"] },
 			summary: { type: "string", description: "One line that makes sense on its own." },
 			body: {
 				type: "string",
 				description: "Details, if any. Plain text; refer to files by their path.",
 			},
-			reply_to: { type: "string", description: "The id of the letter you are answering." },
+			reply_to: {
+				type: "string",
+				description:
+					"The letter this answers. A report to a session whose request you have open is linked to it without this.",
+			},
 			wait: {
 				type: "boolean",
 				description: "Wait for the recipient's answer and get it as this call's result.",
@@ -326,158 +338,114 @@ export const openSessionTool: ToolDefinition = {
 
 const ORGANIZE_ACTIONS = ["rename_session", "create_team", "rename_team", "move_to_team"] as const;
 
-/** The changes an organize_sessions call asks for, checked for shape; the runner checks the rest. */
-function organizeChanges(args: Record<string, unknown>): OrganizeChange[] {
-	const list = args.changes;
-	if (!Array.isArray(list) || list.length === 0)
-		throw new ToolInputError("changes must list at least one change.");
-	if (list.length > 50) throw new ToolInputError("Give at most 50 changes in one call.");
-	return list.map((item, index) => {
-		if (!item || typeof item !== "object")
-			throw new ToolInputError(`changes[${index}] must be an object.`);
-		const change = item as Record<string, unknown>;
-		const action = choice(change, "action", ORGANIZE_ACTIONS);
-		const field = (key: string) => {
-			const value = change[key];
-			if (typeof value !== "string" || !value.trim()) {
-				throw new ToolInputError(`changes[${index}].${key} is required for ${action}.`);
-			}
-			return value.trim();
-		};
-		switch (action) {
-			case "rename_session":
-				return { action, session: field("session"), name: field("name") };
-			case "create_team":
-				return { action, name: field("name") };
-			case "rename_team":
-				return { action, team: field("team"), name: field("name") };
-			case "move_to_team": {
-				const sessions = change.sessions;
-				if (
-					!Array.isArray(sessions) ||
-					sessions.length === 0 ||
-					sessions.some((id) => typeof id !== "string")
-				) {
-					throw new ToolInputError(`changes[${index}].sessions must list session ids.`);
-				}
-				const team =
-					typeof change.team === "string" && change.team.trim() ? change.team.trim() : null;
-				return { action, sessions: sessions as string[], team };
-			}
-			default:
-				throw new ToolInputError(
-					`changes[${index}].action must be one of: ${ORGANIZE_ACTIONS.join(", ")}.`,
-				);
-		}
-	});
-}
+const TEXT = { type: "string" } as const;
 
-/** One line per change, with session names, for the person's approval and the result. */
-/** A change as the person reads it on the permission card: names in place of ids. */
-function organizeStep(change: OrganizeChange, names: (id: string) => string | null): OrganizeStep {
-	const name = (id: string) => names(id) ?? id;
-	switch (change.action) {
-		case "rename_session":
-			return { action: "rename_session", from: name(change.session), to: change.name };
-		case "create_team":
-			return { action: "create_team", name: change.name };
-		case "rename_team":
-			return { action: "rename_team", from: name(change.team), to: change.name };
-		case "move_to_team":
-			return {
-				action: "move_to_team",
-				sessions: change.sessions.map(name),
-				team: change.team === null ? null : name(change.team),
-			};
-	}
-}
-
-function describeChange(change: OrganizeChange, names: (id: string) => string | null): string {
-	const name = (id: string) => `"${names(id) ?? id}"`;
-	switch (change.action) {
-		case "rename_session":
-			return `Rename ${name(change.session)} to "${change.name}"`;
-		case "create_team":
-			return `Create the team "${change.name}"`;
-		case "rename_team":
-			return `Rename the team "${change.team}" to "${change.name}"`;
-		case "move_to_team":
-			return change.team
-				? `Move ${change.sessions.map(name).join(", ")} into the team "${change.team}"`
-				: `Take ${change.sessions.map(name).join(", ")} out of their team`;
-	}
-}
-
-export const organizeSessionsTool: ToolDefinition = {
-	name: "organize_sessions",
+/**
+ * manage_jig: the model changes Jig itself (blueprint 6.2, item 10). One call, all changes; Jig plans it
+ * to rank how far it reaches and to show the person every change, then applies all or none.
+ */
+export const manageJigTool: ToolDefinition = {
+	name: "manage_jig",
 	description:
-		"Keep the person's sessions in order: rename sessions, create and rename teams, and move sessions into or out of teams. Put every change in one call; Jig checks them all and applies all or none. Name sessions by id and teams by id or exact name (list_sessions shows both); a team created earlier in the call can be used by name. Working folders, models, permissions and how sessions receive letters stay the person's.",
+		"Change Jig itself when the person asks or the work needs it: sessions (create a standing one, or change its name, team, role, model, working folder, permission mode, how it receives letters, letter quota, rights, pinned, archived), teams, and settings. Put every change in one call; Jig checks them, asks the person when a change needs it, and applies all or none. Sessions and teams are named by name or id. API keys, pairing and deleting data are the person's.",
 	parameters: {
 		type: "object",
 		properties: {
-			changes: {
+			teams: {
 				type: "array",
-				minItems: 1,
-				maxItems: 50,
+				description: "Teams to create (name only) or rename (team and name).",
 				items: {
 					type: "object",
-					properties: {
-						action: { type: "string", enum: [...ORGANIZE_ACTIONS] },
-						session: { type: "string", description: "rename_session: the session's id." },
-						sessions: {
-							type: "array",
-							items: { type: "string" },
-							description: "move_to_team: the sessions' ids.",
-						},
-						team: {
-							type: "string",
-							description:
-								"rename_team, move_to_team: the team's id or exact name. For move_to_team, leave it out to take the sessions out of their team.",
-						},
-						name: {
-							type: "string",
-							description: "rename_session, create_team, rename_team: the new name.",
-						},
-					},
-					required: ["action"],
+					properties: { team: TEXT, name: TEXT },
+					required: ["name"],
 					additionalProperties: false,
 				},
 			},
-			confirm: CONFIRM_ARGUMENT,
+			sessions: {
+				type: "array",
+				description:
+					"One entry per session with only what changes. Leave out session to create a standing session with that name.",
+				items: {
+					type: "object",
+					properties: {
+						session: TEXT,
+						name: TEXT,
+						team: { type: "string", description: 'A team, or "none".' },
+						role: TEXT,
+						model: { type: "string", description: '"provider/model".' },
+						thinking: { type: "string", enum: [...THINKING_LEVELS] },
+						folder: { type: "string", description: 'Its working folder, or "none" for a chat.' },
+						permission: {
+							type: "string",
+							enum: ["auto", "manual", "skip"],
+							description: "auto: asks when needed; manual: asks each time; skip: full access.",
+						},
+						receive: { type: "string", enum: ["accept", "hold", "refuse"] },
+						letter_quota: {
+							type: "integer",
+							minimum: 0,
+							maximum: 100,
+							description: "Letters it may send between the person's messages; 0 for the default.",
+						},
+						can_post_cards: { type: "boolean" },
+						can_manage: { type: "boolean", description: "May use manage_jig." },
+						pinned: { type: "boolean" },
+						archived: { type: "boolean" },
+					},
+					additionalProperties: false,
+				},
+			},
+			settings: {
+				type: "object",
+				properties: {
+					main: { type: "string", description: "The main conversation." },
+					default_model: { type: "string", description: '"provider/model" for new sessions.' },
+					default_thinking: { type: "string", enum: [...THINKING_LEVELS] },
+					decision_log: {
+						type: "string",
+						description: 'A Markdown file every decision is added to, or "none".',
+					},
+					add_workspace: { type: "string", description: "A folder to add to the workspaces." },
+					remove_workspace: { type: "string", description: "A workspace, by folder or name." },
+					theme: { type: "string", enum: ["system", "light", "dark"] },
+					language: { type: "string", enum: ["system", "zh", "en"] },
+				},
+				additionalProperties: false,
+			},
 		},
-		required: ["changes"],
 		additionalProperties: false,
 	},
 	readOnly: false,
 	needsFolder: false,
 	offered: (_session, roles) => roles.canOrganize,
-	subject(args, _session, names = () => null) {
-		const lines = organizeChanges(args).map((change) => `- ${describeChange(change, names)}`);
+	subject(args, _session, lookup) {
+		if (!lookup) return { kind: "act", tool: "manage_jig", summary: "manage_jig", always: true };
+		let plan: ReturnType<Lookup["plan"]>;
+		try {
+			plan = lookup.plan(args);
+		} catch (error) {
+			if (error instanceof JigError) throw new ToolInputError(error.message);
+			throw error;
+		}
 		return {
 			kind: "act",
-			tool: "organize_sessions",
-			summary: `Organize sessions:\n${lines.join("\n")}`,
+			tool: "manage_jig",
+			summary: plan.summary.join("\n"),
+			scope: plan.tier === "widen" ? undefined : plan.tier,
+			always: plan.tier !== "organize",
+			...(plan.tier === "widen" ? { reasons: plan.reasons } : {}),
 		};
 	},
-	preview(args, _session, names) {
+	preview(args, _session, lookup) {
 		try {
-			return { organize: organizeChanges(args).map((change) => organizeStep(change, names)) };
+			return { changes: lookup.plan(args).steps };
 		} catch {
 			return {};
 		}
 	},
 	async run(args, ctx): Promise<ToolResult> {
-		const done = attempt(() => ctx.mail.organize(organizeChanges(args)));
-		return {
-			content: [
-				text(
-					done.length > 0
-						? `Done:\n${done.map((line) => `- ${line}`).join("\n")}`
-						: "Nothing needed changing.",
-				),
-			],
-			detail: { changes: done.length },
-		};
+		const done = attempt(() => ctx.mail.manage(args));
+		return { content: [text(done.join("\n"))] };
 	},
 };
 
@@ -620,7 +588,7 @@ export const postCardTool: ToolDefinition = {
 			requested_by: {
 				type: "string",
 				description:
-					"The id of the session whose request this is; the decision goes back to it. Leave it out when the question is yours.",
+					"The session whose request this is; the decision goes back to it. Without it, Jig uses the one session whose request is open with you, if there is one.",
 			},
 			replaces: {
 				type: "array",

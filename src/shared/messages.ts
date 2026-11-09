@@ -113,7 +113,15 @@ export interface CompactionRecord {
 
 /** A line in the transcript for the person only; never sent to the model. */
 export interface Notice {
-	kind: "interrupted" | "model_changed" | "restarted" | "error" | "compacted" | "job_finished";
+	kind:
+		| "interrupted"
+		| "model_changed"
+		| "restarted"
+		| "error"
+		| "compacted"
+		| "job_finished"
+		/** Another session changed this one with manage_jig; data has who and the changes. */
+		| "changed";
 	text?: string;
 	data?: JsonObject;
 	timestamp: number;

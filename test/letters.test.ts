@@ -9,7 +9,7 @@ import { ModelGateway } from "../src/server/model/gateway.ts";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "../src/server/model/testing.ts";
 import { PermissionEngine } from "../src/server/permissions/engine.ts";
 import type { NewSession } from "../src/server/store.ts";
-import type { Entry, Letter, Session } from "../src/shared/types.ts";
+import type { Entry, Letter, PermissionRequest, Session } from "../src/shared/types.ts";
 import { newStore, tempDir } from "./helpers/store.ts";
 
 type Reply = ReturnType<typeof fauxAssistantMessage>;
@@ -948,7 +948,7 @@ describe("when things go wrong", () => {
 });
 
 describe("organizing sessions", () => {
-	test("the main conversation renames and groups sessions in one call; a bad change leaves all as it was", async () => {
+	test("the main conversation organizes sessions in one call; a bad call is refused before anyone is asked", async () => {
 		const { store, agents, make, script, seen, said } = harness();
 		const main = make("总办", { options: { permissionMode: "manual" } });
 		const a = make("甲");
@@ -957,12 +957,12 @@ describe("organizing sessions", () => {
 		script(main, [
 			toolUse(
 				fauxToolCall(
-					"organize_sessions",
+					"manage_jig",
 					{
-						changes: [
-							{ action: "create_team", name: "产品" },
-							{ action: "move_to_team", sessions: [a.id, b.id], team: "产品" },
-							{ action: "rename_session", session: a.id, name: "甲 · 产品" },
+						teams: [{ name: "产品" }],
+						sessions: [
+							{ session: a.id, name: "甲 · 产品", team: "产品" },
+							{ session: "乙", team: "产品" },
 						],
 					},
 					{ id: "o1" },
@@ -970,35 +970,28 @@ describe("organizing sessions", () => {
 			),
 			toolUse(
 				fauxToolCall(
-					"organize_sessions",
-					{
-						changes: [
-							{ action: "create_team", name: "临时" },
-							{ action: "rename_session", session: b.id, name: "甲 · 产品" },
-						],
-					},
+					"manage_jig",
+					{ teams: [{ name: "临时" }], sessions: [{ session: b.id, name: "甲 · 产品" }] },
 					{ id: "o2" },
 				),
 			),
 			fauxAssistantMessage("整理好了"),
 		]);
 		agents.send(main.id, "把甲和乙放进产品团队");
-		// Manual approval: the person reads the changes with the sessions' names.
+		// Organizing follows the permission mode: manual asks, and the card lists every change by name.
 		await until(() => store.pendingApprovals(main.id).length === 1);
 		const [approval] = store.pendingApprovals(main.id);
-		const summary = String((approval?.request as { summary?: string } | undefined)?.summary);
-		assert.match(summary, /Move "甲", "乙" into the team "产品"/);
-		assert.match(summary, /Rename "甲" to "甲 · 产品"/);
-		// The interface words the same changes in the person's language from these steps.
-		assert.deepEqual((approval?.request as { organize?: unknown } | undefined)?.organize, [
+		const request = approval?.request as PermissionRequest;
+		assert.deepEqual(request.changes, [
 			{ action: "create_team", name: "产品" },
-			{ action: "move_to_team", sessions: ["甲", "乙"], team: "产品" },
 			{ action: "rename_session", from: "甲", to: "甲 · 产品" },
+			{ action: "move_to_team", sessions: ["甲"], team: "产品" },
+			{ action: "move_to_team", sessions: ["乙"], team: "产品" },
+		]);
+		assert.deepEqual(request.rememberRules, [
+			{ effect: "allow", tool: "manage_jig", pattern: "organize" },
 		]);
 		agents.answer(approval?.id as string, { decision: "allow_once" });
-		await until(() => store.pendingApprovals(main.id).length === 1);
-		const [second] = store.pendingApprovals(main.id);
-		agents.answer(second?.id as string, { decision: "allow_once" });
 		await until(() => said(main).some((text) => text.includes("整理好了")));
 
 		const team = store.listGroups().find((group) => group.name === "产品");
@@ -1006,22 +999,124 @@ describe("organizing sessions", () => {
 		assert.equal(store.getSession(a.id).name, "甲 · 产品");
 		assert.equal(store.getSession(a.id).groupId, team.id);
 		assert.equal(store.getSession(b.id).groupId, team.id);
-		assert.match(
-			lastTool(seen.get("总办")?.[1]),
-			/Created the team \\"产品\\"[\s\S]*Moved \\"乙\\" into the team \\"产品\\"/,
-		);
-		// The second call failed on a taken name: the team it created first is not there either.
-		assert.match(lastTool(seen.get("总办")?.[2]), /already exists/);
+		assert.match(lastTool(seen.get("总办")?.[1]), /Created the team \\"产品\\"/);
+		// The second call names a taken name: refused at once, nothing created, nobody asked.
+		assert.match(lastTool(seen.get("总办")?.[2]), /is taken/);
 		assert.ok(!store.listGroups().some((group) => group.name === "临时"));
 		assert.equal(store.getSession(b.id).name, "乙");
-		// Other sessions are not offered the tool unless the person allows it.
 		const mainTools = (seen.get("总办")?.[0]?.messages[0]?.toolsAdded ?? []).map((t) => t.name);
-		assert.ok(mainTools.includes("organize_sessions"));
+		assert.ok(mainTools.includes("manage_jig"));
 		script(b, [fauxAssistantMessage("好")]);
 		agents.send(b.id, "你好");
 		await until(() => said(b).length === 1);
 		const otherTools = (seen.get("乙")?.[0]?.messages[0]?.toolsAdded ?? []).map((t) => t.name);
-		assert.ok(!otherTools.includes("organize_sessions"));
+		assert.ok(!otherTools.includes("manage_jig"));
+	});
+
+	test("settings changes always ask; widening a session must be confirmed every time and leaves a trace", async () => {
+		const { store, agents, make, script, said, entries } = harness();
+		const main = make("总办", { options: { permissionMode: "skip" } });
+		const ui = make("UI", { options: { permissionMode: "manual" } });
+		store.setSetting("mainSessionId", main.id);
+		script(main, [
+			toolUse(
+				fauxToolCall(
+					"manage_jig",
+					{ sessions: [{ session: "UI", role: "负责界面", pinned: true }] },
+					{ id: "m1" },
+				),
+			),
+			toolUse(
+				fauxToolCall(
+					"manage_jig",
+					{ sessions: [{ session: "UI", permission: "skip", can_post_cards: true }] },
+					{ id: "m2" },
+				),
+			),
+			fauxAssistantMessage("都改好了"),
+		]);
+		agents.send(main.id, "UI 管界面，给它完全授权和放卡片的权利");
+		// A role change asks even with full access, and can be always allowed for this kind.
+		await until(() => store.pendingApprovals(main.id).length === 1);
+		const [configure] = store.pendingApprovals(main.id);
+		const first = configure?.request as PermissionRequest;
+		assert.equal(first.mustConfirm, false);
+		assert.deepEqual(first.rememberRules, [
+			{ effect: "allow", tool: "manage_jig", pattern: "configure" },
+		]);
+		assert.deepEqual(first.changes, [
+			{ action: "pin", session: "UI", on: true },
+			{ action: "set_role", session: "UI", role: "负责界面" },
+		]);
+		agents.answer(configure?.id as string, { decision: "allow_always" });
+		// Raising the permission mode and giving a right must be confirmed, whatever was allowed.
+		await until(() =>
+			store.pendingApprovals(main.id).some((approval) => approval.id !== configure?.id),
+		);
+		const [widen] = store.pendingApprovals(main.id);
+		const second = widen?.request as PermissionRequest;
+		assert.equal(second.mustConfirm, true);
+		assert.deepEqual(second.reasons, ["widen-permission", "grant-rights"]);
+		assert.throws(
+			() => agents.answer(widen?.id as string, { decision: "allow_always" }),
+			/only be allowed once/,
+		);
+		agents.answer(widen?.id as string, { decision: "allow_once" });
+		await until(() => said(main).some((text) => text.includes("都改好了")));
+		const changed = store.getSession(ui.id);
+		assert.equal(changed.responsibility, "负责界面");
+		assert.equal(changed.pinned, true);
+		assert.equal(changed.options.permissionMode, "skip");
+		assert.equal(changed.options.canPostCards, true);
+		const notices = entries(ui).filter((entry) => entry.role === "notice");
+		assert.equal(notices.length, 2);
+		assert.match(JSON.stringify(notices[1]), /"by":"总办"/);
+	});
+
+	test("a session cannot widen itself; a session it creates gets no more room than it has", async () => {
+		const { store, agents, make, script, said } = harness();
+		const helper = make("助手", { options: { permissionMode: "manual", canOrganize: true } });
+		const model = { provider: helper.provider, model: helper.model, thinking: "off" };
+		store.setSetting("defaultModel", model);
+		script(helper, [
+			toolUse(
+				fauxToolCall(
+					"manage_jig",
+					{ sessions: [{ session: "助手", permission: "skip" }] },
+					{ id: "w1" },
+				),
+			),
+			toolUse(
+				fauxToolCall(
+					"manage_jig",
+					{ sessions: [{ name: "文档", role: "整理文档" }], settings: { theme: "dark" } },
+					{ id: "w2" },
+				),
+			),
+			fauxAssistantMessage("好"),
+		]);
+		agents.send(helper.id, "给自己完全授权，再开个文档会话");
+		await until(() => store.pendingApprovals(helper.id).length === 1);
+		const [create] = store.pendingApprovals(helper.id);
+		assert.deepEqual((create?.request as PermissionRequest | undefined)?.changes, [
+			{
+				action: "create_session",
+				name: "文档",
+				folder: null,
+				model: `${model.provider}/${model.model}`,
+				team: null,
+				role: "整理文档",
+			},
+			{ action: "set_theme", to: "dark" },
+		]);
+		agents.answer(create?.id as string, { decision: "allow_once" });
+		await until(() => said(helper).some((text) => text.includes('"text":"好"')));
+		assert.equal(store.getSession(helper.id).options.permissionMode, "manual");
+		const docs = store.findSessionByName("文档");
+		assert.ok(docs);
+		assert.equal(docs.kind, "standing");
+		assert.equal(docs.options.permissionMode, "manual");
+		assert.equal(store.getSetting("theme", "system"), "dark");
 	});
 
 	test("a renamed or moved session hears it as an update; its prompt stays the same", async () => {

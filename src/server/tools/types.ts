@@ -9,6 +9,7 @@ import type {
 	Todo,
 } from "../../shared/types.ts";
 import type { Outgoing, PostOffice } from "../mail/post.ts";
+import type { ManagePlan } from "../manage.ts";
 import type { Subject } from "../permissions/engine.ts";
 import type { Jobs } from "./jobs.ts";
 import type { ReadState } from "./read-state.ts";
@@ -70,8 +71,8 @@ export interface MailContext {
 	wait(letter: Letter): Promise<WaitResult>;
 	open(input: OpenInput): { session: Session; letter: Letter };
 	finish(outcome: TaskOutcome): Session;
-	/** Applies all the changes or none; returns what changed, one line each. */
-	organize(changes: OrganizeChange[]): string[];
+	/** Applies a manage_jig call, all of it or none; returns what changed, one line each. */
+	manage(args: JsonObject): string[];
 }
 
 /**
@@ -96,39 +97,35 @@ export interface ToolDefinition {
 	needsFolder: boolean;
 	/** Offered only when this says so, e.g. card tools to the main conversation. */
 	offered?(session: Session, roles: Roles): boolean;
-	/**
-	 * What the call touches, for the permission check. Throws ToolInputError on bad arguments. `names`
-	 * turns a session id into its name, so a request the person reads says which sessions it means.
-	 */
-	subject(args: JsonObject, session: Session, names?: (id: string) => string | null): Subject;
+	/** What the call touches, for the permission check. Throws ToolInputError on bad arguments. */
+	subject(args: JsonObject, session: Session, lookup?: Lookup): Subject;
 	/**
 	 * What the person sees besides the call itself when Jig asks for permission: its purpose, the change
 	 * it would make. Never throws; a call without a preview is asked about as it is.
 	 */
-	preview?(
-		args: JsonObject,
-		session: Session,
-		names: (id: string) => string | null,
-	): PermissionPreview;
+	preview?(args: JsonObject, session: Session, lookup: Lookup): PermissionPreview;
 	run(args: JsonObject, ctx: ToolContext): Promise<ToolResult>;
 }
 
 /** The parts of a permission request a tool fills in (see PermissionRequest). */
-export type PermissionPreview = Pick<PermissionRequest, "description" | "diff" | "organize">;
+export type PermissionPreview = Partial<
+	Pick<PermissionRequest, "description" | "diff" | "changes">
+>;
+
+/** What a tool may look up while Jig checks a call, before the call runs. */
+export interface Lookup {
+	/** A session's or team's name by id, so what the person reads names the sessions. */
+	name(id: string): string | null;
+	/** Checks a manage_jig call of the calling session and says what it would change, changing nothing. */
+	plan(args: JsonObject): ManagePlan;
+}
 
 /** What a session may do beyond its tools' own checks. */
 export interface Roles {
 	canPostCards: boolean;
-	/** May rename sessions and teams and move sessions between teams. */
+	/** May change Jig with manage_jig: sessions, teams and settings. */
 	canOrganize: boolean;
 }
-
-/** One change organize_sessions makes; teams are named by id or by their exact name. */
-export type OrganizeChange =
-	| { action: "rename_session"; session: string; name: string }
-	| { action: "create_team"; name: string }
-	| { action: "rename_team"; team: string; name: string }
-	| { action: "move_to_team"; sessions: string[]; team: string | null };
 
 /** Bad arguments from the model; reported back to it as an error result. */
 export class ToolInputError extends Error {}

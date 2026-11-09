@@ -40,6 +40,7 @@ interface ExportStrings {
 	stopped: string;
 	modelChanged: string;
 	restarted: string;
+	changed: string;
 	compacted: string;
 	modelError: string;
 	compactFailed: string;
@@ -81,6 +82,7 @@ const ZH: ExportStrings = {
 	stopped: "已停止",
 	modelChanged: "换了模型",
 	restarted: "Jig 重启时这个会话在干活，已标为待核对。检查过后点「继续」接着运行。",
+	changed: "{by} 改了这个会话的设置",
 	compacted: "较早的记录已压成摘要",
 	modelError: "模型请求失败",
 	compactFailed: "压缩上下文失败",
@@ -141,6 +143,7 @@ const EN: ExportStrings = {
 	modelChanged: "Model changed",
 	restarted:
 		"Jig restarted while this session was working, so it is marked for review. Check it, then choose Continue.",
+	changed: "{by} changed this session's settings",
 	compacted: "Earlier messages were summarized",
 	modelError: "The model request failed",
 	compactFailed: "Could not compact the context",
@@ -344,6 +347,10 @@ function noticeLine(notice: Notice, strings: ExportStrings): string {
 			return strings.restarted;
 		case "compacted":
 			return strings.compacted;
+		case "changed": {
+			const by = typeof notice.data?.by === "string" ? notice.data.by : "";
+			return strings.changed.replace("{by}", () => by);
+		}
 		case "error": {
 			const code = typeof notice.data?.code === "string" ? notice.data.code : "";
 			if (code === "model-error") {

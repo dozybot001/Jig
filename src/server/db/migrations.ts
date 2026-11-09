@@ -207,4 +207,9 @@ CREATE INDEX cards_status ON cards (status, updated_at);
 	`
 ALTER TABLE cards ADD COLUMN undoable INTEGER;
 `,
+	// organize_sessions became manage_jig; what "always allow" remembered for it stays limited to organizing.
+	`
+UPDATE sessions SET rules = replace(rules, '"tool":"organize_sessions"', '"tool":"manage_jig","pattern":"organize"')
+WHERE rules LIKE '%"tool":"organize_sessions"%';
+`,
 ];
