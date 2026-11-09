@@ -998,13 +998,14 @@ body.scroll-locked {
 		display: none;
 	}
 }
+/* The count of what waits for you: a quiet grey chip, not a bright one (founder, 2026-11-09). */
 .badge {
 	min-width: 18px;
 	height: 18px;
 	padding: 0 5px;
 	border-radius: 5px;
-	background: var(--accent);
-	color: var(--on-accent);
+	background: var(--surface-3);
+	color: var(--text);
 	font-size: var(--fs-s);
 	font-weight: 600;
 	line-height: 1;
@@ -1031,6 +1032,10 @@ body.scroll-locked {
 }
 .dot-idle {
 	background: transparent;
+}
+/* New replies since you last opened the session. */
+.dot-unread {
+	background: var(--text-3);
 }
 /* On a session row the status is a small dot on the right, where the time otherwise is. */
 .row-dot {
@@ -2016,8 +2021,8 @@ button.about-row {
 	height: 15px;
 	padding: 0 3px;
 	border-radius: 4px;
-	background: var(--accent);
-	color: var(--on-accent);
+	background: var(--surface-3);
+	color: var(--text);
 	font-size: 10px;
 	font-weight: 600;
 	line-height: 15px;
@@ -2245,9 +2250,6 @@ button.about-row {
 	border: 1px solid var(--border);
 	border-radius: var(--radius-l);
 	background: var(--surface);
-}
-.letter-decision {
-	border-left: 3px solid var(--accent);
 }
 .letter-head {
 	display: flex;
