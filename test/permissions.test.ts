@@ -178,6 +178,14 @@ describe("shell permissions", () => {
 		}
 	});
 
+	test("a must-confirm request says why with codes the interface translates", () => {
+		assert.deepEqual(askOf(shell("git push origin main"))?.reasons, ["push"]);
+		assert.deepEqual(askOf(shell("rm -rf build && git push"))?.reasons, ["delete-files", "push"]);
+		assert.deepEqual(askOf(shell("sudo ls"))?.reasons, ["admin"]);
+		assert.deepEqual(askOf(shell("echo hi > /tmp/jig-outside.txt"))?.reasons, ["write-outside"]);
+		assert.equal(askOf(shell("git push"))?.reason, undefined);
+	});
+
 	test("must-confirm stays even when a rule allows the command", () => {
 		const rules: PermissionRule[] = [{ effect: "allow", tool: "shell", pattern: "git" }];
 		assert.ok(askOf(shell("git push", session({ rules })))?.mustConfirm);
@@ -242,6 +250,7 @@ describe("file permissions", () => {
 			write(join(outsideDir, "a.ts"), session({ options: { permissionMode: "skip" } })),
 		);
 		assert.ok(outside?.mustConfirm);
+		assert.deepEqual(outside?.reasons, ["write-outside"]);
 	});
 
 	test("path rules use globs relative to the working folder", () => {

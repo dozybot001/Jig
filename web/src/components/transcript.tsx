@@ -1,4 +1,12 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+	memo,
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import {
 	type AssistantMessage,
 	bodyAfterSummary,
@@ -15,7 +23,7 @@ import type {
 	ToolCallView,
 } from "../../../src/shared/types.ts";
 import { answerApproval, loadEarlier, markRead, selectSession, toolCallFor } from "../actions.ts";
-import { type MessageKey, t, useLang } from "../i18n.ts";
+import { formatAgo, hasMessage, type MessageKey, t, useLang } from "../i18n.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
 import { Capped, Diff, Markdown, ScrollBlock, useStickToBottom } from "./content.tsx";
 import {
@@ -29,7 +37,7 @@ import {
 	SendIcon,
 	ShieldIcon,
 } from "./icons.tsx";
-import { Button, ErrorBox, useAction } from "./ui.tsx";
+import { Button, CardHead, ErrorBox, useAction, useNow } from "./ui.tsx";
 
 function resultText(result: ToolResultMessage | undefined): string {
 	if (!result) return "";
@@ -113,10 +121,30 @@ function Thinking({ text, live }: { text: string; live: boolean }) {
 	);
 }
 
-export function PermissionCard({ approval }: { approval: Approval }) {
+/**
+ * What a permission request does, in the person's words: why a must-confirm operation asks every time,
+ * or the kind of action the tool takes. The command, file or address follows below it.
+ */
+function permissionHeadline(request: PermissionRequest): string {
+	if (request.reasons && request.reasons.length > 0) {
+		return request.reasons
+			.map((reason) => t(`confirm_${reason}` satisfies MessageKey))
+			.join(t("listSeparator"));
+	}
+	if (request.reason) return request.reason;
+	const key = `ask_${request.tool}`;
+	return hasMessage(key) ? t(key) : request.tool;
+}
+
+/**
+ * A permission request. In the approval center it names the session and how long it has been waiting;
+ * in the session itself it says that it needs the person's permission.
+ */
+export function PermissionCard({ approval, session }: { approval: Approval; session?: ReactNode }) {
 	const request = approval.request as PermissionRequest;
 	const [reason, setReason] = useState("");
 	const [denying, setDenying] = useState(false);
+	const now = useNow();
 	const action = useAction((decision: "allow_once" | "allow_always" | "deny") =>
 		answerApproval(
 			approval.id,
@@ -147,18 +175,28 @@ export function PermissionCard({ approval }: { approval: Approval }) {
 				: (rule.pattern ?? rule.tool),
 		)
 		.join(", ");
+	const headline = permissionHeadline(request);
 	return (
-		<section className="card request-card" aria-label={t("approvalTitle")}>
-			<div className="request-head">
-				<ShieldIcon />
-				<h2>{request.mustConfirm ? t("mustConfirmTitle") : t("approvalTitle")}</h2>
-			</div>
-			<ScrollBlock className="code request-code" label={t("approvalTitle")}>
-				{request.tool === "shell" ? request.summary : `${request.tool}: ${request.summary}`}
+		<section className="card request-card" aria-label={headline}>
+			<CardHead
+				icon={<ShieldIcon />}
+				parts={
+					session
+						? [session, t("waitingOnYou"), formatAgo(approval.createdAt, now)]
+						: [t("approvalTitle")]
+				}
+				tags={
+					request.mustConfirm ? (
+						<span className="tag" title={t("confirmEachTimeHint")}>
+							{t("confirmEachTime")}
+						</span>
+					) : null
+				}
+			/>
+			<p className="request-title">{headline}</p>
+			<ScrollBlock className="code request-code" label={headline}>
+				{request.summary}
 			</ScrollBlock>
-			{request.mustConfirm && request.reason && (
-				<p className="hint">{t("mustConfirmBody", { reason: request.reason })}</p>
-			)}
 			{denying && (
 				<input
 					className="input"
@@ -169,7 +207,7 @@ export function PermissionCard({ approval }: { approval: Approval }) {
 					onKeyDown={(event) => event.key === "Enter" && void action.run("deny")}
 				/>
 			)}
-			{/* Allow, always allow (the rule is in the label), decline: in Claude's order. */}
+			{/* Allow, always allow (the rule is in the label), decline. */}
 			<div className="request-actions">
 				<Button variant="primary" busy={action.busy} onClick={() => void action.run("allow_once")}>
 					<CheckIcon />
@@ -200,9 +238,11 @@ export function PermissionCard({ approval }: { approval: Approval }) {
 	);
 }
 
-export function QuestionCard({ approval }: { approval: Approval }) {
+/** A question from a session: the question is the card's line; options answer it in one click. */
+export function QuestionCard({ approval, session }: { approval: Approval; session?: ReactNode }) {
 	const request = approval.request as QuestionRequest;
 	const [text, setText] = useState("");
+	const now = useNow();
 	const action = useAction((answer: string) => answerApproval(approval.id, { answer }));
 	if (approval.status !== "pending") {
 		return (
@@ -215,11 +255,15 @@ export function QuestionCard({ approval }: { approval: Approval }) {
 	}
 	return (
 		<section className="card request-card" aria-label={t("questionTitle")}>
-			<div className="request-head">
-				<QuestionIcon />
-				<h2>{t("questionTitle")}</h2>
-			</div>
-			<div>{request.question}</div>
+			<CardHead
+				icon={<QuestionIcon />}
+				parts={
+					session
+						? [session, t("waitingOnYou"), formatAgo(approval.createdAt, now)]
+						: [t("questionTitle")]
+				}
+			/>
+			<p className="request-title request-question">{request.question}</p>
 			{request.options && (
 				<div className="request-actions">
 					{request.options.map((option) => (

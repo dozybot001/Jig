@@ -185,8 +185,11 @@ export interface Card {
 	deadline: string | null;
 	/** Sessions involved. */
 	sessions: string[];
+	/** Whether the decision can be undone; null on cards from before it was asked. */
+	undoable: boolean | null;
+	/** How it can be undone, or what cannot be; may be empty. */
 	reversible: string;
-	/** Who does what once it is decided. */
+	/** Who does what once it is decided, beyond what the options say; may be empty. */
 	after: string;
 	status: CardStatus;
 	/** Index of the chosen option; null when the person answered with a note only. */
@@ -232,6 +235,35 @@ export interface ToolCallView {
 
 export type ApprovalDecision = "allow_once" | "allow_always" | "deny";
 
+/** Why an operation must be confirmed every time (spec 21.2); the interface words each one. */
+export type ConfirmReason =
+	| "delete-files"
+	| "delete-untracked"
+	| "delete-branch"
+	| "delete-tag"
+	| "delete-stash"
+	| "delete-ref"
+	| "delete-worktree"
+	| "discard-changes"
+	| "rewrite-history"
+	| "push"
+	| "publish-package"
+	| "change-package"
+	| "publish-image"
+	| "github"
+	| "remote-machine"
+	| "remote-copy"
+	| "send-data"
+	| "write-disk"
+	| "cluster"
+	| "infrastructure"
+	| "system-services"
+	| "jig-cli"
+	| "credentials"
+	| "write-credentials"
+	| "admin"
+	| "write-outside";
+
 export interface PermissionRequest {
 	tool: string;
 	/** One line describing what will happen, e.g. the command or the file. */
@@ -240,6 +272,9 @@ export interface PermissionRequest {
 	mustConfirm: boolean;
 	/** Rules "allow and remember" would add; absent when remembering is not offered. */
 	rememberRules?: PermissionRule[];
+	/** Why a must-confirm operation asks every time. */
+	reasons?: ConfirmReason[];
+	/** The same in English words, on requests saved before the reasons had codes. */
 	reason?: string;
 }
 

@@ -108,6 +108,10 @@ export function decisionReport(card: Card, names: (id: string) => string | null)
 				.join("; ")}`,
 		);
 	}
+	if (card.undoable !== null) {
+		const how = card.reversible ? ` (${neutralize(card.reversible)})` : "";
+		lines.push(`Can be undone: ${card.undoable ? "yes" : "no"}${how}`);
+	}
 	if (card.status === "decided") {
 		const chosen = card.choice === null ? null : card.options[card.choice]?.label;
 		lines.push(

@@ -24,7 +24,7 @@ import {
 } from "./icons.tsx";
 import { SidebarToggle } from "./session.tsx";
 import { PermissionCard, QuestionCard } from "./transcript.tsx";
-import { Button, ErrorBox, useAction } from "./ui.tsx";
+import { Button, CardHead, ErrorBox, useAction, useNow } from "./ui.tsx";
 
 /** A session's current name; letters and cards keep ids, so a renamed session shows its new name. */
 function useSessionName(id: string | null): string | null {
@@ -57,41 +57,72 @@ function byDeadline(a: Card, b: Card): number {
 }
 
 /**
- * A decision card (blueprint 6.4): the six points, the options with the recommended one chosen, and a
- * note. Sending records the decision as the person's and returns it to the sessions that asked.
+ * A decision card (blueprint 6.4), read at a glance: the top line says who asks, through whom and since
+ * when, with the deadline and whether it can be undone on the right; then the question, a few lines of
+ * context, the options with the recommended one chosen, and a note. Sending records the decision as the
+ * person's and returns it to the sessions that asked.
  */
 function DecisionCard({ card }: { card: Card }) {
 	useLang();
 	const [choice, setChoice] = useState<number | null>(card.recommended);
 	const [note, setNote] = useState("");
 	const names = useAppState((state) => state.sessions);
+	const now = useNow();
 	const titleId = useId();
 	const noteId = useId();
 	const send = useAction(() => decideCard(card.id, choice, note.trim() || null));
 	const hasOptions = card.options.length > 0;
 	const ready = choice !== null || note.trim().length > 0;
-	const involved = card.sessions
+	// The sessions the card's top line does not already name.
+	const others = card.sessions
+		.filter((id) => id !== card.requestedBy && id !== card.createdBy)
 		.map((id) => names[id]?.name)
 		.filter((name): name is string => Boolean(name));
+	const via = card.createdBy && card.createdBy !== card.requestedBy ? card.createdBy : null;
 	return (
 		<section className="card decision-card" aria-labelledby={titleId}>
-			<div className="decision-meta">
-				<span>#{card.number}</span>
-				{card.requestedBy && (
-					<span>{t("cardFrom", { name: names[card.requestedBy]?.name ?? "" })}</span>
-				)}
-				{card.createdBy && card.createdBy !== card.requestedBy && (
-					<span>{t("cardPostedBy", { name: names[card.createdBy]?.name ?? "" })}</span>
-				)}
-				{card.deadline && (
-					<span className="decision-deadline">{t("cardDeadline", { d: card.deadline })}</span>
-				)}
-			</div>
+			<CardHead
+				icon={<DecisionIcon />}
+				parts={[
+					`#${card.number}`,
+					card.requestedBy && (
+						<WithLink
+							text={t("cardFrom", { name: "\u0000" })}
+							link={<SessionLink id={card.requestedBy} />}
+						/>
+					),
+					via && (
+						<WithLink text={t("cardVia", { name: "\u0000" })} link={<SessionLink id={via} />} />
+					),
+					others.length > 0 && t("cardAlsoInvolves", { names: others.join(t("listSeparator")) }),
+					formatAgo(card.createdAt, now),
+				]}
+				tags={
+					<>
+						{card.deadline && (
+							<span className="tag tag-deadline" title={card.deadline}>
+								{t("cardDeadline", { d: card.deadline })}
+							</span>
+						)}
+						{typeof card.undoable === "boolean" && (
+							<span
+								className={card.undoable ? "tag" : "tag tag-danger"}
+								title={card.reversible || undefined}
+							>
+								{card.undoable ? t("undoable") : t("notUndoable")}
+							</span>
+						)}
+					</>
+				}
+			/>
 			<h3 id={titleId}>{card.title}</h3>
 			{card.context && (
 				<Capped className="decision-context" label={card.title}>
 					<Markdown text={card.context} />
 				</Capped>
+			)}
+			{typeof card.undoable !== "boolean" && card.reversible && (
+				<p className="hint">{card.reversible}</p>
 			)}
 			{hasOptions && (
 				<fieldset className="decision-options">
@@ -122,34 +153,19 @@ function DecisionCard({ card }: { card: Card }) {
 					))}
 				</fieldset>
 			)}
-			<dl className="decision-facts">
-				<div>
-					<dt>{t("cardReversible")}</dt>
-					<dd>{card.reversible}</dd>
-				</div>
-				<div>
-					<dt>{t("cardAfter")}</dt>
-					<dd>{card.after}</dd>
-				</div>
-				{involved.length > 0 && (
-					<div>
-						<dt>{t("cardInvolves")}</dt>
-						<dd>{involved.join(t("listSeparator"))}</dd>
-					</div>
-				)}
-			</dl>
+			{card.after && <p className="hint">{card.after}</p>}
 			<label className="visually-hidden" htmlFor={noteId}>
 				{t("cardNote")}
 			</label>
-			<textarea
-				id={noteId}
-				className="textarea"
-				rows={1}
-				placeholder={hasOptions ? t("notePlaceholder") : t("answerRequired")}
-				value={note}
-				onChange={(event) => setNote(event.target.value)}
-			/>
-			<div className="request-actions">
+			<div className="composer-row">
+				<textarea
+					id={noteId}
+					className="textarea"
+					rows={1}
+					placeholder={hasOptions ? t("notePlaceholder") : t("answerRequired")}
+					value={note}
+					onChange={(event) => setNote(event.target.value)}
+				/>
 				<Button
 					variant="primary"
 					busy={send.busy}
@@ -165,20 +181,25 @@ function DecisionCard({ card }: { card: Card }) {
 	);
 }
 
-/** A letter held for the person: who wrote to whom, why it waits, and release or refuse. */
+/** A letter held for the person: who wrote to whom and since when, why it waits, and release or refuse. */
 function HeldLetter({ letter }: { letter: Letter }) {
 	useLang();
+	const now = useNow();
 	const release = useAction(() => releaseLetter(letter.id));
 	const refuse = useAction(() => refuseLetter(letter.id));
 	return (
 		<section className="card request-card" aria-label={letter.summary}>
-			<div className="request-head">
-				<MailIcon />
-				<h3>
-					<SenderLink letter={letter} /> → <SessionLink id={letter.toSession} />
-				</h3>
-			</div>
-			<p className="letter-summary">{plainLine(letter.summary) || letter.summary}</p>
+			<CardHead
+				icon={<MailIcon />}
+				parts={[
+					<>
+						<SenderLink letter={letter} /> → <SessionLink id={letter.toSession} />
+					</>,
+					t(`letterKind_${letter.kind}`),
+					formatAgo(letter.createdAt, now),
+				]}
+			/>
+			<p className="request-title">{plainLine(letter.summary) || letter.summary}</p>
 			{letter.body && (
 				<Capped className="letter-body" label={letter.summary}>
 					<Markdown text={letter.body} breaks />
@@ -202,21 +223,16 @@ function HeldLetter({ letter }: { letter: Letter }) {
 	);
 }
 
-/** An approval or question from any session, with a link to the session it stops. */
+/** A permission request or question from any session; the card's top line links to the session. */
 function PendingApproval({ approval }: { approval: Approval }) {
-	return (
-		<div className="center-item">
-			<SessionLink id={approval.sessionId} />
-			{approval.kind === "permission" ? (
-				<PermissionCard approval={approval} />
-			) : (
-				<QuestionCard approval={approval} />
-			)}
-		</div>
+	const session = <SessionLink id={approval.sessionId} />;
+	return approval.kind === "permission" ? (
+		<PermissionCard approval={approval} session={session} />
+	) : (
+		<QuestionCard approval={approval} session={session} />
 	);
 }
 
-/** One decision in the record: what was asked, what you chose and your note, marked as yours. */
 /** A translated sentence with a link in place of {name}. */
 function WithLink({ text, link }: { text: string; link: ReactNode }) {
 	const [before = "", after = ""] = text.split("\u0000");

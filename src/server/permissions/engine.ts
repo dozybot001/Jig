@@ -1,5 +1,6 @@
 import { dirname } from "node:path";
 import {
+	type ConfirmReason,
 	type PermissionRequest,
 	type PermissionRule,
 	permissionModeOf,
@@ -126,11 +127,7 @@ export class PermissionEngine {
 
 		if (subject.kind === "write") {
 			if (outside.length > 0) {
-				return this.#ask(
-					subject.tool,
-					subject.summary,
-					`changes files outside the working folder: ${outside.join(", ")}`,
-				);
+				return this.#ask(subject.tool, subject.summary, ["write-outside"]);
 			}
 			if (effects.includes("ask")) return this.#ask(subject.tool, subject.summary);
 			if (effects.every((effect) => effect === "allow")) return { effect: "allow" };
@@ -187,7 +184,7 @@ export class PermissionEngine {
 			understood &&= inner.understood;
 		}
 
-		const reasons = new Set<string>();
+		const reasons = new Set<ConfirmReason>();
 		for (const argv of commands) {
 			const reason = mustConfirmReason(argv);
 			if (reason) reasons.add(reason);
@@ -196,14 +193,13 @@ export class PermissionEngine {
 				const path = resolvePath(arg, cwd);
 				return path !== null && isSecretPath(path, this.#secrets);
 			});
-			if (secret) reasons.add("touches credentials or Jig's own data");
+			if (secret) reasons.add("credentials");
 		}
-		if (privileged) reasons.add("runs with administrator rights");
+		if (privileged) reasons.add("admin");
 		for (const target of redirectTargets) {
 			const path = resolvePath(target, cwd);
-			if (!path || !cwd || !isInside(path, cwd))
-				reasons.add("writes a file outside the working folder");
-			else if (isSecretPath(path, this.#secrets)) reasons.add("writes into a credentials location");
+			if (!path || !cwd || !isInside(path, cwd)) reasons.add("write-outside");
+			else if (isSecretPath(path, this.#secrets)) reasons.add("write-credentials");
 		}
 
 		const ruleFor = (argv: string[]) =>
@@ -211,7 +207,7 @@ export class PermissionEngine {
 		if (commands.some((argv) => ruleFor(argv) === "deny")) {
 			return { effect: "deny", reason: "A rule in this session refuses this command." };
 		}
-		if (reasons.size > 0) return this.#ask(subject.tool, subject.command, [...reasons].join("; "));
+		if (reasons.size > 0) return this.#ask(subject.tool, subject.command, [...reasons]);
 		if (!understood || dynamic) return this.#ask(subject.tool, subject.command);
 
 		const pending: string[][] = [];
@@ -279,9 +275,14 @@ export class PermissionEngine {
 		]);
 	}
 
-	#ask(tool: string, summary: string, mustConfirm?: string, remember?: PermissionRule[]): Decision {
-		const request: PermissionRequest = { tool, summary, mustConfirm: mustConfirm !== undefined };
-		if (mustConfirm) request.reason = mustConfirm;
+	#ask(
+		tool: string,
+		summary: string,
+		reasons?: ConfirmReason[],
+		remember?: PermissionRule[],
+	): Decision {
+		const request: PermissionRequest = { tool, summary, mustConfirm: reasons !== undefined };
+		if (reasons) request.reasons = reasons;
 		else if (remember && remember.length > 0) request.rememberRules = remember;
 		return { effect: "ask", request };
 	}

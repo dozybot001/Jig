@@ -1522,18 +1522,58 @@ body.scroll-locked {
 	padding: 14px 16px 16px;
 	border-color: var(--border);
 }
-.request-head {
+/*
+ * A card's top line: who is waiting, through whom and since when, with the tags that matter on the
+ * right. On a narrow card the tags move under the line.
+ */
+.request-card,
+.decision-card {
+	container-type: inline-size;
+}
+.card-head {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: start;
+	gap: 6px 8px;
+	color: var(--text-2);
+	font-size: var(--fs-s);
+	line-height: 18px;
+}
+.card-head > svg {
+	margin-top: 1px;
+	color: var(--text-3);
+}
+.card-head-parts {
 	display: flex;
-	align-items: center;
-	gap: 8px;
+	flex-wrap: wrap;
+	min-width: 0;
 }
-.request-head svg {
-	flex: none;
-	color: var(--warning);
+.card-head-parts > span:not(:last-child)::after {
+	content: "·";
+	margin: 0 6px;
+	color: var(--text-3);
 }
-.request-head :is(h2, h3) {
+.card-head-tags {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 6px;
+}
+@container (max-width: 480px) {
+	.card-head-tags {
+		grid-row: 2;
+		grid-column: 2;
+		justify-content: flex-start;
+	}
+}
+.request-title {
+	margin: 0;
 	font-size: var(--fs-m);
 	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+.request-question {
+	white-space: pre-wrap;
 }
 .request-code {
 	max-height: 180px;
@@ -2125,6 +2165,19 @@ button.about-row {
 	line-height: 1;
 	white-space: nowrap;
 }
+/* On a card's top line: a decision that cannot be undone, and a deadline that may be long. */
+.tag-danger {
+	border-color: currentColor;
+	color: var(--danger);
+}
+.tag-deadline {
+	display: inline-block;
+	max-width: 14em;
+	overflow: hidden;
+	color: var(--warning);
+	line-height: 16px;
+	text-overflow: ellipsis;
+}
 .link-button {
 	padding: 0;
 	border: none;
@@ -2202,17 +2255,8 @@ button.about-row {
 	font-size: var(--fs-s);
 	font-weight: 600;
 }
-.center-item {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr);
-	gap: 6px;
-	justify-items: start;
-}
-.center-item > .card {
-	justify-self: stretch;
-}
 
-/* A decision card: the six points, options to click, a note (blueprint 6.4). */
+/* A decision card: the top line, the question, a few lines of context, options to click, a note (blueprint 6.4). */
 .decision-card {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr);
@@ -2223,16 +2267,6 @@ button.about-row {
 .decision-card h3 {
 	font-size: var(--fs-m);
 	font-weight: 600;
-}
-.decision-meta {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px 10px;
-	color: var(--text-3);
-	font-size: var(--fs-s);
-}
-.decision-deadline {
-	color: var(--warning);
 }
 .decision-context {
 	max-height: 240px;
@@ -2288,25 +2322,6 @@ button.about-row {
 	align-items: center;
 	gap: 6px;
 	font-weight: 500;
-}
-.decision-facts {
-	display: grid;
-	gap: 6px;
-	margin: 0;
-}
-.decision-facts > div {
-	display: grid;
-	grid-template-columns: 6.5em minmax(0, 1fr);
-	gap: 8px;
-}
-.decision-facts dt {
-	color: var(--text-3);
-	font-size: var(--fs-s);
-	line-height: 20px;
-}
-.decision-facts dd {
-	margin: 0;
-	overflow-wrap: anywhere;
 }
 
 /* Letters in a conversation read as letters, not as the person's words (blueprint 7.2). */

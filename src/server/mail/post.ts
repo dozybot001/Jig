@@ -111,6 +111,8 @@ export interface CardInput {
 	recommended?: number | null;
 	deadline?: string | null;
 	sessions?: string[];
+	/** Whether the decision can be undone; required for a new card. */
+	undoable?: boolean;
 	reversible?: string;
 	after?: string;
 	/** The session whose request this is; the decision goes back to it. */
@@ -650,6 +652,13 @@ export class PostOffice {
 			input.deadline === undefined
 				? (current?.deadline ?? null)
 				: limited(input.deadline, "deadline", 100, false) || null;
+		if (input.undoable !== undefined && typeof input.undoable !== "boolean") {
+			throw invalid("undoable must be true or false.", "undoable");
+		}
+		const undoable = input.undoable ?? current?.undoable ?? null;
+		if (undoable === null) {
+			throw invalid("Say whether the decision can be undone (undoable).", "undoable");
+		}
 		return {
 			title:
 				input.title === undefined && current
@@ -663,14 +672,15 @@ export class PostOffice {
 			recommended,
 			deadline,
 			sessions,
+			undoable,
 			reversible:
-				input.reversible === undefined && current
-					? current.reversible
-					: limited(input.reversible, "reversible", 500, true),
+				input.reversible === undefined
+					? (current?.reversible ?? "")
+					: limited(input.reversible, "reversible", 500, false),
 			after:
-				input.after === undefined && current
-					? current.after
-					: limited(input.after, "after", 2000, true),
+				input.after === undefined
+					? (current?.after ?? "")
+					: limited(input.after, "after", 2000, false),
 		};
 	}
 }

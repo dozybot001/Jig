@@ -47,7 +47,7 @@ import {
 	TeamIcon,
 } from "./icons.tsx";
 import { SettingsMenu } from "./settings.tsx";
-import { Button, describeError, ErrorBox, Menu, type MenuEntry, useAction } from "./ui.tsx";
+import { Button, describeError, ErrorBox, Menu, type MenuEntry, useAction, useNow } from "./ui.tsx";
 import { shortPath, useWorkspaces, WorkspaceDialog } from "./workspaces.tsx";
 
 interface SearchResult {
@@ -70,16 +70,6 @@ export function useNarrow(): boolean {
 		return () => list.removeEventListener("change", change);
 	}, []);
 	return narrow;
-}
-
-/** Re-renders every minute so the times beside sessions stay current. */
-function useNow(): number {
-	const [now, setNow] = useState(() => Date.now());
-	useEffect(() => {
-		const timer = setInterval(() => setNow(Date.now()), 60_000);
-		return () => clearInterval(timer);
-	}, []);
-	return now;
 }
 
 /**

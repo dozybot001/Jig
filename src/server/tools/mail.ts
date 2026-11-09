@@ -480,20 +480,26 @@ export const finishTaskTool: ToolDefinition = {
 };
 
 const CARD_PROPERTIES = {
-	title: { type: "string", description: "What needs deciding, as a question." },
+	title: { type: "string", description: "The question to decide, short enough for one line." },
 	context: {
 		type: "string",
 		description:
-			"What the person needs to know, written so they can decide without opening any session.",
+			"What the person needs to know to decide without opening any session, in two or three short sentences. Do not repeat the options, the deadline or whether it can be undone.",
 	},
 	options: {
 		type: "array",
 		maxItems: 6,
+		description:
+			"The choices. Do not add one for other answers: the person can always write a note.",
 		items: {
 			type: "object",
 			properties: {
-				label: { type: "string" },
-				detail: { type: "string", description: "What this choice means, in a sentence." },
+				label: { type: "string", description: "A few words, such as the action to take." },
+				detail: {
+					type: "string",
+					description:
+						"What happens if the person picks it, in a short sentence. Leave it out when the label says it.",
+				},
 			},
 			required: ["label"],
 			additionalProperties: false,
@@ -506,15 +512,28 @@ const CARD_PROPERTIES = {
 	},
 	deadline: {
 		type: "string",
-		description: 'When it must be decided, such as "2026-11-12" or "before the release".',
+		description:
+			'When it must be decided, in a few words, such as "2026-11-12" or "before the release".',
 	},
 	sessions: {
 		type: "array",
 		items: { type: "string" },
-		description: "Ids of the sessions involved.",
+		description: "Ids of other sessions involved, besides the one that asked and you.",
 	},
-	reversible: { type: "string", description: "Whether it can be undone, and how." },
-	after: { type: "string", description: "Who does what once it is decided." },
+	undoable: {
+		type: "boolean",
+		description: "Whether the decision can be undone after it is carried out.",
+	},
+	reversible: {
+		type: "string",
+		description:
+			"How to undo it, or what cannot be undone, in a few words. Leave it out when that is obvious.",
+	},
+	after: {
+		type: "string",
+		description:
+			"Who does what once it is decided, when the options do not say it. Leave it out when the decision only goes back to the session that asked.",
+	},
 } as const;
 
 function cardInput(args: Record<string, unknown>): CardInput {
@@ -543,6 +562,11 @@ function cardInput(args: Record<string, unknown>): CardInput {
 			throw new ToolInputError("recommended must count from 1.");
 		} else input.recommended = value - 1;
 	}
+	if (args.undoable !== undefined) {
+		if (typeof args.undoable !== "boolean")
+			throw new ToolInputError("undoable must be true or false.");
+		input.undoable = args.undoable;
+	}
 	if (args.sessions !== undefined) {
 		if (!Array.isArray(args.sessions) || args.sessions.some((id) => typeof id !== "string")) {
 			throw new ToolInputError("sessions must be a list of session ids.");
@@ -561,7 +585,7 @@ function cardText(number: number, title: string, verb: string): ToolResult {
 export const postCardTool: ToolDefinition = {
 	name: "post_card",
 	description:
-		"Put a decision card in the approval center for the person. Fill in what needs deciding, the context, options with the one you recommend, the deadline, the sessions involved, whether it can be undone, and who does what afterwards. The person's decision goes to the requesting session and to you.",
+		"Put a decision card in the approval center for the person. Keep it short enough to take in at a glance: the question in one line, a few sentences of context, the options with the one you recommend, the deadline if there is one, and whether it can be undone. Say each thing once. The person's decision goes to the requesting session and to you.",
 	parameters: {
 		type: "object",
 		properties: {
@@ -577,7 +601,7 @@ export const postCardTool: ToolDefinition = {
 				description: "Numbers of waiting cards this one replaces; they are withdrawn.",
 			},
 		},
-		required: ["title", "reversible", "after"],
+		required: ["title", "undoable"],
 		additionalProperties: false,
 	},
 	readOnly: false,

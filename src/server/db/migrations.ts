@@ -203,4 +203,8 @@ CREATE TABLE cards (
 ) STRICT;
 CREATE INDEX cards_status ON cards (status, updated_at);
 `,
+	// Whether a decision can be undone, as yes or no for the card's top line; null on older cards.
+	`
+ALTER TABLE cards ADD COLUMN undoable INTEGER;
+`,
 ];

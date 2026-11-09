@@ -438,6 +438,7 @@ describe("the main conversation", () => {
 						title: "许可证用 MIT 吗？",
 						options: [{ label: "MIT" }, { label: "Apache-2.0" }],
 						recommended: 1,
+						undoable: false,
 						reversible: "开源后不能撤回",
 						after: "Jig · 开发改 LICENSE",
 						requested_by: product.id,

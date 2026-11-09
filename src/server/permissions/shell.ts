@@ -1,4 +1,5 @@
 import { basename } from "node:path";
+import type { ConfirmReason } from "../../shared/types.ts";
 
 /**
  * A small, conservative shell parser for permission checks. It does not try to understand every
@@ -298,49 +299,48 @@ function gitSubcommand(args: string[]): { sub: string | undefined; rest: string[
 }
 
 /** Why an operation must be confirmed every time (spec 21.2), or null. Checked on unwrapped commands. */
-export function mustConfirmReason(argv: string[]): string | null {
+export function mustConfirmReason(argv: string[]): ConfirmReason | null {
 	const name = basename(argv[0] ?? "");
 	const args = argv.slice(1);
 	const has = (...flags: string[]) => args.some((arg) => flags.includes(arg));
 	const hasPrefix = (...prefixes: string[]) =>
 		args.some((arg) => prefixes.some((prefix) => arg.startsWith(prefix)));
 
-	if (["rm", "rmdir", "unlink", "shred", "srm", "trash"].includes(name)) return "deletes files";
+	if (["rm", "rmdir", "unlink", "shred", "srm", "trash"].includes(name)) return "delete-files";
 	// Jig's own command line sends letters and manages keys and the service; sessions use their tools.
 	if (name === "jig") {
 		const informational =
 			has("--help", "-h") || args.every((arg) => ["--version", "-v", "--json"].includes(arg));
-		if (!informational) return "uses Jig's own command line";
+		if (!informational) return "jig-cli";
 	}
-	if (name === "find" && has("-delete")) return "deletes files";
-	if (name === "rsync" && hasPrefix("--delete", "--remove-source-files")) return "deletes files";
+	if (name === "find" && has("-delete")) return "delete-files";
+	if (name === "rsync" && hasPrefix("--delete", "--remove-source-files")) return "delete-files";
 	if (name === "git") {
 		const { sub, rest } = gitSubcommand(args);
 		const restHas = (...flags: string[]) => rest.some((arg) => flags.includes(arg));
-		if (sub === "push") return "pushes to a remote repository";
-		if (sub === "reset" && restHas("--hard", "--merge", "--keep")) return "discards changes";
-		if (sub === "clean") return "deletes untracked files";
-		if (sub === "branch" && restHas("-d", "-D", "--delete")) return "deletes a branch";
-		if (sub === "tag" && restHas("-d", "--delete")) return "deletes a tag";
-		if (sub === "stash" && (rest[0] === "drop" || rest[0] === "clear"))
-			return "deletes stashed changes";
+		if (sub === "push") return "push";
+		if (sub === "reset" && restHas("--hard", "--merge", "--keep")) return "discard-changes";
+		if (sub === "clean") return "delete-untracked";
+		if (sub === "branch" && restHas("-d", "-D", "--delete")) return "delete-branch";
+		if (sub === "tag" && restHas("-d", "--delete")) return "delete-tag";
+		if (sub === "stash" && (rest[0] === "drop" || rest[0] === "clear")) return "delete-stash";
 		if (sub === "checkout" && (restHas("--", ".") || restHas("-f", "--force")))
-			return "discards changes";
-		if (sub === "restore" && !restHas("--staged", "-S")) return "discards changes";
-		if (sub === "filter-branch" || sub === "filter-repo") return "rewrites history";
-		if (sub === "update-ref" && restHas("-d")) return "deletes a reference";
-		if (sub === "worktree" && rest[0] === "remove") return "deletes a working tree";
+			return "discard-changes";
+		if (sub === "restore" && !restHas("--staged", "-S")) return "discard-changes";
+		if (sub === "filter-branch" || sub === "filter-repo") return "rewrite-history";
+		if (sub === "update-ref" && restHas("-d")) return "delete-ref";
+		if (sub === "worktree" && rest[0] === "remove") return "delete-worktree";
 	}
 	if (["npm", "pnpm", "yarn", "bun"].includes(name) && args[0] === "publish")
-		return "publishes a package";
+		return "publish-package";
 	if (name === "npm" && (args[0] === "unpublish" || args[0] === "deprecate"))
-		return "changes a published package";
+		return "change-package";
 	if (["cargo", "poetry", "flit", "hatch"].includes(name) && args[0] === "publish")
-		return "publishes a package";
-	if (name === "gem" && args[0] === "push") return "publishes a package";
-	if (name === "twine" && args[0] === "upload") return "publishes a package";
+		return "publish-package";
+	if (name === "gem" && args[0] === "push") return "publish-package";
+	if (name === "twine" && args[0] === "upload") return "publish-package";
 	if (name === "docker" && (args[0] === "push" || (args[0] === "image" && args[1] === "push"))) {
-		return "publishes an image";
+		return "publish-image";
 	}
 	if (name === "gh") {
 		const action = `${args[0] ?? ""} ${args[1] ?? ""}`;
@@ -349,14 +349,14 @@ export function mustConfirmReason(argv: string[]): string | null {
 				`${action} `,
 			)
 		) {
-			return "changes something on GitHub";
+			return "github";
 		}
 	}
 	if (["ssh", "scp", "sftp", "mosh", "telnet", "ftp", "sshpass"].includes(name)) {
-		return "connects to another machine";
+		return "remote-machine";
 	}
 	if (name === "rsync" && args.some((arg) => /^[^/]*:/.test(arg) && !arg.startsWith("-"))) {
-		return "copies to or from another machine";
+		return "remote-copy";
 	}
 	if (name === "curl") {
 		const sends = args.some(
@@ -368,16 +368,16 @@ export function mustConfirmReason(argv: string[]): string | null {
 				((arg === "-X" || arg === "--request") &&
 					/^(POST|PUT|PATCH|DELETE)$/i.test(args[index + 1] ?? "")),
 		);
-		if (sends) return "sends data to a server";
+		if (sends) return "send-data";
 	}
 	if (
 		name === "wget" &&
 		hasPrefix("--post-data", "--post-file", "--method", "--body-data", "--body-file")
 	) {
-		return "sends data to a server";
+		return "send-data";
 	}
 	if (["dd", "mkfs", "fdisk", "parted", "diskutil"].includes(name) || name.startsWith("mkfs.")) {
-		return "writes to a disk";
+		return "write-disk";
 	}
 	if (
 		name === "kubectl" &&
@@ -385,13 +385,13 @@ export function mustConfirmReason(argv: string[]): string | null {
 			args[0] ?? "",
 		)
 	) {
-		return "changes a cluster";
+		return "cluster";
 	}
 	if (name === "terraform" && ["apply", "destroy", "import"].includes(args[0] ?? "")) {
-		return "changes infrastructure";
+		return "infrastructure";
 	}
 	if (["launchctl", "systemctl", "crontab", "shutdown", "reboot", "halt"].includes(name)) {
-		return "changes system services";
+		return "system-services";
 	}
 	return null;
 }

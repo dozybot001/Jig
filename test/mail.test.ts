@@ -401,6 +401,7 @@ describe("decision cards", () => {
 		title: "Jig 的许可证用 MIT 还是 Apache-2.0？",
 		options: [{ label: "MIT", detail: "最常见" }, { label: "Apache-2.0" }],
 		recommended: 0,
+		undoable: false,
 		reversible: "开源后不能撤回",
 		after: "Jig · 开发改 LICENSE 和 README",
 	};
@@ -428,7 +429,7 @@ describe("decision cards", () => {
 		const main = make("总办");
 		store.setSetting("mainSessionId", main.id);
 		assert.equal(
-			code(() => post.postCard(main, { ...fields, reversible: "" })),
+			code(() => post.postCard(main, { ...fields, undoable: undefined })),
 			"invalid-request",
 		);
 		assert.equal(
@@ -456,6 +457,12 @@ describe("decision cards", () => {
 			"already-answered",
 		);
 		assert.deepEqual(post.center().cards, []);
+		// How to undo it and what happens afterwards may be left out: the options can say it.
+		const short = post.postCard(main, { title: "先发 0.2.0 吗？", undoable: true });
+		assert.equal(short.undoable, true);
+		assert.equal(short.reversible, "");
+		assert.equal(short.after, "");
+		assert.equal(post.updateCard(main, short.number, { title: "先发 0.2.1 吗？" }).undoable, true);
 	});
 
 	test("the person's decision goes to the requester and the main conversation, and into the log file", () => {

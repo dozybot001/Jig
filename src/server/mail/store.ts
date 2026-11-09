@@ -47,6 +47,7 @@ interface CardRow {
 	recommended: number | null;
 	deadline: string | null;
 	sessions: string;
+	undoable: number | null;
 	reversible: string;
 	after: string;
 	status: CardStatus;
@@ -92,6 +93,7 @@ function toCard(row: CardRow): Card {
 		recommended: row.recommended,
 		deadline: row.deadline,
 		sessions: json<string[]>(row.sessions, []),
+		undoable: row.undoable === null ? null : row.undoable === 1,
 		reversible: row.reversible,
 		after: row.after,
 		status: row.status,
@@ -130,6 +132,7 @@ export interface CardFields {
 	recommended: number | null;
 	deadline: string | null;
 	sessions: string[];
+	undoable: boolean;
 	reversible: string;
 	after: string;
 }
@@ -361,8 +364,8 @@ export class MailStore {
 			const max = this.#q("SELECT MAX(number) AS n FROM cards").get() as { n: number | null };
 			this.#q(
 				`INSERT INTO cards (id, number, created_by, requested_by, title, context, options, recommended,
-					deadline, sessions, reversible, after, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					deadline, sessions, undoable, reversible, after, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			).run(
 				id,
 				(max.n ?? 0) + 1,
@@ -374,6 +377,7 @@ export class MailStore {
 				fields.recommended,
 				fields.deadline,
 				JSON.stringify(fields.sessions),
+				fields.undoable ? 1 : 0,
 				fields.reversible,
 				fields.after,
 				now,
@@ -400,7 +404,7 @@ export class MailStore {
 		return this.#store.tx(() => {
 			this.#q(
 				`UPDATE cards SET title = ?, context = ?, options = ?, recommended = ?, deadline = ?, sessions = ?,
-					reversible = ?, after = ?, updated_at = ? WHERE id = ?`,
+					undoable = ?, reversible = ?, after = ?, updated_at = ? WHERE id = ?`,
 			).run(
 				fields.title,
 				fields.context,
@@ -408,6 +412,7 @@ export class MailStore {
 				fields.recommended,
 				fields.deadline,
 				JSON.stringify(fields.sessions),
+				fields.undoable ? 1 : 0,
 				fields.reversible,
 				fields.after,
 				Date.now(),

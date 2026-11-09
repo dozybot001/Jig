@@ -941,3 +941,40 @@ export function Field({
 		</div>
 	);
 }
+
+/** Re-renders every minute so relative times (in the sidebar, on cards) stay current. */
+export function useNow(): number {
+	const [now, setNow] = useState(() => Date.now());
+	useEffect(() => {
+		const timer = setInterval(() => setNow(Date.now()), 60_000);
+		return () => clearInterval(timer);
+	}, []);
+	return now;
+}
+
+/**
+ * The first line of a card waiting for the person: who is waiting, through whom and for how long, with
+ * the tags that change the weight of the answer (deadline, can it be undone, asks every time) on the right.
+ */
+export function CardHead({
+	icon,
+	parts,
+	tags,
+}: {
+	icon: ReactNode;
+	parts: ReactNode[];
+	tags?: ReactNode;
+}) {
+	return (
+		<div className="card-head">
+			{icon}
+			<span className="card-head-parts">
+				{parts.filter(Boolean).map((part, index) => (
+					// biome-ignore lint/suspicious/noArrayIndexKey: the parts are fixed per card and have no ids
+					<span key={index}>{part}</span>
+				))}
+			</span>
+			{tags && <span className="card-head-tags">{tags}</span>}
+		</div>
+	);
+}

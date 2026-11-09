@@ -387,6 +387,7 @@ describe("api: approval center and letters", () => {
 			title: "要不要发布 0.2.0？",
 			options: [{ label: "发布" }, { label: "再等等" }],
 			recommended: 0,
+			undoable: false,
 			reversible: "标签推送后不改写",
 			after: "Jig · 开发打标签并推送",
 			requestedBy: product.id,
