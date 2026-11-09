@@ -21,6 +21,7 @@ import {
 } from "../actions.ts";
 import { formatCost, formatNumber, t, useLang } from "../i18n.ts";
 import { type ModelInfo, setState, type TranscriptState, useAppState } from "../state.ts";
+import { Capped } from "./content.tsx";
 import { NewSessionDialog } from "./dialogs.tsx";
 import {
 	ArrowUpIcon,
@@ -478,7 +479,7 @@ function TodoCard({ session }: { session: Session }) {
 				{current && <span className="todo-current">{current.text}</span>}
 				<ChevronIcon />
 			</button>
-			<ol id={listId} className="todo-list" hidden={!open}>
+			<Capped as="ol" id={listId} className="todo-list" hidden={!open} label={t("todoTitle")}>
 				{todos
 					.map((todo, position) => ({ ...todo, key: `todo-${position}` }))
 					.map((todo) => (
@@ -487,7 +488,7 @@ function TodoCard({ session }: { session: Session }) {
 							<span>{todo.text}</span>
 						</li>
 					))}
-			</ol>
+			</Capped>
 		</aside>
 	);
 }

@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
 	AssistantMessage,
 	LetterRef,
@@ -15,7 +15,7 @@ import type {
 import { answerApproval, loadEarlier, markRead, selectSession, toolCallFor } from "../actions.ts";
 import { type MessageKey, t, useLang } from "../i18n.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
-import { Diff, Markdown, ScrollBlock } from "./content.tsx";
+import { Capped, Diff, Markdown, ScrollBlock, useStickToBottom } from "./content.tsx";
 import { ChevronIcon, DecisionIcon, MailIcon, QuestionIcon, ShieldIcon } from "./icons.tsx";
 import { Button, ErrorBox, useAction } from "./ui.tsx";
 
@@ -94,7 +94,9 @@ function Thinking({ text, live }: { text: string; live: boolean }) {
 				</span>
 				<ChevronIcon />
 			</summary>
-			<div className="thinking-body">{text}</div>
+			<Capped className="thinking-body" label={t("thinkingLabel")} follow={live}>
+				{text}
+			</Capped>
 		</details>
 	);
 }
@@ -139,9 +141,9 @@ export function PermissionCard({ approval }: { approval: Approval }) {
 				<ShieldIcon />
 				<h2>{request.mustConfirm ? t("mustConfirmTitle") : t("approvalTitle")}</h2>
 			</div>
-			<pre className="code request-code">
+			<ScrollBlock className="code request-code" label={t("approvalTitle")}>
 				{request.tool === "shell" ? request.summary : `${request.tool}: ${request.summary}`}
-			</pre>
+			</ScrollBlock>
 			{request.mustConfirm && request.reason && (
 				<p className="hint">{t("mustConfirmBody", { reason: request.reason })}</p>
 			)}
@@ -308,7 +310,7 @@ const ToolCard = memo(function ToolCard({
 						{status === "running" && output && (
 							<>
 								<h2>{t("toolOutput")}</h2>
-								<ScrollBlock className="code output" label={t("toolOutput")}>
+								<ScrollBlock className="code output" label={t("toolOutput")} follow>
 									{output}
 								</ScrollBlock>
 							</>
@@ -352,7 +354,7 @@ type Step =
 /** What the transcript shows, in order: messages, the assistant's text, and runs of steps. */
 type Item =
 	| { kind: "entry"; key: string; entry: Entry }
-	| { kind: "text"; key: string; text: string }
+	| { kind: "text"; key: string; text: string; live: boolean }
 	| { kind: "steps"; key: string; steps: Step[]; live: boolean; alone: boolean };
 
 function userText(entry: Extract<Entry, { role: "user" }>): string {
@@ -386,7 +388,7 @@ function buildItems(transcript: TranscriptState, working: boolean): Item[] {
 			} else if (block.type === "text") {
 				if (!block.text.trim()) return;
 				flush();
-				items.push({ kind: "text", key, text: block.text });
+				items.push({ kind: "text", key, text: block.text, live });
 			} else {
 				const view = entryId ? toolCallFor(transcript.toolCalls, entryId, block.id) : undefined;
 				const waiting =
@@ -543,11 +545,11 @@ function StepGroup({
 					)}
 					<ChevronIcon />
 				</summary>
-				<div className="step-list">
+				<Capped className="step-list" label={summarize(steps)} follow={live}>
 					{steps.map((step) => (
 						<StepView key={step.key} step={step} transcript={transcript} results={results} />
 					))}
-				</div>
+				</Capped>
 			</details>
 			{live && !open && last && <StepView step={last} transcript={transcript} results={results} />}
 		</div>
@@ -577,17 +579,14 @@ function NoteStep({ entry }: { entry: Entry }) {
 					<span className="activity-verb">{t("summaryTitle")}</span>
 					<ChevronIcon />
 				</summary>
-				<div className="tool-detail">
+				<Capped className="tool-detail note-summary" label={t("summaryTitle")}>
 					<Markdown text={entry.compaction.summary} />
-				</div>
+				</Capped>
 			</details>
 		);
 	}
 	return null;
 }
-
-/** Letters longer than this start folded. */
-const LONG_LETTER = 600;
 
 /**
  * A letter from another session, a script or Jig, shown as a letter, not as words of the person. The
@@ -650,19 +649,11 @@ function LetterEntry({ letter }: { letter: LetterRef }) {
 				{letter.auto && <span className="hint">{t("autoReport")}</span>}
 			</div>
 			<p className="letter-summary">{letter.summary}</p>
-			{body &&
-				(body.length > LONG_LETTER ? (
-					<details className="letter-details">
-						<summary>{t("letterExpand")}</summary>
-						<div className="letter-body">
-							<Markdown text={body} />
-						</div>
-					</details>
-				) : (
-					<div className="letter-body">
-						<Markdown text={body} />
-					</div>
-				))}
+			{body && (
+				<Capped className="letter-body" label={letter.summary}>
+					<Markdown text={body} />
+				</Capped>
+			)}
 			{letter.decision && (
 				<p className="hint">
 					{t("verifiedDecision", { n: letter.decision.number })} ·{" "}
@@ -681,10 +672,10 @@ function EntryView({ entry }: { entry: Entry }) {
 		case "user":
 			if (entry.letter) return <LetterEntry letter={entry.letter} />;
 			return (
-				<div className="msg-user">
+				<Capped className="msg-user" label={t("you")}>
 					<span className="visually-hidden">{t("you")}: </span>
 					{userText(entry)}
-				</div>
+				</Capped>
 			);
 		case "notice": {
 			const notice = entry.notice;
@@ -727,8 +718,12 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 	useLang();
 	const session = useAppState((state) => state.sessions[transcript.sessionId]);
 	const scroller = useRef<HTMLDivElement>(null);
-	const atBottom = useRef(true);
 	const [behind, setBehind] = useState(false);
+	const onFollow = useCallback((following: boolean) => {
+		if (following) setBehind(false);
+	}, []);
+	// Follows new content only while you are at the bottom; any scroll up stops it at once (spec 9.8).
+	const following = useStickToBottom(scroller, onFollow);
 	const loadMore = useAction(loadEarlier);
 
 	const results = new Map<string, ToolResultMessage>();
@@ -753,7 +748,7 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 	useLayoutEffect(() => {
 		const element = scroller.current;
 		if (!element) return;
-		if (atBottom.current) {
+		if (following.current) {
 			element.scrollTop = element.scrollHeight;
 			markRead(transcript.sessionId);
 		} else {
@@ -764,28 +759,20 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 	const openSessionId = transcript.sessionId;
 	// biome-ignore lint/correctness/useExhaustiveDependencies: resets the scroll state when another session opens
 	useEffect(() => {
-		atBottom.current = true;
+		following.current = true;
 		setBehind(false);
 	}, [openSessionId]);
 
 	// A turn that ends while you are watching at the bottom counts as read.
 	const unread = session?.unread ?? 0;
 	useEffect(() => {
-		if (unread > 0 && atBottom.current) markRead(transcript.sessionId);
-	}, [unread, transcript.sessionId]);
-
-	const onScroll = () => {
-		const element = scroller.current;
-		if (!element) return;
-		atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
-		if (atBottom.current) setBehind(false);
-	};
+		if (unread > 0 && following.current) markRead(transcript.sessionId);
+	}, [unread, transcript.sessionId, following]);
 
 	return (
 		<section
 			ref={scroller}
 			className="transcript"
-			onScroll={onScroll}
 			aria-label={session?.name ?? ""}
 			aria-live="off"
 			// biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll area must be reachable by keyboard (spec 18.6)
@@ -806,7 +793,7 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 					if (item.kind === "text") {
 						return (
 							<div key={item.key} className="msg-assistant">
-								<Markdown text={item.text} />
+								<Markdown text={item.text} live={item.live} />
 							</div>
 						);
 					}
@@ -836,7 +823,7 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 						onClick={() => {
 							const element = scroller.current;
 							if (element) element.scrollTop = element.scrollHeight;
-							atBottom.current = true;
+							following.current = true;
 							setBehind(false);
 						}}
 					>

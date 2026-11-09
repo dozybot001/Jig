@@ -1,4 +1,14 @@
-import { memo, type ReactNode } from "react";
+import {
+	memo,
+	type ReactNode,
+	type RefObject,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { t } from "../i18n.ts";
@@ -10,7 +20,7 @@ function urlTransform(url: string): string {
 	return SAFE_PROTOCOLS.test(url.trim()) ? url : "";
 }
 
-const components: Components = {
+const baseComponents: Components = {
 	a: ({ href, children }) =>
 		href ? (
 			<a href={href} target="_blank" rel="noopener noreferrer">
@@ -27,7 +37,196 @@ const components: Components = {
 	),
 };
 
-export const Markdown = memo(function Markdown({ text }: { text: string }) {
+/**
+ * Keeps a scroll area at its bottom while content arrives, until the person scrolls up (spec 9.8).
+ * Scrolling up with the wheel, a finger or the keyboard stops following at once, before the next update
+ * could pull the view back; so does moving the scroll bar up. Reaching the bottom again follows again.
+ * A wheel or finger over an inner box that scrolls on its own does not count: it scrolls that box.
+ */
+export function useStickToBottom(
+	ref: RefObject<HTMLElement | null>,
+	onChange?: (following: boolean) => void,
+): { current: boolean } {
+	const following = useRef(true);
+	useEffect(() => {
+		const element = ref.current;
+		if (!element) return;
+		let lastTop = element.scrollTop;
+		let touchY: number | null = null;
+		const set = (value: boolean) => {
+			if (following.current === value) return;
+			following.current = value;
+			onChange?.(value);
+		};
+		const innerScrolls = (target: EventTarget | null) => {
+			for (
+				let node = target as HTMLElement | null;
+				node && node !== element;
+				node = node.parentElement
+			) {
+				if (node.scrollHeight > node.clientHeight + 1) {
+					const overflow = getComputedStyle(node).overflowY;
+					if (overflow === "auto" || overflow === "scroll") return true;
+				}
+			}
+			return false;
+		};
+		const onScroll = () => {
+			if (element.scrollHeight - element.scrollTop - element.clientHeight <= 2) set(true);
+			else if (element.scrollTop < lastTop) set(false);
+			lastTop = element.scrollTop;
+		};
+		const onWheel = (event: WheelEvent) => {
+			if (event.deltaY < 0 && !innerScrolls(event.target)) set(false);
+		};
+		const onTouchStart = (event: TouchEvent) => {
+			touchY = event.touches[0]?.clientY ?? null;
+		};
+		const onTouchMove = (event: TouchEvent) => {
+			const y = event.touches[0]?.clientY;
+			if (y === undefined) return;
+			// A finger moving down scrolls the content up.
+			if (touchY !== null && y > touchY + 2 && !innerScrolls(event.target)) set(false);
+			touchY = y;
+		};
+		const onKey = (event: KeyboardEvent) => {
+			const target = event.target as HTMLElement;
+			if (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+			if (event.key === "ArrowUp" || event.key === "PageUp" || event.key === "Home") set(false);
+		};
+		element.addEventListener("scroll", onScroll, { passive: true });
+		element.addEventListener("wheel", onWheel, { passive: true });
+		element.addEventListener("touchstart", onTouchStart, { passive: true });
+		element.addEventListener("touchmove", onTouchMove, { passive: true });
+		element.addEventListener("keydown", onKey);
+		return () => {
+			element.removeEventListener("scroll", onScroll);
+			element.removeEventListener("wheel", onWheel);
+			element.removeEventListener("touchstart", onTouchStart);
+			element.removeEventListener("touchmove", onTouchMove);
+			element.removeEventListener("keydown", onKey);
+		};
+	}, [ref, onChange]);
+	return following;
+}
+
+/**
+ * A block with a fixed maximum height that scrolls inside instead of growing the page (spec 9.5–9.7):
+ * thinking, long messages, letters, code and tool output. The limit is invisible until it is reached;
+ * then the block fades out at the bottom while more lies below, and it can take focus so keyboard and
+ * screen-reader users can scroll it (spec 18.6). With `follow`, it stays at its bottom while the text
+ * streams in, until the person scrolls up inside it.
+ */
+export function Capped({
+	as = "div",
+	className,
+	label,
+	follow = false,
+	focusable = "overflow",
+	id,
+	hidden,
+	children,
+}: {
+	as?: "div" | "pre" | "ol";
+	className?: string;
+	label: string;
+	follow?: boolean;
+	/** "always" for blocks that are usually long, such as tool output. */
+	focusable?: "always" | "overflow";
+	id?: string;
+	hidden?: boolean;
+	children: ReactNode;
+}) {
+	const ref = useRef<HTMLElement>(null);
+	const [fit, setFit] = useState({ overflow: false, more: false });
+	const following = useStickToBottom(ref);
+	const measure = useCallback(() => {
+		const element = ref.current;
+		if (!element) return;
+		const overflow = element.scrollHeight > element.clientHeight + 1;
+		const more = overflow && element.scrollHeight - element.scrollTop - element.clientHeight > 1;
+		setFit((current) =>
+			current.overflow === overflow && current.more === more ? current : { overflow, more },
+		);
+	}, []);
+	// After every render: new text may have arrived.
+	useLayoutEffect(() => {
+		const element = ref.current;
+		if (element && follow && following.current) element.scrollTop = element.scrollHeight;
+		measure();
+	});
+	useEffect(() => {
+		const element = ref.current;
+		if (!element) return;
+		element.addEventListener("scroll", measure, { passive: true });
+		const observer = new ResizeObserver(measure);
+		observer.observe(element);
+		return () => {
+			element.removeEventListener("scroll", measure);
+			observer.disconnect();
+		};
+	}, [measure]);
+	const Tag = as;
+	const scrollable = focusable === "always" || fit.overflow;
+	return (
+		<Tag
+			ref={ref as never}
+			id={id}
+			hidden={hidden}
+			className={className}
+			data-more={fit.more ? "true" : undefined}
+			// A named group, not a region: many blocks would otherwise flood the landmark list.
+			role={scrollable ? "group" : undefined}
+			aria-label={scrollable ? label : undefined}
+			// A scroll area without focusable content must be focusable (spec 18.6).
+			tabIndex={scrollable ? 0 : undefined}
+		>
+			{children}
+		</Tag>
+	);
+}
+
+/** A scrolling block of code or output; see Capped. */
+export function ScrollBlock({
+	label,
+	className,
+	follow = false,
+	children,
+}: {
+	label: string;
+	className: string;
+	follow?: boolean;
+	children: ReactNode;
+}) {
+	return (
+		<Capped as="pre" className={className} label={label} follow={follow} focusable="always">
+			{children}
+		</Capped>
+	);
+}
+
+/**
+ * Markdown from the model or another session. Code blocks keep a fixed height and scroll inside; in a
+ * reply that is still streaming they follow the newest line.
+ */
+export const Markdown = memo(function Markdown({
+	text,
+	live = false,
+}: {
+	text: string;
+	live?: boolean;
+}) {
+	const components = useMemo<Components>(
+		() => ({
+			...baseComponents,
+			pre: ({ children }) => (
+				<Capped as="pre" label={t("codeBlock")} follow={live}>
+					{children}
+				</Capped>
+			),
+		}),
+		[live],
+	);
 	return (
 		<div className="markdown">
 			<ReactMarkdown
@@ -41,29 +240,6 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
 		</div>
 	);
 });
-
-/**
- * A scrolling block of code or output. It has no focusable content, so it takes focus itself and has a
- * name, letting keyboard and screen-reader users scroll it (spec 18.6).
- */
-export function ScrollBlock({
-	label,
-	className,
-	children,
-}: {
-	label: string;
-	className: string;
-	children: ReactNode;
-}) {
-	return (
-		// A named group, not a region: many output blocks would otherwise flood the landmark list.
-		// biome-ignore lint/a11y/useSemanticElements: <pre> keeps whitespace; a fieldset would not
-		// biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll area without focusable content must be focusable (spec 18.6)
-		<pre className={className} role="group" aria-label={label} tabIndex={0}>
-			{children}
-		</pre>
-	);
-}
 
 export function Diff({ patch }: { patch: string }) {
 	const lines = patch

@@ -91,6 +91,9 @@
 	--radius-s: 8px;
 	--radius: 10px;
 	--radius-l: 16px;
+	/* Long content in the conversation keeps this height and scrolls inside (spec 9.5–9.6). */
+	--cap: clamp(160px, 40dvh, 360px);
+	--cap-tall: clamp(240px, 60dvh, 600px);
 	/* Dialog size tiers (spec 9.1): width × height. Dialogs use only these. */
 	--dialog-s-w: 440px;
 	--dialog-s-h: 320px;
@@ -1412,7 +1415,7 @@ body.scroll-locked {
 	margin: 4px 0;
 }
 .output {
-	max-height: 360px;
+	max-height: var(--cap);
 	overflow: auto;
 	overscroll-behavior: contain;
 	white-space: pre-wrap;
@@ -2292,4 +2295,27 @@ button.about-row {
 .letter-card p,
 .decision-card p {
 	margin: 0;
+}
+
+/*
+ * Fixed heights with inner scrolling (spec 9.5–9.7): thinking, long messages and letters, code blocks
+ * and an opened run of steps keep the conversation from growing without end. The limit shows only when
+ * it is reached: the block then fades out at the bottom while more lies below.
+ */
+.thinking-body,
+.msg-user,
+.letter-body,
+.note-summary,
+.markdown pre {
+	max-height: var(--cap);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+.step-list {
+	max-height: var(--cap-tall);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+[data-more="true"] {
+	mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
 }

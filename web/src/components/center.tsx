@@ -11,7 +11,7 @@ import {
 } from "../actions.ts";
 import { formatAgo, type MessageKey, t, useLang } from "../i18n.ts";
 import { type CenterTab, centerCount, useAppState } from "../state.ts";
-import { Markdown } from "./content.tsx";
+import { Capped, Markdown } from "./content.tsx";
 import { DecisionIcon, MailIcon } from "./icons.tsx";
 import { SidebarToggle } from "./session.tsx";
 import { PermissionCard, QuestionCard } from "./transcript.tsx";
@@ -80,9 +80,9 @@ function DecisionCard({ card }: { card: Card }) {
 			</div>
 			<h3 id={titleId}>{card.title}</h3>
 			{card.context && (
-				<div className="decision-context">
+				<Capped className="decision-context" label={card.title}>
 					<Markdown text={card.context} />
-				</div>
+				</Capped>
 			)}
 			{hasOptions && (
 				<fieldset className="decision-options">
@@ -169,7 +169,11 @@ function HeldLetter({ letter }: { letter: Letter }) {
 				</h3>
 			</div>
 			<p className="letter-summary">{letter.summary}</p>
-			{letter.body && <div className="letter-body">{letter.body}</div>}
+			{letter.body && (
+				<Capped className="letter-body" label={letter.summary}>
+					{letter.body}
+				</Capped>
+			)}
 			<p className="hint">
 				{t(`letterReason_${letter.statusReason ?? "hold-policy"}` as MessageKey)}
 			</p>
@@ -307,7 +311,9 @@ function LetterRow({ letter, now }: { letter: Letter; now: number }) {
 			{letter.body ? (
 				<details className="letter-details">
 					<summary>{letter.summary}</summary>
-					<div className="letter-body">{letter.body}</div>
+					<Capped className="letter-body" label={letter.summary}>
+						{letter.body}
+					</Capped>
 				</details>
 			) : (
 				<p className="letter-summary">{letter.summary}</p>
