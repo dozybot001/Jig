@@ -354,6 +354,8 @@ function CenterList() {
 	useLang();
 	const center = useAppState((state) => state.center);
 	const approvals = Object.values(center.approvals).sort((a, b) => a.createdAt - b.createdAt);
+	const permissions = approvals.filter((approval) => approval.kind === "permission");
+	const questions = approvals.filter((approval) => approval.kind === "question");
 	const cards = Object.values(center.cards).sort(byDeadline);
 	const held = Object.values(center.held).sort((a, b) => a.createdAt - b.createdAt);
 	return (
@@ -361,10 +363,18 @@ function CenterList() {
 			{approvals.length + cards.length + held.length === 0 && (
 				<p className="empty-box">{t("centerEmpty")}</p>
 			)}
-			{approvals.length > 0 && (
+			{permissions.length > 0 && (
 				<section className="center-section" aria-label={t("waitingApprovals")}>
 					<h2>{t("waitingApprovals")}</h2>
-					{approvals.map((approval) => (
+					{permissions.map((approval) => (
+						<PendingApproval key={approval.id} approval={approval} />
+					))}
+				</section>
+			)}
+			{questions.length > 0 && (
+				<section className="center-section" aria-label={t("waitingQuestions")}>
+					<h2>{t("waitingQuestions")}</h2>
+					{questions.map((approval) => (
 						<PendingApproval key={approval.id} approval={approval} />
 					))}
 				</section>

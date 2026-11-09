@@ -291,9 +291,42 @@ export type OrganizeStep =
 	| { action: "rename_team"; from: string; to: string }
 	| { action: "move_to_team"; sessions: string[]; team: string | null };
 
-export interface QuestionRequest {
+/** One question a session asks the person with ask_user; a card holds up to four. */
+export interface Question {
 	question: string;
+	/** A tag of a few words shown before the question, such as its topic. */
+	header?: string;
+	options?: QuestionOption[];
+	/** Index of the option the session recommends; it is chosen to start with. */
+	recommended?: number;
+	/** The person may pick more than one option. */
+	multiple?: boolean;
+}
+
+export interface QuestionOption {
+	label: string;
+	/** What the choice means or leads to. */
+	detail?: string;
+}
+
+export interface QuestionRequest {
+	questions?: Question[];
+	/** One question with plain options, as asked before a card could hold several. */
+	question?: string;
 	options?: string[];
+}
+
+/** The person's answer to one question: the options picked, by index, and words of their own. */
+export interface QuestionAnswer {
+	choices: number[];
+	text?: string;
+}
+
+/** The questions of a request, whichever form it was saved in. */
+export function questionsOf(request: QuestionRequest): Question[] {
+	if (request.questions && request.questions.length > 0) return request.questions;
+	const options = request.options?.map((label) => ({ label }));
+	return [{ question: request.question ?? "", ...(options?.length ? { options } : {}) }];
 }
 
 export interface Approval {
@@ -303,7 +336,13 @@ export interface Approval {
 	kind: "permission" | "question";
 	request: PermissionRequest | QuestionRequest;
 	status: "pending" | "resolved" | "cancelled";
-	response: { decision?: ApprovalDecision; reason?: string; answer?: string } | null;
+	/** answer is the person's words, or for structured answers the text the session read. */
+	response: {
+		decision?: ApprovalDecision;
+		reason?: string;
+		answer?: string;
+		answers?: QuestionAnswer[];
+	} | null;
 	createdAt: number;
 	resolvedAt: number | null;
 }

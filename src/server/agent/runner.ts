@@ -16,6 +16,8 @@ import {
 	type Entry,
 	type Letter,
 	permissionModeOf,
+	type QuestionAnswer,
+	type QuestionRequest,
 	type QueuedMessage,
 	type Session,
 	type SessionStatus,
@@ -31,6 +33,7 @@ import type { PermissionEngine } from "../permissions/engine.ts";
 import { isInside } from "../permissions/paths.ts";
 import { type Store, validateSessionName } from "../store.ts";
 import { Jobs } from "../tools/jobs.ts";
+import { settleAnswer } from "../tools/misc.ts";
 import { ReadState } from "../tools/read-state.ts";
 import { ALL_TOOLS, specs, toolsFor } from "../tools/registry.ts";
 import {
@@ -78,7 +81,12 @@ function mainUpdate(session: Session, before: SessionRef | null, now: SessionRef
 	return "The person has no main conversation now. When something needs the person's decision, ask them with ask_user.";
 }
 
-type Answer = { decision?: ApprovalDecision; reason?: string; answer?: string };
+type Answer = {
+	decision?: ApprovalDecision;
+	reason?: string;
+	answer?: string;
+	answers?: QuestionAnswer[];
+};
 
 interface Live {
 	controller: AbortController;
@@ -286,8 +294,13 @@ export class Agents {
 			if (answer.decision === "allow_always" && (request.mustConfirm || !request.rememberRules)) {
 				throw invalid("This operation can only be allowed once.", "decision");
 			}
-		} else if (typeof answer.answer !== "string" || !answer.answer.trim()) {
-			throw invalid("The answer is empty.", "answer");
+		} else {
+			// The session reads the answer as text; the structured answer stays for the card.
+			const settled = settleAnswer(approval.request as QuestionRequest, answer);
+			answer = {
+				answer: settled.text,
+				...(settled.answers ? { answers: settled.answers } : {}),
+			};
 		}
 		const resolved = this.#store.resolveApproval(approvalId, answer);
 		this.#store.addIntervention(approval.sessionId);
@@ -824,12 +837,12 @@ export class Agents {
 				}, 200);
 			},
 			setTodos: (todos) => this.#store.setTodos(sessionId, todos),
-			ask: async (question, options) => {
+			ask: async (request) => {
 				const approval = this.#store.createApproval({
 					sessionId,
 					toolCallId: row.id,
 					kind: "question",
-					request: options ? { question, options } : { question },
+					request,
 				});
 				const answer = await this.#waitFor(sessionId, approval.id, live);
 				if (!answer?.answer) throw new ToolInputError("Stopped before the person answered.");

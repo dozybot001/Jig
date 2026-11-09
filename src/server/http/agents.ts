@@ -1,9 +1,28 @@
 import { Hono } from "hono";
+import type { QuestionAnswer } from "../../shared/types.ts";
 import type { Agents } from "../agent/runner.ts";
+import { invalid } from "../errors.ts";
 import type { Store } from "../store.ts";
 import { idempotent } from "./idempotency.ts";
-import { optEnum, optString, readJson, reqString } from "./input.ts";
+import { optArray, optEnum, optString, readJson, reqString } from "./input.ts";
 import type { AppEnv } from "./problem.ts";
+
+/** One answer of a structured question card: option indexes and the person's own words. */
+function questionAnswer(value: unknown): QuestionAnswer {
+	const fields = (value && typeof value === "object" ? value : null) as Record<
+		string,
+		unknown
+	> | null;
+	const choices = fields?.choices;
+	if (!fields || !Array.isArray(choices) || choices.some((choice) => !Number.isInteger(choice))) {
+		throw invalid("Each answer needs a list of option numbers in choices.", "answers");
+	}
+	const text = fields.text;
+	if (text !== undefined && (typeof text !== "string" || text.length > 10_000)) {
+		throw invalid("An answer's text must be text of at most 10000 characters.", "answers");
+	}
+	return { choices: choices as number[], ...(typeof text === "string" ? { text } : {}) };
+}
 
 /** Sending messages, stopping, continuing, and answering approvals and questions. */
 export function agentRoutes(
@@ -48,11 +67,13 @@ export function agentRoutes(
 		const decision = optEnum(fields, "decision", ["allow_once", "allow_always", "deny"] as const);
 		const reason = optString(fields, "reason", 2000);
 		const answer = optString(fields, "answer", 10_000);
+		const answers = optArray(fields, "answers")?.map(questionAnswer);
 		return c.json(
 			agents.answer(c.req.param("id"), {
 				...(decision ? { decision } : {}),
 				...(reason ? { reason } : {}),
 				...(answer !== undefined ? { answer } : {}),
+				...(answers ? { answers } : {}),
 			}),
 		);
 	});

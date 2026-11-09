@@ -6,6 +6,7 @@ import type {
 	ToolResultMessage,
 	UserMessage,
 } from "../shared/messages.ts";
+import { askedQuestion } from "../shared/messages.ts";
 import type { Entry, Session, ToolCallStatus, ToolCallView } from "../shared/types.ts";
 
 export type ExportLanguage = "zh" | "en";
@@ -377,7 +378,9 @@ function noticeLine(notice: Notice, strings: ExportStrings): string {
 }
 
 function callTarget(args: ToolCallBlock["arguments"]): string {
-	const value = args.command ?? args.path ?? args.pattern ?? args.url ?? args.question ?? args.job;
+	const asked = askedQuestion(args);
+	if (asked) return oneLine(asked.question);
+	const value = args.command ?? args.path ?? args.pattern ?? args.url ?? args.job;
 	return typeof value === "string" ? oneLine(value) : "";
 }
 

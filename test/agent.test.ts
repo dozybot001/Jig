@@ -232,6 +232,113 @@ describe("agent loop", () => {
 		assert.ok(existsSync(join(cwd, "b.txt")));
 	});
 
+	test("ask_user puts several questions on one card; the answer reads as options and own words", async () => {
+		const { faux, store, agents, session, contexts, capture } = setup();
+		faux.setResponses([
+			toolUse(
+				fauxToolCall(
+					"ask_user",
+					{
+						questions: [
+							{
+								question: "按钮用什么颜色？",
+								header: "颜色",
+								options: [
+									{ label: "深灰", detail: "和侧栏一致" },
+									{ label: "黑色", detail: "对比最强" },
+								],
+								recommended: 1,
+							},
+							{
+								question: "放在哪儿？",
+								options: ["左上角", "右上角", "底部"],
+								multiple: true,
+							},
+						],
+					},
+					{ id: "q1" },
+				),
+			),
+			capture(fauxAssistantMessage("好")),
+		]);
+		agents.send(session.id, "做个按钮");
+		await until(() => store.pendingApprovals(session.id).length === 1);
+		const [card] = store.pendingApprovals(session.id);
+		assert.ok(card);
+		assert.deepEqual(card.request, {
+			questions: [
+				{
+					question: "按钮用什么颜色？",
+					header: "颜色",
+					options: [
+						{ label: "深灰", detail: "和侧栏一致" },
+						{ label: "黑色", detail: "对比最强" },
+					],
+					recommended: 0,
+				},
+				{
+					question: "放在哪儿？",
+					options: [{ label: "左上角" }, { label: "右上角" }, { label: "底部" }],
+					multiple: true,
+				},
+			],
+		});
+		const code = (fn: () => unknown) => {
+			try {
+				fn();
+				return "ok";
+			} catch (error) {
+				return (error as { code?: string }).code;
+			}
+		};
+		// Every question needs an answer; a single-choice question takes one option.
+		assert.equal(
+			code(() => agents.answer(card.id, { answers: [{ choices: [0] }] })),
+			"invalid-request",
+		);
+		assert.equal(
+			code(() => agents.answer(card.id, { answers: [{ choices: [0, 1] }, { choices: [0] }] })),
+			"invalid-request",
+		);
+		assert.equal(
+			code(() => agents.answer(card.id, { answers: [{ choices: [0] }, { choices: [] }] })),
+			"invalid-request",
+		);
+		const resolved = agents.answer(card.id, {
+			answers: [{ choices: [0], text: "稍微浅一点" }, { choices: [0, 2] }],
+		});
+		assert.deepEqual(resolved.response?.answers, [
+			{ choices: [0], text: "稍微浅一点" },
+			{ choices: [0, 2] },
+		]);
+		await agents.whenIdle(session.id);
+		const result = textOf(contexts[0]?.messages.at(-1));
+		assert.match(
+			result,
+			/The person answered:\\n1\. 按钮用什么颜色？ → 深灰; 稍微浅一点\\n2\. 放在哪儿？ → 左上角, 底部/,
+		);
+	});
+
+	test("a question asked the old way still takes a plain answer", async () => {
+		const { faux, store, agents, session, contexts, capture } = setup();
+		faux.setResponses([
+			toolUse(
+				fauxToolCall("ask_user", { question: "继续吗？", options: ["继续", "停下"] }, { id: "q1" }),
+			),
+			capture(fauxAssistantMessage("好")),
+		]);
+		agents.send(session.id, "试试");
+		await until(() => store.pendingApprovals(session.id).length === 1);
+		const [card] = store.pendingApprovals(session.id);
+		assert.ok(card);
+		assert.deepEqual(card.request, {
+			questions: [{ question: "继续吗？", options: [{ label: "继续" }, { label: "停下" }] }],
+		});
+		agents.answer(card.id, { answer: "先停一下" });
+		await agents.whenIdle(session.id);
+		assert.match(textOf(contexts[0]?.messages.at(-1)), /The person answered: 先停一下/);
+	});
+
 	test("stopping while waiting cancels the approval and leaves a valid transcript", async () => {
 		const { faux, store, agents, session, contexts, capture } = setup();
 		faux.setResponses([

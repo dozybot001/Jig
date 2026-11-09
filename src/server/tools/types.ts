@@ -2,6 +2,7 @@ import type { ImageBlock, JsonObject, TextBlock } from "../../shared/messages.ts
 import type {
 	Letter,
 	PermissionRequest,
+	QuestionRequest,
 	Session,
 	SessionStatus,
 	TaskOutcome,
@@ -32,7 +33,8 @@ export interface ToolContext {
 	output(text: string): void;
 	setTodos(todos: Todo[]): void;
 	/** Asks the person a question in Jig and waits for the answer. */
-	ask(question: string, options?: string[]): Promise<string>;
+	/** Puts questions to the person and waits; resolves with the answer as the session reads it. */
+	ask(request: QuestionRequest): Promise<string>;
 	mail: MailContext;
 }
 

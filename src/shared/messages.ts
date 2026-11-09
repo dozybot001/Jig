@@ -182,3 +182,13 @@ export function messageText(message: ModelMessage): string {
 	}
 	return parts.join("\n");
 }
+
+/** The first question of an ask_user call, and how many it asks, for one-line summaries. */
+export function askedQuestion(
+	args: Record<string, unknown>,
+): { question: string; count: number } | null {
+	const list = Array.isArray(args.questions) ? args.questions : null;
+	const first = list ? (list[0] as { question?: unknown } | undefined)?.question : args.question;
+	if (typeof first !== "string") return null;
+	return { question: first, count: list ? list.length : 1 };
+}

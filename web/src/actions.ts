@@ -9,6 +9,7 @@ import type {
 	Page,
 	PermissionMode,
 	PermissionRule,
+	QuestionAnswer,
 	QueuedMessage,
 	ReceivePolicy,
 	Session,
@@ -663,7 +664,12 @@ export async function withdrawQueued(sessionId: string, id: string): Promise<voi
 
 export async function answerApproval(
 	approvalId: string,
-	answer: { decision?: ApprovalDecision; reason?: string; answer?: string },
+	answer: {
+		decision?: ApprovalDecision;
+		reason?: string;
+		answer?: string;
+		answers?: QuestionAnswer[];
+	},
 ): Promise<Approval> {
 	return api<Approval>("POST", `/api/approvals/${approvalId}`, answer);
 }

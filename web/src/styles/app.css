@@ -2330,6 +2330,64 @@ button.about-row {
 	background: var(--accent);
 	box-shadow: inset 0 0 0 2.5px var(--surface-2);
 }
+/* A question where several options may be picked: square marks instead of round ones. */
+.decision-check {
+	flex: none;
+	width: 14px;
+	height: 14px;
+	margin-top: 3px;
+	border: 1.5px solid var(--control-strong);
+	border-radius: 3px;
+}
+.decision-option[data-checked="true"] .decision-check {
+	border-color: var(--accent);
+	background: var(--accent);
+	box-shadow: inset 0 0 0 2.5px var(--surface-2);
+}
+/* One question of a question card: the question, its options, then a row for the person's own words. */
+.question-block {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 6px;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: none;
+}
+.question-block .request-title {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+.question-block .request-title .hint {
+	font-weight: 400;
+}
+.question-other {
+	cursor: text;
+}
+.question-other > label {
+	display: flex;
+	cursor: pointer;
+}
+.question-other-input {
+	flex: 1;
+	min-width: 0;
+	min-height: 20px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	resize: none;
+	field-sizing: content;
+}
+.question-other-input:focus-visible {
+	outline: none;
+}
+.question-other:focus-within {
+	border-color: var(--control-strong);
+}
 .decision-option-text {
 	display: grid;
 	gap: 2px;
