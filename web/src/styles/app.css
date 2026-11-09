@@ -986,7 +986,7 @@ body.scroll-locked {
 	.group-heading:not(:hover, :focus-within) .btn-icon:not(.heading-add) {
 		opacity: 0;
 	}
-	.session-item:is(:hover, :focus-within) :is(.session-time, .badge, .row-dot) {
+	.session-item:is(:hover, :focus-within) :is(.session-time, .badge, .row-dot, .unread-count) {
 		visibility: hidden;
 	}
 }
@@ -1033,9 +1033,14 @@ body.scroll-locked {
 .dot-idle {
 	background: transparent;
 }
-/* New replies since you last opened the session. */
-.dot-unread {
-	background: var(--text-3);
+/* New replies since you last opened the session: a plain number, weaker than a count of to-dos. */
+.unread-count {
+	min-width: 18px;
+	color: var(--text-2);
+	font-size: var(--fs-s);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	text-align: center;
 }
 /* On a session row the status is a small dot on the right, where the time otherwise is. */
 .row-dot {

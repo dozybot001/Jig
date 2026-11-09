@@ -497,14 +497,16 @@ function SessionRow({
 					</span>
 					{session.pinned && <PinIcon />}
 					{/*
-					 * On the right: the status while it is not idle (waiting for you comes first), else a grey
-					 * dot for new replies, else the time. Numbers are kept for what waits for you in the
-					 * approval center, so an unread count is not mistaken for a to-do (founder, 2026-11-09).
+					 * On the right: the status while it is not idle (waiting for you comes first), else the
+					 * unread count, else the time. The unread count is a plain grey number, weaker than the
+					 * approval center's count of what waits for you, which keeps its chip (founder, 2026-11-09).
 					 */}
 					{session.status !== "idle" ? (
 						<span className={`dot row-dot dot-${session.status}`} aria-hidden="true" />
 					) : session.unread > 0 ? (
-						<span className="dot row-dot dot-unread" aria-hidden="true" />
+						<span className="unread-count" aria-hidden="true">
+							{session.unread}
+						</span>
 					) : (
 						<span className="session-time" aria-hidden="true">
 							{formatAgo(session.lastActivityAt, now)}
