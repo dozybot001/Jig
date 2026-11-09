@@ -66,8 +66,8 @@ export const MailIcon = () => <Mail {...props} />;
 export const CenterIcon = () => <Inbox {...props} />;
 /** The main conversation, where the person usually works. */
 export const MainIcon = () => <MessagesSquare {...props} />;
-/** A department of the person's organization. */
-export const DepartmentIcon = () => <Users {...props} />;
+/** A team in the person's organization. */
+export const TeamIcon = () => <Users {...props} />;
 /** A decision the person made. */
 export const DecisionIcon = () => <Stamp {...props} />;
 export const CollapseIcon = () => <PanelLeftClose {...props} />;

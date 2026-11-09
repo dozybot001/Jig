@@ -29,7 +29,6 @@ import {
 	CodeIcon,
 	CollapseIcon,
 	ComposeIcon,
-	DepartmentIcon,
 	ExpandIcon,
 	FolderIcon,
 	JigMark,
@@ -37,6 +36,7 @@ import {
 	PinIcon,
 	PlusIcon,
 	SearchIcon,
+	TeamIcon,
 } from "./icons.tsx";
 import { SettingsMenu } from "./settings.tsx";
 import { Button, describeError, ErrorBox, Menu, useAction } from "./ui.tsx";
@@ -197,10 +197,10 @@ function WorkspaceRow({ workspace, all }: { workspace: Workspace; all: Workspace
 }
 
 /**
- * A department: click to list only its sessions (click again for all), double-click or the menu to
- * rename. Departments, workspaces and sessions are three lists built alike (blueprint section 8).
+ * A team: click to list only its sessions (click again for all), double-click or the menu to
+ * rename. Teams, workspaces and sessions are three lists built alike (blueprint section 8).
  */
-function DepartmentRow({
+function TeamRow({
 	group,
 	count,
 	active,
@@ -219,7 +219,7 @@ function DepartmentRow({
 		<div className="session-item">
 			{renaming ? (
 				<InlineRename
-					icon={<DepartmentIcon />}
+					icon={<TeamIcon />}
 					value={group.name}
 					onSave={(name) => renameGroup(group.id, name)}
 					onDone={() => setRenaming(false)}
@@ -229,15 +229,15 @@ function DepartmentRow({
 					type="button"
 					className="session-row"
 					aria-pressed={active}
-					onClick={() => setState({ departmentFilter: active ? null : group.id })}
+					onClick={() => setState({ teamFilter: active ? null : group.id })}
 					onDoubleClick={() => setRenaming(true)}
 				>
 					<span className="session-icon" aria-hidden="true">
-						<DepartmentIcon />
+						<TeamIcon />
 					</span>
 					<span className="session-name">
 						{group.name}
-						<span className="visually-hidden"> · {t("departmentCount", { n: count })}</span>
+						<span className="visually-hidden"> · {t("teamCount", { n: count })}</span>
 					</span>
 					<span className="session-time" aria-hidden="true">
 						{count}
@@ -260,11 +260,11 @@ function DepartmentRow({
 	);
 }
 
-function Departments() {
+function Teams() {
 	useLang();
 	const groups = useAppState((state) => state.groups);
 	const sessions = useAppState((state) => state.sessions);
-	const filter = useAppState((state) => state.departmentFilter);
+	const filter = useAppState((state) => state.teamFilter);
 	const [dialog, setDialog] = useState<
 		| { kind: "create" }
 		| { kind: "session"; groupId: string }
@@ -278,9 +278,9 @@ function Departments() {
 		}
 	}
 	return (
-		<section aria-label={t("departments")}>
+		<section aria-label={t("teams")}>
 			<div className="group-heading">
-				<span>{t("departments")}</span>
+				<span>{t("teams")}</span>
 				<Button
 					variant="icon"
 					className="heading-add"
@@ -292,10 +292,10 @@ function Departments() {
 				</Button>
 			</div>
 			{groups.length === 0 ? (
-				<p className="empty-box">{t("noDepartments")}</p>
+				<p className="empty-box">{t("noTeams")}</p>
 			) : (
 				groups.map((group) => (
-					<DepartmentRow
+					<TeamRow
 						key={group.id}
 						group={group}
 						count={counts.get(group.id) ?? 0}
@@ -316,7 +316,7 @@ function Departments() {
 					confirmLabel={t("delete")}
 					onConfirm={async () => {
 						await deleteGroup(dialog.group.id);
-						if (filter === dialog.group.id) setState({ departmentFilter: null });
+						if (filter === dialog.group.id) setState({ teamFilter: null });
 					}}
 					onClose={() => setDialog(null)}
 				/>
@@ -381,7 +381,7 @@ function SessionRow({
 }) {
 	useLang();
 	const isMain = useAppState((state) => state.settings?.mainSessionId === session.id);
-	const department = groups.find((group) => group.id === session.groupId)?.name ?? null;
+	const team = groups.find((group) => group.id === session.groupId)?.name ?? null;
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [renaming, setRenaming] = useState(false);
 	const download = useAction(() => exportSession(session));
@@ -435,7 +435,7 @@ function SessionRow({
 							{" "}
 							· {session.cwd ? t("mode_code") : t("mode_chat")} · {t(`status_${session.status}`)}
 							{isMain ? ` · ${t("mainConversation")}` : ""}
-							{department ? ` · ${department}` : ""}
+							{team ? ` · ${team}` : ""}
 							{session.pinned ? ` · ${t("pinned")}` : ""}
 							{session.unread > 0 ? ` · ${t("unread", { n: session.unread })}` : ""}
 						</span>
@@ -591,11 +591,9 @@ function Search() {
 	const sessions = useAppState((state) => state.sessions);
 	const groups = useAppState((state) => state.groups);
 	const workspaces = useWorkspaces();
-	// Departments and workspaces are few and already loaded; they are matched here, by name or folder.
+	// Teams and workspaces are few and already loaded; they are matched here, by name or folder.
 	const needle = query.trim().toLowerCase();
-	const departments = needle
-		? groups.filter((group) => group.name.toLowerCase().includes(needle))
-		: [];
+	const teams = needle ? groups.filter((group) => group.name.toLowerCase().includes(needle)) : [];
 	const places = needle
 		? workspaces.filter(
 				(workspace) =>
@@ -650,21 +648,22 @@ function Search() {
 			</div>
 			{result && (
 				<section className="search-results" aria-label={t("searchResults")}>
-					{result.sessions.length + result.hits.length + departments.length + places.length ===
-						0 && <p className="hint">{t("noResults")}</p>}
-					{departments.map((group) => (
+					{result.sessions.length + result.hits.length + teams.length + places.length === 0 && (
+						<p className="hint">{t("noResults")}</p>
+					)}
+					{teams.map((group) => (
 						<button
 							key={group.id}
 							type="button"
 							className="search-hit search-hit-row"
 							onClick={() => {
 								done();
-								setState({ departmentFilter: group.id });
+								setState({ teamFilter: group.id });
 							}}
 						>
-							<DepartmentIcon />
+							<TeamIcon />
 							<strong>{group.name}</strong>
-							<span className="hint">{t("departments")}</span>
+							<span className="hint">{t("teams")}</span>
 						</button>
 					))}
 					{places.map((workspace) => (
@@ -804,11 +803,11 @@ export function Sidebar() {
 	const selectedId = useAppState((state) => (state.page ? null : state.selectedId));
 	const showArchived = useAppState((state) => state.showArchived);
 	const hasArchived = useAppState((state) => state.hasArchived);
-	const chosen = useAppState((state) => state.departmentFilter);
+	const chosen = useAppState((state) => state.teamFilter);
 	const now = useNow();
 	const [newSession, setNewSession] = useState<string | null>(null);
 
-	// A filter for a department that was deleted meanwhile shows everything.
+	// A filter for a team that was deleted meanwhile shows everything.
 	const filter = groups.some((group) => group.id === chosen) ? chosen : null;
 	const filterName = groups.find((group) => group.id === filter)?.name ?? null;
 	const all = Object.values(sessions);
@@ -880,7 +879,7 @@ export function Sidebar() {
 				<Search />
 			</div>
 			<div className="sidebar-list">
-				<Departments />
+				<Teams />
 				<Workspaces />
 				<section aria-label={filterName ? `${t("sessions")} · ${filterName}` : t("sessions")}>
 					<div className="group-heading">
@@ -894,7 +893,7 @@ export function Sidebar() {
 								className="heading-add"
 								aria-label={t("showAllSessions")}
 								title={t("showAllSessions")}
-								onClick={() => setState({ departmentFilter: null })}
+								onClick={() => setState({ teamFilter: null })}
 							>
 								<CloseIcon />
 							</Button>

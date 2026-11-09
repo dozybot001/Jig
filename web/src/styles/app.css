@@ -910,7 +910,7 @@ body.scroll-locked {
 	cursor: pointer;
 	color: var(--text);
 }
-/* The open session, and the department whose sessions are listed. */
+/* The open session, and the team whose sessions are listed. */
 .session-row:is([aria-current="true"], [aria-pressed="true"]) {
 	background: var(--selected);
 	font-weight: 600;
@@ -1067,7 +1067,7 @@ body.scroll-locked {
 	text-align: left;
 	cursor: pointer;
 }
-/* Departments and workspaces among the results: icon, name and what it is. */
+/* Teams and workspaces among the results: icon, name and what it is. */
 .search-hit-row {
 	display: flex;
 	align-items: center;

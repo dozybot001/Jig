@@ -381,7 +381,7 @@ describe("system prompt", () => {
 	});
 	const base = { name: "产品", responsibility: "负责 Jig 的产品设计。", cwd: "/tmp/demo" };
 
-	test("a standing session learns its role, its department and to keep lasting facts in files", () => {
+	test("a standing session learns its role, its team and to keep lasting facts in files", () => {
 		const text = systemPrompt(
 			{ ...base, kind: "standing" } as Session,
 			snapshot("/tmp/demo"),
@@ -391,7 +391,7 @@ describe("system prompt", () => {
 			text,
 			/^You are "产品", one of the agent sessions that make up the person's organization in Jig\./,
 		);
-		assert.match(text, /You belong to the department "Tenon"\./);
+		assert.match(text, /You belong to the team "Tenon"\./);
 		assert.match(text, /负责 Jig 的产品设计。/);
 		assert.match(text, /standing session: this role is yours for the long term/);
 		assert.match(text, /in files in your working folder/);
@@ -399,19 +399,19 @@ describe("system prompt", () => {
 		assert.match(text, /Approval mode is automatic.*set "confirm": true/);
 	});
 
-	test("a task session ends with a report; a chat without department or role mentions neither", () => {
+	test("a task session ends with a report; a chat without team or role mentions neither", () => {
 		const text = systemPrompt(
 			{ ...base, kind: "task", responsibility: "", cwd: null } as Session,
 			snapshot(null),
 		);
 		assert.match(text, /task session, opened for one job/);
 		assert.match(text, /the result \(done, given up or failed\)/);
-		assert.doesNotMatch(text, /You belong to the department/);
+		assert.doesNotMatch(text, /You belong to the team/);
 		assert.doesNotMatch(text, /Your role, as the person wrote it/);
 		assert.match(text, /No working folder/);
 	});
 
-	test("the prompt sent with a turn names the session's department", async () => {
+	test("the prompt sent with a turn names the session's team", async () => {
 		const { faux, store, agents, session, contexts, capture } = setup();
 		const group = store.createGroup("平台组");
 		store.updateSession(session.id, { groupId: group.id });
@@ -420,6 +420,6 @@ describe("system prompt", () => {
 		await agents.whenIdle(session.id);
 		// The model library hands the system prompt to the model as the first, "system" message.
 		const system = contexts[0]?.messages.find((message) => message.role === "system");
-		assert.match(String(system?.content ?? ""), /You belong to the department "平台组"\./);
+		assert.match(String(system?.content ?? ""), /You belong to the team "平台组"\./);
 	});
 });
