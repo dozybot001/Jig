@@ -10,7 +10,6 @@ import {
 	Inbox,
 	Info,
 	KeyRound,
-	ListPlus,
 	ListTodo,
 	Mail,
 	Menu,
@@ -30,6 +29,7 @@ import {
 	Square,
 	SquarePen,
 	Stamp,
+	Users,
 	X,
 } from "lucide-react";
 
@@ -41,8 +41,6 @@ const props = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
 
 export const PlusIcon = () => <Plus {...props} />;
 export const FolderIcon = () => <Folder {...props} />;
-/** New group: groups are lists of sessions, not folders. */
-export const GroupPlusIcon = () => <ListPlus {...props} />;
 export const GearIcon = () => <Settings {...props} />;
 export const MenuIcon = () => <Menu {...props} />;
 export const CodeIcon = () => <Code {...props} />;
@@ -68,6 +66,8 @@ export const MailIcon = () => <Mail {...props} />;
 export const CenterIcon = () => <Inbox {...props} />;
 /** The main conversation, where the person usually works. */
 export const MainIcon = () => <MessagesSquare {...props} />;
+/** A department of the person's organization. */
+export const DepartmentIcon = () => <Users {...props} />;
 /** A decision the person made. */
 export const DecisionIcon = () => <Stamp {...props} />;
 export const CollapseIcon = () => <PanelLeftClose {...props} />;

@@ -229,7 +229,7 @@ export function systemPrompt(
 ): string {
 	const parts: string[] = [];
 	parts.push(
-		`You are "${session.name}", one of the agent sessions that make up the person's organization in Jig. The person runs their work with a group of sessions; each has a name, a role, and its own working folder, model and permissions.${group ? ` You belong to the group "${group}".` : ""}`,
+		`You are "${session.name}", one of the agent sessions that make up the person's organization in Jig. The person runs their work with a group of sessions; each has a name, a role, and its own working folder, model and permissions.${group ? ` You belong to the department "${group}".` : ""}`,
 	);
 	if (session.responsibility.trim()) {
 		parts.push(`Your role, as the person wrote it:\n${session.responsibility.trim()}`);

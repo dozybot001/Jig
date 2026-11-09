@@ -113,6 +113,8 @@ export interface AppState {
 	 */
 	page: "center" | null;
 	centerTab: CenterTab;
+	/** The sessions list shows one department's sessions; null shows all (blueprint section 8). */
+	departmentFilter: string | null;
 }
 
 /** How many things wait for the person: approvals, questions, cards and held letters. */
@@ -169,6 +171,7 @@ let state: AppState = {
 	decisions: { items: [], nextCursor: null, loaded: false },
 	page: null,
 	centerTab: "pending",
+	departmentFilter: null,
 };
 
 const listeners = new Set<() => void>();

@@ -103,7 +103,7 @@ describe("Markdown export", () => {
 
 		assert.match(markdown, /^# Jig 产品会话\n/);
 		assert.match(markdown, /- 类型：常设会话/);
-		assert.match(markdown, /- 分组：产品/);
+		assert.match(markdown, /- 部门：产品/);
 		assert.match(markdown, /- 模型：deepseek\/deepseek-v4-pro/);
 		assert.match(markdown, /- 用量：30 token · USD 0\.00/);
 		assert.match(markdown, /## 职责说明\n\n负责 Jig 仓库。/);
@@ -125,7 +125,7 @@ describe("Markdown export", () => {
 		const { inputs } = sample();
 		const markdown = sessionMarkdown({ ...inputs(), language: "en" });
 		assert.match(markdown, /- Type: Standing session/);
-		assert.match(markdown, /- Group: 产品/);
+		assert.match(markdown, /- Department: 产品/);
 		assert.match(markdown, /## Role\n\n负责 Jig 仓库。/);
 		assert.match(markdown, /## You\n\n> 请把会话导出为 Markdown。/);
 		assert.match(markdown, /### Tool call: Read src\/server\/store\.ts/);

@@ -876,6 +876,16 @@ body.scroll-locked {
 	width: 28px;
 	min-height: 28px;
 }
+.heading-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.heading-filter {
+	color: var(--text-2);
+}
 .archived-toggle {
 	margin: 10px 0 0;
 	font-size: var(--fs-s);
@@ -900,12 +910,13 @@ body.scroll-locked {
 	cursor: pointer;
 	color: var(--text);
 }
-.session-row[aria-current="true"] {
+/* The open session, and the department whose sessions are listed. */
+.session-row:is([aria-current="true"], [aria-pressed="true"]) {
 	background: var(--selected);
 	font-weight: 600;
 }
 @media (hover: hover) {
-	.session-row:not([aria-current="true"]):hover {
+	.session-row:not([aria-current="true"], [aria-pressed="true"]):hover {
 		background: var(--hover);
 	}
 }
@@ -1055,6 +1066,22 @@ body.scroll-locked {
 	background: none;
 	text-align: left;
 	cursor: pointer;
+}
+/* Departments and workspaces among the results: icon, name and what it is. */
+.search-hit-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.search-hit-row svg {
+	flex: none;
+	color: var(--text-3);
+}
+.search-hit-row .hint {
+	margin-left: auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .search-hit mark {
 	background: var(--accent-soft);

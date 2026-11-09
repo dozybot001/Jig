@@ -4,6 +4,7 @@ import {
 	deleteGroup,
 	exportSession,
 	openCenter,
+	renameGroup,
 	saveSettings,
 	selectSession,
 	setMainSession,
@@ -28,9 +29,9 @@ import {
 	CodeIcon,
 	CollapseIcon,
 	ComposeIcon,
+	DepartmentIcon,
 	ExpandIcon,
 	FolderIcon,
-	GroupPlusIcon,
 	JigMark,
 	MainIcon,
 	PinIcon,
@@ -195,7 +196,136 @@ function WorkspaceRow({ workspace, all }: { workspace: Workspace; all: Workspace
 	);
 }
 
-/** Workspaces first in the sidebar, as Claude lists projects above recent work. */
+/**
+ * A department: click to list only its sessions (click again for all), double-click or the menu to
+ * rename. Departments, workspaces and sessions are three lists built alike (blueprint section 8).
+ */
+function DepartmentRow({
+	group,
+	count,
+	active,
+	onNewSession,
+	onDelete,
+}: {
+	group: Group;
+	count: number;
+	active: boolean;
+	onNewSession: () => void;
+	onDelete: () => void;
+}) {
+	useLang();
+	const [renaming, setRenaming] = useState(false);
+	return (
+		<div className="session-item">
+			{renaming ? (
+				<InlineRename
+					icon={<DepartmentIcon />}
+					value={group.name}
+					onSave={(name) => renameGroup(group.id, name)}
+					onDone={() => setRenaming(false)}
+				/>
+			) : (
+				<button
+					type="button"
+					className="session-row"
+					aria-pressed={active}
+					onClick={() => setState({ departmentFilter: active ? null : group.id })}
+					onDoubleClick={() => setRenaming(true)}
+				>
+					<span className="session-icon" aria-hidden="true">
+						<DepartmentIcon />
+					</span>
+					<span className="session-name">
+						{group.name}
+						<span className="visually-hidden"> · {t("departmentCount", { n: count })}</span>
+					</span>
+					<span className="session-time" aria-hidden="true">
+						{count}
+					</span>
+				</button>
+			)}
+			{!renaming && (
+				<span className="session-row-menu">
+					<Menu
+						label={`${group.name} – ${t("more")}`}
+						items={[
+							{ label: t("newSessionHere"), onSelect: onNewSession },
+							{ label: t("rename"), onSelect: () => setRenaming(true) },
+							{ label: t("deleteGroup"), danger: true, onSelect: onDelete },
+						]}
+					/>
+				</span>
+			)}
+		</div>
+	);
+}
+
+function Departments() {
+	useLang();
+	const groups = useAppState((state) => state.groups);
+	const sessions = useAppState((state) => state.sessions);
+	const filter = useAppState((state) => state.departmentFilter);
+	const [dialog, setDialog] = useState<
+		| { kind: "create" }
+		| { kind: "session"; groupId: string }
+		| { kind: "delete"; group: Group }
+		| null
+	>(null);
+	const counts = new Map<string, number>();
+	for (const session of Object.values(sessions)) {
+		if (session.archivedAt === null && session.groupId) {
+			counts.set(session.groupId, (counts.get(session.groupId) ?? 0) + 1);
+		}
+	}
+	return (
+		<section aria-label={t("departments")}>
+			<div className="group-heading">
+				<span>{t("departments")}</span>
+				<Button
+					variant="icon"
+					className="heading-add"
+					aria-label={t("newGroup")}
+					title={t("newGroup")}
+					onClick={() => setDialog({ kind: "create" })}
+				>
+					<PlusIcon />
+				</Button>
+			</div>
+			{groups.length === 0 ? (
+				<p className="empty-box">{t("noDepartments")}</p>
+			) : (
+				groups.map((group) => (
+					<DepartmentRow
+						key={group.id}
+						group={group}
+						count={counts.get(group.id) ?? 0}
+						active={filter === group.id}
+						onNewSession={() => setDialog({ kind: "session", groupId: group.id })}
+						onDelete={() => setDialog({ kind: "delete", group })}
+					/>
+				))
+			)}
+			{dialog?.kind === "create" && <GroupDialog onClose={() => setDialog(null)} />}
+			{dialog?.kind === "session" && (
+				<NewSessionDialog groupId={dialog.groupId} onClose={() => setDialog(null)} />
+			)}
+			{dialog?.kind === "delete" && (
+				<ConfirmDialog
+					title={t("deleteGroup")}
+					body={t("deleteGroupBody")}
+					confirmLabel={t("delete")}
+					onConfirm={async () => {
+						await deleteGroup(dialog.group.id);
+						if (filter === dialog.group.id) setState({ departmentFilter: null });
+					}}
+					onClose={() => setDialog(null)}
+				/>
+			)}
+		</section>
+	);
+}
+
+/** Saved workspaces: click one to start a session in it. */
 function Workspaces() {
 	useLang();
 	const workspaces = useWorkspaces();
@@ -251,6 +381,7 @@ function SessionRow({
 }) {
 	useLang();
 	const isMain = useAppState((state) => state.settings?.mainSessionId === session.id);
+	const department = groups.find((group) => group.id === session.groupId)?.name ?? null;
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [renaming, setRenaming] = useState(false);
 	const download = useAction(() => exportSession(session));
@@ -304,6 +435,7 @@ function SessionRow({
 							{" "}
 							· {session.cwd ? t("mode_code") : t("mode_chat")} · {t(`status_${session.status}`)}
 							{isMain ? ` · ${t("mainConversation")}` : ""}
+							{department ? ` · ${department}` : ""}
 							{session.pinned ? ` · ${t("pinned")}` : ""}
 							{session.unread > 0 ? ` · ${t("unread", { n: session.unread })}` : ""}
 						</span>
@@ -457,6 +589,20 @@ function Search() {
 	const [query, setQuery] = useState("");
 	const [result, setResult] = useState<SearchResult | null>(null);
 	const sessions = useAppState((state) => state.sessions);
+	const groups = useAppState((state) => state.groups);
+	const workspaces = useWorkspaces();
+	// Departments and workspaces are few and already loaded; they are matched here, by name or folder.
+	const needle = query.trim().toLowerCase();
+	const departments = needle
+		? groups.filter((group) => group.name.toLowerCase().includes(needle))
+		: [];
+	const places = needle
+		? workspaces.filter(
+				(workspace) =>
+					workspace.name.toLowerCase().includes(needle) ||
+					workspace.path.toLowerCase().includes(needle),
+			)
+		: [];
 	const box = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		const q = query.trim();
@@ -479,10 +625,13 @@ function Search() {
 		document.addEventListener("mousedown", onDown);
 		return () => document.removeEventListener("mousedown", onDown);
 	}, []);
-	const open = (id: string) => {
+	const done = () => {
 		setQuery("");
 		setResult(null);
 		closeDrawer();
+	};
+	const open = (id: string) => {
+		done();
 		void selectSession(id);
 	};
 	return (
@@ -501,9 +650,40 @@ function Search() {
 			</div>
 			{result && (
 				<section className="search-results" aria-label={t("searchResults")}>
-					{result.sessions.length === 0 && result.hits.length === 0 && (
-						<p className="hint">{t("noResults")}</p>
-					)}
+					{result.sessions.length + result.hits.length + departments.length + places.length ===
+						0 && <p className="hint">{t("noResults")}</p>}
+					{departments.map((group) => (
+						<button
+							key={group.id}
+							type="button"
+							className="search-hit search-hit-row"
+							onClick={() => {
+								done();
+								setState({ departmentFilter: group.id });
+							}}
+						>
+							<DepartmentIcon />
+							<strong>{group.name}</strong>
+							<span className="hint">{t("departments")}</span>
+						</button>
+					))}
+					{places.map((workspace) => (
+						<button
+							key={workspace.id}
+							type="button"
+							className="search-hit search-hit-row"
+							title={workspace.path}
+							onClick={() => {
+								done();
+								setState({ homeFolder: workspace.path });
+								void selectSession(null);
+							}}
+						>
+							<FolderIcon />
+							<strong>{workspace.name}</strong>
+							<span className="hint">{shortPath(workspace.path)}</span>
+						</button>
+					))}
 					{result.sessions.map((session) => (
 						<button
 							key={session.id}
@@ -539,7 +719,6 @@ function Search() {
  */
 export function SidebarRail() {
 	useLang();
-	const [creatingGroup, setCreatingGroup] = useState(false);
 	const mainId = useAppState((state) => state.settings?.mainSessionId ?? null);
 	const hasMain = useAppState((state) => (mainId ? Boolean(state.sessions[mainId]) : false));
 	const count = useAppState((state) => centerCount(state.center));
@@ -599,14 +778,6 @@ export function SidebarRail() {
 			</Button>
 			<Button
 				variant="icon"
-				aria-label={t("newGroup")}
-				title={t("newGroup")}
-				onClick={() => setCreatingGroup(true)}
-			>
-				<GroupPlusIcon />
-			</Button>
-			<Button
-				variant="icon"
 				aria-label={t("search")}
 				title={t("search")}
 				onClick={() => {
@@ -620,7 +791,6 @@ export function SidebarRail() {
 			</Button>
 			<span className="rail-spacer" />
 			<SettingsMenu variant="icon" />
-			{creatingGroup && <GroupDialog onClose={() => setCreatingGroup(false)} />}
 		</nav>
 	);
 }
@@ -634,19 +804,18 @@ export function Sidebar() {
 	const selectedId = useAppState((state) => (state.page ? null : state.selectedId));
 	const showArchived = useAppState((state) => state.showArchived);
 	const hasArchived = useAppState((state) => state.hasArchived);
+	const chosen = useAppState((state) => state.departmentFilter);
 	const now = useNow();
-	const [dialog, setDialog] = useState<
-		| { kind: "session"; groupId: string | null }
-		| { kind: "group"; group?: Group }
-		| { kind: "deleteGroup"; group: Group }
-		| null
-	>(null);
+	const [newSession, setNewSession] = useState<string | null>(null);
 
+	// A filter for a department that was deleted meanwhile shows everything.
+	const filter = groups.some((group) => group.id === chosen) ? chosen : null;
+	const filterName = groups.find((group) => group.id === filter)?.name ?? null;
 	const all = Object.values(sessions);
-	const active = all.filter((s) => s.archivedAt === null);
 	const archived = sortSessions(all.filter((s) => s.archivedAt !== null));
-	const byGroup = (groupId: string | null) =>
-		sortSessions(active.filter((s) => s.groupId === groupId));
+	const listed = sortSessions(
+		all.filter((s) => s.archivedAt === null && (filter === null || s.groupId === filter)),
+	);
 	const current = selectedId;
 	const row = (session: Session, depth = 0) => (
 		<SessionRow
@@ -708,65 +877,51 @@ export function Sidebar() {
 			</div>
 			<div className="sidebar-nav">
 				<FixedEntries />
-				<button type="button" className="nav-row" onClick={() => setDialog({ kind: "group" })}>
-					<GroupPlusIcon />
-					{t("newGroup")}
-				</button>
 				<Search />
 			</div>
 			<div className="sidebar-list">
+				<Departments />
 				<Workspaces />
-				{groups.map((group) => (
-					<section key={group.id} aria-label={group.name}>
-						<div className="group-heading">
-							<span>{group.name}</span>
-							<Menu
-								label={`${group.name} – ${t("more")}`}
-								items={[
-									{
-										label: t("newSession"),
-										onSelect: () => setDialog({ kind: "session", groupId: group.id }),
-									},
-									{ label: t("renameGroup"), onSelect: () => setDialog({ kind: "group", group }) },
-									{
-										label: t("deleteGroup"),
-										danger: true,
-										onSelect: () => setDialog({ kind: "deleteGroup", group }),
-									},
-								]}
-							/>
-						</div>
-						{byGroup(group.id).length === 0 ? (
-							<p className="empty-box">{t("emptyGroup")}</p>
-						) : (
-							rows(byGroup(group.id))
-						)}
-					</section>
-				))}
-				{(byGroup(null).length > 0 || groups.length === 0) && (
-					<section aria-label={groups.length > 0 ? t("ungrouped") : t("sessions")}>
-						<div className="group-heading">
-							<span>{groups.length > 0 ? t("ungrouped") : t("sessions")}</span>
+				<section aria-label={filterName ? `${t("sessions")} · ${filterName}` : t("sessions")}>
+					<div className="group-heading">
+						<span className="heading-text">
+							{t("sessions")}
+							{filterName && <span className="heading-filter"> · {filterName}</span>}
+						</span>
+						{filter && (
 							<Button
 								variant="icon"
 								className="heading-add"
-								aria-label={t("newSession")}
-								title={t("newSession")}
-								onClick={() => {
-									closeDrawer();
-									void selectSession(null);
-								}}
+								aria-label={t("showAllSessions")}
+								title={t("showAllSessions")}
+								onClick={() => setState({ departmentFilter: null })}
 							>
-								<PlusIcon />
+								<CloseIcon />
 							</Button>
-						</div>
-						{byGroup(null).length === 0 ? (
-							<p className="empty-box">{t("emptySidebar")}</p>
-						) : (
-							rows(byGroup(null))
 						)}
-					</section>
-				)}
+						<Button
+							variant="icon"
+							className="heading-add"
+							aria-label={filter ? t("newSessionHere") : t("newSession")}
+							title={filter ? t("newSessionHere") : t("newSession")}
+							onClick={() => {
+								if (filter) {
+									setNewSession(filter);
+									return;
+								}
+								closeDrawer();
+								void selectSession(null);
+							}}
+						>
+							<PlusIcon />
+						</Button>
+					</div>
+					{listed.length === 0 ? (
+						<p className="empty-box">{filter ? t("emptyGroup") : t("emptySidebar")}</p>
+					) : (
+						rows(listed)
+					)}
+				</section>
 				{hasArchived && (
 					<>
 						<Button
@@ -783,24 +938,7 @@ export function Sidebar() {
 			<div className="sidebar-bottom">
 				<SettingsMenu variant="row" />
 			</div>
-			{dialog?.kind === "session" && (
-				<NewSessionDialog groupId={dialog.groupId} onClose={() => setDialog(null)} />
-			)}
-			{dialog?.kind === "group" && (
-				<GroupDialog
-					{...(dialog.group ? { group: dialog.group } : {})}
-					onClose={() => setDialog(null)}
-				/>
-			)}
-			{dialog?.kind === "deleteGroup" && (
-				<ConfirmDialog
-					title={t("deleteGroup")}
-					body={t("deleteGroupBody")}
-					confirmLabel={t("delete")}
-					onConfirm={() => deleteGroup(dialog.group.id)}
-					onClose={() => setDialog(null)}
-				/>
-			)}
+			{newSession && <NewSessionDialog groupId={newSession} onClose={() => setNewSession(null)} />}
 		</nav>
 	);
 }
