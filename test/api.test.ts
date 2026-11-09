@@ -424,3 +424,94 @@ describe("api: approval center and letters", () => {
 		);
 	});
 });
+
+describe("api: duplicating a session", () => {
+	test("the copy has the settings, task list and conversation under a free name; usage starts at zero", async () => {
+		const { store, call } = setup();
+		const session = await (
+			await call("POST", "/api/sessions", { name: "产品会话", responsibility: "负责产品" })
+		).json();
+		store.setTodos(session.id, [{ text: "写测试", status: "in_progress" }]);
+		const first = store.appendEntry(session.id, {
+			role: "user",
+			message: { role: "user", content: "加一个导出功能", timestamp: Date.now() },
+		});
+		const reply = store.appendEntry(session.id, {
+			role: "assistant",
+			message: {
+				role: "assistant",
+				content: [{ type: "toolCall", id: "c1", name: "read", arguments: { path: "a.txt" } }],
+				api: "faux",
+				provider: "faux",
+				model: "faux",
+				usage: {
+					input: 1,
+					output: 1,
+					cacheRead: 0,
+					cacheWrite: 0,
+					totalTokens: 2,
+					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.5 },
+				},
+				stopReason: "toolUse",
+				timestamp: Date.now(),
+			},
+		});
+		const callRow = store.createToolCall({
+			sessionId: session.id,
+			messageId: reply.id,
+			callId: "c1",
+			tool: "read",
+			args: { path: "a.txt" },
+		});
+		const result = store.appendEntry(session.id, {
+			role: "toolResult",
+			message: {
+				role: "toolResult",
+				toolCallId: "c1",
+				toolName: "read",
+				content: [{ type: "text", text: "alpha" }],
+				isError: false,
+				timestamp: Date.now(),
+			},
+		});
+		store.updateToolCall(callRow.id, {
+			status: "done",
+			resultMessageId: result.id,
+			finishedAt: Date.now(),
+		});
+		store.addUsage(
+			session.id,
+			{ input: 1, output: 1, cacheRead: 0, cacheWrite: 0, cost: 0.5 },
+			100,
+		);
+
+		const response = await call("POST", `/api/sessions/${session.id}/duplicate`);
+		assert.equal(response.status, 201);
+		const copy = await response.json();
+		assert.equal(copy.name, "产品会话 副本");
+		assert.equal(copy.responsibility, "负责产品");
+		assert.deepEqual(copy.todos, [{ text: "写测试", status: "in_progress" }]);
+		assert.equal(copy.usage.cost, 0);
+		const transcript = await (await call("GET", `/api/sessions/${copy.id}/transcript`)).json();
+		assert.deepEqual(
+			transcript.entries.map((e: { seq: number; role: string }) => [e.seq, e.role]),
+			[
+				[first.seq, "user"],
+				[reply.seq, "assistant"],
+				[result.seq, "toolResult"],
+			],
+		);
+		assert.equal(transcript.toolCalls.length, 1);
+		assert.equal(transcript.toolCalls[0].status, "done");
+		assert.equal(transcript.toolCalls[0].resultMessageId, transcript.entries[2].id);
+		assert.notEqual(transcript.entries[0].id, first.id);
+		// A second copy gets the next free name; a session at work cannot be copied.
+		assert.equal(
+			(await (await call("POST", `/api/sessions/${session.id}/duplicate`)).json()).name,
+			"产品会话 副本 2",
+		);
+		store.setStatus(session.id, "working");
+		const busy = await call("POST", `/api/sessions/${session.id}/duplicate`);
+		assert.equal(busy.status, 409);
+	});
+});

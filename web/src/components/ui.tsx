@@ -11,7 +11,7 @@ import {
 } from "react";
 import { ApiError } from "../api.ts";
 import { type MessageKey, t } from "../i18n.ts";
-import { CloseIcon, InfoIcon } from "./icons.tsx";
+import { CloseIcon, InfoIcon, SubmenuIcon } from "./icons.tsx";
 
 /** Places a top-layer popover next to its trigger, flipping above when there is no room below (spec 5.9). */
 function place(popover: HTMLElement, trigger: HTMLElement, width?: number): void {
@@ -430,7 +430,10 @@ export function Select({
 
 export interface MenuItem {
 	label: string;
-	onSelect: () => void;
+	/** What choosing the item does; an item with `items` opens them instead. */
+	onSelect?: () => void;
+	/** A submenu, opened beside the item (as in Claude's session menu). */
+	items?: MenuEntry[];
 	/** Distinguishes items with the same label in different groups. */
 	id?: string;
 	danger?: boolean;
@@ -445,12 +448,65 @@ export type MenuEntry =
 	| { separator: true; id: string }
 	| { group: string; items: MenuItem[] };
 
-function MenuItemButton({ item, close }: { item: MenuItem; close: () => void }) {
-	const onClick = (event: { stopPropagation(): void }) => {
+/** Puts a submenu beside the item that opened it: to the right, or to the left when there is no room. */
+function placeBeside(popover: HTMLElement, anchor: HTMLElement): void {
+	const rect = anchor.getBoundingClientRect();
+	const margin = 8;
+	const width = popover.offsetWidth;
+	const height = popover.offsetHeight;
+	let left = rect.right + 6;
+	if (left + width > window.innerWidth - margin) left = Math.max(margin, rect.left - width - 6);
+	const top = Math.max(margin, Math.min(rect.top - 6, window.innerHeight - margin - height));
+	popover.style.left = `${left}px`;
+	popover.style.top = `${top}px`;
+}
+
+function MenuItemButton({
+	item,
+	close,
+	onPointerEnter,
+	submenu,
+}: {
+	item: MenuItem;
+	close: () => void;
+	onPointerEnter?: (button: HTMLButtonElement) => void;
+	/** For an item with a submenu: whether it is open, and how to open it. */
+	submenu?: { open: boolean; show: (button: HTMLButtonElement, focusFirst: boolean) => void };
+}) {
+	const onClick = (event: { stopPropagation(): void; currentTarget: HTMLButtonElement }) => {
 		event.stopPropagation();
+		if (submenu) {
+			submenu.show(event.currentTarget, true);
+			return;
+		}
 		close();
-		item.onSelect();
+		item.onSelect?.();
 	};
+	if (submenu) {
+		return (
+			<button
+				type="button"
+				role="menuitem"
+				tabIndex={-1}
+				aria-haspopup="menu"
+				aria-expanded={submenu.open}
+				className="menu-parent"
+				onClick={onClick}
+				onPointerEnter={(event) => submenu.show(event.currentTarget, false)}
+				onKeyDown={(event) => {
+					if (event.key === "ArrowRight") {
+						event.preventDefault();
+						event.stopPropagation();
+						submenu.show(event.currentTarget, true);
+					}
+				}}
+			>
+				{item.icon}
+				<span className="menu-label">{item.label}</span>
+				<SubmenuIcon />
+			</button>
+		);
+	}
 	const content = (
 		<>
 			{item.icon}
@@ -470,6 +526,7 @@ function MenuItemButton({ item, close }: { item: MenuItem; close: () => void }) 
 				aria-checked={item.checked}
 				tabIndex={-1}
 				onClick={onClick}
+				onPointerEnter={(event) => onPointerEnter?.(event.currentTarget)}
 			>
 				{content}
 			</button>
@@ -482,9 +539,39 @@ function MenuItemButton({ item, close }: { item: MenuItem; close: () => void }) 
 			tabIndex={-1}
 			className={item.danger ? "menu-danger" : undefined}
 			onClick={onClick}
+			onPointerEnter={(event) => onPointerEnter?.(event.currentTarget)}
 		>
 			{content}
 		</button>
+	);
+}
+
+/** Separators, groups and items, as one menu level shows them. */
+function MenuEntries({
+	entries,
+	render,
+}: {
+	entries: MenuEntry[];
+	render: (item: MenuItem, key: string) => ReactNode;
+}) {
+	return (
+		<>
+			{entries.map((entry) => {
+				if ("separator" in entry) return <hr key={entry.id} className="menu-separator" />;
+				if ("group" in entry) {
+					return (
+						// biome-ignore lint/a11y/useSemanticElements: a group of menu items is role="group" in the APG menu pattern; a fieldset does not belong in a menu
+						<div key={entry.group} role="group" aria-label={entry.group}>
+							<div className="menu-heading" aria-hidden="true">
+								{entry.group}
+							</div>
+							{entry.items.map((item) => render(item, item.id ?? item.label))}
+						</div>
+					);
+				}
+				return render(entry, entry.id ?? entry.label);
+			})}
+		</>
 	);
 }
 
@@ -515,7 +602,12 @@ export function Menu({
 	};
 	const button = useRef<HTMLButtonElement>(null);
 	const menu = useRef<HTMLDivElement>(null);
+	const subMenu = useRef<HTMLDivElement>(null);
 	const id = useId();
+	// The open submenu: which item opened it, and whether its first item takes the focus (keyboard).
+	const [sub, setSub] = useState<{ key: string; anchor: HTMLButtonElement; focus: boolean } | null>(
+		null,
+	);
 
 	useLayoutEffect(() => {
 		const element = menu.current;
@@ -527,14 +619,27 @@ export function Menu({
 		} else if (element.matches(":popover-open")) {
 			element.hidePopover?.();
 		}
+		if (!open) setSub(null);
 	}, [open, width]);
+
+	useLayoutEffect(() => {
+		const element = subMenu.current;
+		if (!element || !sub) return;
+		element.showPopover?.();
+		placeBeside(element, sub.anchor);
+		if (sub.focus) (element.querySelector("[role^=menuitem]") as HTMLElement | null)?.focus();
+	}, [sub]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: setOpen is rebuilt each render; the listener only needs to follow `open`
 	useEffect(() => {
 		if (!open) return;
 		const onDown = (event: MouseEvent) => {
 			const target = event.target as Node;
-			if (!menu.current?.contains(target) && !button.current?.contains(target)) setOpen(false);
+			const inside =
+				menu.current?.contains(target) ||
+				subMenu.current?.contains(target) ||
+				button.current?.contains(target);
+			if (!inside) setOpen(false);
 		};
 		document.addEventListener("mousedown", onDown);
 		return () => document.removeEventListener("mousedown", onDown);
@@ -557,6 +662,51 @@ export function Menu({
 		}
 	};
 	const close = () => setOpen(false);
+	const subItems = sub
+		? (items.find(
+				(entry): entry is MenuItem =>
+					!("separator" in entry) && !("group" in entry) && (entry.id ?? entry.label) === sub.key,
+			)?.items ?? null)
+		: null;
+	const onSubKeyDown = (event: KeyboardEvent) => {
+		const entries = [...(subMenu.current?.querySelectorAll<HTMLElement>("[role^=menuitem]") ?? [])];
+		const index = entries.indexOf(document.activeElement as HTMLElement);
+		if (event.key === "Escape" || event.key === "ArrowLeft") {
+			event.preventDefault();
+			event.stopPropagation();
+			const anchor = sub?.anchor;
+			setSub(null);
+			anchor?.focus();
+		} else if (event.key === "ArrowDown") {
+			event.preventDefault();
+			entries[(index + 1) % entries.length]?.focus();
+		} else if (event.key === "ArrowUp") {
+			event.preventDefault();
+			entries[(index - 1 + entries.length) % entries.length]?.focus();
+		} else if (event.key === "Tab") {
+			setOpen(false);
+		}
+	};
+	const renderItem = (item: MenuItem, key: string) =>
+		item.items ? (
+			<MenuItemButton
+				key={key}
+				item={item}
+				close={close}
+				submenu={{
+					open: sub?.key === key,
+					show: (anchor, focus) => setSub({ key, anchor, focus }),
+				}}
+			/>
+		) : (
+			<MenuItemButton
+				key={key}
+				item={item}
+				close={close}
+				// Moving onto a plain item closes an open submenu, as menus do elsewhere.
+				onPointerEnter={() => setSub(null)}
+			/>
+		);
 
 	return (
 		<>
@@ -585,26 +735,23 @@ export function Menu({
 				className="menu"
 				onKeyDown={onKeyDown}
 			>
-				{items.map((entry) => {
-					if ("separator" in entry) {
-						return <hr key={entry.id} className="menu-separator" />;
-					}
-					if ("group" in entry) {
-						return (
-							// biome-ignore lint/a11y/useSemanticElements: a group of menu items is role="group" in the APG menu pattern; a fieldset does not belong in a menu
-							<div key={entry.group} role="group" aria-label={entry.group}>
-								<div className="menu-heading" aria-hidden="true">
-									{entry.group}
-								</div>
-								{entry.items.map((item) => (
-									<MenuItemButton key={item.id ?? item.label} item={item} close={close} />
-								))}
-							</div>
-						);
-					}
-					return <MenuItemButton key={entry.id ?? entry.label} item={entry} close={close} />;
-				})}
+				<MenuEntries entries={items} render={renderItem} />
 			</div>
+			{open && sub && subItems && (
+				<div
+					ref={subMenu}
+					role="menu"
+					aria-label={sub.anchor.textContent ?? label}
+					popover="manual"
+					className="menu submenu"
+					onKeyDown={onSubKeyDown}
+				>
+					<MenuEntries
+						entries={subItems}
+						render={(item, key) => <MenuItemButton key={key} item={item} close={close} />}
+					/>
+				</div>
+			)}
 		</>
 	);
 }

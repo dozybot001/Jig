@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Group, Session } from "../../../src/shared/types.ts";
 import {
 	deleteGroup,
+	duplicateSession,
 	exportSession,
 	openCenter,
 	renameGroup,
@@ -39,7 +40,7 @@ import {
 	TeamIcon,
 } from "./icons.tsx";
 import { SettingsMenu } from "./settings.tsx";
-import { Button, describeError, ErrorBox, Menu, useAction } from "./ui.tsx";
+import { Button, describeError, ErrorBox, Menu, type MenuEntry, useAction } from "./ui.tsx";
 import { shortPath, useWorkspaces, WorkspaceDialog } from "./workspaces.tsx";
 
 interface SearchResult {
@@ -435,13 +436,17 @@ function SessionRow({
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [renaming, setRenaming] = useState(false);
 	const download = useAction(() => exportSession(session));
-	const moves = [
-		...groups
-			.filter((group) => group.id !== session.groupId)
-			.map((group) => ({
-				label: t("moveTo", { name: group.name }),
-				onSelect: () => void updateSession(session.id, { groupId: group.id }),
-			})),
+	const copy = useAction(() => duplicateSession(session.id));
+	const [newTeam, setNewTeam] = useState(false);
+	// "Move to team": every team, the current one checked; then leaving it, or a new team (as in Claude).
+	const teams: MenuEntry[] = [
+		...groups.map((group) => ({
+			id: group.id,
+			label: group.name,
+			checked: group.id === session.groupId,
+			onSelect: () => void updateSession(session.id, { groupId: group.id }),
+		})),
+		...(groups.length > 0 ? [{ separator: true as const, id: "teams-end" }] : []),
 		...(session.groupId
 			? [
 					{
@@ -450,6 +455,7 @@ function SessionRow({
 					},
 				]
 			: []),
+		{ label: t("newTeamEllipsis"), onSelect: () => setNewTeam(true) },
 	];
 	return (
 		<div
@@ -520,11 +526,15 @@ function SessionRow({
 					<Menu
 						label={`${session.name} – ${t("more")}`}
 						items={[
+							// The session itself.
 							{
 								label: session.pinned ? t("unpin") : t("pin"),
 								onSelect: () => void updateSession(session.id, { pinned: !session.pinned }),
 							},
 							{ label: t("rename"), onSelect: () => setRenaming(true) },
+							{ label: t("duplicate"), onSelect: () => void copy.run() },
+							{ separator: true, id: "role" },
+							// Its place and its settings.
 							...(session.archivedAt === null
 								? [
 										{
@@ -534,8 +544,14 @@ function SessionRow({
 									]
 								: []),
 							{ label: t("sessionSettings"), onSelect: () => setSettingsOpen(true) },
-							{ label: t("exportMarkdown"), onSelect: () => void download.run() },
-							...moves,
+							{ separator: true, id: "move" },
+							// Where it goes.
+							{ label: t("moveToTeam"), items: teams },
+							{
+								label: t("exportAs"),
+								items: [{ label: t("exportMarkdown"), onSelect: () => void download.run() }],
+							},
+							{ separator: true, id: "archive" },
 							session.archivedAt
 								? {
 										label: t("unarchive"),
@@ -551,6 +567,17 @@ function SessionRow({
 			)}
 			{settingsOpen && (
 				<SessionSettingsDialog session={session} onClose={() => setSettingsOpen(false)} />
+			)}
+			{newTeam && (
+				<GroupDialog
+					onClose={() => setNewTeam(false)}
+					onCreated={(group) => updateSession(session.id, { groupId: group.id })}
+				/>
+			)}
+			{copy.error !== null && copy.error !== undefined && (
+				<div className="row-error">
+					<ErrorBox error={copy.error} />
+				</div>
 			)}
 			{download.busy && (
 				<p className="hint row-error" role="status">

@@ -389,6 +389,16 @@ export async function createSession(input: NewSessionInput): Promise<Session> {
 	return session;
 }
 
+/** A copy of the session with its conversation, opened at once (blueprint section 8). */
+export async function duplicateSession(sessionId: string): Promise<Session> {
+	const copy = await api<Session>("POST", `/api/sessions/${sessionId}/duplicate`, undefined, {
+		idempotent: true,
+	});
+	setState((current) => ({ sessions: { ...current.sessions, [copy.id]: copy } }));
+	await selectSession(copy.id);
+	return copy;
+}
+
 export type SessionPatch = Partial<{
 	name: string;
 	groupId: string | null;

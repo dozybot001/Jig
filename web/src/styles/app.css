@@ -531,7 +531,17 @@ a {
 	height: 1px;
 	margin: 5px 6px;
 	border: none;
-	background: var(--divider);
+	/* The divider colour is too close to the menu's own in the dark theme; the border colour shows. */
+	background: var(--border);
+}
+/* An item that opens a submenu: an arrow on the right, and it stays marked while the submenu is open. */
+.menu .menu-parent[aria-expanded="true"] {
+	background: var(--hover);
+}
+.menu .menu-arrow {
+	flex: none;
+	margin-left: auto;
+	color: var(--text-3);
 }
 @media (hover: hover) {
 	.listbox [role="option"]:hover,

@@ -526,6 +526,103 @@ export class Store {
 		});
 	}
 
+	/**
+	 * A copy of a session to take another way from here: the same settings, team, workspace, task list
+	 * and conversation (with its tool calls), under a new name. Usage starts at zero; letters, approvals
+	 * and the main-conversation role stay with the original. Not while the original is working, since its
+	 * last calls would have no results.
+	 */
+	duplicateSession(id: string, name: string): Session {
+		return this.tx(() => {
+			const source = this.getSession(id);
+			if (source.status === "working" || source.status === "waiting") {
+				throw conflict(
+					"Wait until the session stops working, then make the copy.",
+					undefined,
+					"session-busy",
+				);
+			}
+			const copy = this.createSession({
+				name,
+				kind: source.kind,
+				groupId: source.groupId,
+				responsibility: source.responsibility,
+				cwd: source.cwd,
+				provider: source.provider,
+				model: source.model,
+				thinking: source.thinking,
+				rules: source.rules,
+				options: source.options,
+			});
+			const ids = new Map<string, string>();
+			const rows = this.#q("SELECT * FROM messages WHERE session_id = ? ORDER BY seq").all(
+				id,
+			) as unknown as EntryRow[];
+			for (const row of rows) {
+				const entryId = newId();
+				ids.set(row.id, entryId);
+				this.#q(
+					"INSERT INTO messages (id, session_id, seq, role, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+				).run(entryId, copy.id, row.seq, row.role, row.body, row.created_at);
+				const text = searchableText(JSON.parse(row.body) as EntryBody);
+				if (text) {
+					this.#q("INSERT INTO message_search (text, session_id, message_id) VALUES (?, ?, ?)").run(
+						text,
+						copy.id,
+						entryId,
+					);
+				}
+			}
+			const calls = this.#q("SELECT * FROM tool_calls WHERE session_id = ? ORDER BY id").all(
+				id,
+			) as unknown as ToolCallRow[];
+			for (const call of calls) {
+				const messageId = ids.get(call.message_id);
+				if (!messageId) continue;
+				this.#q(
+					`INSERT INTO tool_calls (id, session_id, message_id, call_id, tool, args, status, detail,
+						result_message_id, started_at, finished_at, created_at)
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				).run(
+					newId(),
+					copy.id,
+					messageId,
+					call.call_id,
+					call.tool,
+					call.args,
+					// A call that never ran is pending in the copy, one cut off while running needs review:
+					// the copy's next message closes both, as it would in the original.
+					call.status === "waiting"
+						? "pending"
+						: call.status === "running"
+							? "needs_review"
+							: call.status,
+					call.detail,
+					call.result_message_id ? (ids.get(call.result_message_id) ?? null) : null,
+					call.started_at,
+					call.finished_at,
+					call.created_at,
+				);
+			}
+			const context = this.#q("SELECT context, message_seq FROM sessions WHERE id = ?").get(id) as {
+				context: string | null;
+				message_seq: number;
+			};
+			this.#q(
+				`UPDATE sessions SET todos = ?, context = ?, message_seq = ?, context_tokens = ?,
+					last_activity_at = ? WHERE id = ?`,
+			).run(
+				JSON.stringify(source.todos),
+				context.context,
+				context.message_seq,
+				source.contextTokens,
+				Date.now(),
+				copy.id,
+			);
+			return this.#emitSession(copy.id);
+		});
+	}
+
 	updateSession(id: string, patch: SessionPatch): Session {
 		return this.tx(() => {
 			const current = this.getSession(id);

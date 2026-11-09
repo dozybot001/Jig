@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import {
+	type Group,
 	letterQuotaOf,
 	type PermissionRule,
 	RECEIVE_POLICIES,
@@ -378,16 +379,19 @@ export function SessionSettingsDialog({
 export function GroupDialog({
 	group,
 	onClose,
+	onCreated,
 }: {
 	group?: { id: string; name: string };
 	onClose: () => void;
+	/** Called with a new team, e.g. to move a session into it right away. */
+	onCreated?: (group: Group) => unknown;
 }) {
 	useLang();
 	const [name, setName] = useState(group?.name ?? "");
 	const id = useId();
 	const save = useAction(async () => {
 		if (group) await renameGroup(group.id, name);
-		else await createGroup(name);
+		else await onCreated?.(await createGroup(name));
 		onClose();
 	});
 	return (

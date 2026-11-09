@@ -50,6 +50,8 @@ export const ArrowUpIcon = () => <ArrowUp {...props} strokeWidth={2} />;
 export const StopIcon = () => <Square {...props} fill="currentColor" />;
 export const SearchIcon = () => <Search {...props} />;
 export const ChevronIcon = () => <ChevronRight {...props} size={14} className="chevron" />;
+/** Marks a menu item that opens a submenu. */
+export const SubmenuIcon = () => <ChevronRight {...props} size={14} className="menu-arrow" />;
 export const PinIcon = () => <Pin {...props} size={13} className="pin-icon" />;
 /** Make the context smaller. */
 export const CompactIcon = () => <Minimize2 {...props} />;

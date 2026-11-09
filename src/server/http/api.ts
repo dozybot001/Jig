@@ -256,6 +256,16 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 
 	app.get("/sessions/:id", (c) => c.json(store.getSession(c.req.param("id"))));
 
+	// A copy of the session, with its conversation, under a free name ("名称 副本", "名称 副本 2"…).
+	app.post("/sessions/:id/duplicate", once, (c) => {
+		const source = store.getSession(c.req.param("id"));
+		const english = readSettings(store).language === "en";
+		const base = `${[...source.name].slice(0, 52).join("")}${english ? " copy" : " 副本"}`;
+		let name = base;
+		for (let n = 2; store.findSessionByName(name); n++) name = `${base} ${n}`;
+		return c.json(store.duplicateSession(source.id, name), 201);
+	});
+
 	app.patch("/sessions/:id", async (c) => {
 		const id = c.req.param("id");
 		const fields = await readJson(c);
