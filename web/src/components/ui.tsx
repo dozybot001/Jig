@@ -440,6 +440,8 @@ export interface MenuItem {
 	/** Set for a choice among options (menuitemradio); a check marks the current one. */
 	checked?: boolean;
 	icon?: ReactNode;
+	/** The current value of a submenu's choice, shown quietly before the arrow. */
+	detail?: string;
 }
 
 /** A menu entry: an item, a line between sections, or a labelled group of choices. */
@@ -503,6 +505,7 @@ function MenuItemButton({
 			>
 				{item.icon}
 				<span className="menu-label">{item.label}</span>
+				{item.detail && <span className="menu-detail">{item.detail}</span>}
 				<SubmenuIcon />
 			</button>
 		);

@@ -522,6 +522,15 @@ a {
 .menu-check {
 	color: var(--text-2);
 }
+.menu-detail {
+	flex: none;
+	max-width: 8em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-3);
+	font-size: var(--fs-s);
+}
 .menu-heading {
 	padding: 6px 10px 2px;
 	font-size: var(--fs-s);
@@ -2250,16 +2259,6 @@ button.about-row {
 	margin: 0;
 	overflow-wrap: anywhere;
 }
-.recent-head {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	font-weight: 500;
-}
-.decision-record .recent-head svg {
-	flex: none;
-	color: var(--text-3);
-}
 
 /* Letters in a conversation read as letters, not as the person's words (blueprint 7.2). */
 .letter-card {
@@ -2324,21 +2323,49 @@ button.about-row {
 	color: var(--text);
 }
 /* The letters list: one line per letter that unfolds in place, in the same card (blueprint 7.2). */
-/* One grid for the whole list, so direction, kind and summary line up from row to row. */
+/*
+ * One grid for the whole list, so direction, kind and summary line up from row to row. The gap between
+ * rows is always there, so two unfolded letters stay apart and unfolding moves nothing.
+ */
+.letter-lines,
+.decision-lines {
+	gap: 4px 8px;
+}
 .letter-lines {
 	grid-template-columns: fit-content(16em) max-content minmax(0, 1fr) max-content max-content;
-	column-gap: 8px;
+}
+/* Decisions: number, question, what you chose, when. */
+.decision-lines {
+	grid-template-columns: max-content minmax(0, 1fr) fit-content(12em) max-content max-content;
+}
+.record-options {
+	display: grid;
+	gap: 2px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.record-options li {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+}
+.record-options li[data-chosen="true"] {
+	color: var(--text);
+	font-weight: 500;
+}
+.record-check {
+	flex: none;
+	width: 1em;
 }
 .letter-item {
 	display: grid;
 	grid-column: 1 / -1;
 	grid-template-columns: subgrid;
-	border: 1px solid transparent;
 	border-radius: var(--radius);
 }
-/* The border is always there, transparent when folded, so unfolding moves nothing. */
+/* Unfolded, the line and the letter share one background, without a border (founder, 2026-11-09). */
 .letter-item[data-open="true"] {
-	border-color: var(--border);
 	background: var(--surface);
 }
 .letter-line {
@@ -2359,6 +2386,10 @@ button.about-row {
 }
 .letter-line > .tag {
 	justify-self: start;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .letter-line-route {
 	overflow: hidden;
@@ -2414,6 +2445,7 @@ button.about-row {
 }
 @media (max-width: 640px) {
 	.letter-lines,
+	.decision-lines,
 	.letter-item {
 		grid-template-columns: minmax(0, 1fr);
 	}

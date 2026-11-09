@@ -19,6 +19,9 @@ export interface ContextSnapshot {
 	main?: SessionRef | null;
 	/** The session that opened this one. */
 	parent?: SessionRef | null;
+	/** The session's name and team when the snapshot was taken; absent in older snapshots. */
+	name?: string;
+	team?: string | null;
 	/**
 	 * What the model was told after the snapshot, through updates in the transcript. The prompt itself
 	 * keeps the snapshot, so it stays the same until the next compaction (prompt caching).
@@ -32,6 +35,9 @@ export interface Told {
 	instructions: InstructionFile[];
 	permissionMode: PermissionMode;
 	main: SessionRef | null;
+	/** Absent in what was told before sessions could be renamed and moved by the main conversation. */
+	name?: string;
+	team?: string | null;
 }
 
 export interface SessionRef {
@@ -39,10 +45,11 @@ export interface SessionRef {
 	name: string;
 }
 
-/** Where the session stands among the others: the main conversation, and who opened it. */
+/** Where the session stands among the others: the main conversation, who opened it, its team. */
 export interface Placement {
 	main: SessionRef | null;
 	parent: SessionRef | null;
+	team?: string | null;
 }
 
 export interface InstructionFile {
@@ -163,6 +170,8 @@ export function takeSnapshot(
 		permissionMode: permissionModeOf(session.options),
 		main: placement.main,
 		parent: placement.parent,
+		name: session.name,
+		team: placement.team ?? null,
 	};
 }
 
@@ -190,7 +199,12 @@ export const MAIN_ROLE = `You are the person's main conversation. The person wor
 - When reports come back, tell the person the outcome in a few lines; they can open the session for the details.
 - When something needs the person's decision, put a card in the approval center with post_card. Write it so the person can decide without opening any session: what needs deciding, your recommendation and the alternatives as options, the deadline, the sessions involved, whether it can be undone, and who does what afterwards. Merge cards about the same question, update cards when things change, and withdraw cards that no longer apply.
 - Jig delivers the person's decision to the session that asked and to you, marked as the person's; you do not need to pass it on.
+- Keep the sessions in order with organize_sessions: clear names, and related sessions in one team.
 - Decide only what your role covers. Never answer in the person's place.`;
+
+/** Asks a session's own model for a short name after its first turn (Jig's wording). */
+export const NAMING_PROMPT =
+	"Give this conversation a short name for the person's list of sessions. Write it in the language of the person's message: at most 16 characters in Chinese, Japanese or Korean, otherwise at most 6 words. Reply with the name only, without quotes or a full stop.";
 
 /** How a session reaches the others (blueprint 6.3 and section 7). */
 function sessionsSection(session: Session, snapshot: ContextSnapshot): string {
@@ -228,8 +242,11 @@ export function systemPrompt(
 	group: string | null = null,
 ): string {
 	const parts: string[] = [];
+	// The name and team as saved with the snapshot: a later change arrives as an update instead.
+	const name = snapshot.name ?? session.name;
+	const team = snapshot.team === undefined ? group : snapshot.team;
 	parts.push(
-		`You are "${session.name}", one of the agent sessions that make up the person's organization in Jig. The person runs their work with a group of sessions; each has a name, a role, and its own working folder, model and permissions.${group ? ` You belong to the team "${group}".` : ""}`,
+		`You are "${name}", one of the agent sessions that make up the person's organization in Jig. The person runs their work with a group of sessions; each has a name, a role, and its own working folder, model and permissions.${team ? ` You belong to the team "${team}".` : ""}`,
 	);
 	if (session.responsibility.trim()) {
 		parts.push(`Your role, as the person wrote it:\n${session.responsibility.trim()}`);

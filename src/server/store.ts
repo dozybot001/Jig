@@ -1257,6 +1257,28 @@ export class Store {
 		return { sessions, hits };
 	}
 
+	// --- deleting ---
+
+	/**
+	 * Deletes archived sessions for good: their conversations, tool calls, approvals, queued messages,
+	 * events, search entries and the letters sent to them. Letters they sent and decisions they asked for
+	 * stay, without the link to them. Sessions `keep` names (still running) are left alone.
+	 */
+	deleteArchivedSessions(keep: (id: string) => boolean = () => false): string[] {
+		return this.tx(() => {
+			const rows = this.#q("SELECT id FROM sessions WHERE archived_at IS NOT NULL").all() as {
+				id: string;
+			}[];
+			const ids = rows.map((row) => row.id).filter((id) => !keep(id));
+			for (const id of ids) {
+				this.#q("DELETE FROM message_search WHERE session_id = ?").run(id);
+				this.#q("DELETE FROM sessions WHERE id = ?").run(id);
+			}
+			if (ids.length > 0) this.publish({ type: "sessionsDeleted", ids });
+			return ids;
+		});
+	}
+
 	// --- restart recovery ---
 
 	/**

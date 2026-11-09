@@ -1,8 +1,10 @@
+import { rmSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import {
 	type AssistantMessage,
 	type EntryBody,
 	type JsonObject,
+	messageText,
 	type Notice,
 	plainLine,
 	type ToolCallBlock,
@@ -34,6 +36,7 @@ import { ALL_TOOLS, specs, toolsFor } from "../tools/registry.ts";
 import {
 	type MailContext,
 	type OpenInput,
+	type OrganizeChange,
 	type Roles,
 	type ToolContext,
 	type ToolDefinition,
@@ -52,6 +55,7 @@ import {
 	type ContextSnapshot,
 	loadInstructions,
 	MAIN_ROLE,
+	NAMING_PROMPT,
 	type Placement,
 	renderInstructions,
 	type SessionRef,
@@ -319,6 +323,25 @@ export class Agents {
 		}
 	}
 
+	/**
+	 * Deletes every archived session for good, except one that is still working. Their scratch folders go
+	 * too, and the main conversation setting if it named one of them. Returns the deleted sessions' ids.
+	 */
+	deleteArchived(): string[] {
+		const ids = this.#store.deleteArchivedSessions((id) => this.isRunning(id));
+		for (const id of ids) {
+			rmSync(join(this.#home, "tmp", id), { recursive: true, force: true });
+			this.#readStates.delete(id);
+			this.#jobs.get(id)?.stopAll();
+			this.#jobs.delete(id);
+			this.#paused.delete(id);
+		}
+		if (ids.includes(this.#store.getSetting<string | null>("mainSessionId", null) ?? "")) {
+			this.#store.setSetting("mainSessionId", null);
+		}
+		return ids;
+	}
+
 	shutdown(): void {
 		for (const live of this.#live.values()) live.controller.abort();
 		for (const jobs of this.#jobs.values()) jobs.stopAll();
@@ -343,7 +366,10 @@ export class Agents {
 
 	/** The calls a session can make depend on its place: card tools for the main conversation. */
 	#roles(session: Session): Roles {
-		return { canPostCards: this.post.canPostCards(session) };
+		return {
+			canPostCards: this.post.canPostCards(session),
+			canOrganize: this.post.canOrganize(session),
+		};
 	}
 
 	/**
@@ -458,6 +484,76 @@ export class Agents {
 			this.#store.setStatus(sessionId, endStatus, detail);
 			this.#store.bumpUnread(sessionId);
 			this.#endTurn(sessionId, endStatus, detail, signal.aborted);
+			if (endStatus === "idle" && !signal.aborted) {
+				this.#nameAfterFirstTurn(sessionId).catch((error: unknown) =>
+					this.#log(`session ${sessionId}: naming failed: ${(error as Error).message}`),
+				);
+			}
+		}
+	}
+
+	/**
+	 * A session started from the home page is named after the start of its first message. After its
+	 * first turn its own model gives it a short name, once; a name the person or the main conversation
+	 * chose is kept (blueprint section 5).
+	 */
+	async #nameAfterFirstTurn(sessionId: string): Promise<void> {
+		const session = this.#store.getSession(sessionId);
+		if (!session.options.autoName) return;
+		this.#store.updateSession(sessionId, { options: { autoName: false } });
+		const model = this.#gateway.model(session.provider, session.model);
+		if (!model) return;
+		const entries = this.#store.contextEntries(sessionId);
+		const asked = entries.find((entry) => entry.role === "user");
+		const replied = entries.find((entry) => entry.role === "assistant");
+		const textOf = (entry: Entry | undefined) =>
+			entry && (entry.role === "user" || entry.role === "assistant")
+				? messageText(entry.message).trim()
+				: "";
+		const first = clip(textOf(asked), 2000);
+		if (!first) return;
+		const reply = await this.#gateway.stream({
+			provider: session.provider,
+			model: model.id,
+			thinking: "off",
+			systemPrompt: NAMING_PROMPT,
+			messages: [
+				{
+					role: "user",
+					content: `The person's first message:\n${first}\n\nThe start of the reply:\n${clip(textOf(replied), 500)}`,
+					timestamp: Date.now(),
+				},
+			],
+			tools: [],
+			signal: new AbortController().signal,
+		});
+		const now = this.#store.getSession(sessionId);
+		this.#store.addUsage(sessionId, totals(reply), now.contextTokens);
+		const said = reply.content
+			.map((block) => (block.type === "text" ? block.text : ""))
+			.join("")
+			.trim();
+		const name = plainLine(said)
+			.replace(/^["'“”‘’「」『』《》]+|["'“”‘’「」『』《》]+$/g, "")
+			.replace(/[。.!！?？]+$/, "")
+			.trim();
+		// Renamed meanwhile, or nothing usable came back: keep the name it has.
+		if (reply.stopReason !== "stop" || !name || now.name !== session.name) return;
+		let chosen: string;
+		try {
+			chosen = this.#freeName(validateSessionName(clip(name, 40)));
+		} catch {
+			return;
+		}
+		this.#store.updateSession(sessionId, { name: chosen });
+		// One turn in, there is little prompt cache to keep: the prompt learns the name without an update.
+		const saved = this.#store.getContextSnapshot<ContextSnapshot>(sessionId);
+		if (saved) {
+			this.#store.setContextSnapshot(sessionId, {
+				...saved,
+				name: chosen,
+				...(saved.told ? { told: { ...saved.told, name: chosen } } : {}),
+			});
 		}
 	}
 
@@ -552,7 +648,8 @@ export class Agents {
 			try {
 				// In the automatic mode the model asks for a person's approval itself, with `confirm`.
 				const flagged = (row.args as { confirm?: unknown }).confirm === true;
-				decision = this.#permissions.decide(tool.subject(row.args, session), session, flagged);
+				const subject = tool.subject(row.args, session, (id) => this.post.sessionName(id));
+				decision = this.#permissions.decide(subject, session, flagged);
 			} catch (error) {
 				const message =
 					error instanceof ToolInputError
@@ -744,7 +841,79 @@ export class Agents {
 			wait: (letter) => this.#awaitReply(sessionId, letter, live, callId),
 			open: (input) => this.#openChild(this.#store.getSession(sessionId), input),
 			finish: (outcome) => this.#store.setOutcome(sessionId, outcome),
+			organize: (changes) => this.#organize(this.#store.getSession(sessionId), changes),
 		};
+	}
+
+	/**
+	 * Renames sessions and teams, creates teams and moves sessions between them, for the main conversation
+	 * and the sessions the person allowed (blueprint 6.4). Every change is checked and applied in one
+	 * transaction, so a bad one leaves everything as it was. Folders, models, permissions and receive
+	 * policies are the person's and cannot be changed here.
+	 */
+	#organize(by: Session, changes: OrganizeChange[]): string[] {
+		if (!this.post.canOrganize(by)) {
+			throw conflict(
+				"Only the main conversation, or a session the person allowed, can organize sessions.",
+				undefined,
+				"not-allowed",
+			);
+		}
+		const session = (id: string): Session => {
+			let found: Session;
+			try {
+				found = this.#store.getSession(id);
+			} catch {
+				throw invalid(`There is no session with the id ${id}.`, "session");
+			}
+			if (found.archivedAt !== null) throw invalid(`"${found.name}" is archived.`, "session");
+			return found;
+		};
+		const team = (ref: string) => {
+			const groups = this.#store.listGroups();
+			const byId = groups.find((group) => group.id === ref);
+			if (byId) return byId;
+			const named = groups.filter((group) => group.name === ref);
+			if (named.length > 1)
+				throw invalid(`Several teams are called "${ref}"; give its id.`, "team");
+			if (!named[0]) throw invalid(`There is no team "${ref}"; create it first.`, "team");
+			return named[0];
+		};
+		return this.#store.tx(() => {
+			const done: string[] = [];
+			for (const change of changes) {
+				if (change.action === "rename_session") {
+					const target = session(change.session);
+					const name = validateSessionName(change.name);
+					if (name === target.name) continue;
+					// A name chosen on purpose is not replaced by Jig's automatic one.
+					this.#store.updateSession(target.id, { name, options: { autoName: false } });
+					done.push(`Renamed "${target.name}" to "${name}".`);
+				} else if (change.action === "create_team") {
+					const group = this.#store.createGroup(change.name);
+					done.push(`Created the team "${group.name}" (id ${group.id}).`);
+				} else if (change.action === "rename_team") {
+					const group = team(change.team);
+					const renamed = this.#store.updateGroup(group.id, { name: change.name });
+					if (renamed.name !== group.name) {
+						done.push(`Renamed the team "${group.name}" to "${renamed.name}".`);
+					}
+				} else {
+					const group = change.team === null ? null : team(change.team);
+					for (const id of change.sessions) {
+						const target = session(id);
+						if (target.groupId === (group?.id ?? null)) continue;
+						this.#store.updateSession(target.id, { groupId: group?.id ?? null });
+						done.push(
+							group
+								? `Moved "${target.name}" into the team "${group.name}".`
+								: `Took "${target.name}" out of its team.`,
+						);
+					}
+				}
+			}
+			return done;
+		});
 	}
 
 	/** Notes a letter the session sent in this turn, for what Jig sends on its behalf at the end. */
@@ -1091,7 +1260,7 @@ export class Agents {
 				return null;
 			}
 		};
-		return { main: ref(mainId), parent: ref(session.parentId) };
+		return { main: ref(mainId), parent: ref(session.parentId), team: this.#groupName(session) };
 	}
 
 	#readState(sessionId: string): ReadState {
@@ -1210,11 +1379,14 @@ export class Agents {
 		}
 		const mode = permissionModeOf(session.options);
 		// Snapshots from before a field existed learn it quietly; the prompt reads the same either way.
+		const team = placement.team ?? null;
 		const { told: _told, ...prompt } = {
 			...saved,
 			permissionMode: saved.permissionMode ?? mode,
 			main: saved.main === undefined ? null : saved.main,
 			parent: saved.parent === undefined ? placement.parent : saved.parent,
+			name: saved.name ?? session.name,
+			team: saved.team === undefined ? team : saved.team,
 		};
 		const told: Told = saved.told ?? {
 			date: prompt.date,
@@ -1222,6 +1394,8 @@ export class Agents {
 			permissionMode: prompt.permissionMode,
 			main: prompt.main,
 		};
+		const toldName = told.name ?? prompt.name;
+		const toldTeam = told.team === undefined ? prompt.team : told.team;
 		const updates: string[] = [];
 		const date = today();
 		if (date !== told.date) updates.push(`Today's date is now ${date}.`);
@@ -1238,6 +1412,10 @@ export class Agents {
 		}
 		const sameMain = (told.main?.id ?? null) === (placement.main?.id ?? null);
 		if (!sameMain) updates.push(mainUpdate(session, told.main, placement.main));
+		if (session.name !== toldName) updates.push(`Your name is now "${session.name}".`);
+		if (team !== toldTeam) {
+			updates.push(team ? `You now belong to the team "${team}".` : "You are no longer in a team.");
+		}
 		if (updates.length > 0) {
 			this.#store.appendEntry(session.id, {
 				role: "system",
@@ -1251,6 +1429,8 @@ export class Agents {
 				instructions: current,
 				permissionMode: mode,
 				main: sameMain ? told.main : placement.main,
+				name: session.name,
+				team,
 			},
 		};
 		if (JSON.stringify(next) !== JSON.stringify(saved)) {

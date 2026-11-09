@@ -41,6 +41,10 @@ export interface SessionOptions {
 	letterQuota?: number | null;
 	/** May put decision cards in the approval center directly, as the main conversation can. */
 	canPostCards?: boolean;
+	/** May rename sessions and teams and move sessions between teams, as the main conversation can. */
+	canOrganize?: boolean;
+	/** Named after its first message; after its first turn Jig gives it a short name of its own. */
+	autoName?: boolean;
 }
 
 export const RECEIVE_POLICIES = ["accept", "hold", "refuse"] as const;

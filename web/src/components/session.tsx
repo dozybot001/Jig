@@ -555,6 +555,7 @@ function HomeView() {
 				cwd: folder,
 				responsibility: role ? t(`template_${role}_role`) : "",
 				...model,
+				autoName: true,
 			},
 			value,
 		);

@@ -7,6 +7,7 @@ import {
 	listCardsTool,
 	listSessionsTool,
 	openSessionTool,
+	organizeSessionsTool,
 	postCardTool,
 	sendLetterTool,
 	updateCardTool,
@@ -34,6 +35,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
 	checkDecisionTool,
 	openSessionTool,
 	finishTaskTool,
+	organizeSessionsTool,
 	postCardTool,
 	updateCardTool,
 	withdrawCardTool,
@@ -47,7 +49,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
 export function toolsFor(
 	session: Session,
 	tools: ToolDefinition[] = ALL_TOOLS,
-	roles: Roles = { canPostCards: false },
+	roles: Roles = { canPostCards: false, canOrganize: false },
 ): ToolDefinition[] {
 	return tools.filter(
 		(tool) =>

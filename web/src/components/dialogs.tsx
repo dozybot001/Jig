@@ -251,6 +251,7 @@ export function SessionSettingsDialog({
 	const savedQuota = session.options.letterQuota ? String(session.options.letterQuota) : "";
 	const [quota, setQuota] = useState(savedQuota);
 	const [canPost, setCanPost] = useState(session.options.canPostCards === true);
+	const [canOrganize, setCanOrganize] = useState(session.options.canOrganize === true);
 	const roleId = useId();
 	const compactId = useId();
 	const compactErrorId = useId();
@@ -265,6 +266,7 @@ export function SessionSettingsDialog({
 				receive,
 				letterQuota: quota.trim() ? Number(quota) : null,
 				canPostCards: canPost,
+				canOrganize,
 			},
 		});
 		onClose();
@@ -276,7 +278,8 @@ export function SessionSettingsDialog({
 		JSON.stringify(rules) !== JSON.stringify(session.rules) ||
 		receive !== (session.options.receive ?? "accept") ||
 		quota !== savedQuota ||
-		canPost !== (session.options.canPostCards === true);
+		canPost !== (session.options.canPostCards === true) ||
+		canOrganize !== (session.options.canOrganize === true);
 	return (
 		<Dialog
 			title={t("sessionSettings")}
@@ -334,12 +337,20 @@ export function SessionSettingsDialog({
 				</span>
 			</Field>
 			{!isMain && (
-				<Switch
-					label={t("canPostCards")}
-					info={t("canPostCardsHint")}
-					checked={canPost}
-					onChange={setCanPost}
-				/>
+				<>
+					<Switch
+						label={t("canPostCards")}
+						info={t("canPostCardsHint")}
+						checked={canPost}
+						onChange={setCanPost}
+					/>
+					<Switch
+						label={t("canOrganize")}
+						info={t("canOrganizeHint")}
+						checked={canOrganize}
+						onChange={setCanOrganize}
+					/>
+				</>
 			)}
 			<Field
 				label={t("compactAt")}

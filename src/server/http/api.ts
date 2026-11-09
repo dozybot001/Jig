@@ -250,7 +250,10 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			thinking: optEnum(fields, "thinking", THINKING_LEVELS) ?? settings.defaultModel.thinking,
 			// New sessions start with no remembered approvals; "always allow" adds them.
 			rules: [],
-			options: { permissionMode: "auto" },
+			// Named after the first message (the home page): Jig gives it a short name after one turn.
+			options: optBoolean(fields, "autoName")
+				? { permissionMode: "auto", autoName: true }
+				: { permissionMode: "auto" },
 		});
 		return c.json(session, 201);
 	});
@@ -315,14 +318,18 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 				throw invalid("letterQuota must be a whole number from 1 to 100, or null.", "options");
 			}
 			const canPostCards = optBoolean(options, "canPostCards");
+			const canOrganize = optBoolean(options, "canOrganize");
 			const next: SessionOptions = {};
 			if (compactAt !== undefined) next.compactAt = compactAt as number | null;
 			if (permissionMode !== undefined) next.permissionMode = permissionMode;
 			if (receive !== undefined) next.receive = receive;
 			if (letterQuota !== undefined) next.letterQuota = letterQuota as number | null;
 			if (canPostCards !== undefined) next.canPostCards = canPostCards;
+			if (canOrganize !== undefined) next.canOrganize = canOrganize;
 			patch.options = next;
 		}
+		// A name the person chose is not replaced by Jig's automatic one.
+		if (patch.name !== undefined) patch.options = { ...patch.options, autoName: false };
 		const pinned = optBoolean(fields, "pinned");
 		if (pinned !== undefined) patch.pinned = pinned;
 		const archived = optBoolean(fields, "archived");

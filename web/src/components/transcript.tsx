@@ -18,7 +18,17 @@ import { answerApproval, loadEarlier, markRead, selectSession, toolCallFor } fro
 import { type MessageKey, t, useLang } from "../i18n.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
 import { Capped, Diff, Markdown, ScrollBlock, useStickToBottom } from "./content.tsx";
-import { ChevronIcon, DecisionIcon, MailIcon, QuestionIcon, ShieldIcon } from "./icons.tsx";
+import {
+	CheckAllIcon,
+	CheckIcon,
+	ChevronIcon,
+	DecisionIcon,
+	MailIcon,
+	QuestionIcon,
+	RefuseIcon,
+	SendIcon,
+	ShieldIcon,
+} from "./icons.tsx";
 import { Button, ErrorBox, useAction } from "./ui.tsx";
 
 function resultText(result: ToolResultMessage | undefined): string {
@@ -162,6 +172,7 @@ export function PermissionCard({ approval }: { approval: Approval }) {
 			{/* Allow, always allow (the rule is in the label), decline: in Claude's order. */}
 			<div className="request-actions">
 				<Button variant="primary" busy={action.busy} onClick={() => void action.run("allow_once")}>
+					<CheckIcon />
 					{t("approve")}
 				</Button>
 				{rules && (
@@ -171,6 +182,7 @@ export function PermissionCard({ approval }: { approval: Approval }) {
 						onClick={() => void action.run("allow_always")}
 						title={t("rememberAs", { rules })}
 					>
+						<CheckAllIcon />
 						{t("approveAlways", { rules })}
 					</Button>
 				)}
@@ -179,6 +191,7 @@ export function PermissionCard({ approval }: { approval: Approval }) {
 					busy={action.busy}
 					onClick={() => (denying ? void action.run("deny") : setDenying(true))}
 				>
+					<RefuseIcon />
 					{denying ? t("confirmDeny") : t("deny")}
 				</Button>
 			</div>
@@ -236,6 +249,7 @@ export function QuestionCard({ approval }: { approval: Approval }) {
 					disabled={!text.trim()}
 					onClick={() => void action.run(text.trim())}
 				>
+					<SendIcon />
 					{t("answer")}
 				</Button>
 			</div>

@@ -356,6 +356,26 @@ describe("api: approval center and letters", () => {
 		}
 	});
 
+	test("a session from the home page is named by Jig once; a name the person picks stays", async () => {
+		const { call } = setup();
+		const started = await (
+			await call("POST", "/api/sessions", { name: "帮我看看这个仓库…", autoName: true })
+		).json();
+		assert.equal(started.options.autoName, true);
+		const renamed = await (
+			await call("PATCH", `/api/sessions/${started.id}`, { name: "仓库体检" })
+		).json();
+		assert.equal(renamed.options.autoName, false);
+		const plain = await (await call("POST", "/api/sessions", { name: "总办" })).json();
+		assert.equal(plain.options.autoName, undefined);
+		const allowed = await (
+			await call("PATCH", `/api/sessions/${plain.id}`, { options: { canOrganize: true } })
+		).json();
+		assert.equal(allowed.options.canOrganize, true);
+		const bad = await call("PATCH", `/api/sessions/${plain.id}`, { options: { canOrganize: 1 } });
+		assert.equal(bad.status, 400);
+	});
+
 	test("the person decides a card; held letters are released or refused", async () => {
 		const { store, call } = setup();
 		const { main, product } = await twoSessions(call);

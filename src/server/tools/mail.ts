@@ -9,6 +9,7 @@ import {
 	errorResult,
 	int,
 	type MailContext,
+	type OrganizeChange,
 	str,
 	type ToolDefinition,
 	ToolInputError,
@@ -135,7 +136,7 @@ function letterDetail(mail: MailContext, letter: Letter) {
 export const listSessionsTool: ToolDefinition = {
 	name: "list_sessions",
 	description:
-		"List the sessions that can receive letters: id, name, kind, status, group, and the first line of each role. Letters are addressed by id.",
+		"List the sessions that can receive letters (id, name, kind, status, team, and the first line of each role) and the teams. Letters are addressed by id.",
 	parameters: { type: "object", properties: {}, additionalProperties: false },
 	readOnly: true,
 	needsFolder: false,
@@ -154,7 +155,14 @@ export const listSessionsTool: ToolDefinition = {
 				group: session.groupId ? (groups.get(session.groupId) ?? null) : null,
 			}),
 		);
-		return { content: [text(`Sessions (id · name · kind · status):\n${lines.join("\n")}`)] };
+		const teams = [...groups].map(([id, name]) => `- ${id} · ${name}`);
+		return {
+			content: [
+				text(
+					`Sessions (id · name · kind · status):\n${lines.join("\n")}\n\nTeams (id · name):\n${teams.length > 0 ? teams.join("\n") : "(none)"}`,
+				),
+			],
+		};
 	},
 };
 
@@ -309,6 +317,137 @@ export const openSessionTool: ToolDefinition = {
 				),
 			],
 			detail,
+		};
+	},
+};
+
+const ORGANIZE_ACTIONS = ["rename_session", "create_team", "rename_team", "move_to_team"] as const;
+
+/** The changes an organize_sessions call asks for, checked for shape; the runner checks the rest. */
+function organizeChanges(args: Record<string, unknown>): OrganizeChange[] {
+	const list = args.changes;
+	if (!Array.isArray(list) || list.length === 0)
+		throw new ToolInputError("changes must list at least one change.");
+	if (list.length > 50) throw new ToolInputError("Give at most 50 changes in one call.");
+	return list.map((item, index) => {
+		if (!item || typeof item !== "object")
+			throw new ToolInputError(`changes[${index}] must be an object.`);
+		const change = item as Record<string, unknown>;
+		const action = choice(change, "action", ORGANIZE_ACTIONS);
+		const field = (key: string) => {
+			const value = change[key];
+			if (typeof value !== "string" || !value.trim()) {
+				throw new ToolInputError(`changes[${index}].${key} is required for ${action}.`);
+			}
+			return value.trim();
+		};
+		switch (action) {
+			case "rename_session":
+				return { action, session: field("session"), name: field("name") };
+			case "create_team":
+				return { action, name: field("name") };
+			case "rename_team":
+				return { action, team: field("team"), name: field("name") };
+			case "move_to_team": {
+				const sessions = change.sessions;
+				if (
+					!Array.isArray(sessions) ||
+					sessions.length === 0 ||
+					sessions.some((id) => typeof id !== "string")
+				) {
+					throw new ToolInputError(`changes[${index}].sessions must list session ids.`);
+				}
+				const team =
+					typeof change.team === "string" && change.team.trim() ? change.team.trim() : null;
+				return { action, sessions: sessions as string[], team };
+			}
+			default:
+				throw new ToolInputError(
+					`changes[${index}].action must be one of: ${ORGANIZE_ACTIONS.join(", ")}.`,
+				);
+		}
+	});
+}
+
+/** One line per change, with session names, for the person's approval and the result. */
+function describeChange(change: OrganizeChange, names: (id: string) => string | null): string {
+	const name = (id: string) => `"${names(id) ?? id}"`;
+	switch (change.action) {
+		case "rename_session":
+			return `Rename ${name(change.session)} to "${change.name}"`;
+		case "create_team":
+			return `Create the team "${change.name}"`;
+		case "rename_team":
+			return `Rename the team "${change.team}" to "${change.name}"`;
+		case "move_to_team":
+			return change.team
+				? `Move ${change.sessions.map(name).join(", ")} into the team "${change.team}"`
+				: `Take ${change.sessions.map(name).join(", ")} out of their team`;
+	}
+}
+
+export const organizeSessionsTool: ToolDefinition = {
+	name: "organize_sessions",
+	description:
+		"Keep the person's sessions in order: rename sessions, create and rename teams, and move sessions into or out of teams. Put every change in one call; Jig checks them all and applies all or none. Name sessions by id and teams by id or exact name (list_sessions shows both); a team created earlier in the call can be used by name. Working folders, models, permissions and how sessions receive letters stay the person's.",
+	parameters: {
+		type: "object",
+		properties: {
+			changes: {
+				type: "array",
+				minItems: 1,
+				maxItems: 50,
+				items: {
+					type: "object",
+					properties: {
+						action: { type: "string", enum: [...ORGANIZE_ACTIONS] },
+						session: { type: "string", description: "rename_session: the session's id." },
+						sessions: {
+							type: "array",
+							items: { type: "string" },
+							description: "move_to_team: the sessions' ids.",
+						},
+						team: {
+							type: "string",
+							description:
+								"rename_team, move_to_team: the team's id or exact name. For move_to_team, leave it out to take the sessions out of their team.",
+						},
+						name: {
+							type: "string",
+							description: "rename_session, create_team, rename_team: the new name.",
+						},
+					},
+					required: ["action"],
+					additionalProperties: false,
+				},
+			},
+			confirm: CONFIRM_ARGUMENT,
+		},
+		required: ["changes"],
+		additionalProperties: false,
+	},
+	readOnly: false,
+	needsFolder: false,
+	offered: (_session, roles) => roles.canOrganize,
+	subject(args, _session, names = () => null) {
+		const lines = organizeChanges(args).map((change) => `- ${describeChange(change, names)}`);
+		return {
+			kind: "act",
+			tool: "organize_sessions",
+			summary: `Organize sessions:\n${lines.join("\n")}`,
+		};
+	},
+	async run(args, ctx): Promise<ToolResult> {
+		const done = attempt(() => ctx.mail.organize(organizeChanges(args)));
+		return {
+			content: [
+				text(
+					done.length > 0
+						? `Done:\n${done.map((line) => `- ${line}`).join("\n")}`
+						: "Nothing needed changing.",
+				),
+			],
+			detail: { changes: done.length },
 		};
 	},
 };

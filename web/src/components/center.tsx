@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { bodyAfterSummary, plainLine } from "../../../src/shared/messages.ts";
 import type { Approval, Card, Letter } from "../../../src/shared/types.ts";
 import {
@@ -13,7 +13,15 @@ import {
 import { formatAgo, type MessageKey, t, useLang } from "../i18n.ts";
 import { type CenterTab, centerCount, useAppState } from "../state.ts";
 import { Capped, Markdown } from "./content.tsx";
-import { ChevronIcon, DecisionIcon, MailIcon } from "./icons.tsx";
+import {
+	CenterIcon,
+	CheckIcon,
+	ChevronIcon,
+	DecisionIcon,
+	MailIcon,
+	RefuseIcon,
+	SendIcon,
+} from "./icons.tsx";
 import { SidebarToggle } from "./session.tsx";
 import { PermissionCard, QuestionCard } from "./transcript.tsx";
 import { Button, ErrorBox, useAction } from "./ui.tsx";
@@ -148,6 +156,7 @@ function DecisionCard({ card }: { card: Card }) {
 					disabled={!ready}
 					onClick={() => void send.run()}
 				>
+					<SendIcon />
 					{t("send")}
 				</Button>
 			</div>
@@ -180,9 +189,11 @@ function HeldLetter({ letter }: { letter: Letter }) {
 			</p>
 			<div className="request-actions">
 				<Button variant="primary" busy={release.busy} onClick={() => void release.run()}>
+					<CheckIcon />
 					{t("release")}
 				</Button>
 				<Button variant="danger" busy={refuse.busy} onClick={() => void refuse.run()}>
+					<RefuseIcon />
 					{t("refuse")}
 				</Button>
 			</div>
@@ -206,24 +217,95 @@ function PendingApproval({ approval }: { approval: Approval }) {
 }
 
 /** One decision in the record: what was asked, what you chose and your note, marked as yours. */
+/** A translated sentence with a link in place of {name}. */
+function WithLink({ text, link }: { text: string; link: ReactNode }) {
+	const [before = "", after = ""] = text.split("\u0000");
+	return (
+		<span>
+			{before}
+			{link}
+			{after}
+		</span>
+	);
+}
+
+/**
+ * One decision on one line: its number, the question, what you chose and when. Clicking the line
+ * unfolds it in place, in the same card: the context, the options with your choice and the recommended
+ * one, your note, then who asked and who put it up.
+ */
 function DecisionRecord({ card, now }: { card: Card; now: number }) {
 	useLang();
-	const chosen = card.choice === null ? null : card.options[card.choice]?.label;
+	const [open, setOpen] = useState(false);
+	const panel = useId();
+	const chosen = card.choice === null ? null : (card.options[card.choice]?.label ?? null);
 	return (
-		<li className="letter-row decision-record">
-			<div className="letter-row-head">
-				<span className="recent-head">
-					<DecisionIcon />#{card.number}
+		<li className="letter-item" data-open={open}>
+			<button
+				type="button"
+				className="letter-line"
+				aria-expanded={open}
+				aria-controls={panel}
+				onClick={() => setOpen((value) => !value)}
+			>
+				<span className="letter-line-route">#{card.number}</span>
+				<span className="letter-line-summary">{card.title}</span>
+				<span className="tag">{chosen ?? t("noteOnly")}</span>
+				<span className="letter-line-meta">
+					<span className="session-time">{formatAgo(card.decidedAt ?? card.updatedAt, now)}</span>
 				</span>
-				<span className="tag">{t("byYou")}</span>
-				{card.requestedBy && <SessionLink id={card.requestedBy} />}
-				<span className="session-time">{formatAgo(card.decidedAt ?? card.updatedAt, now)}</span>
-			</div>
-			<p className="letter-summary">{card.title}</p>
-			<p className="letter-note">
-				{chosen ? t("decidedChoice", { c: chosen }) : t("noteOnly")}
-				{card.note ? ` · ${card.note}` : ""}
-			</p>
+				<ChevronIcon />
+			</button>
+			{open && (
+				<div className="letter-panel" id={panel}>
+					<Capped className="letter-content" label={card.title}>
+						<p className="letter-summary">{card.title}</p>
+						{card.context && <Markdown text={card.context} breaks />}
+						{card.options.length > 0 && (
+							<ul className="record-options" aria-label={t("cardOptions")}>
+								{card.options.map((option, index) => (
+									<li
+										// biome-ignore lint/suspicious/noArrayIndexKey: a card's options never change order, and labels may repeat
+										key={index}
+										data-chosen={index === card.choice}
+									>
+										<span className="record-check" aria-hidden="true">
+											{index === card.choice ? "✓" : ""}
+										</span>
+										<span>
+											{option.label}
+											{index === card.choice && (
+												<span className="visually-hidden">{t("chosenMark")}</span>
+											)}
+										</span>
+										{index === card.recommended && <span className="tag">{t("recommended")}</span>}
+									</li>
+								))}
+							</ul>
+						)}
+						{card.note && (
+							<p>
+								{t("cardNote")}：{card.note}
+							</p>
+						)}
+					</Capped>
+					<div className="letter-row-head">
+						<span>{t("byYou")}</span>
+						{card.requestedBy && (
+							<WithLink
+								text={t("cardFrom", { name: "\u0000" })}
+								link={<SessionLink id={card.requestedBy} />}
+							/>
+						)}
+						{card.createdBy && card.createdBy !== card.requestedBy && (
+							<WithLink
+								text={t("cardPostedBy", { name: "\u0000" })}
+								link={<SessionLink id={card.createdBy} />}
+							/>
+						)}
+					</div>
+				</div>
+			)}
 		</li>
 	);
 }
@@ -237,7 +319,7 @@ function DecisionList() {
 	if (decisions.items.length === 0) return <p className="empty-box">{t("decisionsEmpty")}</p>;
 	return (
 		<>
-			<ul className="letter-list">
+			<ul className="letter-list decision-lines">
 				{decisions.items.map((card) => (
 					<DecisionRecord key={card.id} card={card} now={now} />
 				))}
@@ -401,6 +483,11 @@ export function CenterPage() {
 		decided: t("tabDecided"),
 		letters: t("tabLetters"),
 	};
+	const icon: Record<CenterTab, ReactNode> = {
+		pending: <CenterIcon />,
+		decided: <DecisionIcon />,
+		letters: <MailIcon />,
+	};
 	// Arrow keys move between tabs, as in any tab list (WAI-ARIA).
 	const onKeyDown = (event: React.KeyboardEvent) => {
 		const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
@@ -441,6 +528,7 @@ export function CenterPage() {
 								onKeyDown={onKeyDown}
 								onClick={() => openCenter(name)}
 							>
+								{icon[name]}
 								{label[name]}
 								{name === "pending" && count > 0 ? <span className="badge">{count}</span> : null}
 							</button>

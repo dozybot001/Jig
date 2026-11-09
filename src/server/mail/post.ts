@@ -201,6 +201,11 @@ export class PostOffice {
 		return session.id === this.mainSessionId() || session.options.canPostCards === true;
 	}
 
+	/** Sessions that may rename sessions and teams and move sessions between teams. */
+	canOrganize(session: Session): boolean {
+		return session.id === this.mainSessionId() || session.options.canOrganize === true;
+	}
+
 	letterQuota(session: Session): number {
 		return letterQuotaOf(session.options, session.id === this.mainSessionId());
 	}

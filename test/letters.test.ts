@@ -943,3 +943,164 @@ describe("when things go wrong", () => {
 		await until(() => !agents.isRunning(b.id));
 	});
 });
+
+describe("organizing sessions", () => {
+	test("the main conversation renames and groups sessions in one call; a bad change leaves all as it was", async () => {
+		const { store, agents, make, script, seen, said } = harness();
+		const main = make("总办", { options: { permissionMode: "manual" } });
+		const a = make("甲");
+		const b = make("乙");
+		store.setSetting("mainSessionId", main.id);
+		script(main, [
+			toolUse(
+				fauxToolCall(
+					"organize_sessions",
+					{
+						changes: [
+							{ action: "create_team", name: "产品" },
+							{ action: "move_to_team", sessions: [a.id, b.id], team: "产品" },
+							{ action: "rename_session", session: a.id, name: "甲 · 产品" },
+						],
+					},
+					{ id: "o1" },
+				),
+			),
+			toolUse(
+				fauxToolCall(
+					"organize_sessions",
+					{
+						changes: [
+							{ action: "create_team", name: "临时" },
+							{ action: "rename_session", session: b.id, name: "甲 · 产品" },
+						],
+					},
+					{ id: "o2" },
+				),
+			),
+			fauxAssistantMessage("整理好了"),
+		]);
+		agents.send(main.id, "把甲和乙放进产品团队");
+		// Manual approval: the person reads the changes with the sessions' names.
+		await until(() => store.pendingApprovals(main.id).length === 1);
+		const [approval] = store.pendingApprovals(main.id);
+		const summary = String((approval?.request as { summary?: string } | undefined)?.summary);
+		assert.match(summary, /Move "甲", "乙" into the team "产品"/);
+		assert.match(summary, /Rename "甲" to "甲 · 产品"/);
+		agents.answer(approval?.id as string, { decision: "allow_once" });
+		await until(() => store.pendingApprovals(main.id).length === 1);
+		const [second] = store.pendingApprovals(main.id);
+		agents.answer(second?.id as string, { decision: "allow_once" });
+		await until(() => said(main).some((text) => text.includes("整理好了")));
+
+		const team = store.listGroups().find((group) => group.name === "产品");
+		assert.ok(team);
+		assert.equal(store.getSession(a.id).name, "甲 · 产品");
+		assert.equal(store.getSession(a.id).groupId, team.id);
+		assert.equal(store.getSession(b.id).groupId, team.id);
+		assert.match(
+			lastTool(seen.get("总办")?.[1]),
+			/Created the team \\"产品\\"[\s\S]*Moved \\"乙\\" into the team \\"产品\\"/,
+		);
+		// The second call failed on a taken name: the team it created first is not there either.
+		assert.match(lastTool(seen.get("总办")?.[2]), /already exists/);
+		assert.ok(!store.listGroups().some((group) => group.name === "临时"));
+		assert.equal(store.getSession(b.id).name, "乙");
+		// Other sessions are not offered the tool unless the person allows it.
+		const mainTools = (seen.get("总办")?.[0]?.messages[0]?.toolsAdded ?? []).map((t) => t.name);
+		assert.ok(mainTools.includes("organize_sessions"));
+		script(b, [fauxAssistantMessage("好")]);
+		agents.send(b.id, "你好");
+		await until(() => said(b).length === 1);
+		const otherTools = (seen.get("乙")?.[0]?.messages[0]?.toolsAdded ?? []).map((t) => t.name);
+		assert.ok(!otherTools.includes("organize_sessions"));
+	});
+
+	test("a renamed or moved session hears it as an update; its prompt stays the same", async () => {
+		const { store, agents, make, script, seen, said } = harness();
+		const x = make("旧名");
+		script(x, [fauxAssistantMessage("第一轮"), fauxAssistantMessage("第二轮")]);
+		agents.send(x.id, "开始");
+		await until(() => said(x).length === 1);
+		await agents.whenIdle(x.id);
+		const team = store.createGroup("平台");
+		store.updateSession(x.id, { name: "新名", groupId: team.id });
+		agents.send(x.id, "继续");
+		await until(() => said(x).length === 2);
+		const [first, second] = seen.get("旧名") ?? [];
+		assert.equal(first?.messages[0]?.content, second?.messages[0]?.content, "same system prompt");
+		const update = textOf(second?.messages.filter((m) => m.role === "system").slice(1));
+		assert.match(update, /Your name is now \\"新名\\"/);
+		assert.match(update, /You now belong to the team \\"平台\\"/);
+	});
+
+	test("a session started from the home page gets a short name after its first turn", async () => {
+		const { store, agents, make, script, said } = harness();
+		const x = make("帮我看看这个仓库里有哪些地方需要…", {
+			options: { permissionMode: "auto", autoName: true },
+		});
+		const kept = make("我起的名字", { options: { permissionMode: "auto" } });
+		script(x, [fauxAssistantMessage("看了，主要有三处")]);
+		script(kept, [fauxAssistantMessage("好")]);
+		// The naming request has a system prompt of its own, without a session's name.
+		script({ name: "" } as Session, [fauxAssistantMessage("「仓库体检」")]);
+		agents.send(x.id, "帮我看看这个仓库里有哪些地方需要整理");
+		agents.send(kept.id, "你好");
+		await until(() => store.getSession(x.id).name === "仓库体检");
+		assert.equal(store.getSession(x.id).options.autoName, false);
+		await until(() => said(kept).length === 1);
+		await agents.whenIdle(kept.id);
+		assert.equal(store.getSession(kept.id).name, "我起的名字");
+	});
+});
+
+describe("deleting archived sessions", () => {
+	test("archived sessions go with their data; letters they sent stay; a working one is kept", async () => {
+		const { store, agents, make, script } = harness();
+		const kept = make("留下的");
+		const gone = make("要删的");
+		const busy = make("还在干活的");
+		store.appendEntry(gone.id, {
+			role: "user",
+			message: { role: "user", content: "可以搜到的旧消息", timestamp: Date.now() },
+		});
+		const letter = (from: Session, to: Session) =>
+			agents.post.mail.addLetter({
+				fromKind: "session",
+				fromSession: from.id,
+				fromName: from.name,
+				toSession: to.id,
+				kind: "notice",
+				summary: `${from.name} 写给 ${to.name}`,
+				body: "",
+				status: "done",
+			});
+		const toGone = letter(kept, gone);
+		const fromGone = letter(gone, kept);
+		let release: () => void = () => {};
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		script(busy, [
+			async () => {
+				await gate;
+				return fauxAssistantMessage("做完了");
+			},
+		]);
+		agents.send(busy.id, "开始");
+		await until(() => agents.isRunning(busy.id));
+		store.updateSession(gone.id, { archived: true });
+		store.updateSession(busy.id, { archived: true });
+		assert.equal(store.search("可以搜到", 10).hits.length, 1);
+
+		assert.deepEqual(agents.deleteArchived(), [gone.id]);
+		assert.throws(() => store.getSession(gone.id));
+		assert.equal(store.search("可以搜到", 10).hits.length, 0);
+		assert.throws(() => agents.post.mail.getLetter(toGone.id));
+		assert.equal(agents.post.mail.getLetter(fromGone.id).fromSession, null);
+		assert.equal(agents.post.mail.getLetter(fromGone.id).fromName, "要删的");
+		assert.equal(store.getSession(busy.id).archivedAt !== null, true, "still working, so kept");
+		assert.equal(store.getSession(kept.id).name, "留下的");
+		release();
+		await agents.whenIdle(busy.id);
+	});
+});

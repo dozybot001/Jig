@@ -1,7 +1,10 @@
 import { useEffect, useId, useState } from "react";
+import type { Session } from "../../../src/shared/types.ts";
 import {
+	deleteArchivedSessions,
 	deleteCustomProvider,
 	deleteKey,
+	loadArchived,
 	openSettings,
 	saveCustomProvider,
 	saveKey,
@@ -12,13 +15,16 @@ import { type ProviderSummary, setState, useAppState } from "../state.ts";
 import { ConfirmDialog } from "./dialogs.tsx";
 import {
 	ChevronIcon,
+	DataIcon,
 	GearIcon,
 	InfoIcon,
 	JigMark,
 	KeyIcon,
+	LanguageIcon,
 	MailIcon,
 	PlusIcon,
 	SlidersIcon,
+	ThemeIcon,
 } from "./icons.tsx";
 import { ModelPicker } from "./session.tsx";
 import { Button, Dialog, ErrorBox, Field, Menu, type MenuEntry, Switch, useAction } from "./ui.tsx";
@@ -410,6 +416,7 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 	useLang();
 	const settings = useAppState((state) => state.settings);
 	const [open, setOpen] = useState(false);
+	const [deleting, setDeleting] = useState(false);
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if ((event.metaKey || event.ctrlKey) && event.key === ",") {
@@ -424,9 +431,17 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 		void saveSettings(patch).catch(() => {});
 	const theme = settings?.theme ?? "system";
 	const language = settings?.language ?? "system";
+	const languages = [
+		{ id: "language-system", label: t("language_system"), value: "system" as const },
+		{ id: "language-zh", label: "简体中文", value: "zh" as const },
+		{ id: "language-en", label: "English", value: "en" as const },
+	];
+	// Theme and language open beside the menu, as the session menu's submenus do; each shows its value.
 	const items: MenuEntry[] = [
 		{
-			group: t("theme"),
+			label: t("theme"),
+			detail: t(`theme_${theme}`),
+			icon: <ThemeIcon />,
 			items: (["system", "light", "dark"] as const).map((value) => ({
 				id: `theme-${value}`,
 				label: t(`theme_${value}`),
@@ -435,12 +450,10 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 			})),
 		},
 		{
-			group: t("language"),
-			items: [
-				{ id: "language-system", label: t("language_system"), value: "system" as const },
-				{ id: "language-zh", label: "简体中文", value: "zh" as const },
-				{ id: "language-en", label: "English", value: "en" as const },
-			].map(({ id, label, value }) => ({
+			label: t("language"),
+			detail: languages.find((option) => option.value === language)?.label ?? "",
+			icon: <LanguageIcon />,
+			items: languages.map(({ id, label, value }) => ({
 				id,
 				label,
 				checked: language === value,
@@ -450,6 +463,17 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 		{ separator: true, id: "line-1" },
 		{ label: t("providersMenu"), icon: <KeyIcon />, onSelect: () => openSettings("providers") },
 		{ label: t("defaultsMenu"), icon: <SlidersIcon />, onSelect: () => openSettings("defaults") },
+		{
+			label: t("dataMenu"),
+			icon: <DataIcon />,
+			items: [
+				{
+					label: t("deleteArchivedMenu"),
+					danger: true,
+					onSelect: () => setDeleting(true),
+				},
+			],
+		},
 		{ separator: true, id: "line-2" },
 		{ label: t("aboutMenu"), icon: <InfoIcon />, onSelect: () => openSettings("about") },
 		{
@@ -461,26 +485,80 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 		},
 	];
 	return (
-		<Menu
-			label={t("settings")}
-			items={items}
-			open={open}
-			onOpenChange={setOpen}
-			width={240}
-			trigger={
-				variant === "row"
-					? {
-							className: "nav-row",
-							title: `${t("settings")}（⌘,）`,
-							content: (
-								<>
-									<GearIcon />
-									{t("settings")}
-								</>
-							),
-						}
-					: { className: "btn btn-ghost btn-icon", title: t("settings"), content: <GearIcon /> }
+		<>
+			<Menu
+				label={t("settings")}
+				items={items}
+				open={open}
+				onOpenChange={setOpen}
+				width={240}
+				trigger={
+					variant === "row"
+						? {
+								className: "nav-row",
+								title: `${t("settings")}（⌘,）`,
+								content: (
+									<>
+										<GearIcon />
+										{t("settings")}
+									</>
+								),
+							}
+						: { className: "btn btn-ghost btn-icon", title: t("settings"), content: <GearIcon /> }
+				}
+			/>
+			{deleting && <DeleteArchivedDialog onClose={() => setDeleting(false)} />}
+		</>
+	);
+}
+
+/**
+ * Deletes every archived session for good. It says how many and which first, and that this cannot be
+ * undone (AGENTS.md: deleting data is confirmed by the person).
+ */
+function DeleteArchivedDialog({ onClose }: { onClose: () => void }) {
+	useLang();
+	const [archived, setArchived] = useState<Session[] | null>(null);
+	const [error, setError] = useState<unknown>(null);
+	useEffect(() => {
+		loadArchived().then(setArchived, setError);
+	}, []);
+	const remove = useAction(async () => {
+		await deleteArchivedSessions();
+		onClose();
+	});
+	const count = archived?.length ?? 0;
+	const names = (archived ?? []).slice(0, 5).map((session) => session.name);
+	return (
+		<Dialog
+			title={t("deleteArchivedTitle")}
+			size="s"
+			onClose={onClose}
+			footer={
+				<>
+					<Button onClick={onClose}>{t("cancel")}</Button>
+					{count > 0 && (
+						<Button variant="danger" busy={remove.busy} onClick={() => void remove.run()}>
+							{t("deleteArchivedConfirm", { n: count })}
+						</Button>
+					)}
+				</>
 			}
-		/>
+		>
+			{archived === null ? (
+				<p className="hint">{t("loading")}</p>
+			) : count === 0 ? (
+				<p>{t("noArchived")}</p>
+			) : (
+				<>
+					<p>{t("deleteArchivedBody", { n: count })}</p>
+					<p className="hint">
+						{names.join(t("listSeparator"))}
+						{count > names.length ? t("andMore", { n: count - names.length }) : ""}
+					</p>
+				</>
+			)}
+			<ErrorBox error={error ?? remove.error} />
+		</Dialog>
 	);
 }

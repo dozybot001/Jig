@@ -16,7 +16,9 @@ export type GlobalEvent =
 	| { type: "groups"; groups: Group[] }
 	| { type: "approval"; approval: Approval }
 	| { type: "letter"; letter: Letter }
-	| { type: "card"; card: Card };
+	| { type: "card"; card: Card }
+	/** Archived sessions the person deleted for good. */
+	| { type: "sessionsDeleted"; ids: string[] };
 
 export type BusEvent =
 	| { scope: "session"; sessionId: string; seq: number; event: SessionEvent }

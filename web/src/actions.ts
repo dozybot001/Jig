@@ -221,7 +221,21 @@ type GlobalEvent =
 	| { type: "groups"; groups: Group[] }
 	| { type: "approval"; approval: Approval }
 	| { type: "letter"; letter: Letter }
-	| { type: "card"; card: Card };
+	| { type: "card"; card: Card }
+	| { type: "sessionsDeleted"; ids: string[] };
+
+/** Drops deleted sessions from every list; a deleted session that is open closes. */
+function dropSessions(ids: string[]): void {
+	const gone = new Set(ids);
+	setState((current) => ({
+		sessions: Object.fromEntries(Object.entries(current.sessions).filter(([id]) => !gone.has(id))),
+		hasArchived: Object.values(current.sessions).some(
+			(session) => session.archivedAt !== null && !gone.has(session.id),
+		),
+	}));
+	const selected = getState().selectedId;
+	if (selected && gone.has(selected)) void selectSession(null);
+}
 
 function without<T>(record: Record<string, T>, id: string): Record<string, T> {
 	if (!(id in record)) return record;
@@ -234,6 +248,9 @@ function applyGlobalEvent(event: GlobalEvent): void {
 	switch (event.type) {
 		case "groups":
 			setState({ groups: event.groups });
+			return;
+		case "sessionsDeleted":
+			dropSessions(event.ids);
 			return;
 		case "sessionSummary":
 			setState((current) => ({
@@ -413,6 +430,8 @@ export interface NewSessionInput {
 	provider: string;
 	model: string;
 	thinking: ThinkingLevel;
+	/** Named after the first message; Jig gives it a short name after its first turn. */
+	autoName?: boolean;
 }
 
 export async function createSession(input: NewSessionInput): Promise<Session> {
@@ -448,6 +467,7 @@ export type SessionPatch = Partial<{
 		receive?: ReceivePolicy;
 		letterQuota?: number | null;
 		canPostCards?: boolean;
+		canOrganize?: boolean;
 	};
 	pinned: boolean;
 	archived: boolean;
@@ -508,6 +528,19 @@ export async function startSession(input: NewSessionInput, text: string): Promis
 	await sendMessage(session.id, text);
 	await selectSession(session.id);
 	return session;
+}
+
+/** The archived sessions, all of them, for the data settings. */
+export async function loadArchived(): Promise<Session[]> {
+	return all<Session>("/api/sessions?archived=true");
+}
+
+/** Deletes every archived session for good; the person confirmed it first. */
+export async function deleteArchivedSessions(): Promise<number> {
+	const result = await api<{ deleted: string[] }>("DELETE", "/api/sessions/archived");
+	dropSessions(result.deleted);
+	setState({ showArchived: false });
+	return result.deleted.length;
 }
 
 export async function toggleArchived(show: boolean): Promise<void> {

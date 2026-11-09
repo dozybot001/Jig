@@ -14,6 +14,9 @@ export function agentRoutes(
 	const app = new Hono<AppEnv>();
 	const once = idempotent(store.db);
 
+	// The person deletes all archived sessions for good (settings, data); the interface asks first.
+	app.delete("/sessions/archived", (c) => c.json({ deleted: agents.deleteArchived() }));
+
 	app.post("/sessions/:id/messages", once, async (c) => {
 		const fields = await readJson(c);
 		const result = agents.send(c.req.param("id"), reqString(fields, "text", 100_000));

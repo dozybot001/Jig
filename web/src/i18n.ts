@@ -456,6 +456,18 @@ const zh = {
 	lettersLeft: "到你下一条消息前还能发 {n} 封",
 	canPostCards: "可以直接往审批中心放卡片",
 	canPostCardsHint: "主对话总是可以；其他会话默认要经主对话转交。",
+	dataMenu: "数据管理",
+	deleteArchivedMenu: "删除所有归档会话…",
+	deleteArchivedTitle: "删除所有归档会话",
+	deleteArchivedBody:
+		"将永久删除 {n} 个归档会话，连同它们的对话记录、工具调用和收到的信，不能撤回。它们发出的信和提出的决定会保留。",
+	deleteArchivedConfirm: "永久删除 {n} 个",
+	noArchived: "没有归档的会话。",
+	andMore: " 等 {n} 个",
+	canOrganize: "可以整理会话",
+	canOrganizeHint:
+		"像主对话一样给会话改名、建团队、把会话移进团队；工作区、权限和收信方式仍只由你改。",
+	chosenMark: "（你选的）",
 	decisionLog: "决定记录文件",
 	decisionLogHelp: "每做一个决定，Jig 在这个 Markdown 文件末尾加一行，不改已有内容。留空就不同步。",
 	decisionLogPlaceholder: "例如 ~/Tenon-AI/docs/decisions.md",
@@ -922,6 +934,18 @@ const en: Record<MessageKey, string> = {
 	lettersLeft: "{n} left until your next message",
 	canPostCards: "Can put cards in the approval center",
 	canPostCardsHint: "The main conversation always can; other sessions go through it by default.",
+	dataMenu: "Data",
+	deleteArchivedMenu: "Delete all archived sessions…",
+	deleteArchivedTitle: "Delete all archived sessions",
+	deleteArchivedBody:
+		"This permanently deletes {n} archived sessions with their conversations, tool calls and the letters sent to them. It cannot be undone. Letters they sent and decisions they asked for stay.",
+	deleteArchivedConfirm: "Delete {n} for good",
+	noArchived: "There are no archived sessions.",
+	andMore: " and {n} more",
+	canOrganize: "Can organize sessions",
+	canOrganizeHint:
+		"Rename sessions, create teams and move sessions into them, as the main conversation can. Folders, permissions and how it receives letters stay yours to change.",
+	chosenMark: " (your choice)",
 	decisionLog: "Decision log file",
 	decisionLogHelp:
 		"Jig adds a line to the end of this Markdown file for each decision and leaves the rest alone. Leave it empty to turn this off.",

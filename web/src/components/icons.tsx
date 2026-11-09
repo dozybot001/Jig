@@ -1,16 +1,21 @@
 import {
 	ArrowUp,
+	Ban,
+	Check,
+	CheckCheck,
 	ChevronRight,
 	Circle,
 	CircleCheck,
 	CircleDot,
 	Code,
+	Database,
 	FileText,
 	Folder,
 	FolderPlus,
 	Inbox,
 	Info,
 	KeyRound,
+	Languages,
 	ListTodo,
 	Mail,
 	Menu,
@@ -24,12 +29,14 @@ import {
 	Play,
 	Plus,
 	Search,
+	Send,
 	Settings,
 	ShieldAlert,
 	SlidersHorizontal,
 	Square,
 	SquarePen,
 	Stamp,
+	SunMoon,
 	UserRoundPlus,
 	Users,
 	X,
@@ -75,6 +82,15 @@ export const TeamIcon = () => <Users {...props} />;
 /** New team, new workspace and new session look different where they stand side by side (the rail). */
 export const NewTeamIcon = () => <UserRoundPlus {...props} />;
 export const NewWorkspaceIcon = () => <FolderPlus {...props} />;
+/** Actions on cards: send an answer or decision, allow, allow always, refuse. */
+export const SendIcon = () => <Send {...props} />;
+export const CheckIcon = () => <Check {...props} />;
+export const CheckAllIcon = () => <CheckCheck {...props} />;
+export const RefuseIcon = () => <Ban {...props} />;
+export const ThemeIcon = () => <SunMoon {...props} />;
+export const LanguageIcon = () => <Languages {...props} />;
+/** Jig's data on this computer. */
+export const DataIcon = () => <Database {...props} />;
 /** A decision the person made. */
 export const DecisionIcon = () => <Stamp {...props} />;
 export const CollapseIcon = () => <PanelLeftClose {...props} />;
