@@ -475,7 +475,7 @@ function TodoCard({ session }: { session: Session }) {
 			>
 				<TodoIcon />
 				<span className="todo-count">{t("todoProgress", { done, total: todos.length })}</span>
-				{!open && current && <span className="todo-current">{current.text}</span>}
+				{current && <span className="todo-current">{current.text}</span>}
 				<ChevronIcon />
 			</button>
 			<ol id={listId} className="todo-list" hidden={!open}>

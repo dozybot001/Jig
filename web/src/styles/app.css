@@ -659,23 +659,28 @@ body.scroll-locked {
 .app.app-collapsed {
 	grid-template-columns: 56px minmax(0, 1fr);
 }
-/* The folded sidebar (as in ChatGPT and Yew): Jig's graphic, then the main actions as icons. */
+/*
+ * The folded sidebar (as in ChatGPT and Yew): Jig's graphic, then the main actions as icons. Folding and
+ * unfolding keeps the graphic and the icons where they were: centred 28 px from the left, the graphic
+ * 32 px from the top and the rows 42 px apart, as in the open sidebar. The edge is a shadow, not a
+ * border, so it does not shift the centre.
+ */
 .rail {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 4px;
+	gap: 2px;
 	min-height: 0;
-	padding: 10px 0 14px;
+	padding: 12px 0 14px;
 	background: var(--bg-side);
-	border-right: 1px solid var(--divider);
+	box-shadow: inset -1px 0 0 var(--divider);
 }
 .rail-brand {
 	display: grid;
 	place-items: center;
 	width: 40px;
 	height: 40px;
-	margin-bottom: 6px;
+	margin-bottom: 8px;
 	border: none;
 	border-radius: var(--radius-s);
 	background: transparent;
@@ -757,7 +762,8 @@ body.scroll-locked {
 	align-items: center;
 	justify-content: space-between;
 	min-height: 60px;
-	padding: 16px 12px 12px 20px;
+	/* The graphic's centre lines up with the icons below and with the folded rail (28 px). */
+	padding: 16px 12px 12px 17px;
 }
 .sidebar-nav {
 	display: grid;
@@ -1777,21 +1783,24 @@ button.about-row {
 	gap: 8px;
 }
 
-/* The task list floats over the transcript's top right and never narrows it. */
+/*
+ * The task list floats over the transcript's top right and never narrows it. Opening it does not move
+ * the line on top: the card keeps its width (set by that line, never by the list) and the line its
+ * content.
+ */
 .todo-card {
 	position: absolute;
 	top: 8px;
 	right: 16px;
 	z-index: 5;
-	max-width: calc(100% - 32px);
+	width: max-content;
+	min-width: min(220px, calc(100% - 32px));
+	max-width: min(360px, calc(100% - 32px));
 	border: 1px solid var(--divider);
 	border-radius: var(--radius-l);
 	background: var(--surface);
 	box-shadow: var(--shadow);
 	font-size: var(--fs-s);
-}
-.todo-card.open {
-	width: min(340px, calc(100% - 32px));
 }
 .todo-toggle {
 	display: flex;
@@ -1836,6 +1845,7 @@ button.about-row {
 	}
 }
 .todo-card ol {
+	contain: inline-size;
 	list-style: none;
 	margin: 0;
 	padding: 2px 12px 12px;
@@ -2018,28 +2028,25 @@ button.about-row {
 	font-size: var(--fs-s);
 }
 
-/* The right-hand drawer: over the conversation, which keeps its width (M2 plan, section 10). */
-.side-panel {
-	position: fixed;
-	top: 0;
-	right: 0;
-	bottom: 0;
-	z-index: 30;
-	width: min(440px, 100vw);
-	display: grid;
+/* The approval center: a page of its own in place of the session (blueprint section 8). */
+.center-main {
 	grid-template-rows: auto minmax(0, 1fr);
-	border-left: 1px solid var(--border);
-	background: var(--bg);
-	box-shadow: var(--shadow);
 }
-.side-panel-head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
-	min-height: 52px;
-	padding: 8px 10px 8px 14px;
-	border-bottom: 1px solid var(--divider);
+.center-body {
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding: 8px 20px 32px;
+}
+.center-inner,
+.center-panel {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	align-content: start;
+	gap: 18px;
+}
+.center-inner {
+	max-width: 760px;
+	margin: 0 auto;
 }
 .panel-tabs {
 	display: flex;
@@ -2067,15 +2074,6 @@ button.about-row {
 	.panel-tab[aria-selected="false"]:hover {
 		background: var(--hover);
 	}
-}
-.side-panel-body {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr);
-	align-content: start;
-	gap: 18px;
-	overflow-y: auto;
-	overscroll-behavior: contain;
-	padding: 16px 16px 28px;
 }
 .center-section {
 	display: grid;
@@ -2193,34 +2191,13 @@ button.about-row {
 	margin: 0;
 	overflow-wrap: anywhere;
 }
-.recent-decisions > summary {
-	cursor: pointer;
-	list-style: none;
-}
-.recent-decisions > summary::-webkit-details-marker {
-	display: none;
-}
-.recent-decisions h2 {
-	display: inline;
-}
-.recent-decisions ul {
-	display: grid;
-	gap: 10px;
-	margin: 10px 0 0;
-	padding: 0;
-	list-style: none;
-}
-.recent-decision {
-	display: grid;
-	gap: 2px;
-}
 .recent-head {
 	display: flex;
 	align-items: center;
 	gap: 6px;
 	font-weight: 500;
 }
-.recent-decision .recent-head svg {
+.decision-record .recent-head svg {
 	flex: none;
 	color: var(--text-3);
 }
@@ -2315,9 +2292,4 @@ button.about-row {
 .letter-card p,
 .decision-card p {
 	margin: 0;
-}
-/* The approval center's row stays marked while its drawer is open. */
-.nav-row[aria-expanded="true"] {
-	background: var(--selected);
-	font-weight: 600;
 }

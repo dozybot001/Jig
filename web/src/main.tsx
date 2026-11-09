@@ -1,7 +1,7 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { boot } from "./actions.ts";
-import { SidePanel } from "./components/center.tsx";
+import { CenterPage } from "./components/center.tsx";
 import { SessionView } from "./components/session.tsx";
 import { SettingsDialogs } from "./components/settings.tsx";
 import { Sidebar, SidebarRail, useNarrow } from "./components/sidebar.tsx";
@@ -18,6 +18,7 @@ function App() {
 	const collapsed = useAppState((state) => state.sidebarCollapsed);
 	const drawerOpen = useAppState((state) => state.drawerOpen);
 	const waiting = useAppState((state) => centerCount(state.center));
+	const page = useAppState((state) => state.page);
 	const narrow = useNarrow();
 	// The tab's title carries the approval center's count, so it shows in the tab strip.
 	useEffect(() => {
@@ -80,8 +81,7 @@ function App() {
 						onClick={() => setState({ drawerOpen: false })}
 					/>
 				)}
-				<SessionView />
-				<SidePanel />
+				{page === "center" ? <CenterPage /> : <SessionView />}
 				<SettingsDialogs />
 			</div>
 		</>

@@ -3,7 +3,7 @@ import type { Group, Session } from "../../../src/shared/types.ts";
 import {
 	deleteGroup,
 	exportSession,
-	openPanel,
+	openCenter,
 	saveSettings,
 	selectSession,
 	setMainSession,
@@ -411,9 +411,9 @@ function FixedEntries() {
 	useLang();
 	const mainId = useAppState((state) => state.settings?.mainSessionId ?? null);
 	const mainName = useAppState((state) => (mainId ? (state.sessions[mainId]?.name ?? null) : null));
-	const selected = useAppState((state) => state.selectedId);
+	const selected = useAppState((state) => (state.page ? null : state.selectedId));
 	const count = useAppState((state) => centerCount(state.center));
-	const open = useAppState((state) => state.panel === "center");
+	const open = useAppState((state) => state.page === "center");
 	return (
 		<>
 			{mainId && mainName && (
@@ -434,8 +434,8 @@ function FixedEntries() {
 			<button
 				type="button"
 				className="nav-row"
-				aria-expanded={open}
-				onClick={() => openPanel("center")}
+				aria-current={open ? "page" : undefined}
+				onClick={() => openCenter("pending")}
 			>
 				<CenterIcon />
 				<span className="nav-label">{t("approvalCenter")}</span>
@@ -543,6 +543,7 @@ export function SidebarRail() {
 	const mainId = useAppState((state) => state.settings?.mainSessionId ?? null);
 	const hasMain = useAppState((state) => (mainId ? Boolean(state.sessions[mainId]) : false));
 	const count = useAppState((state) => centerCount(state.center));
+	const onCenter = useAppState((state) => state.page === "center");
 	return (
 		<nav className="rail" aria-label={t("sessions")}>
 			<button
@@ -578,7 +579,8 @@ export function SidebarRail() {
 						: t("approvalCenter")
 				}
 				title={t("approvalCenter")}
-				onClick={() => openPanel("center")}
+				aria-current={onCenter ? "page" : undefined}
+				onClick={() => openCenter("pending")}
 			>
 				<CenterIcon />
 				{count > 0 && (
@@ -628,7 +630,8 @@ export function Sidebar() {
 	const narrow = useNarrow();
 	const sessions = useAppState((state) => state.sessions);
 	const groups = useAppState((state) => state.groups);
-	const selectedId = useAppState((state) => state.selectedId);
+	// On the approval center page no session is the current one.
+	const selectedId = useAppState((state) => (state.page ? null : state.selectedId));
 	const showArchived = useAppState((state) => state.showArchived);
 	const hasArchived = useAppState((state) => state.hasArchived);
 	const now = useNow();

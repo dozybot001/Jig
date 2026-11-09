@@ -22,6 +22,7 @@ import { ApiError, all, api, downloadFile } from "./api.ts";
 import { getLang, setLang, systemLang } from "./i18n.ts";
 import {
 	type CenterState,
+	type CenterTab,
 	getState,
 	type ModelInfo,
 	type ProviderSummary,
@@ -229,11 +230,14 @@ function applyGlobalEvent(event: GlobalEvent): void {
 						card.status === "pending"
 							? { ...current.center.cards, [card.id]: card }
 							: without(current.center.cards, card.id),
-					decided:
-						card.status === "decided"
-							? [card, ...current.center.decided.filter((c) => c.id !== card.id)].slice(0, 10)
-							: current.center.decided,
 				},
+				decisions:
+					card.status === "decided" && current.decisions.loaded
+						? {
+								...current.decisions,
+								items: [card, ...current.decisions.items.filter((c) => c.id !== card.id)],
+							}
+						: current.decisions,
 			}));
 			return;
 		}
@@ -325,7 +329,7 @@ export function openSettings(dialog: "providers" | "defaults" | "about"): void {
 }
 
 export async function selectSession(sessionId: string | null): Promise<void> {
-	setState({ selectedId: sessionId, transcript: null });
+	setState({ selectedId: sessionId, transcript: null, page: null });
 	remember(LAST_SESSION, sessionId);
 	if (!sessionId) {
 		connect(null, null);
@@ -485,32 +489,38 @@ export async function deleteGroup(groupId: string): Promise<void> {
 // --- the approval center and letters ---
 
 export async function loadCenter(): Promise<void> {
-	const [center, decided] = await Promise.all([
-		api<{ approvals: Approval[]; cards: Card[]; held: Letter[] }>("GET", "/api/center"),
-		api<Page<Card>>("GET", "/api/cards?status=decided&limit=10"),
-	]);
+	const center = await api<{ approvals: Approval[]; cards: Card[]; held: Letter[] }>(
+		"GET",
+		"/api/center",
+	);
 	const next: CenterState = {
 		approvals: indexBy(center.approvals),
 		cards: indexBy(center.cards),
 		held: indexBy(center.held),
-		decided: decided.items,
 	};
 	setState({ center: next });
 }
 
-/** The element that opened the drawer gets the focus back when it closes (spec 18.2). */
-let panelOpener: HTMLElement | null = null;
-
-export function openPanel(panel: "center" | "letters"): void {
-	if (!getState().panel) panelOpener = document.activeElement as HTMLElement | null;
-	setState({ panel, drawerOpen: false });
-	if (panel === "letters" && !getState().letters.loaded) void loadLetters();
+/** Opens the approval center page in place of the session (blueprint section 8). */
+export function openCenter(tab: CenterTab = getState().centerTab): void {
+	setState({ page: "center", centerTab: tab, drawerOpen: false });
+	if (tab === "letters" && !getState().letters.loaded) void loadLetters();
+	if (tab === "decided" && !getState().decisions.loaded) void loadDecisions();
 }
 
-export function closePanel(): void {
-	setState({ panel: null });
-	panelOpener?.focus();
-	panelOpener = null;
+export async function loadDecisions(more = false): Promise<void> {
+	const cursor = more ? getState().decisions.nextCursor : null;
+	const page = await api<Page<Card>>(
+		"GET",
+		`/api/cards?status=decided&limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+	);
+	setState((current) => ({
+		decisions: {
+			items: more ? [...current.decisions.items, ...page.items] : page.items,
+			nextCursor: page.nextCursor,
+			loaded: true,
+		},
+	}));
 }
 
 export async function loadLetters(more = false): Promise<void> {

@@ -1,18 +1,19 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import type { Approval, Card, Letter } from "../../../src/shared/types.ts";
 import {
-	closePanel,
 	decideCard,
+	loadDecisions,
 	loadLetters,
-	openPanel,
+	openCenter,
 	refuseLetter,
 	releaseLetter,
 	selectSession,
 } from "../actions.ts";
 import { formatAgo, type MessageKey, t, useLang } from "../i18n.ts";
-import { centerCount, useAppState } from "../state.ts";
+import { type CenterTab, centerCount, useAppState } from "../state.ts";
 import { Markdown } from "./content.tsx";
-import { CloseIcon, DecisionIcon, MailIcon } from "./icons.tsx";
+import { DecisionIcon, MailIcon } from "./icons.tsx";
+import { SidebarToggle } from "./session.tsx";
 import { PermissionCard, QuestionCard } from "./transcript.tsx";
 import { Button, ErrorBox, useAction } from "./ui.tsx";
 
@@ -25,14 +26,7 @@ function SessionLink({ id, fallback }: { id: string | null; fallback?: string })
 	const name = useSessionName(id);
 	if (!id || !name) return <span>{fallback ?? ""}</span>;
 	return (
-		<button
-			type="button"
-			className="link-button"
-			onClick={() => {
-				closePanel();
-				void selectSession(id);
-			}}
-		>
+		<button type="button" className="link-button" onClick={() => void selectSession(id)}>
 			{name}
 		</button>
 	);
@@ -206,21 +200,50 @@ function PendingApproval({ approval }: { approval: Approval }) {
 	);
 }
 
-function RecentDecision({ card }: { card: Card }) {
+/** One decision in the record: what was asked, what you chose and your note, marked as yours. */
+function DecisionRecord({ card, now }: { card: Card; now: number }) {
 	useLang();
-	const now = Date.now();
 	const chosen = card.choice === null ? null : card.options[card.choice]?.label;
 	return (
-		<li className="recent-decision">
-			<span className="recent-head">
-				<DecisionIcon />#{card.number} {card.title}
-			</span>
-			<span className="hint">
+		<li className="letter-row decision-record">
+			<div className="letter-row-head">
+				<span className="recent-head">
+					<DecisionIcon />#{card.number}
+				</span>
+				<span className="tag">{t("byYou")}</span>
+				{card.requestedBy && <SessionLink id={card.requestedBy} />}
+				<span className="session-time">{formatAgo(card.decidedAt ?? card.updatedAt, now)}</span>
+			</div>
+			<p className="letter-summary">{card.title}</p>
+			<p className="letter-note">
 				{chosen ? t("decidedChoice", { c: chosen }) : t("noteOnly")}
-				{card.note ? ` · ${card.note}` : ""} · {t("byYou")} ·{" "}
-				{formatAgo(card.decidedAt ?? card.updatedAt, now)}
-			</span>
+				{card.note ? ` · ${card.note}` : ""}
+			</p>
 		</li>
+	);
+}
+
+function DecisionList() {
+	useLang();
+	const decisions = useAppState((state) => state.decisions);
+	const more = useAction(() => loadDecisions(true));
+	const now = Date.now();
+	if (!decisions.loaded) return <p className="hint">{t("loading")}</p>;
+	if (decisions.items.length === 0) return <p className="empty-box">{t("decisionsEmpty")}</p>;
+	return (
+		<>
+			<ul className="letter-list">
+				{decisions.items.map((card) => (
+					<DecisionRecord key={card.id} card={card} now={now} />
+				))}
+			</ul>
+			{decisions.nextCursor && (
+				<Button busy={more.busy} onClick={() => void more.run()}>
+					{t("loadMore")}
+				</Button>
+			)}
+			<ErrorBox error={more.error} />
+		</>
 	);
 }
 
@@ -258,18 +281,6 @@ function CenterList() {
 						<HeldLetter key={letter.id} letter={letter} />
 					))}
 				</section>
-			)}
-			{center.decided.length > 0 && (
-				<details className="center-section recent-decisions">
-					<summary>
-						<h2>{t("recentDecisions")}</h2>
-					</summary>
-					<ul>
-						{center.decided.map((card) => (
-							<RecentDecision key={card.id} card={card} />
-						))}
-					</ul>
-				</details>
 			)}
 		</>
 	);
@@ -330,62 +341,83 @@ function LetterList() {
 	);
 }
 
+const TABS: CenterTab[] = ["pending", "decided", "letters"];
+
 /**
- * The right-hand drawer over the conversation (M2 plan, section 10): the approval center and all
- * letters. It does not replace the conversation; Escape or the close button puts it away.
+ * The approval center, a page of its own in place of the session (blueprint section 8). In a session
+ * you work on one thing; here you clear what every session is waiting for, then go back.
  */
-export function SidePanel() {
+export function CenterPage() {
 	useLang();
-	const panel = useAppState((state) => state.panel);
+	const tab = useAppState((state) => state.centerTab);
 	const count = useAppState((state) => centerCount(state.center));
-	const titleId = useId();
-	const tabs = useRef<HTMLDivElement>(null);
-	useEffect(() => {
-		if (!panel) return;
-		tabs.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus();
-		const onKey = (event: KeyboardEvent) => {
-			if (event.key === "Escape" && !document.querySelector("dialog[open]")) closePanel();
-		};
-		document.addEventListener("keydown", onKey);
-		return () => document.removeEventListener("keydown", onKey);
-	}, [panel]);
-	if (!panel) return null;
-	const tab = (id: "center" | "letters", label: string, badge?: number) => (
-		<button
-			type="button"
-			role="tab"
-			className="panel-tab"
-			aria-selected={panel === id}
-			aria-controls={`${titleId}-body`}
-			onClick={() => openPanel(id)}
-		>
-			{label}
-			{badge ? <span className="badge">{badge}</span> : null}
-		</button>
-	);
+	const id = useId();
+	const label: Record<CenterTab, string> = {
+		pending: t("tabPending"),
+		decided: t("tabDecided"),
+		letters: t("tabLetters"),
+	};
+	// Arrow keys move between tabs, as in any tab list (WAI-ARIA).
+	const onKeyDown = (event: React.KeyboardEvent) => {
+		const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+		if (!step) return;
+		event.preventDefault();
+		const next = TABS[(TABS.indexOf(tab) + step + TABS.length) % TABS.length] as CenterTab;
+		openCenter(next);
+		document.getElementById(`${id}-${next}`)?.focus();
+	};
 	return (
-		<aside className="side-panel" aria-labelledby={titleId}>
-			<header className="side-panel-head">
-				<h2 id={titleId} className="visually-hidden">
-					{panel === "center" ? t("approvalCenter") : t("tabLetters")}
-				</h2>
-				<div className="panel-tabs" role="tablist" ref={tabs}>
-					{tab("center", t("tabApprovals"), count)}
-					{tab("letters", t("tabLetters"))}
+		<main className="main center-main">
+			<header className="session-header">
+				<SidebarToggle />
+				<div className="session-title">
+					<h1>{t("approvalCenter")}</h1>
+					<span className="session-meta">
+						{count > 0 ? t("approvalCount", { n: count }) : t("centerEmpty")}
+					</span>
 				</div>
-				<Button variant="icon" aria-label={t("close")} title={t("close")} onClick={closePanel}>
-					<CloseIcon />
-				</Button>
 			</header>
 			<div
-				id={`${titleId}-body`}
-				className="side-panel-body"
-				role="tabpanel"
+				className="center-body"
 				// biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll area must be reachable by keyboard (spec 18.6)
 				tabIndex={0}
 			>
-				{panel === "center" ? <CenterList /> : <LetterList />}
+				<div className="center-inner">
+					<div className="panel-tabs" role="tablist" aria-label={t("approvalCenter")}>
+						{TABS.map((name) => (
+							<button
+								key={name}
+								id={`${id}-${name}`}
+								type="button"
+								role="tab"
+								className="panel-tab"
+								aria-selected={tab === name}
+								aria-controls={`${id}-panel`}
+								tabIndex={tab === name ? 0 : -1}
+								onKeyDown={onKeyDown}
+								onClick={() => openCenter(name)}
+							>
+								{label[name]}
+								{name === "pending" && count > 0 ? <span className="badge">{count}</span> : null}
+							</button>
+						))}
+					</div>
+					<div
+						id={`${id}-panel`}
+						className="center-panel"
+						role="tabpanel"
+						aria-labelledby={`${id}-${tab}`}
+					>
+						{tab === "pending" ? (
+							<CenterList />
+						) : tab === "decided" ? (
+							<DecisionList />
+						) : (
+							<LetterList />
+						)}
+					</div>
+				</div>
 			</div>
-		</aside>
+		</main>
 	);
 }

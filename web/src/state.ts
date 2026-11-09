@@ -28,16 +28,16 @@ export interface CenterState {
 	approvals: Record<string, Approval>;
 	cards: Record<string, Card>;
 	held: Record<string, Letter>;
-	/** The latest decisions, newest first. */
-	decided: Card[];
 }
 
-/** The letters tab: every letter, newest first, loaded a page at a time. */
-export interface LettersState {
-	items: Letter[];
+/** A list read a page at a time, newest first: all letters, or the decisions made. */
+export interface PagedList<T> {
+	items: T[];
 	nextCursor: string | null;
 	loaded: boolean;
 }
+
+export type CenterTab = "pending" | "decided" | "letters";
 
 /** A saved working folder. */
 export interface Workspace {
@@ -105,9 +105,14 @@ export interface AppState {
 	/** Narrow screens: the sidebar drawer is open. */
 	drawerOpen: boolean;
 	center: CenterState;
-	letters: LettersState;
-	/** The right-hand drawer: the approval center or the letters, over the conversation. */
-	panel: "center" | "letters" | null;
+	letters: PagedList<Letter>;
+	decisions: PagedList<Card>;
+	/**
+	 * The approval center is a page of its own: you go there to clear what waits across sessions, and
+	 * into a session to work on one thing (founder, 2026-11-09). Null shows the session or home.
+	 */
+	page: "center" | null;
+	centerTab: CenterTab;
 }
 
 /** How many things wait for the person: approvals, questions, cards and held letters. */
@@ -159,9 +164,11 @@ let state: AppState = {
 	homeFolder: null,
 	sidebarCollapsed: rememberedCollapse(),
 	drawerOpen: false,
-	center: { approvals: {}, cards: {}, held: {}, decided: [] },
+	center: { approvals: {}, cards: {}, held: {} },
 	letters: { items: [], nextCursor: null, loaded: false },
-	panel: null,
+	decisions: { items: [], nextCursor: null, loaded: false },
+	page: null,
+	centerTab: "pending",
 };
 
 const listeners = new Set<() => void>();
