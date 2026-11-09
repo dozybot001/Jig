@@ -1,9 +1,12 @@
 import { useId, useState } from "react";
-import type {
-	PermissionRule,
-	Session,
-	SessionKind,
-	ThinkingLevel,
+import {
+	letterQuotaOf,
+	type PermissionRule,
+	RECEIVE_POLICIES,
+	type ReceivePolicy,
+	type Session,
+	type SessionKind,
+	type ThinkingLevel,
 } from "../../../src/shared/types.ts";
 import { createGroup, createSession, renameGroup, updateSession } from "../actions.ts";
 import { ApiError } from "../api.ts";
@@ -18,6 +21,7 @@ import {
 	ErrorBox,
 	Field,
 	Select,
+	Switch,
 	Toggletip,
 	useAction,
 } from "./ui.tsx";
@@ -254,21 +258,37 @@ export function SessionSettingsDialog({
 		session.options.compactAt ? String(session.options.compactAt) : "",
 	);
 	const [rules, setRules] = useState(session.rules);
+	const isMain = useAppState((state) => state.settings?.mainSessionId === session.id);
+	const [receive, setReceive] = useState<ReceivePolicy>(session.options.receive ?? "accept");
+	const savedQuota = session.options.letterQuota ? String(session.options.letterQuota) : "";
+	const [quota, setQuota] = useState(savedQuota);
+	const [canPost, setCanPost] = useState(session.options.canPostCards === true);
 	const roleId = useId();
 	const compactId = useId();
 	const compactErrorId = useId();
+	const quotaId = useId();
+	const receiveId = useId();
 	const save = useAction(async () => {
 		await updateSession(session.id, {
 			responsibility,
 			rules,
-			options: { compactAt: compactAt.trim() ? Number(compactAt) : null },
+			options: {
+				compactAt: compactAt.trim() ? Number(compactAt) : null,
+				receive,
+				letterQuota: quota.trim() ? Number(quota) : null,
+				canPostCards: canPost,
+			},
 		});
 		onClose();
 	});
+	const left = Math.max(0, letterQuotaOf(session.options, isMain) - session.lettersSent);
 	const dirty =
 		responsibility !== session.responsibility ||
 		compactAt !== (session.options.compactAt ? String(session.options.compactAt) : "") ||
-		JSON.stringify(rules) !== JSON.stringify(session.rules);
+		JSON.stringify(rules) !== JSON.stringify(session.rules) ||
+		receive !== (session.options.receive ?? "accept") ||
+		quota !== savedQuota ||
+		canPost !== (session.options.canPostCards === true);
 	return (
 		<Dialog
 			title={t("sessionSettings")}
@@ -298,6 +318,41 @@ export function SessionSettingsDialog({
 				/>
 			</Field>
 			<RulesEditor rules={rules} onChange={setRules} />
+			<h3 className="field-heading">{t("lettersSection")}</h3>
+			<Field label={t("receive")} labelId={receiveId}>
+				<Select
+					labelledBy={receiveId}
+					value={receive}
+					options={RECEIVE_POLICIES.map((policy) => ({
+						value: policy,
+						label: t(`receive_${policy}`),
+						hint: t(`receive_${policy}_hint`),
+					}))}
+					onChange={(value) => setReceive(value as ReceivePolicy)}
+				/>
+			</Field>
+			<Field label={t("letterQuota")} htmlFor={quotaId} info={t("letterQuotaHelp")}>
+				<input
+					id={quotaId}
+					className="input"
+					inputMode="numeric"
+					placeholder={String(letterQuotaOf({}, isMain))}
+					aria-describedby={`${quotaId}-left`}
+					value={quota}
+					onChange={(event) => setQuota(event.target.value.replace(/[^\d]/g, "").slice(0, 3))}
+				/>
+				<span id={`${quotaId}-left`} className="hint">
+					{t("lettersLeft", { n: left })}
+				</span>
+			</Field>
+			{!isMain && (
+				<Switch
+					label={t("canPostCards")}
+					info={t("canPostCardsHint")}
+					checked={canPost}
+					onChange={setCanPost}
+				/>
+			)}
 			<Field
 				label={t("compactAt")}
 				htmlFor={compactId}

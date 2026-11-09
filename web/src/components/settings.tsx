@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
 	deleteCustomProvider,
 	deleteKey,
@@ -237,19 +237,29 @@ function Providers() {
 	);
 }
 
-/** Defaults for new sessions: the model and the permission rules, saved together. */
+/**
+ * Defaults for new sessions (the model and the permission rules), and where decisions are logged;
+ * saved together.
+ */
 function DefaultsDialog({ onClose }: { onClose: () => void }) {
 	useLang();
 	const settings = useAppState((state) => state.settings);
 	const [model, setModel] = useState(settings?.defaultModel);
 	const [rules, setRules] = useState(settings?.defaultRules ?? []);
+	const [log, setLog] = useState(settings?.decisionLog ?? "");
+	const logId = useId();
 	const save = useAction(async () => {
-		await saveSettings({ ...(model ? { defaultModel: model } : {}), defaultRules: rules });
+		await saveSettings({
+			...(model ? { defaultModel: model } : {}),
+			defaultRules: rules,
+			decisionLog: log.trim() || null,
+		});
 		onClose();
 	});
 	const dirty =
 		JSON.stringify(model) !== JSON.stringify(settings?.defaultModel) ||
-		JSON.stringify(rules) !== JSON.stringify(settings?.defaultRules ?? []);
+		JSON.stringify(rules) !== JSON.stringify(settings?.defaultRules ?? []) ||
+		log.trim() !== (settings?.decisionLog ?? "");
 	return (
 		<Dialog
 			title={t("defaultsTitle")}
@@ -285,6 +295,16 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 			)}
 			<RulesEditor rules={rules} onChange={setRules} />
 			<p className="hint">{t("defaultRulesBody")}</p>
+			<Field label={t("decisionLog")} htmlFor={logId} info={t("decisionLogHelp")}>
+				<input
+					id={logId}
+					className="input"
+					spellCheck={false}
+					placeholder={t("decisionLogPlaceholder")}
+					value={log}
+					onChange={(event) => setLog(event.target.value)}
+				/>
+			</Field>
 			<ErrorBox error={save.error} />
 		</Dialog>
 	);
@@ -357,7 +377,7 @@ function About() {
 					onClose={() => setDoc(null)}
 					footer={<Button onClick={() => setDoc(null)}>{t("close")}</Button>}
 				>
-					<p className="hint">{t("docVersion", { v: "1.0", date: t("policyDate") })}</p>
+					<p className="hint">{t("docVersion", { v: "1.1", date: t("policyDate") })}</p>
 					{paragraphs(doc === "privacy" ? t("privacyPolicyBody") : t("termsBody"))}
 				</Dialog>
 			)}

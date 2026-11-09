@@ -2,8 +2,10 @@ import { useSyncExternalStore } from "react";
 import type { AssistantMessage } from "../../src/shared/messages.ts";
 import type {
 	Approval,
+	Card,
 	Entry,
 	Group,
+	Letter,
 	PermissionRule,
 	QueuedMessage,
 	Session,
@@ -17,6 +19,24 @@ export interface Settings {
 	theme: "system" | "light" | "dark";
 	language: "system" | "zh" | "en";
 	workspaces: Workspace[];
+	mainSessionId: string | null;
+	decisionLog: string | null;
+}
+
+/** Everything waiting for the person, across sessions (M2 plan, section 5). */
+export interface CenterState {
+	approvals: Record<string, Approval>;
+	cards: Record<string, Card>;
+	held: Record<string, Letter>;
+	/** The latest decisions, newest first. */
+	decided: Card[];
+}
+
+/** The letters tab: every letter, newest first, loaded a page at a time. */
+export interface LettersState {
+	items: Letter[];
+	nextCursor: string | null;
+	loaded: boolean;
 }
 
 /** A saved working folder. */
@@ -84,6 +104,19 @@ export interface AppState {
 	sidebarCollapsed: boolean;
 	/** Narrow screens: the sidebar drawer is open. */
 	drawerOpen: boolean;
+	center: CenterState;
+	letters: LettersState;
+	/** The right-hand drawer: the approval center or the letters, over the conversation. */
+	panel: "center" | "letters" | null;
+}
+
+/** How many things wait for the person: approvals, questions, cards and held letters. */
+export function centerCount(center: CenterState): number {
+	return (
+		Object.keys(center.approvals).length +
+		Object.keys(center.cards).length +
+		Object.keys(center.held).length
+	);
 }
 
 const SIDEBAR_KEY = "jig.sidebar";
@@ -126,6 +159,9 @@ let state: AppState = {
 	homeFolder: null,
 	sidebarCollapsed: rememberedCollapse(),
 	drawerOpen: false,
+	center: { approvals: {}, cards: {}, held: {}, decided: [] },
+	letters: { items: [], nextCursor: null, loaded: false },
+	panel: null,
 };
 
 const listeners = new Set<() => void>();

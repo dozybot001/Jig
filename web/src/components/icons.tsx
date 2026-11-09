@@ -7,6 +7,7 @@ import {
 	Code,
 	FileText,
 	Folder,
+	Inbox,
 	Info,
 	KeyRound,
 	ListPlus,
@@ -15,6 +16,7 @@ import {
 	Menu,
 	MessageCircle,
 	MessageCircleQuestion,
+	MessagesSquare,
 	Minimize2,
 	PanelLeftClose,
 	PanelLeftOpen,
@@ -27,6 +29,7 @@ import {
 	SlidersHorizontal,
 	Square,
 	SquarePen,
+	Stamp,
 	X,
 } from "lucide-react";
 
@@ -61,6 +64,12 @@ export const ShieldIcon = () => <ShieldAlert {...props} />;
 export const QuestionIcon = () => <MessageCircleQuestion {...props} />;
 export const SlidersIcon = () => <SlidersHorizontal {...props} />;
 export const MailIcon = () => <Mail {...props} />;
+/** The approval center: everything waiting for the person. */
+export const CenterIcon = () => <Inbox {...props} />;
+/** The main conversation, where the person usually works. */
+export const MainIcon = () => <MessagesSquare {...props} />;
+/** A decision the person made. */
+export const DecisionIcon = () => <Stamp {...props} />;
 export const CollapseIcon = () => <PanelLeftClose {...props} />;
 export const ExpandIcon = () => <PanelLeftOpen {...props} />;
 export const TodoIcon = () => <ListTodo {...props} />;

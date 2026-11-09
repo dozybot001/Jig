@@ -12,6 +12,7 @@ import {
 	editQueued,
 	freeName,
 	loadModels,
+	selectSession,
 	sendMessage,
 	startSession,
 	stopSession,
@@ -178,6 +179,11 @@ export function SidebarToggle({ className = "" }: { className?: string }) {
 function SessionHeader({ session }: { session: Session }) {
 	useLang();
 	const workspaces = useWorkspaces();
+	const isMain = useAppState((state) => state.settings?.mainSessionId === session.id);
+	const parentId = session.parentId;
+	const parent = useAppState((state) =>
+		parentId ? (state.sessions[parentId]?.name ?? null) : null,
+	);
 	const tokens =
 		session.usage.input + session.usage.output + session.usage.cacheRead + session.usage.cacheWrite;
 	return (
@@ -185,6 +191,17 @@ function SessionHeader({ session }: { session: Session }) {
 			<SidebarToggle />
 			<div className="session-title">
 				<h1>{session.name}</h1>
+				{isMain && <span className="tag">{t("mainConversation")}</span>}
+				{session.outcome && <span className="tag">{t(`outcome_${session.outcome}`)}</span>}
+				{parentId && parent && (
+					<button
+						type="button"
+						className="link-button session-parent"
+						onClick={() => void selectSession(parentId)}
+					>
+						{t("openedBy", { name: parent })}
+					</button>
+				)}
 				<span className="session-meta" title={session.cwd ?? undefined}>
 					{t(`status_${session.status}`)} ·{" "}
 					{session.cwd ? workspaceLabel(workspaces, session.cwd) : t("chat")} ·{" "}

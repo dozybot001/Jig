@@ -1,6 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
 	AssistantMessage,
+	LetterRef,
 	ToolCallBlock,
 	ToolResultMessage,
 } from "../../../src/shared/messages.ts";
@@ -11,11 +12,11 @@ import type {
 	QuestionRequest,
 	ToolCallView,
 } from "../../../src/shared/types.ts";
-import { answerApproval, loadEarlier, markRead, toolCallFor } from "../actions.ts";
-import { t, useLang } from "../i18n.ts";
+import { answerApproval, loadEarlier, markRead, selectSession, toolCallFor } from "../actions.ts";
+import { type MessageKey, t, useLang } from "../i18n.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
 import { Diff, Markdown, ScrollBlock } from "./content.tsx";
-import { ChevronIcon, QuestionIcon, ShieldIcon } from "./icons.tsx";
+import { ChevronIcon, DecisionIcon, MailIcon, QuestionIcon, ShieldIcon } from "./icons.tsx";
 import { Button, ErrorBox, useAction } from "./ui.tsx";
 
 function resultText(result: ToolResultMessage | undefined): string {
@@ -23,11 +24,29 @@ function resultText(result: ToolResultMessage | undefined): string {
 	return result.content.map((block) => (block.type === "text" ? block.text : "[image]")).join("\n");
 }
 
-function callSummary(call: ToolCallBlock): string {
+/** The line beside a tool's verb: the command, the file, the letter's summary… */
+function callSummary(call: ToolCallBlock, recipient: string | null): string {
 	const args = call.arguments as Record<string, unknown>;
+	switch (call.name) {
+		case "send_letter":
+			return `${recipient ?? String(args.to ?? "")} · ${String(args.summary ?? "")}`;
+		case "open_session":
+			return String(args.name ?? "");
+		case "post_card":
+			return String(args.title ?? "");
+		case "update_card":
+		case "withdraw_card":
+		case "check_decision":
+			return `#${String(args.number ?? "")}`;
+		case "finish_task":
+			return typeof args.result === "string" ? t(`outcome_${args.result}` as MessageKey) : "";
+		case "todo":
+		case "list_sessions":
+		case "list_cards":
+			return "";
+	}
 	const value = args.command ?? args.path ?? args.pattern ?? args.url ?? args.question ?? args.job;
 	if (typeof value === "string") return value;
-	if (call.name === "todo") return "";
 	return JSON.stringify(args);
 }
 
@@ -42,6 +61,15 @@ const TOOL_VERBS = [
 	"todo",
 	"ask_user",
 	"web_fetch",
+	"send_letter",
+	"list_sessions",
+	"check_decision",
+	"open_session",
+	"finish_task",
+	"post_card",
+	"update_card",
+	"withdraw_card",
+	"list_cards",
 ] as const;
 
 function isToolVerb(name: string): name is (typeof TOOL_VERBS)[number] {
@@ -71,7 +99,7 @@ function Thinking({ text, live }: { text: string; live: boolean }) {
 	);
 }
 
-function PermissionCard({ approval }: { approval: Approval }) {
+export function PermissionCard({ approval }: { approval: Approval }) {
 	const request = approval.request as PermissionRequest;
 	const [reason, setReason] = useState("");
 	const [denying, setDenying] = useState(false);
@@ -155,7 +183,7 @@ function PermissionCard({ approval }: { approval: Approval }) {
 	);
 }
 
-function QuestionCard({ approval }: { approval: Approval }) {
+export function QuestionCard({ approval }: { approval: Approval }) {
 	const request = approval.request as QuestionRequest;
 	const [text, setText] = useState("");
 	const action = useAction((answer: string) => answerApproval(approval.id, { answer }));
@@ -232,6 +260,10 @@ const ToolCard = memo(function ToolCard({
 		| null
 		| undefined;
 	const [open, setOpen] = useState(false);
+	const to = call.name === "send_letter" ? (call.arguments as { to?: unknown }).to : undefined;
+	const recipient = useAppState((state) =>
+		typeof to === "string" ? (state.sessions[to]?.name ?? null) : null,
+	);
 	const running = status === "running";
 	const verb = isToolVerb(call.name)
 		? t(running ? `act_${call.name}_ing` : `act_${call.name}`)
@@ -248,7 +280,7 @@ const ToolCard = memo(function ToolCard({
 				>
 					<summary>
 						<span className={running ? "activity-verb shimmer" : "activity-verb"}>{verb}</span>
-						<span className="tool-summary">{callSummary(call)}</span>
+						<span className="tool-summary">{callSummary(call, recipient)}</span>
 						{detail?.diff && (
 							<span className="tool-stat">
 								<span className="stat-add" aria-hidden="true">
@@ -388,7 +420,17 @@ function buildItems(transcript: TranscriptState, working: boolean): Item[] {
 	return items;
 }
 
-const SUMMARY_KINDS = ["read", "edit", "write", "search", "shell", "web"] as const;
+const SUMMARY_KINDS = [
+	"read",
+	"edit",
+	"write",
+	"search",
+	"shell",
+	"web",
+	"letter",
+	"session",
+	"card",
+] as const;
 type SummaryKind = (typeof SUMMARY_KINDS)[number];
 
 function summaryKind(tool: string): SummaryKind | null {
@@ -396,6 +438,9 @@ function summaryKind(tool: string): SummaryKind | null {
 	if (tool === "grep" || tool === "glob") return "search";
 	if (tool === "shell" || tool === "shell_job") return "shell";
 	if (tool === "web_fetch") return "web";
+	if (tool === "send_letter") return "letter";
+	if (tool === "open_session") return "session";
+	if (tool === "post_card" || tool === "update_card" || tool === "withdraw_card") return "card";
 	return null;
 }
 
@@ -541,10 +586,100 @@ function NoteStep({ entry }: { entry: Entry }) {
 	return null;
 }
 
-/** A message from the person, or a notice from Jig. */
+/** Letters longer than this start folded. */
+const LONG_LETTER = 600;
+
+/**
+ * A letter from another session, a script or Jig, shown as a letter, not as words of the person. The
+ * person's own decisions carry the "by you" mark (blueprint 7.2).
+ */
+function LetterEntry({ letter }: { letter: LetterRef }) {
+	useLang();
+	const senderId = letter.from.sessionId;
+	const sender = useAppState((state) =>
+		senderId ? (state.sessions[senderId]?.name ?? null) : null,
+	);
+	if (letter.kind === "decision" && letter.decision && letter.from.kind === "person") {
+		const decision = letter.decision;
+		return (
+			<section
+				className="letter-card letter-decision"
+				aria-label={t("decisionHeading", { n: decision.number })}
+			>
+				<div className="letter-head">
+					<DecisionIcon />
+					<span>{t("decisionHeading", { n: decision.number })}</span>
+					<span className="tag">{t("byYou")}</span>
+				</div>
+				<p className="letter-summary">{decision.title}</p>
+				<p>{decision.choice ? t("decidedChoice", { c: decision.choice }) : t("noteOnly")}</p>
+				{decision.note && <p className="letter-note">{decision.note}</p>}
+			</section>
+		);
+	}
+	const from =
+		letter.from.kind === "cli"
+			? t("fromCli")
+			: letter.from.kind === "person"
+				? t("you")
+				: (sender ?? letter.from.name);
+	// An automatic report repeats its first line as the summary; show it once.
+	const body =
+		letter.body.startsWith(letter.summary) && letter.body.length > letter.summary.length
+			? letter.body.slice(letter.summary.length).trim()
+			: letter.body === letter.summary
+				? ""
+				: letter.body;
+	const kind = t(`letterKind_${letter.kind}`);
+	return (
+		<section className="letter-card" aria-label={`${kind} · ${from}`}>
+			<div className="letter-head">
+				<MailIcon />
+				{senderId && sender ? (
+					<button
+						type="button"
+						className="link-button"
+						onClick={() => void selectSession(senderId)}
+					>
+						{from}
+					</button>
+				) : (
+					<span>{from}</span>
+				)}
+				<span className="tag">{kind}</span>
+				{letter.auto && <span className="hint">{t("autoReport")}</span>}
+			</div>
+			<p className="letter-summary">{letter.summary}</p>
+			{body &&
+				(body.length > LONG_LETTER ? (
+					<details className="letter-details">
+						<summary>{t("letterExpand")}</summary>
+						<div className="letter-body">
+							<Markdown text={body} />
+						</div>
+					</details>
+				) : (
+					<div className="letter-body">
+						<Markdown text={body} />
+					</div>
+				))}
+			{letter.decision && (
+				<p className="hint">
+					{t("verifiedDecision", { n: letter.decision.number })} ·{" "}
+					{letter.decision.choice
+						? t("decidedChoice", { c: letter.decision.choice })
+						: t("noteOnly")}
+				</p>
+			)}
+		</section>
+	);
+}
+
+/** A message from the person, a letter, or a notice from Jig. */
 function EntryView({ entry }: { entry: Entry }) {
 	switch (entry.role) {
 		case "user":
+			if (entry.letter) return <LetterEntry letter={entry.letter} />;
 			return (
 				<div className="msg-user">
 					<span className="visually-hidden">{t("you")}: </span>

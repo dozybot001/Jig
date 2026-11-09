@@ -2,11 +2,15 @@ import type { AssistantMessage } from "../../src/shared/messages.ts";
 import type {
 	Approval,
 	ApprovalDecision,
+	Card,
 	Entry,
 	Group,
+	Letter,
+	Page,
 	PermissionMode,
 	PermissionRule,
 	QueuedMessage,
+	ReceivePolicy,
 	Session,
 	SessionEvent,
 	SessionKind,
@@ -17,6 +21,7 @@ import type {
 import { ApiError, all, api, downloadFile } from "./api.ts";
 import { getLang, setLang, systemLang } from "./i18n.ts";
 import {
+	type CenterState,
 	getState,
 	type ModelInfo,
 	type ProviderSummary,
@@ -96,8 +101,12 @@ export async function boot(): Promise<void> {
 			providers,
 			hasArchived: archived.items.length > 0,
 		});
+		await loadCenter();
+		// Jig opens on the main conversation; without one, where you left off (blueprint section 5).
+		const main = settings.mainSessionId;
 		const last = recall(LAST_SESSION);
-		if (last && getState().sessions[last]) await selectSession(last);
+		if (main && getState().sessions[main]) await selectSession(main);
+		else if (last && getState().sessions[last]) await selectSession(last);
 		else connect(null, null);
 	} catch (error) {
 		if (error instanceof ApiError && error.status === 401) setState({ phase: "signin" });
@@ -125,24 +134,21 @@ function connect(sessionId: string | null, after: number | null): void {
 		if (stream.readyState === EventSource.CLOSED) void recover();
 	});
 	stream.addEventListener("hello", () => {
-		// Sidebar events are not replayed, so a reconnect reloads the list.
-		if (connectedOnce) void reloadSessions();
+		// Sidebar and approval center events are not replayed, so a reconnect reloads them.
+		if (connectedOnce) {
+			void reloadSessions();
+			void loadCenter();
+		}
 		connectedOnce = true;
 	});
 	stream.addEventListener("reset", () => {
 		if (source !== stream) return;
 		void reloadSessions();
+		void loadCenter();
 		if (sessionId) void loadTranscript(sessionId);
 	});
 	stream.addEventListener("global", (message) => {
-		const event = JSON.parse((message as MessageEvent<string>).data) as
-			| { type: "sessionSummary"; session: Session }
-			| { type: "groups"; groups: Group[] };
-		if (event.type === "groups") setState({ groups: event.groups });
-		else
-			setState((current) => ({
-				sessions: { ...current.sessions, [event.session.id]: event.session },
-			}));
+		applyGlobalEvent(JSON.parse((message as MessageEvent<string>).data) as GlobalEvent);
 	});
 	if (!sessionId) return;
 	stream.addEventListener("session", (message) => {
@@ -174,6 +180,83 @@ async function recover(): Promise<void> {
 	} catch (error) {
 		if (error instanceof ApiError && error.status === 401) setState({ phase: "signin" });
 		else setTimeout(() => void recover(), 3000);
+	}
+}
+
+type GlobalEvent =
+	| { type: "sessionSummary"; session: Session }
+	| { type: "groups"; groups: Group[] }
+	| { type: "approval"; approval: Approval }
+	| { type: "letter"; letter: Letter }
+	| { type: "card"; card: Card };
+
+function without<T>(record: Record<string, T>, id: string): Record<string, T> {
+	if (!(id in record)) return record;
+	const next = { ...record };
+	delete next[id];
+	return next;
+}
+
+function applyGlobalEvent(event: GlobalEvent): void {
+	switch (event.type) {
+		case "groups":
+			setState({ groups: event.groups });
+			return;
+		case "sessionSummary":
+			setState((current) => ({
+				sessions: { ...current.sessions, [event.session.id]: event.session },
+			}));
+			return;
+		case "approval": {
+			const approval = event.approval;
+			setState((current) => ({
+				center: {
+					...current.center,
+					approvals:
+						approval.status === "pending"
+							? { ...current.center.approvals, [approval.id]: approval }
+							: without(current.center.approvals, approval.id),
+				},
+			}));
+			return;
+		}
+		case "card": {
+			const card = event.card;
+			setState((current) => ({
+				center: {
+					...current.center,
+					cards:
+						card.status === "pending"
+							? { ...current.center.cards, [card.id]: card }
+							: without(current.center.cards, card.id),
+					decided:
+						card.status === "decided"
+							? [card, ...current.center.decided.filter((c) => c.id !== card.id)].slice(0, 10)
+							: current.center.decided,
+				},
+			}));
+			return;
+		}
+		case "letter": {
+			const letter = event.letter;
+			setState((current) => {
+				const items = current.letters.items;
+				const index = items.findIndex((item) => item.id === letter.id);
+				const next =
+					index >= 0 ? items.map((item, i) => (i === index ? letter : item)) : [letter, ...items];
+				return {
+					center: {
+						...current.center,
+						held:
+							letter.status === "held"
+								? { ...current.center.held, [letter.id]: letter }
+								: without(current.center.held, letter.id),
+					},
+					letters: current.letters.loaded ? { ...current.letters, items: next } : current.letters,
+				};
+			});
+			return;
+		}
 	}
 }
 
@@ -236,7 +319,6 @@ async function loadTranscript(sessionId: string): Promise<number> {
 	return data.session.eventSeq;
 }
 
-/** Shows the settings page in the main area (spec 10.5). */
 /** Opens a settings dialog over the conversation; the conversation stays where it is. */
 export function openSettings(dialog: "providers" | "defaults" | "about"): void {
 	setState({ settingsDialog: dialog });
@@ -313,7 +395,13 @@ export type SessionPatch = Partial<{
 	model: string;
 	thinking: ThinkingLevel;
 	rules: PermissionRule[];
-	options: { compactAt?: number | null; permissionMode?: PermissionMode };
+	options: {
+		compactAt?: number | null;
+		permissionMode?: PermissionMode;
+		receive?: ReceivePolicy;
+		letterQuota?: number | null;
+		canPostCards?: boolean;
+	};
 	pinned: boolean;
 	archived: boolean;
 }>;
@@ -392,6 +480,69 @@ export async function renameGroup(groupId: string, name: string): Promise<void> 
 
 export async function deleteGroup(groupId: string): Promise<void> {
 	await api("DELETE", `/api/groups/${groupId}`);
+}
+
+// --- the approval center and letters ---
+
+export async function loadCenter(): Promise<void> {
+	const [center, decided] = await Promise.all([
+		api<{ approvals: Approval[]; cards: Card[]; held: Letter[] }>("GET", "/api/center"),
+		api<Page<Card>>("GET", "/api/cards?status=decided&limit=10"),
+	]);
+	const next: CenterState = {
+		approvals: indexBy(center.approvals),
+		cards: indexBy(center.cards),
+		held: indexBy(center.held),
+		decided: decided.items,
+	};
+	setState({ center: next });
+}
+
+/** The element that opened the drawer gets the focus back when it closes (spec 18.2). */
+let panelOpener: HTMLElement | null = null;
+
+export function openPanel(panel: "center" | "letters"): void {
+	if (!getState().panel) panelOpener = document.activeElement as HTMLElement | null;
+	setState({ panel, drawerOpen: false });
+	if (panel === "letters" && !getState().letters.loaded) void loadLetters();
+}
+
+export function closePanel(): void {
+	setState({ panel: null });
+	panelOpener?.focus();
+	panelOpener = null;
+}
+
+export async function loadLetters(more = false): Promise<void> {
+	const cursor = more ? getState().letters.nextCursor : null;
+	const page = await api<Page<Letter>>(
+		"GET",
+		`/api/letters?limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+	);
+	setState((current) => ({
+		letters: {
+			items: more ? [...current.letters.items, ...page.items] : page.items,
+			nextCursor: page.nextCursor,
+			loaded: true,
+		},
+	}));
+}
+
+export async function decideCard(cardId: string, choice: number | null, note: string | null) {
+	return api<Card>(
+		"POST",
+		`/api/cards/${cardId}/decide`,
+		{ choice, ...(note ? { note } : {}) },
+		{ idempotent: true },
+	);
+}
+
+export const releaseLetter = (id: string) => api<Letter>("POST", `/api/letters/${id}/release`);
+export const refuseLetter = (id: string) => api<Letter>("POST", `/api/letters/${id}/refuse`);
+
+/** Makes a session the main conversation, or none (blueprint section 5). */
+export async function setMainSession(sessionId: string | null): Promise<void> {
+	await saveSettings({ mainSessionId: sessionId });
 }
 
 // --- talking to a session ---

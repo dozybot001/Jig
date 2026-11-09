@@ -3,17 +3,26 @@ import type { Group, Session } from "../../../src/shared/types.ts";
 import {
 	deleteGroup,
 	exportSession,
+	openPanel,
 	saveSettings,
 	selectSession,
+	setMainSession,
 	toggleArchived,
 	updateSession,
 } from "../actions.ts";
 import { api } from "../api.ts";
 import { formatAgo, t, useLang } from "../i18n.ts";
-import { setSidebarCollapsed, setState, useAppState, type Workspace } from "../state.ts";
+import {
+	centerCount,
+	setSidebarCollapsed,
+	setState,
+	useAppState,
+	type Workspace,
+} from "../state.ts";
 import { Snippet } from "./content.tsx";
 import { ConfirmDialog, GroupDialog, NewSessionDialog, SessionSettingsDialog } from "./dialogs.tsx";
 import {
+	CenterIcon,
 	ChatIcon,
 	CloseIcon,
 	CodeIcon,
@@ -23,6 +32,7 @@ import {
 	FolderIcon,
 	GroupPlusIcon,
 	JigMark,
+	MainIcon,
 	PinIcon,
 	PlusIcon,
 	SearchIcon,
@@ -230,13 +240,17 @@ function SessionRow({
 	selected,
 	groups,
 	now,
+	depth = 0,
 }: {
 	session: Session;
 	selected: boolean;
 	groups: Group[];
 	now: number;
+	/** Sessions opened by another are listed under it, indented (blueprint section 8). */
+	depth?: number;
 }) {
 	useLang();
+	const isMain = useAppState((state) => state.settings?.mainSessionId === session.id);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [renaming, setRenaming] = useState(false);
 	const download = useAction(() => exportSession(session));
@@ -257,7 +271,11 @@ function SessionRow({
 			: []),
 	];
 	return (
-		<div className="session-item">
+		<div
+			className="session-item"
+			style={depth > 0 ? ({ "--depth": Math.min(depth, 3) } as React.CSSProperties) : undefined}
+			data-child={depth > 0 ? "true" : undefined}
+		>
 			{renaming ? (
 				<InlineRename
 					icon={session.cwd ? <CodeIcon /> : <ChatIcon />}
@@ -285,6 +303,7 @@ function SessionRow({
 						<span className="visually-hidden">
 							{" "}
 							· {session.cwd ? t("mode_code") : t("mode_chat")} · {t(`status_${session.status}`)}
+							{isMain ? ` · ${t("mainConversation")}` : ""}
 							{session.pinned ? ` · ${t("pinned")}` : ""}
 							{session.unread > 0 ? ` · ${t("unread", { n: session.unread })}` : ""}
 						</span>
@@ -315,6 +334,14 @@ function SessionRow({
 								onSelect: () => void updateSession(session.id, { pinned: !session.pinned }),
 							},
 							{ label: t("rename"), onSelect: () => setRenaming(true) },
+							...(session.archivedAt === null
+								? [
+										{
+											label: isMain ? t("unsetMain") : t("setMain"),
+											onSelect: () => void setMainSession(isMain ? null : session.id),
+										},
+									]
+								: []),
 							{ label: t("sessionSettings"), onSelect: () => setSettingsOpen(true) },
 							{ label: t("exportMarkdown"), onSelect: () => void download.run() },
 							...moves,
@@ -352,6 +379,76 @@ function SessionRow({
 function sortSessions(list: Session[]): Session[] {
 	return [...list].sort(
 		(a, b) => Number(b.pinned) - Number(a.pinned) || b.lastActivityAt - a.lastActivityAt,
+	);
+}
+
+/**
+ * A list with each session's children right under it, oldest child first, so a task stays next to the
+ * session that handed it out. A child whose parent is not in the list stands on its own.
+ */
+function nest(list: Session[]): { session: Session; depth: number }[] {
+	const ids = new Set(list.map((session) => session.id));
+	const children = new Map<string, Session[]>();
+	for (const session of list) {
+		if (session.parentId && ids.has(session.parentId)) {
+			children.set(session.parentId, [...(children.get(session.parentId) ?? []), session]);
+		}
+	}
+	const out: { session: Session; depth: number }[] = [];
+	const visit = (session: Session, depth: number) => {
+		out.push({ session, depth });
+		const kids = (children.get(session.id) ?? []).sort((a, b) => a.createdAt - b.createdAt);
+		for (const child of kids) visit(child, depth + 1);
+	};
+	for (const session of list) {
+		if (!session.parentId || !ids.has(session.parentId)) visit(session, 0);
+	}
+	return out;
+}
+
+/** The two fixed entries at the top: the main conversation and the approval center (M2 plan, 10). */
+function FixedEntries() {
+	useLang();
+	const mainId = useAppState((state) => state.settings?.mainSessionId ?? null);
+	const mainName = useAppState((state) => (mainId ? (state.sessions[mainId]?.name ?? null) : null));
+	const selected = useAppState((state) => state.selectedId);
+	const count = useAppState((state) => centerCount(state.center));
+	const open = useAppState((state) => state.panel === "center");
+	return (
+		<>
+			{mainId && mainName && (
+				<button
+					type="button"
+					className="nav-row"
+					aria-current={selected === mainId ? "page" : undefined}
+					onClick={() => {
+						closeDrawer();
+						void selectSession(mainId);
+					}}
+				>
+					<MainIcon />
+					<span className="nav-label">{t("mainConversation")}</span>
+					<span className="nav-detail">{mainName}</span>
+				</button>
+			)}
+			<button
+				type="button"
+				className="nav-row"
+				aria-expanded={open}
+				onClick={() => openPanel("center")}
+			>
+				<CenterIcon />
+				<span className="nav-label">{t("approvalCenter")}</span>
+				{count > 0 && (
+					<>
+						<span className="badge" aria-hidden="true">
+							{count}
+						</span>
+						<span className="visually-hidden">{t("approvalCount", { n: count })}</span>
+					</>
+				)}
+			</button>
+		</>
 	);
 }
 
@@ -443,6 +540,9 @@ function Search() {
 export function SidebarRail() {
 	useLang();
 	const [creatingGroup, setCreatingGroup] = useState(false);
+	const mainId = useAppState((state) => state.settings?.mainSessionId ?? null);
+	const hasMain = useAppState((state) => (mainId ? Boolean(state.sessions[mainId]) : false));
+	const count = useAppState((state) => centerCount(state.center));
 	return (
 		<nav className="rail" aria-label={t("sessions")}>
 			<button
@@ -459,6 +559,34 @@ export function SidebarRail() {
 					<ExpandIcon />
 				</span>
 			</button>
+			{mainId && hasMain && (
+				<Button
+					variant="icon"
+					aria-label={t("mainConversation")}
+					title={t("mainConversation")}
+					onClick={() => void selectSession(mainId)}
+				>
+					<MainIcon />
+				</Button>
+			)}
+			<Button
+				variant="icon"
+				className="rail-center"
+				aria-label={
+					count > 0
+						? `${t("approvalCenter")} · ${t("approvalCount", { n: count })}`
+						: t("approvalCenter")
+				}
+				title={t("approvalCenter")}
+				onClick={() => openPanel("center")}
+			>
+				<CenterIcon />
+				{count > 0 && (
+					<span className="rail-badge" aria-hidden="true">
+						{count}
+					</span>
+				)}
+			</Button>
 			<Button
 				variant="icon"
 				aria-label={t("newSession")}
@@ -517,15 +645,17 @@ export function Sidebar() {
 	const byGroup = (groupId: string | null) =>
 		sortSessions(active.filter((s) => s.groupId === groupId));
 	const current = selectedId;
-	const row = (session: Session) => (
+	const row = (session: Session, depth = 0) => (
 		<SessionRow
 			key={session.id}
 			session={session}
 			selected={session.id === current}
 			groups={groups}
 			now={now}
+			depth={depth}
 		/>
 	);
+	const rows = (list: Session[]) => nest(list).map(({ session, depth }) => row(session, depth));
 
 	return (
 		<nav className="sidebar" aria-label={t("sessions")}>
@@ -574,6 +704,7 @@ export function Sidebar() {
 				)}
 			</div>
 			<div className="sidebar-nav">
+				<FixedEntries />
 				<button type="button" className="nav-row" onClick={() => setDialog({ kind: "group" })}>
 					<GroupPlusIcon />
 					{t("newGroup")}
@@ -605,7 +736,7 @@ export function Sidebar() {
 						{byGroup(group.id).length === 0 ? (
 							<p className="empty-box">{t("emptyGroup")}</p>
 						) : (
-							byGroup(group.id).map(row)
+							rows(byGroup(group.id))
 						)}
 					</section>
 				))}
@@ -629,7 +760,7 @@ export function Sidebar() {
 						{byGroup(null).length === 0 ? (
 							<p className="empty-box">{t("emptySidebar")}</p>
 						) : (
-							byGroup(null).map(row)
+							rows(byGroup(null))
 						)}
 					</section>
 				)}
@@ -642,7 +773,7 @@ export function Sidebar() {
 						>
 							{showArchived ? t("hideArchived") : t("showArchived")}
 						</Button>
-						{showArchived && archived.map(row)}
+						{showArchived && archived.map((session) => row(session))}
 					</>
 				)}
 			</div>

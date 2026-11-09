@@ -1,12 +1,13 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { boot } from "./actions.ts";
+import { SidePanel } from "./components/center.tsx";
 import { SessionView } from "./components/session.tsx";
 import { SettingsDialogs } from "./components/settings.tsx";
 import { Sidebar, SidebarRail, useNarrow } from "./components/sidebar.tsx";
 import { Button } from "./components/ui.tsx";
 import { t, useLang } from "./i18n.ts";
-import { setState, useAppState } from "./state.ts";
+import { centerCount, setState, useAppState } from "./state.ts";
 import "./styles/app.css";
 
 function App() {
@@ -16,7 +17,12 @@ function App() {
 	const connection = useAppState((state) => state.connection);
 	const collapsed = useAppState((state) => state.sidebarCollapsed);
 	const drawerOpen = useAppState((state) => state.drawerOpen);
+	const waiting = useAppState((state) => centerCount(state.center));
 	const narrow = useNarrow();
+	// The tab's title carries the approval center's count, so it shows in the tab strip.
+	useEffect(() => {
+		document.title = waiting > 0 ? `(${waiting}) Jig` : "Jig";
+	}, [waiting]);
 	// The drawer closes with Escape, like a dialog.
 	useEffect(() => {
 		if (!drawerOpen) return;
@@ -75,6 +81,7 @@ function App() {
 					/>
 				)}
 				<SessionView />
+				<SidePanel />
 				<SettingsDialogs />
 			</div>
 		</>
