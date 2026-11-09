@@ -89,7 +89,7 @@ const ZH: ExportStrings = {
 	jobExit: "，退出码 {code}",
 	toolStatus: {
 		pending: "等待",
-		waiting: "等你批准",
+		waiting: "等你确认",
 		running: "执行中",
 		done: "完成",
 		error: "出错",
@@ -149,7 +149,7 @@ const EN: ExportStrings = {
 	jobExit: " with exit code {code}",
 	toolStatus: {
 		pending: "Waiting",
-		waiting: "Needs your approval",
+		waiting: "Needs your OK",
 		running: "Running",
 		done: "Done",
 		error: "Error",
