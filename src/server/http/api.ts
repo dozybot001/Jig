@@ -1,10 +1,5 @@
 import { Hono } from "hono";
-import type {
-	PermissionRule,
-	Session,
-	SessionOptions,
-	Transcript,
-} from "../../shared/types.ts";
+import type { PermissionRule, Session, SessionOptions, Transcript } from "../../shared/types.ts";
 import {
 	PERMISSION_MODES,
 	RECEIVE_POLICIES,
