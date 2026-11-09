@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import type {
 	AssistantMessage,
 	EntryBody,
@@ -11,6 +11,7 @@ import {
 	type Approval,
 	type ApprovalDecision,
 	type Entry,
+	type Letter,
 	permissionModeOf,
 	type QueuedMessage,
 	type Session,
@@ -19,17 +20,25 @@ import {
 	type UsageTotals,
 } from "../../shared/types.ts";
 import { conflict, invalid, JigError } from "../errors.ts";
+import { decisionRef, letterRef, letterText } from "../mail/envelope.ts";
+import { BODY_MAX, PostOffice, SUMMARY_MAX } from "../mail/post.ts";
 import type { ModelGateway, ModelInfo } from "../model/gateway.ts";
+import { resolveWorkingFolder } from "../paths.ts";
 import type { PermissionEngine } from "../permissions/engine.ts";
-import type { Store } from "../store.ts";
+import { isInside } from "../permissions/paths.ts";
+import { type Store, validateSessionName } from "../store.ts";
 import { Jobs } from "../tools/jobs.ts";
 import { ReadState } from "../tools/read-state.ts";
 import { ALL_TOOLS, specs, toolsFor } from "../tools/registry.ts";
 import {
+	type MailContext,
+	type OpenInput,
+	type Roles,
 	type ToolContext,
 	type ToolDefinition,
 	ToolInputError,
 	type ToolResult,
+	type WaitResult,
 } from "../tools/types.ts";
 import {
 	estimateTokens,
@@ -41,12 +50,28 @@ import {
 	APPROVAL_MODE,
 	type ContextSnapshot,
 	loadInstructions,
+	MAIN_ROLE,
+	type Placement,
 	renderInstructions,
+	type SessionRef,
 	SUMMARY_PROMPT,
 	systemPrompt,
+	type Told,
 	takeSnapshot,
 	today,
 } from "./prompt.ts";
+
+/** What a session is told when the person's main conversation changes. */
+function mainUpdate(session: Session, before: SessionRef | null, now: SessionRef | null): string {
+	if (now?.id === session.id) return `The person made you their main conversation.\n${MAIN_ROLE}`;
+	if (before?.id === session.id) {
+		return `You are no longer the person's main conversation.${now ? ` Their main conversation is now "${now.name}" (id ${now.id}).` : ""}`;
+	}
+	if (now) {
+		return `The person's main conversation is now "${now.name}" (id ${now.id}). When something needs the person's decision, send it a request; it puts the question in the approval center.`;
+	}
+	return "The person has no main conversation now. When something needs the person's decision, ask them with ask_user.";
+}
 
 type Answer = { decision?: ApprovalDecision; reason?: string; answer?: string };
 
@@ -66,6 +91,10 @@ export interface AgentsOptions {
 	log?: (line: string) => void;
 	/** How often streaming drafts go to the interface. */
 	draftIntervalMs?: number;
+	/** Letters and the approval center; one is made when not given. */
+	post?: PostOffice;
+	/** The longest send_letter and open_session wait for an answer; tests shorten it. */
+	waitMs?: number;
 }
 
 const KEEP_RECENT_TOKENS = 20_000;
@@ -74,6 +103,12 @@ const MAX_MESSAGE_CHARS = 100_000;
 const MAX_STEPS = 500;
 /** After this many tool calls without a change to a task list that still has open tasks, Jig reminds the model. */
 const TODO_REMINDER_AFTER = 12;
+/** How long a session waits for another one's answer (blueprint 7.1: one wait, no polling). */
+const WAIT_MS = 30 * 60 * 1000;
+
+const firstLine = (text: string) => (text.trim().split("\n")[0] ?? "").trim();
+const clip = (text: string, max: number) =>
+	[...text].length > max ? `${[...text].slice(0, max - 1).join("")}…` : text;
 
 const userEntry = (text: string): EntryBody => ({
 	role: "user",
@@ -140,6 +175,17 @@ export class Agents {
 	readonly #notes = new Map<string, string[]>();
 	/** Tool calls since each session last changed its task list. */
 	readonly #sinceTodo = new Map<string, number>();
+	/** Letters, decision cards and the approval center. */
+	readonly post: PostOffice;
+	readonly #waitMs: number;
+	/** Requests each working session owes an answer to: requester → the request letter. */
+	readonly #owed = new Map<string, Map<string, string>>();
+	/** Letters delivered in each session's current turn; they are done when the turn ends. */
+	readonly #turnLetters = new Map<string, string[]>();
+	/** Each working session's latest written reply in this turn. */
+	readonly #lastText = new Map<string, string>();
+	/** Sessions blocked in send_letter or open_session, and the session each waits for. */
+	readonly #waits = new Map<string, { target: string; resolve: (result: WaitResult) => void }>();
 
 	constructor(options: AgentsOptions) {
 		this.#store = options.store;
@@ -150,6 +196,9 @@ export class Agents {
 		this.#tools = options.tools ?? ALL_TOOLS;
 		this.#log = options.log ?? ((line) => process.stderr.write(`${line}\n`));
 		this.#draftInterval = options.draftIntervalMs ?? 50;
+		this.post = options.post ?? new PostOffice(options.store, this.#log);
+		this.#waitMs = options.waitMs ?? WAIT_MS;
+		this.post.setHooks({ queued: (letter) => this.#onQueued(letter) });
 	}
 
 	isRunning(sessionId: string): boolean {
@@ -169,18 +218,12 @@ export class Agents {
 		const session = this.#store.getSession(sessionId);
 		if (session.archivedAt !== null)
 			throw conflict("This session is archived. Restore it first.", undefined, "session-archived");
+		// The person stepped in: a full quota of letters again, and a new chain of hand-offs (blueprint 7.1).
+		this.#store.resetLettersSent(sessionId);
+		this.#store.addIntervention(sessionId);
+		this.post.resetChain(sessionId);
 		if (this.isRunning(sessionId)) return { queued: this.#store.enqueue(sessionId, text) };
-		// The conversation moves on: calls left over from an interrupted run will not be run later.
-		this.#store.tx(() => {
-			for (const call of this.#store.toolCallsByStatus(sessionId, ["pending", "needs_review"])) {
-				this.#finishCall(
-					call,
-					failure("Not run: the person sent a new message instead of continuing."),
-					"error",
-					Date.now(),
-				);
-			}
-		});
+		this.#dropLeftovers(sessionId, "Not run: the person sent a new message instead of continuing.");
 		const entry = this.#store.appendEntry(sessionId, userEntry(text));
 		this.#start(sessionId);
 		return { entry };
@@ -216,6 +259,7 @@ export class Agents {
 			throw invalid("The answer is empty.", "answer");
 		}
 		const resolved = this.#store.resolveApproval(approvalId, answer);
+		this.#store.addIntervention(approval.sessionId);
 		const waiter = this.#live.get(approval.sessionId)?.waiters.get(approvalId);
 		waiter?.(answer);
 		return resolved;
@@ -236,6 +280,7 @@ export class Agents {
 		} finally {
 			this.#live.delete(sessionId);
 			this.#store.setStatus(sessionId, "idle");
+			this.#wake(sessionId);
 		}
 	}
 
@@ -248,11 +293,30 @@ export class Agents {
 		const controller = new AbortController();
 		const live: Live = { controller, done: Promise.resolve(), waiters: new Map() };
 		this.#live.set(sessionId, live);
+		this.#lastText.delete(sessionId);
 		live.done = this.#run(sessionId, live, options.resume ?? false)
 			.catch((error: unknown) =>
 				this.#log(`session ${sessionId}: ${(error as Error).stack ?? error}`),
 			)
-			.finally(() => this.#live.delete(sessionId));
+			.finally(() => {
+				this.#live.delete(sessionId);
+				// Letters that arrived after the last delivery start the next turn, unless the person stopped this one.
+				if (!controller.signal.aborted) this.#wake(sessionId);
+			});
+	}
+
+	/** The calls a session can make depend on its place: card tools for the main conversation. */
+	#roles(session: Session): Roles {
+		return { canPostCards: this.post.canPostCards(session) };
+	}
+
+	/** The conversation moves on: calls left over from an interrupted run will not be run later. */
+	#dropLeftovers(sessionId: string, reason: string): void {
+		this.#store.tx(() => {
+			for (const call of this.#store.toolCallsByStatus(sessionId, ["pending", "needs_review"])) {
+				this.#finishCall(call, failure(reason), "error", Date.now());
+			}
+		});
 	}
 
 	#requireModel(session: Session): ModelInfo {
@@ -284,6 +348,11 @@ export class Agents {
 					message.content.length > 0
 						? this.#store.appendEntry(sessionId, { role: "assistant", message })
 						: null;
+				const said = message.content
+					.map((block) => (block.type === "text" ? block.text : ""))
+					.join("\n")
+					.trim();
+				if (said) this.#lastText.set(sessionId, said);
 				this.#store.addUsage(sessionId, totals(final), contextSize(final));
 
 				if (final.stopReason === "aborted" || signal.aborted) {
@@ -348,6 +417,7 @@ export class Agents {
 			if (signal.aborted) endStatus = "idle";
 			this.#store.setStatus(sessionId, endStatus, detail);
 			this.#store.bumpUnread(sessionId);
+			this.#endTurn(sessionId, endStatus, detail, signal.aborted);
 		}
 	}
 
@@ -357,7 +427,7 @@ export class Agents {
 		snapshot: ContextSnapshot,
 		signal: AbortSignal,
 	): Promise<AssistantMessage> {
-		const tools = toolsFor(session, this.#tools);
+		const tools = toolsFor(session, this.#tools, this.#roles(session));
 		let last = 0;
 		let pending: ReturnType<typeof setTimeout> | null = null;
 		let latest: AssistantMessage | null = null;
@@ -399,8 +469,9 @@ export class Agents {
 		live: Live,
 	): Promise<void> {
 		const signal = live.controller.signal;
+		const current = this.#store.getSession(sessionId);
 		const byName = new Map(
-			toolsFor(this.#store.getSession(sessionId), this.#tools).map((tool) => [tool.name, tool]),
+			toolsFor(current, this.#tools, this.#roles(current)).map((tool) => [tool.name, tool]),
 		);
 		const results = new Map<
 			string,
@@ -619,7 +690,282 @@ export class Agents {
 				if (!answer?.answer) throw new ToolInputError("Stopped before the person answered.");
 				return answer.answer;
 			},
+			mail: this.#mailContext(sessionId, live),
 		};
+	}
+
+	// --- letters (blueprint section 7) ---
+
+	#mailContext(sessionId: string, live: Live): MailContext {
+		return {
+			post: this.post,
+			canPostCards: this.post.canPostCards(this.#store.getSession(sessionId)),
+			send: (out) => {
+				const letter = this.post.send(
+					{ kind: "session", session: this.#store.getSession(sessionId) },
+					out,
+				);
+				// Writing back to a session whose request started this turn is the answer; no automatic report.
+				if (letter.status !== "refused" && letter.status !== "dropped") {
+					this.#owed.get(sessionId)?.delete(letter.toSession);
+				}
+				return letter;
+			},
+			wait: (letter) => this.#awaitReply(sessionId, letter, live),
+			open: (input) => this.#openChild(this.#store.getSession(sessionId), input),
+			finish: (outcome) => this.#store.setOutcome(sessionId, outcome),
+		};
+	}
+
+	/** A letter is queued: it answers a session that waits for its sender, or it wakes the recipient. */
+	#onQueued(letter: Letter): void {
+		const waiting = this.#waits.get(letter.toSession);
+		if (waiting && letter.fromSession !== null && waiting.target === letter.fromSession) {
+			this.post.mail.setLetterStatus(letter.id, "delivered", {
+				entryId: null,
+				deliveredAt: Date.now(),
+			});
+			this.#owed.get(letter.fromSession)?.delete(letter.toSession);
+			waiting.resolve({ kind: "letter", letter: this.post.mail.getLetter(letter.id) });
+			return;
+		}
+		this.#wake(letter.toSession);
+	}
+
+	/**
+	 * Starts a session that has letters waiting, when it is free: idle, or stopped by an error. A session
+	 * that needs review waits for the person (blueprint 7.3); one that is working gets its letters
+	 * between tool calls.
+	 */
+	#wake(sessionId: string): void {
+		if (this.isRunning(sessionId)) return;
+		let session: Session;
+		try {
+			session = this.#store.getSession(sessionId);
+		} catch {
+			return;
+		}
+		if (session.archivedAt !== null) return;
+		if (session.status !== "idle" && session.status !== "error") return;
+		if (this.post.mail.queuedFor(sessionId).length === 0) return;
+		this.#dropLeftovers(sessionId, "Not run: a letter arrived and the conversation moved on.");
+		this.#start(sessionId);
+	}
+
+	/** Starts every free session with letters waiting: after a restart, and for letters from `jig send`. */
+	wakeQueued(): void {
+		for (const id of this.post.mail.sessionsWithQueued()) this.#wake(id);
+	}
+
+	/** Moves queued letters into the transcript; the model reads them, the interface shows letters. */
+	#deliverLetters(sessionId: string): number {
+		const letters = this.post.mail.queuedFor(sessionId);
+		if (letters.length === 0) return 0;
+		this.#store.tx(() => {
+			for (const letter of letters) {
+				let decision = null;
+				if (letter.decision !== null) {
+					try {
+						decision = decisionRef(this.post.mail.cardByNumber(letter.decision));
+					} catch {
+						decision = null;
+					}
+				}
+				const entry = this.#store.appendEntry(sessionId, {
+					role: "user",
+					message: { role: "user", content: letterText(letter, decision), timestamp: Date.now() },
+					letter: letterRef(letter, decision),
+				});
+				this.post.mail.setLetterStatus(letter.id, "delivered", {
+					entryId: entry.id,
+					deliveredAt: Date.now(),
+				});
+			}
+		});
+		this.post.enterChain(sessionId, letters);
+		const owed = this.#owed.get(sessionId) ?? new Map<string, string>();
+		for (const letter of letters) {
+			if (letter.kind === "request" && letter.fromKind === "session" && letter.fromSession) {
+				owed.set(letter.fromSession, letter.id);
+			}
+		}
+		if (owed.size > 0) this.#owed.set(sessionId, owed);
+		this.#turnLetters.set(sessionId, [
+			...(this.#turnLetters.get(sessionId) ?? []),
+			...letters.map((letter) => letter.id),
+		]);
+		return letters.length;
+	}
+
+	/**
+	 * The turn is over. Letters it read are done; sessions waiting for this one get its last reply; and
+	 * sessions whose request started the turn get that reply as a report, unless this session already
+	 * wrote back to them (blueprint 6.3, item 11). Reports never ask for reports, so this cannot loop.
+	 */
+	#endTurn(
+		sessionId: string,
+		status: SessionStatus,
+		detail: string | null,
+		stopped: boolean,
+	): void {
+		for (const id of this.#turnLetters.get(sessionId) ?? []) {
+			try {
+				if (this.post.mail.getLetter(id).status === "delivered") {
+					this.post.mail.setLetterStatus(id, "done");
+				}
+			} catch {
+				// The letter is gone with its session.
+			}
+		}
+		this.#turnLetters.delete(sessionId);
+		this.post.resetChain(sessionId);
+		const said = this.#lastText.get(sessionId) ?? "";
+		this.#lastText.delete(sessionId);
+		const answered = new Set<string>();
+		for (const [waiter, waiting] of [...this.#waits]) {
+			if (waiting.target !== sessionId) continue;
+			answered.add(waiter);
+			waiting.resolve({ kind: "ended", status, text: said, detail, stopped });
+		}
+		const owed = this.#owed.get(sessionId);
+		this.#owed.delete(sessionId);
+		if (!owed || owed.size === 0) return;
+		const session = this.#store.getSession(sessionId);
+		const summary = stopped
+			? `${session.name} was stopped by the person before it finished.`
+			: status === "error"
+				? `${session.name} stopped with an error.`
+				: firstLine(said) || `${session.name} finished without a written reply.`;
+		const body = status === "error" && !stopped ? (detail ?? "") : said;
+		for (const [requester, letterId] of owed) {
+			if (answered.has(requester)) continue;
+			try {
+				this.post.send(
+					{ kind: "session", session },
+					{
+						to: requester,
+						kind: "report",
+						summary: clip(summary, SUMMARY_MAX),
+						body: clip(body, BODY_MAX),
+						replyTo: letterId,
+						auto: true,
+					},
+				);
+			} catch (error) {
+				if (!(error instanceof JigError)) throw error;
+				this.#log(`session ${sessionId}: no report to ${requester}: ${error.message}`);
+			}
+		}
+	}
+
+	/**
+	 * Waits until the recipient of `letter` writes back or ends its turn, at most `waitMs`. Refuses to wait
+	 * when the recipient already waits for this session, directly or through others: neither could go on.
+	 */
+	#awaitReply(sessionId: string, letter: Letter, live: Live): Promise<WaitResult> {
+		const target = letter.toSession;
+		for (let at: string | undefined = target, hops = 0; at && hops < 100; hops++) {
+			if (at === sessionId) return Promise.resolve({ kind: "cycle" });
+			at = this.#waits.get(at)?.target;
+		}
+		const current = this.post.mail.getLetter(letter.id);
+		if (current.status === "queued" && !this.isRunning(target)) {
+			return Promise.resolve({
+				kind: "not-running",
+				status: this.#store.getSession(target).status,
+			});
+		}
+		const signal = live.controller.signal;
+		return new Promise<WaitResult>((resolve) => {
+			const finish = (result: WaitResult) => {
+				clearTimeout(timer);
+				signal.removeEventListener("abort", onAbort);
+				if (this.#waits.get(sessionId)?.resolve === finish) this.#waits.delete(sessionId);
+				resolve(result);
+			};
+			const onAbort = () => finish({ kind: "stopped" });
+			const timer = setTimeout(() => finish({ kind: "timeout" }), this.#waitMs);
+			this.#waits.set(sessionId, { target, resolve: finish });
+			if (signal.aborted) onAbort();
+			else signal.addEventListener("abort", onAbort, { once: true });
+		});
+	}
+
+	/**
+	 * Opens a task session for `parent` and sends it the brief as a request (blueprint 6.2, item 8). Its
+	 * permissions are never above the parent's: same mode and rules, the parent's folder or one inside it.
+	 */
+	#openChild(parent: Session, input: OpenInput): { session: Session; letter: Letter } {
+		const brief = input.brief.trim();
+		if (!brief) throw invalid("The brief is empty.", "brief");
+		let cwd = parent.cwd;
+		if (input.cwd === null) cwd = null;
+		else if (input.cwd !== undefined) {
+			if (!parent.cwd) {
+				throw invalid("You have no working folder, so the new session cannot have one.", "folder");
+			}
+			const folder = resolveWorkingFolder(
+				isAbsolute(input.cwd) ? input.cwd : join(parent.cwd, input.cwd),
+			);
+			if (!isInside(folder, parent.cwd)) {
+				throw invalid("The folder must be your working folder or inside it.", "folder");
+			}
+			cwd = folder;
+		}
+		let provider = parent.provider;
+		let model = parent.model;
+		if (input.provider && input.model) {
+			if (!this.#gateway.model(input.provider, input.model)) {
+				throw invalid(`${input.provider} has no model ${input.model}.`, "model");
+			}
+			provider = input.provider;
+			model = input.model;
+		}
+		const session = this.#store.createSession({
+			name: this.#freeName(validateSessionName(input.name)),
+			kind: "task",
+			groupId: parent.groupId,
+			cwd,
+			provider,
+			model,
+			thinking: parent.thinking,
+			rules: parent.rules,
+			options: { permissionMode: permissionModeOf(parent.options) },
+			parentId: parent.id,
+		});
+		const letter = this.post.send(
+			{ kind: "session", session: parent },
+			{
+				to: session.id,
+				kind: "request",
+				summary: clip(firstLine(brief), SUMMARY_MAX),
+				body: brief,
+			},
+		);
+		return { session: this.#store.getSession(session.id), letter };
+	}
+
+	/** Session names are unique: "修复登录", then "修复登录 2"… */
+	#freeName(base: string): string {
+		if (!this.#store.findSessionByName(base)) return base;
+		for (let n = 2; ; n++) {
+			const name = `${base.slice(0, 55)} ${n}`;
+			if (!this.#store.findSessionByName(name)) return name;
+		}
+	}
+
+	/** The main conversation and the session's opener, as the system prompt names them. */
+	#placement(session: Session): Placement {
+		const mainId = this.post.mainSessionId();
+		const ref = (id: string | null) => {
+			if (!id) return null;
+			try {
+				return { id, name: this.#store.getSession(id).name };
+			} catch {
+				return null;
+			}
+		};
+		return { main: ref(mainId), parent: ref(session.parentId) };
 	}
 
 	#readState(sessionId: string): ReadState {
@@ -677,14 +1023,18 @@ export class Agents {
 		);
 	}
 
-	/** Moves queued messages and Jig's notes into the transcript; true if anything arrived. */
+	/** Moves Jig's notes, letters and the person's queued messages into the transcript; true if anything arrived. */
 	#deliver(sessionId: string): boolean {
 		const notes = this.#notes.get(sessionId) ?? [];
 		this.#notes.delete(sessionId);
 		for (const note of notes) {
 			this.#store.appendEntry(sessionId, userEntry(`[From Jig, not from the person] ${note}`));
 		}
-		return this.#store.deliverQueue(sessionId, userEntry).length > 0 || notes.length > 0;
+		const letters = this.#deliverLetters(sessionId);
+		const fromPerson = this.#store.deliverQueue(sessionId, userEntry).length;
+		// What the person wrote starts a new chain of hand-offs.
+		if (fromPerson > 0) this.post.resetChain(sessionId);
+		return letters > 0 || fromPerson > 0 || notes.length > 0;
 	}
 
 	/** The name of the session's group, for the system prompt. */
@@ -703,20 +1053,22 @@ export class Agents {
 	}
 
 	/**
-	 * Keeps the system prompt stable between turns. The environment and instruction files are saved at the
-	 * first turn; if the files or the date change later, an update is appended to the transcript instead of
-	 * rewriting the prompt, so the provider's prompt cache stays valid (prior-art 4.5).
+	 * Keeps the system prompt the same between turns. The environment and instruction files are saved at the
+	 * first turn; when the files, the date, the approval mode or the main conversation change later, an
+	 * update is appended to the transcript instead, and the prompt keeps its saved inputs until the next
+	 * compaction, so the provider's prompt cache stays valid (prior-art 4.5).
 	 */
 	#refreshContext(session: Session): ContextSnapshot {
+		const placement = this.#placement(session);
 		const saved = this.#store.getContextSnapshot<ContextSnapshot>(session.id);
 		if (!saved) {
-			const snapshot = takeSnapshot(session, this.#home);
+			const snapshot = takeSnapshot(session, this.#home, placement);
 			this.#store.setContextSnapshot(session.id, snapshot);
 			return snapshot;
 		}
 		// A session switched between chat and code gets a fresh environment: folder, git status and files.
 		if (saved.cwd !== session.cwd) {
-			const snapshot = takeSnapshot(session, this.#home);
+			const snapshot = takeSnapshot(session, this.#home, placement);
 			this.#store.setContextSnapshot(session.id, snapshot);
 			this.#store.appendEntry(session.id, {
 				role: "system",
@@ -730,37 +1082,55 @@ export class Agents {
 			});
 			return snapshot;
 		}
+		const mode = permissionModeOf(session.options);
+		// Snapshots from before a field existed learn it quietly; the prompt reads the same either way.
+		const { told: _told, ...prompt } = {
+			...saved,
+			permissionMode: saved.permissionMode ?? mode,
+			main: saved.main === undefined ? null : saved.main,
+			parent: saved.parent === undefined ? placement.parent : saved.parent,
+		};
+		const told: Told = saved.told ?? {
+			date: prompt.date,
+			instructions: prompt.instructions,
+			permissionMode: prompt.permissionMode,
+			main: prompt.main,
+		};
 		const updates: string[] = [];
 		const date = today();
-		if (date !== saved.date) updates.push(`Today's date is now ${date}.`);
+		if (date !== told.date) updates.push(`Today's date is now ${date}.`);
 		const current = loadInstructions(session.cwd, this.#home);
-		const changed = JSON.stringify(current) !== JSON.stringify(saved.instructions);
-		if (changed) {
+		if (JSON.stringify(current) !== JSON.stringify(told.instructions)) {
 			updates.push(
 				current.length > 0
 					? `The instruction files changed. These are the current versions; they replace the earlier ones.\n\n${renderInstructions(current, session.cwd)}`
 					: "The instruction files were removed.",
 			);
 		}
-		const mode = permissionModeOf(session.options);
-		if (saved.permissionMode && saved.permissionMode !== mode) {
+		if (told.permissionMode !== mode) {
 			updates.push(`The person changed the approval mode. ${APPROVAL_MODE[mode]}`);
 		}
-		if (updates.length === 0) {
-			if (saved.permissionMode) return saved;
-			// A snapshot from before the modes learns the mode quietly; the prompt already states it.
-			const next = { ...saved, permissionMode: mode };
-			this.#store.setContextSnapshot(session.id, next);
-			return next;
+		const sameMain = (told.main?.id ?? null) === (placement.main?.id ?? null);
+		if (!sameMain) updates.push(mainUpdate(session, told.main, placement.main));
+		if (updates.length > 0) {
+			this.#store.appendEntry(session.id, {
+				role: "system",
+				message: { role: "system", content: updates.join("\n\n"), timestamp: Date.now() },
+			});
 		}
-		this.#store.appendEntry(session.id, {
-			role: "system",
-			message: { role: "system", content: updates.join("\n\n"), timestamp: Date.now() },
-		});
-		const next = { ...saved, date, instructions: current, permissionMode: mode };
-		this.#store.setContextSnapshot(session.id, next);
-		// The prompt keeps the old snapshot so it stays cacheable; the update above carries the change.
-		return { ...saved };
+		const next: ContextSnapshot = {
+			...prompt,
+			told: {
+				date,
+				instructions: current,
+				permissionMode: mode,
+				main: sameMain ? told.main : placement.main,
+			},
+		};
+		if (JSON.stringify(next) !== JSON.stringify(saved)) {
+			this.#store.setContextSnapshot(session.id, next);
+		}
+		return prompt;
 	}
 
 	async #compactIfNeeded(session: Session, model: ModelInfo, signal: AbortSignal): Promise<void> {

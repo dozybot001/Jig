@@ -266,7 +266,11 @@ describe("agent loop", () => {
 		const { faux, store, agents, session, cwd, contexts, capture } = setup();
 		writeFileSync(join(cwd, "AGENTS.md"), "Always answer in haiku.\n");
 		writeFileSync(join(cwd, "CLAUDE.md"), "@AGENTS.md\n");
-		faux.setResponses([capture(fauxAssistantMessage("ok")), capture(fauxAssistantMessage("ok"))]);
+		faux.setResponses([
+			capture(fauxAssistantMessage("ok")),
+			capture(toolUse(fauxToolCall("glob", { pattern: "*.md" }, { id: "g1" }))),
+			capture(fauxAssistantMessage("ok")),
+		]);
 		agents.send(session.id, "hi");
 		await agents.whenIdle(session.id);
 		const system = textOf(contexts[0]?.messages[0]);
@@ -279,7 +283,9 @@ describe("agent loop", () => {
 			.entries.filter((e) => e.role === "system");
 		assert.equal(updates.length, 1);
 		assert.match(textOf(updates[0]), /Always answer in prose/);
+		// The prompt stays the same for every step until the next compaction, not only the first one.
 		assert.equal(textOf(contexts[1]?.messages[0]), system);
+		assert.equal(textOf(contexts[2]?.messages[0]), system);
 		assert.equal(readFileSync(join(cwd, "AGENTS.md"), "utf8"), "Always answer in prose.\n");
 	});
 
@@ -330,7 +336,16 @@ describe("agent loop", () => {
 		agents.send(session.id, "hi");
 		await agents.whenIdle(session.id);
 		const tools = (contexts[0]?.messages[0]?.toolsAdded ?? []).map((tool) => tool.name).sort();
-		assert.deepEqual(tools, ["ask_user", "todo", "web_fetch"]);
+		assert.deepEqual(tools, [
+			"ask_user",
+			"check_decision",
+			"finish_task",
+			"list_sessions",
+			"open_session",
+			"send_letter",
+			"todo",
+			"web_fetch",
+		]);
 	});
 
 	test("a chat switched to code gets file tools and a note about its folder", async () => {

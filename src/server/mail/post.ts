@@ -173,6 +173,18 @@ export class PostOffice {
 		return letterQuotaOf(session.options, session.id === this.mainSessionId());
 	}
 
+	/** Sessions that can receive letters, with their groups' names (list_sessions). */
+	directory(): { sessions: Session[]; groups: Map<string, string> } {
+		return {
+			sessions: this.#store.activeSessions(),
+			groups: new Map(this.#store.listGroups().map((group) => [group.id, group.name])),
+		};
+	}
+
+	sessionName(id: string): string | null {
+		return this.#nameOf(id);
+	}
+
 	// --- chains of hand-offs ---
 
 	/** Letters reached the session; letters it now sends continue the longest chain among them. */

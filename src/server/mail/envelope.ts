@@ -1,0 +1,127 @@
+import type { DecisionRef, LetterRef } from "../../shared/messages.ts";
+import type { Card, Letter, Session } from "../../shared/types.ts";
+
+/** Attribute values stay on one line and cannot close the tag they sit in. */
+const attr = (value: string) => value.replace(/["\n\r<>]/g, " ");
+
+function senderLabel(letter: Letter): string {
+	if (letter.fromKind === "cli") return "the command line (jig send)";
+	if (letter.fromKind === "person") return "the person";
+	return letter.fromName;
+}
+
+/** The decision as Jig recorded it, for a session to rely on. */
+export function decisionRef(card: Card): DecisionRef {
+	return {
+		number: card.number,
+		title: card.title,
+		choice: card.choice === null ? null : (card.options[card.choice]?.label ?? null),
+		note: card.note,
+		decidedAt: card.decidedAt ?? card.updatedAt,
+	};
+}
+
+/** What the interface shows for a delivered letter. */
+export function letterRef(letter: Letter, decision: DecisionRef | null): LetterRef {
+	return {
+		id: letter.id,
+		kind: letter.kind,
+		from: { kind: letter.fromKind, sessionId: letter.fromSession, name: letter.fromName },
+		summary: letter.summary,
+		body: letter.body,
+		...(letter.auto ? { auto: true } : {}),
+		...(decision ? { decision } : {}),
+	};
+}
+
+function decisionLines(decision: DecisionRef): string[] {
+	return [
+		`Question: ${decision.title}`,
+		decision.choice
+			? `Chosen: ${decision.choice}`
+			: "No option was chosen; the note is the answer.",
+		...(decision.note ? [`Note: ${decision.note}`] : []),
+	];
+}
+
+/**
+ * What the model reads for a delivered letter. The closing tag repeats the letter's id, which the sender
+ * could not know while writing, so text inside a letter cannot pass itself off as the end of it.
+ */
+export function letterText(letter: Letter, decision: DecisionRef | null): string {
+	if (letter.fromKind === "person" && decision) {
+		return [
+			`<decision number="${decision.number}" from="the person" recorded-by="Jig">`,
+			...decisionLines(decision),
+			`</decision number="${decision.number}">`,
+		].join("\n");
+	}
+	const attributes = [
+		`id="${letter.id}"`,
+		`kind="${letter.kind}"`,
+		`from="${attr(senderLabel(letter))}"`,
+		...(letter.fromSession ? [`from-id="${letter.fromSession}"`] : []),
+		`thread="${letter.threadId}"`,
+		...(letter.replyTo ? [`reply-to="${letter.replyTo}"`] : []),
+		...(letter.auto ? ['auto="true"'] : []),
+	];
+	const lines = [`<letter ${attributes.join(" ")}>`, letter.summary];
+	if (letter.body) lines.push("", letter.body);
+	if (decision) {
+		lines.push(
+			"",
+			`[Jig checked decision #${decision.number}: the person decided it in Jig.]`,
+			...decisionLines(decision),
+		);
+	}
+	lines.push(`</letter id="${letter.id}">`);
+	return lines.join("\n");
+}
+
+/** A decision for check_decision, with its state told plainly. */
+export function decisionReport(card: Card, names: (id: string) => string | null): string {
+	const lines: string[] = [];
+	if (card.status === "pending") lines.push(`#${card.number} is still waiting for the person.`);
+	else if (card.status === "withdrawn")
+		lines.push(`#${card.number} was withdrawn: ${card.withdrawnReason ?? ""}`);
+	else {
+		const when = new Date(card.decidedAt ?? card.updatedAt).toISOString();
+		lines.push(`#${card.number} was decided by the person in Jig (${when}).`);
+	}
+	lines.push(`Question: ${card.title}`);
+	if (card.options.length > 0) {
+		lines.push(
+			`Options: ${card.options
+				.map(
+					(option, index) =>
+						`${index + 1}. ${option.label}${index === card.recommended ? " (recommended)" : ""}`,
+				)
+				.join("; ")}`,
+		);
+	}
+	if (card.status === "decided") {
+		const chosen = card.choice === null ? null : card.options[card.choice]?.label;
+		lines.push(chosen ? `Chosen: ${chosen}` : "No option was chosen; the note is the answer.");
+		if (card.note) lines.push(`Note: ${card.note}`);
+	}
+	const requester = card.requestedBy ? names(card.requestedBy) : null;
+	if (requester) lines.push(`Requested by: ${requester}`);
+	return lines.join("\n");
+}
+
+/** One line per session for list_sessions. */
+export function directoryLine(
+	session: Session,
+	marks: { you: boolean; main: boolean; parentName: string | null; group: string | null },
+): string {
+	const kind = `${session.kind} ${session.cwd ? `code (${session.cwd})` : "chat"}`;
+	const parts = [session.id, session.name, kind, session.status];
+	if (marks.group) parts.push(`group: ${marks.group}`);
+	if (marks.main) parts.push("the main conversation");
+	if (marks.you) parts.push("you");
+	if (marks.parentName) parts.push(`opened by ${marks.parentName}`);
+	if (session.outcome) parts.push(`result: ${session.outcome}`);
+	const role = session.responsibility.trim().split("\n")[0]?.trim();
+	if (role) parts.push(`role: ${role.length > 120 ? `${role.slice(0, 120)}…` : role}`);
+	return `- ${parts.join(" · ")}`;
+}

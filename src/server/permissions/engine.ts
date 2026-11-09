@@ -23,7 +23,9 @@ export type Subject =
 	| { kind: "read"; tool: string; paths: string[]; summary: string }
 	| { kind: "write"; tool: string; paths: string[]; summary: string }
 	| { kind: "command"; tool: string; command: string }
-	| { kind: "url"; tool: string; url: string };
+	| { kind: "url"; tool: string; url: string }
+	/** Something that is neither a file, a command nor a URL, such as opening a session. */
+	| { kind: "act"; tool: string; summary: string };
 
 export type Decision =
 	| { effect: "allow" }
@@ -68,6 +70,8 @@ export class PermissionEngine {
 				return this.#command(subject, session, flagged);
 			case "url":
 				return this.#url(subject, session, flagged);
+			case "act":
+				return this.#act(subject, session, flagged);
 		}
 	}
 
@@ -256,6 +260,16 @@ export class PermissionEngine {
 		if (rule === "ask") return this.#ask(subject.tool, subject.url);
 		return this.#byDefault(session, flagged, subject.tool, subject.url, [
 			{ effect: "allow", tool: subject.tool, pattern: host },
+		]);
+	}
+
+	#act(subject: Extract<Subject, { kind: "act" }>, session: Session, flagged: boolean): Decision {
+		const rule = this.#rulesFor(session, subject.tool, () => true);
+		if (rule === "deny") return { effect: "deny", reason: "A rule in this session refuses this." };
+		if (rule === "allow") return { effect: "allow" };
+		if (rule === "ask") return this.#ask(subject.tool, subject.summary);
+		return this.#byDefault(session, flagged, subject.tool, subject.summary, [
+			{ effect: "allow", tool: subject.tool },
 		]);
 	}
 

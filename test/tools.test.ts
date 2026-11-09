@@ -35,6 +35,8 @@ function makeContext(
 		output: () => {},
 		setTodos: (list) => todos.splice(0, todos.length, ...list),
 		ask: async () => "yes",
+		// File, shell and web tools never touch letters.
+		mail: {} as ToolContext["mail"],
 		todos,
 		...overrides,
 	};

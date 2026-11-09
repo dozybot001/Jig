@@ -1,12 +1,10 @@
-import { realpathSync, statSync } from "node:fs";
-import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
 import { Hono } from "hono";
 import type { PermissionRule, Session, ThinkingLevel, Transcript } from "../../shared/types.ts";
 import { PERMISSION_MODES, SESSION_KINDS, THINKING_LEVELS } from "../../shared/types.ts";
 import { invalid } from "../errors.ts";
 import { type ExportLanguage, exportFileName, sessionMarkdown } from "../export.ts";
 import { pickFolder } from "../folder-picker.ts";
+import { resolveWorkingFolder } from "../paths.ts";
 import type { SessionPatch, Store } from "../store.ts";
 import { idempotent } from "./idempotency.ts";
 import {
@@ -132,21 +130,6 @@ export function parseWorkspaces(value: unknown[], saved: Workspace[]): Workspace
 		paths.add(path);
 		return { id, name, path };
 	});
-}
-
-/** Resolves `~`, requires an existing folder and stores its real path, so permission checks compare like with like. */
-export function resolveWorkingFolder(path: string): string {
-	const expanded =
-		path === "~" ? homedir() : path.startsWith("~/") ? join(homedir(), path.slice(2)) : path;
-	if (!isAbsolute(expanded)) throw invalid("The working folder must be an absolute path.", "cwd");
-	let real: string;
-	try {
-		real = realpathSync(expanded);
-	} catch {
-		throw invalid(`The folder ${path} does not exist.`, "cwd");
-	}
-	if (!statSync(real).isDirectory()) throw invalid(`${path} is not a folder.`, "cwd");
-	return real;
 }
 
 /** `filename` for old clients, `filename*` for the real name (RFC 6266 and 5987). */

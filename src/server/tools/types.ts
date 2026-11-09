@@ -1,5 +1,6 @@
 import type { ImageBlock, JsonObject, TextBlock } from "../../shared/messages.ts";
-import type { Session, Todo } from "../../shared/types.ts";
+import type { Letter, Session, SessionStatus, TaskOutcome, Todo } from "../../shared/types.ts";
+import type { Outgoing, PostOffice } from "../mail/post.ts";
 import type { Subject } from "../permissions/engine.ts";
 import type { Jobs } from "./jobs.ts";
 import type { ReadState } from "./read-state.ts";
@@ -25,6 +26,39 @@ export interface ToolContext {
 	setTodos(todos: Todo[]): void;
 	/** Asks the person a question in Jig and waits for the answer. */
 	ask(question: string, options?: string[]): Promise<string>;
+	mail: MailContext;
+}
+
+/** How waiting for another session ended (send_letter and open_session with `wait`). */
+export type WaitResult =
+	| { kind: "letter"; letter: Letter }
+	| { kind: "ended"; status: SessionStatus; text: string; detail: string | null; stopped: boolean }
+	| { kind: "timeout" }
+	/** Waiting would close a circle of sessions waiting for each other. */
+	| { kind: "cycle" }
+	/** The recipient is not running (it needs the person first); the letter waits for it. */
+	| { kind: "not-running"; status: SessionStatus }
+	/** This session was stopped while it waited. */
+	| { kind: "stopped" };
+
+export interface OpenInput {
+	name: string;
+	brief: string;
+	/** Absolute folder inside the opener's, or null for a chat; undefined keeps the opener's folder. */
+	cwd?: string | null;
+	provider?: string;
+	model?: string;
+}
+
+/** Letters, decision cards and child sessions, as the calling session. */
+export interface MailContext {
+	post: PostOffice;
+	/** The calling session may put cards in the approval center. */
+	canPostCards: boolean;
+	send(out: Outgoing): Letter;
+	wait(letter: Letter): Promise<WaitResult>;
+	open(input: OpenInput): { session: Session; letter: Letter };
+	finish(outcome: TaskOutcome): Session;
 }
 
 /**
@@ -47,9 +81,16 @@ export interface ToolDefinition {
 	readOnly: boolean;
 	/** Offered only to sessions with a working folder; chats get the rest. */
 	needsFolder: boolean;
+	/** Offered only when this says so, e.g. card tools to the main conversation. */
+	offered?(session: Session, roles: Roles): boolean;
 	/** What the call touches, for the permission check. Throws ToolInputError on bad arguments. */
 	subject(args: JsonObject, session: Session): Subject;
 	run(args: JsonObject, ctx: ToolContext): Promise<ToolResult>;
+}
+
+/** What a session may do beyond its tools' own checks. */
+export interface Roles {
+	canPostCards: boolean;
 }
 
 /** Bad arguments from the model; reported back to it as an error result. */
