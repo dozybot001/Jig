@@ -1,6 +1,6 @@
 # Jig 对外介绍
 
-版本 0.3（2026-11-09）。官网产品库、README、App Store 描述和各渠道介绍 Jig 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
+版本 0.4（2026-11-09）。官网产品库、README、App Store 描述和各渠道介绍 Jig 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
 
 ## 一、定义
 
@@ -94,22 +94,23 @@ Jig 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 | 在你的电脑上运行 | 会话在你电脑上的 Jig 服务里运行，网页关了也照常干活。会话、信件和设置存在你的电脑上，Jig 不收集任何数据。每个会话单独选服务商和模型，默认用 DeepSeek。 |
 | Runs on your computer | Sessions run in the Jig service on your computer and keep working when the web page is closed. Sessions, letters and settings stay on your computer, and Jig collects no data. Each session has its own provider and model; DeepSeek is the default. |
 
-**`showcase`**：主图用审批中心；`alt`「Jig 审批中心：等你授权的推送和等你回答的问题」/ "Jig's approval center: a push waiting for approval and questions waiting for answers"，`caption`「Jig 实际界面 · 本地演示数据」/ "Jig's actual interface · local demo data"。
+**`showcase`**：主图用审批中心，alt 见第七节；`caption`「Jig 实际界面 · 本地演示数据」/ "Jig's actual interface · local demo data"。
 
 ## 七、标识与截图
 
 - **产品图形**：三道平行线组成的 J，单色：浅色主题用近黑，深色主题反白，不另设主题色（蓝图第十二节）。文件是 `web/public/icons/jig-mark.svg`，字标是「Jig」，组合标志按规范第 1 节，右上是 Tenon 小标。
-- **截图**：真实界面加本地演示数据：用临时数据目录，不读真实的 `~/.jig`；模型回复由脚本模拟，会话、信件和卡片都由 Jig 自己的代码生成。1920×1080 WebP，中英文、深浅色各一套，文件名 `jig-{画面}-{zh|en}-{light|dark}.webp`。四种画面讲同一件事：你让统筹上线首页改版、修好登录问题，统筹分给网站和后端。
+- **截图**：真实界面加本地演示数据：用临时数据目录，不读真实的 `~/.jig`；模型回复由脚本模拟，会话、信件和卡片都由 Jig 自己的代码生成。1280×720 的窗口按 2 倍截取，2560×1440 PNG，中英文、深浅色各一套，文件名 `jig-{画面}-{zh|en}-{light|dark}.png`。四种画面讲同一件事：你让统筹上线首页改版、修好登录问题，统筹分给网站和后端。
 
-| 画面 | 说明 | Caption |
+| 画面 | 官网上的位置 | alt |
 | --- | --- | --- |
-| `center`（主图） | 审批中心：网站等你授权推送，内容等你回答两个问题。你平时在这里处理要你做的事 | The approval center: Website waits for you to approve a push, and Content waits for answers to two questions. This is where you handle what needs you |
-| `decision` | 决定卡：后端提出、经统筹放进审批中心，写明建议、期限和能否撤回；你选好后送回后端 | A decision card: raised by Backend and put in the approval center by the coordinator, with a recommendation, a deadline and whether it can be undone; your choice goes back to Backend |
-| `main` | 主对话：你说一句要做什么，统筹分给网站和后端；后端修好后回报，统筹汇总给你 | The main conversation: you say what you want, and the coordinator hands it to Website and Backend; Backend reports back, and the coordinator sums up for you |
-| `session` | 网站的会话：改好首页、跑完测试，推送前停下来等你授权。这张卡也在审批中心，不用进来看 | Website's session: it finished the page and ran the tests, then stopped before pushing. The same card is in the approval center, so you don't need to come here |
+| `approval` | 首屏主图，也用在产品卡片上 | Jig 审批中心：网站等你授权推送，后端提出、经统筹放进来的决定卡 / Jig's approval center: Website waiting for you to approve a push, and a decision card raised by Backend through the coordinator |
+| `main` | 「主次结构」一段 | Jig 主对话：统筹把首页改版和登录问题分给网站和后端，收到后端的回报后汇总给你 / Jig's main conversation: the coordinator hands the redesign and the sign-in fix to Website and Backend, and sums up once Backend reports back |
+| `permission` | 「结构由 Jig 执行」一段 | Jig 代码会话：网站改好首页、跑完测试，推送前停下来等你授权 / A code session in Jig: Website finished the page and ran the tests, then stopped to ask before pushing |
+| `letters` | 「会话之间的信件」一段 | Jig 信件列表：会话之间的请求、回报和通知，以及命令行寄来的信 / Jig's letters: requests, reports and notices between sessions, and a letter from the command line |
 
 ## 修改记录
 
+- **0.4（2026-11-09）** 截图按官网详情页的版面重拍：审批中心（一张授权卡加一张决定卡）、主对话、代码会话里的授权卡、信件列表，2560×1440；第七节写明每张的位置和中英文 alt。
 - **0.3（2026-11-09）** 按创始人给的方向重写定位：Jig 推的是 session engineering 的做法，会话分主次，人只对接主对话、在审批中心处理要人做的事，不用逐个进入会话。重写第二、三、五、六节，第七节写明四种截图画面。
 - **0.2（2026-11-09）** 记下产品库条目的现状（官网提交 0c2d448，不公开），以及改了本文要把提交号告诉平台组。
 - **0.1（2026-11-09）** 首版。创始人定 Jig 纳入 Tenon 产品库，让 Jig 会话给平台组写文案指导。

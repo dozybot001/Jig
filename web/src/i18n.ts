@@ -398,7 +398,7 @@ const zh = {
 	version: "版本 {v}",
 	build: "构建 {b}",
 	aboutBody:
-		"AI 原生的多 Agent 工作台。在 Jig 里，一个人和一组 Agent 会话一起做事。每个会话是一个有名字、有职责的成员，有自己的工作区、模型和权限；按团队组织，常设会话长期负责一块事，任务会话为一件事开设，做完可以归档。\n\n会话跑在你电脑上的 Jig 服务里，网页关了也照常干活。你不用逐个盯着对话，只处理会话停下来找你的事：需要你授权的操作，和只有你能回答的问题。",
+		"AI 原生的多 Agent 工作台。Jig 按 session engineering 的做法组织 Agent 会话：主对话统筹，其他会话各管一块，做完逐级回报。你只对接主对话，要你授权和决定的事都汇到审批中心，不用逐个进入会话。\n\n每个会话有名字、职责、工作区、模型和权限，按团队组织：常设会话长期负责一块事，任务会话为一件事开设，做完回报。会话跑在你电脑上的 Jig 服务里，网页关了也照常干活。",
 	publisher: "出品方",
 	publisherName: "榫卯 Tenon AI",
 	website: "官网",
@@ -1051,7 +1051,7 @@ const en: Record<MessageKey, string> = {
 	version: "Version {v}",
 	build: "Build {b}",
 	aboutBody:
-		"An AI-native multi-agent workbench. In Jig, one person works with a group of agent sessions. Each session is a named member with a role, its own workspace, model and permissions. Sessions are organized in teams: a standing session owns an area for the long term, and a task session is opened for one job and can be archived when it is done.\n\nSessions run in the Jig service on your computer and keep working when the page is closed. You don't watch each conversation; you handle what sessions stop to bring you: operations that need your permission and questions only you can answer.",
+		"An AI-native multi-agent workbench. Jig organizes agent sessions the session engineering way: the main conversation coordinates, and the other sessions each own an area and report back up. You deal only with the main conversation, and everything that needs your approval or decision comes to the approval center, so you don't have to open each session.\n\nEach session has a name, a role, a workspace, a model and permissions, and sessions are organized in teams: a standing session owns an area for the long term, and a task session is opened for one job and reports when it is done. Sessions run in the Jig service on your computer and keep working when the page is closed.",
 	publisher: "Publisher",
 	publisherName: "Tenon AI",
 	website: "Website",

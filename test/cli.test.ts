@@ -28,10 +28,12 @@ describe("jig cli", () => {
 		});
 	});
 
-	test("no arguments and --help print usage", async () => {
+	test("no arguments and --help print the definition and usage", async () => {
 		for (const argv of [[], ["--help"], ["-h"]]) {
 			const { io, stdout } = fakeIo();
 			assert.equal(await run(argv, io), 0);
+			// The one-line definition, as everywhere else (spec 1.8).
+			assert.match(stdout.text(), /^jig \S+\nAn AI-native multi-agent workbench\.\n/);
 			assert.match(stdout.text(), /Usage: jig <command>/);
 		}
 	});

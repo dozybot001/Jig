@@ -10,7 +10,12 @@ export interface Command {
 
 function helpText(io: CliIo, commands: Command[]): string {
 	const bold = (s: string) => paint("bold", s, io.stdout, io.env);
-	const lines = [`${NAME} ${VERSION}`, "", `${bold("Usage:")} ${NAME} <command> [options]`];
+	const lines = [
+		`${NAME} ${VERSION}`,
+		"An AI-native multi-agent workbench.",
+		"",
+		`${bold("Usage:")} ${NAME} <command> [options]`,
+	];
 	if (commands.length > 0) {
 		lines.push("", bold("Commands:"));
 		const width = Math.max(...commands.map((c) => c.name.length));

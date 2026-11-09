@@ -138,12 +138,12 @@
         }
       }
     },
-    "An AI-native multi-agent workbench. In Jig, one person works with a group of agent sessions, which run in Jig on your Mac.": {
+    "An AI-native multi-agent workbench. Jig organizes agent sessions the session engineering way: the main conversation coordinates, and the other sessions each own an area and report back up. The sessions run in Jig on your Mac.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI 原生的多 Agent 工作台。在 Jig 里，一个人和一组 Agent 会话一起做事，会话跑在你 Mac 上的 Jig 里。"
+            "value": "AI 原生的多 Agent 工作台。Jig 按 session engineering 的做法组织 Agent 会话：主对话统筹，其他会话各管一块，做完逐级回报。会话跑在你 Mac 上的 Jig 里。"
           }
         }
       }
@@ -527,12 +527,12 @@
     "Jig": {
       "shouldTranslate": false
     },
-    "Jig on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you can allow operations, answer the sessions' questions, decide on cards, and follow and reply to sessions.": {
+    "Jig on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions' questions and decide on cards, and you can follow and reply to sessions.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone 上的 Jig 经中继连接你的 Mac，两端之间端到端加密。离开电脑时，你可以在手机上授权操作、回答会话的提问、处理决定卡，看会话的进展并回复。"
+            "value": "iPhone 上的 Jig 经中继连接你的 Mac，两端之间端到端加密。离开电脑时，你在这里处理要你做的事：授权操作、回答会话的提问、处理决定卡，也能看会话的进展并回复。"
           }
         }
       }
