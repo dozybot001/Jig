@@ -1,11 +1,12 @@
 import { isAbsolute, join } from "node:path";
-import type {
-	AssistantMessage,
-	EntryBody,
-	JsonObject,
-	Notice,
-	ToolCallBlock,
-	ToolResultMessage,
+import {
+	type AssistantMessage,
+	type EntryBody,
+	type JsonObject,
+	type Notice,
+	plainLine,
+	type ToolCallBlock,
+	type ToolResultMessage,
 } from "../../shared/messages.ts";
 import {
 	type Approval,
@@ -109,7 +110,6 @@ const WAIT_MS = 30 * 60 * 1000;
 const RESTARTED =
 	"Jig restarted while this call was running. It may or may not have finished; check the current state before running it again.";
 
-const firstLine = (text: string) => (text.trim().split("\n")[0] ?? "").trim();
 const clip = (text: string, max: number) =>
 	[...text].length > max ? `${[...text].slice(0, max - 1).join("")}…` : text;
 
@@ -922,7 +922,7 @@ export class Agents {
 				if (requests.length === 0 && wrote.some((letter) => letter.kind === "report")) continue;
 				this.#autoLetter(session, requester, {
 					kind: "report",
-					summary: firstLine(said) || `${session.name} finished without a written reply.`,
+					summary: plainLine(said) || `${session.name} finished without a written reply.`,
 					body: said,
 					replyTo,
 				});
@@ -938,7 +938,7 @@ export class Agents {
 					? `The person stopped ${session.name} before it finished.`
 					: status === "error"
 						? `${session.name} stopped with an error.`
-						: firstLine(said) || `${session.name} is waiting for answers from other sessions.`,
+						: plainLine(said) || `${session.name} is waiting for answers from other sessions.`,
 				body: [status === "error" && !stopped ? (detail ?? "") : said, follows]
 					.filter(Boolean)
 					.join("\n\n"),
@@ -1063,7 +1063,7 @@ export class Agents {
 				{
 					to: session.id,
 					kind: "request",
-					summary: clip(firstLine(brief), SUMMARY_MAX),
+					summary: clip(plainLine(brief), SUMMARY_MAX),
 					body: brief,
 				},
 			),

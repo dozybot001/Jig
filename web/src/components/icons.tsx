@@ -7,6 +7,7 @@ import {
 	Code,
 	FileText,
 	Folder,
+	FolderPlus,
 	Inbox,
 	Info,
 	KeyRound,
@@ -29,6 +30,7 @@ import {
 	Square,
 	SquarePen,
 	Stamp,
+	UserRoundPlus,
 	Users,
 	X,
 } from "lucide-react";
@@ -70,6 +72,9 @@ export const CenterIcon = () => <Inbox {...props} />;
 export const MainIcon = () => <MessagesSquare {...props} />;
 /** A team in the person's organization. */
 export const TeamIcon = () => <Users {...props} />;
+/** New team, new workspace and new session look different where they stand side by side (the rail). */
+export const NewTeamIcon = () => <UserRoundPlus {...props} />;
+export const NewWorkspaceIcon = () => <FolderPlus {...props} />;
 /** A decision the person made. */
 export const DecisionIcon = () => <Stamp {...props} />;
 export const CollapseIcon = () => <PanelLeftClose {...props} />;

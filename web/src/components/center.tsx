@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { bodyAfterSummary, plainLine } from "../../../src/shared/messages.ts";
 import type { Approval, Card, Letter } from "../../../src/shared/types.ts";
 import {
 	decideCard,
@@ -12,7 +13,7 @@ import {
 import { formatAgo, type MessageKey, t, useLang } from "../i18n.ts";
 import { type CenterTab, centerCount, useAppState } from "../state.ts";
 import { Capped, Markdown } from "./content.tsx";
-import { DecisionIcon, MailIcon } from "./icons.tsx";
+import { ChevronIcon, DecisionIcon, MailIcon } from "./icons.tsx";
 import { SidebarToggle } from "./session.tsx";
 import { PermissionCard, QuestionCard } from "./transcript.tsx";
 import { Button, ErrorBox, useAction } from "./ui.tsx";
@@ -168,10 +169,10 @@ function HeldLetter({ letter }: { letter: Letter }) {
 					<SenderLink letter={letter} /> → <SessionLink id={letter.toSession} />
 				</h3>
 			</div>
-			<p className="letter-summary">{letter.summary}</p>
+			<p className="letter-summary">{plainLine(letter.summary) || letter.summary}</p>
 			{letter.body && (
 				<Capped className="letter-body" label={letter.summary}>
-					{letter.body}
+					<Markdown text={letter.body} breaks />
 				</Capped>
 			)}
 			<p className="hint">
@@ -290,35 +291,72 @@ function CenterList() {
 	);
 }
 
+/** Who a letter is from, as plain text for the one-line row. */
+function useSenderName(letter: Letter): string {
+	const name = useSessionName(letter.fromSession);
+	if (letter.fromKind === "cli") return t("fromCli");
+	if (letter.fromKind === "person") return t("you");
+	return name ?? letter.fromName;
+}
+
+/**
+ * One letter on one line: who wrote to whom, the kind, the summary and when. Only a letter that did not
+ * get through (held, refused, dropped) shows its state on the line. Clicking the line unfolds the letter
+ * under it, in the same card: the full summary and the body at a fixed height that scrolls inside, then
+ * links to both sessions with every state and its reason.
+ */
 function LetterRow({ letter, now }: { letter: Letter; now: number }) {
 	useLang();
+	const [open, setOpen] = useState(false);
+	const panel = useId();
+	const from = useSenderName(letter);
+	const to = useSessionName(letter.toSession) ?? "";
+	const summary = plainLine(letter.summary) || letter.summary;
+	const body = bodyAfterSummary(letter.body, letter.summary);
+	const failed = ["held", "refused", "dropped"].includes(letter.status);
 	const reason =
-		letter.statusReason && (letter.status === "refused" || letter.status === "dropped")
-			? t(`letterReason_${letter.statusReason}` as MessageKey)
-			: null;
+		letter.statusReason && failed ? t(`letterReason_${letter.statusReason}` as MessageKey) : null;
+	const status = (
+		<span className={`letter-status letter-status-${letter.status}`}>
+			{t(`letterStatus_${letter.status}`)}
+		</span>
+	);
 	return (
-		<li className="letter-row">
-			<div className="letter-row-head">
-				<span className="letter-route">
-					<SenderLink letter={letter} /> → <SessionLink id={letter.toSession} />
+		<li className="letter-item" data-open={open}>
+			<button
+				type="button"
+				className="letter-line"
+				aria-expanded={open}
+				aria-controls={panel}
+				onClick={() => setOpen((value) => !value)}
+			>
+				<span className="letter-line-route">
+					{from} → {to}
 				</span>
 				<span className="tag">{t(`letterKind_${letter.kind}`)}</span>
-				<span className={`letter-status letter-status-${letter.status}`}>
-					{t(`letterStatus_${letter.status}`)}
+				<span className="letter-line-summary">{summary}</span>
+				<span className="letter-line-meta">
+					{failed && status}
+					<span className="session-time">{formatAgo(letter.createdAt, now)}</span>
 				</span>
-				<span className="session-time">{formatAgo(letter.createdAt, now)}</span>
-			</div>
-			{letter.body ? (
-				<details className="letter-details">
-					<summary>{letter.summary}</summary>
-					<Capped className="letter-body" label={letter.summary}>
-						{letter.body}
+				<ChevronIcon />
+			</button>
+			{open && (
+				<div className="letter-panel" id={panel}>
+					<Capped className="letter-content" label={summary}>
+						<p className="letter-summary">{summary}</p>
+						{body && <Markdown text={body} breaks />}
 					</Capped>
-				</details>
-			) : (
-				<p className="letter-summary">{letter.summary}</p>
+					<div className="letter-row-head">
+						<span>
+							<SenderLink letter={letter} /> → <SessionLink id={letter.toSession} />
+						</span>
+						{letter.auto && <span>{t("sentByJig")}</span>}
+						{status}
+						{reason && <span>{reason}</span>}
+					</div>
+				</div>
 			)}
-			{reason && <p className="hint">{reason}</p>}
 		</li>
 	);
 }
@@ -332,7 +370,7 @@ function LetterList() {
 	if (letters.items.length === 0) return <p className="empty-box">{t("lettersEmpty")}</p>;
 	return (
 		<>
-			<ul className="letter-list">
+			<ul className="letter-list letter-lines">
 				{letters.items.map((letter) => (
 					<LetterRow key={letter.id} letter={letter} now={now} />
 				))}

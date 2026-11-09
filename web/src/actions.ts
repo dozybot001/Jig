@@ -51,6 +51,29 @@ function recall(key: string): string | null {
 	}
 }
 
+const VIEW = "jig.view";
+const CENTER_TABS: readonly string[] = ["pending", "decided", "letters"];
+
+/**
+ * Where this tab is (a session, the approval center, the start page), so reloading the page returns
+ * there. It lives as long as the tab: a new tab still opens on the main conversation.
+ */
+function rememberView(view: string): void {
+	try {
+		sessionStorage.setItem(VIEW, view);
+	} catch {
+		// Storage can be unavailable; the page then opens as on a fresh start.
+	}
+}
+
+function recallView(): string | null {
+	try {
+		return sessionStorage.getItem(VIEW);
+	} catch {
+		return null;
+	}
+}
+
 // --- appearance ---
 
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -103,10 +126,19 @@ export async function boot(): Promise<void> {
 			hasArchived: archived.items.length > 0,
 		});
 		await loadCenter();
-		// Jig opens on the main conversation; without one, where you left off (blueprint section 5).
+		// A reload stays where the tab was. Otherwise Jig opens on the main conversation; without one,
+		// where you left off (blueprint section 5).
+		const view = recallView();
+		const tab = view?.startsWith("center:") ? view.slice("center:".length) : null;
+		const viewed = view?.startsWith("session:") ? view.slice("session:".length) : null;
 		const main = settings.mainSessionId;
 		const last = recall(LAST_SESSION);
-		if (main && getState().sessions[main]) await selectSession(main);
+		if (tab && CENTER_TABS.includes(tab)) {
+			connect(null, null);
+			openCenter(tab as CenterTab);
+		} else if (viewed && getState().sessions[viewed]) await selectSession(viewed);
+		else if (view === "home") connect(null, null);
+		else if (main && getState().sessions[main]) await selectSession(main);
 		else if (last && getState().sessions[last]) await selectSession(last);
 		else connect(null, null);
 	} catch (error) {
@@ -331,6 +363,7 @@ export function openSettings(dialog: "providers" | "defaults" | "about"): void {
 export async function selectSession(sessionId: string | null): Promise<void> {
 	setState({ selectedId: sessionId, transcript: null, page: null });
 	remember(LAST_SESSION, sessionId);
+	rememberView(sessionId ? `session:${sessionId}` : "home");
 	if (!sessionId) {
 		connect(null, null);
 		return;
@@ -514,6 +547,7 @@ export async function loadCenter(): Promise<void> {
 /** Opens the approval center page in place of the session (blueprint section 8). */
 export function openCenter(tab: CenterTab = getState().centerTab): void {
 	setState({ page: "center", centerTab: tab, drawerOpen: false });
+	rememberView(`center:${tab}`);
 	if (tab === "letters" && !getState().letters.loaded) void loadLetters();
 	if (tab === "decided" && !getState().decisions.loaded) void loadDecisions();
 }

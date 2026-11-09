@@ -151,6 +151,26 @@ export type EntryBody =
 
 export type EntryRole = EntryBody["role"];
 
+/**
+ * The first line of a text without Markdown marks, for a one-line summary: a reply that starts with
+ * "**Done**" reads "Done" in a letter's summary.
+ */
+export function plainLine(text: string): string {
+	const first = (text.trim().split("\n")[0] ?? "").trim();
+	return first
+		.replace(/^(#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/, "")
+		.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+		.replace(/\*\*(.+?)\*\*/g, "$1")
+		.replace(/`([^`]+)`/g, "$1")
+		.trim();
+}
+
+/** A letter's body without a first line that only repeats the summary, as Jig's reports do. */
+export function bodyAfterSummary(body: string, summary: string): string {
+	const [first = "", ...rest] = body.trim().split("\n");
+	return plainLine(first) === plainLine(summary) ? rest.join("\n").trim() : body;
+}
+
 export function messageText(message: ModelMessage): string {
 	if (typeof message.content === "string") return message.content;
 	const parts: string[] = [];

@@ -34,6 +34,8 @@ import {
 	FolderIcon,
 	JigMark,
 	MainIcon,
+	NewTeamIcon,
+	NewWorkspaceIcon,
 	PinIcon,
 	PlusIcon,
 	SearchIcon,
@@ -808,6 +810,7 @@ export function SidebarRail() {
 	const hasMain = useAppState((state) => (mainId ? Boolean(state.sessions[mainId]) : false));
 	const count = useAppState((state) => centerCount(state.center));
 	const onCenter = useAppState((state) => state.page === "center");
+	const [dialog, setDialog] = useState<"team" | "workspace" | null>(null);
 	return (
 		<nav className="rail" aria-label={t("sessions")}>
 			<button
@@ -855,14 +858,6 @@ export function SidebarRail() {
 			</Button>
 			<Button
 				variant="icon"
-				aria-label={t("newSession")}
-				title={t("newSession")}
-				onClick={() => void selectSession(null)}
-			>
-				<ComposeIcon />
-			</Button>
-			<Button
-				variant="icon"
 				aria-label={t("search")}
 				title={t("search")}
 				onClick={() => {
@@ -874,8 +869,42 @@ export function SidebarRail() {
 			>
 				<SearchIcon />
 			</Button>
+			<Button
+				variant="icon"
+				aria-label={t("newGroup")}
+				title={t("newGroup")}
+				onClick={() => setDialog("team")}
+			>
+				<NewTeamIcon />
+			</Button>
+			<Button
+				variant="icon"
+				aria-label={t("newWorkspace")}
+				title={t("newWorkspace")}
+				onClick={() => setDialog("workspace")}
+			>
+				<NewWorkspaceIcon />
+			</Button>
+			<Button
+				variant="icon"
+				aria-label={t("newSession")}
+				title={t("newSession")}
+				onClick={() => void selectSession(null)}
+			>
+				<ComposeIcon />
+			</Button>
 			<span className="rail-spacer" />
 			<SettingsMenu variant="icon" />
+			{dialog === "team" && <GroupDialog onClose={() => setDialog(null)} />}
+			{dialog === "workspace" && (
+				<WorkspaceDialog
+					onClose={() => setDialog(null)}
+					onCreated={(path) => {
+						setState({ homeFolder: path });
+						void selectSession(null);
+					}}
+				/>
+			)}
 		</nav>
 	);
 }

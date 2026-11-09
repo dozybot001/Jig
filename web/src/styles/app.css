@@ -1004,7 +1004,8 @@ body.scroll-locked {
 	.session-row {
 		padding-right: 38px;
 	}
-	.session-time {
+	/* Sidebar rows show their menu in place of the time; lists elsewhere keep it. */
+	.session-row .session-time {
 		display: none;
 	}
 }
@@ -2297,14 +2298,6 @@ button.about-row {
 .letter-body .markdown {
 	white-space: normal;
 }
-.letter-details > summary {
-	color: var(--text-2);
-	cursor: pointer;
-	overflow-wrap: anywhere;
-}
-.letter-details[open] > summary {
-	margin-bottom: 6px;
-}
 .letter-list {
 	display: grid;
 	margin: 0;
@@ -2313,8 +2306,9 @@ button.about-row {
 }
 .letter-row {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 4px;
-	padding: 10px 0;
+	padding: 12px 0;
 	border-bottom: 1px solid var(--divider);
 }
 .letter-row-head {
@@ -2328,6 +2322,121 @@ button.about-row {
 .letter-route {
 	font-weight: 500;
 	color: var(--text);
+}
+/* The letters list: one line per letter that unfolds in place, in the same card (blueprint 7.2). */
+/* One grid for the whole list, so direction, kind and summary line up from row to row. */
+.letter-lines {
+	grid-template-columns: fit-content(16em) max-content minmax(0, 1fr) max-content max-content;
+	column-gap: 8px;
+}
+.letter-item {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
+	border: 1px solid transparent;
+	border-radius: var(--radius);
+}
+/* The border is always there, transparent when folded, so unfolding moves nothing. */
+.letter-item[data-open="true"] {
+	border-color: var(--border);
+	background: var(--surface);
+}
+.letter-line {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: subgrid;
+	align-items: center;
+	width: 100%;
+	min-height: 36px;
+	padding: 6px 10px;
+	border: 0;
+	border-radius: var(--radius);
+	background: none;
+	color: var(--text-2);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+.letter-line > .tag {
+	justify-self: start;
+}
+.letter-line-route {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text);
+}
+.letter-line-summary {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.letter-line-meta {
+	display: flex;
+	justify-self: end;
+	align-items: center;
+	gap: 8px;
+	font-size: var(--fs-s);
+	white-space: nowrap;
+}
+.letter-line[aria-expanded="true"] {
+	color: var(--text);
+}
+/* Unfolded, the summary is the letter's first line below, in full. */
+.letter-item[data-open="true"] .letter-line-summary {
+	visibility: hidden;
+}
+.letter-item > .letter-line[aria-expanded="true"] > .chevron {
+	transform: rotate(90deg);
+}
+@media (hover: hover) {
+	.letter-item[data-open="false"] > .letter-line:hover {
+		background: var(--hover);
+		color: var(--text);
+	}
+}
+.letter-panel {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 10px;
+	padding: 2px 14px 12px;
+}
+.letter-content {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 6px;
+	color: var(--text-2);
+	overflow-wrap: anywhere;
+}
+.letter-panel p {
+	margin: 0;
+}
+@media (max-width: 640px) {
+	.letter-lines,
+	.letter-item {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.letter-line {
+		grid-template-columns: minmax(0, 1fr) auto auto auto;
+		grid-template-areas: "route tag meta chevron" "summary summary summary summary";
+		gap: 2px 8px;
+	}
+	.letter-line-route {
+		grid-area: route;
+	}
+	.letter-line > .tag {
+		grid-area: tag;
+	}
+	.letter-line-meta {
+		grid-area: meta;
+	}
+	.letter-line > .chevron {
+		grid-area: chevron;
+	}
+	.letter-line-summary {
+		grid-area: summary;
+	}
 }
 .letter-status {
 	color: var(--text-3);
@@ -2357,6 +2466,7 @@ button.about-row {
 .thinking-body,
 .msg-user,
 .letter-body,
+.letter-content,
 .note-summary,
 .markdown pre {
 	max-height: var(--cap);

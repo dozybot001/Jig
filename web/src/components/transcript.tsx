@@ -1,9 +1,11 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type {
-	AssistantMessage,
-	LetterRef,
-	ToolCallBlock,
-	ToolResultMessage,
+import {
+	type AssistantMessage,
+	bodyAfterSummary,
+	type LetterRef,
+	plainLine,
+	type ToolCallBlock,
+	type ToolResultMessage,
 } from "../../../src/shared/messages.ts";
 import type {
 	Approval,
@@ -623,12 +625,7 @@ function LetterEntry({ letter }: { letter: LetterRef }) {
 				? t("you")
 				: (sender ?? letter.from.name);
 	// An automatic report repeats its first line as the summary; show it once.
-	const body =
-		letter.body.startsWith(letter.summary) && letter.body.length > letter.summary.length
-			? letter.body.slice(letter.summary.length).trim()
-			: letter.body === letter.summary
-				? ""
-				: letter.body;
+	const body = bodyAfterSummary(letter.body, letter.summary);
 	const kind = t(`letterKind_${letter.kind}`);
 	return (
 		<section className="letter-card" aria-label={`${kind} · ${from}`}>
@@ -648,10 +645,10 @@ function LetterEntry({ letter }: { letter: LetterRef }) {
 				<span className="tag">{kind}</span>
 				{letter.auto && <span className="hint">{t("sentByJig")}</span>}
 			</div>
-			<p className="letter-summary">{letter.summary}</p>
+			<p className="letter-summary">{plainLine(letter.summary) || letter.summary}</p>
 			{body && (
 				<Capped className="letter-body" label={letter.summary}>
-					<Markdown text={body} />
+					<Markdown text={body} breaks />
 				</Capped>
 			)}
 			{letter.decision && (

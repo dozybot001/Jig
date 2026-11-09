@@ -10,6 +10,7 @@ import {
 	useState,
 } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { t } from "../i18n.ts";
 
@@ -209,12 +210,18 @@ export function ScrollBlock({
  * Markdown from the model or another session. Code blocks keep a fixed height and scroll inside; in a
  * reply that is still streaming they follow the newest line.
  */
+/** Letters are plain text first (blueprint 7.1): their single line breaks stay line breaks. */
+const PLAIN_PLUGINS = [remarkGfm];
+const LETTER_PLUGINS = [remarkGfm, remarkBreaks];
+
 export const Markdown = memo(function Markdown({
 	text,
 	live = false,
+	breaks = false,
 }: {
 	text: string;
 	live?: boolean;
+	breaks?: boolean;
 }) {
 	const components = useMemo<Components>(
 		() => ({
@@ -230,7 +237,7 @@ export const Markdown = memo(function Markdown({
 	return (
 		<div className="markdown">
 			<ReactMarkdown
-				remarkPlugins={[remarkGfm]}
+				remarkPlugins={breaks ? LETTER_PLUGINS : PLAIN_PLUGINS}
 				urlTransform={urlTransform}
 				components={components}
 				skipHtml
