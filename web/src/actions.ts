@@ -13,6 +13,7 @@ import type {
 	QuestionAnswer,
 	QueuedMessage,
 	ReceivePolicy,
+	Schedule,
 	Session,
 	SessionEvent,
 	SessionKind,
@@ -139,6 +140,9 @@ export async function boot(): Promise<void> {
 		if (tab && CENTER_TABS.includes(tab)) {
 			connect(null, null);
 			openCenter(tab as CenterTab);
+		} else if (view === "schedules") {
+			connect(null, null);
+			openSchedules();
 		} else if (viewed && getState().sessions[viewed]) await selectSession(viewed);
 		else if (view === "home") connect(null, null);
 		else if (main && getState().sessions[main]) await selectSession(main);
@@ -174,6 +178,7 @@ function connect(sessionId: string | null, after: number | null): void {
 		if (connectedOnce) {
 			void reloadSessions();
 			void loadCenter();
+			if (getState().schedules) void loadSchedules();
 		}
 		connectedOnce = true;
 	});
@@ -226,7 +231,8 @@ type GlobalEvent =
 	| { type: "letter"; letter: Letter }
 	| { type: "card"; card: Card }
 	| { type: "sessionsDeleted"; ids: string[] }
-	| { type: "devices"; devices: Device[] };
+	| { type: "devices"; devices: Device[] }
+	| { type: "schedules"; schedules: Schedule[] };
 
 /** Drops deleted sessions from every list; a deleted session that is open closes. */
 function dropSessions(ids: string[]): void {
@@ -260,6 +266,9 @@ function applyGlobalEvent(event: GlobalEvent): void {
 			setState((current) => ({
 				phones: current.phones ? { ...current.phones, devices: event.devices } : current.phones,
 			}));
+			return;
+		case "schedules":
+			setState({ schedules: event.schedules });
 			return;
 		case "sessionSummary":
 			setState((current) => ({
@@ -592,6 +601,58 @@ export function openCenter(tab: CenterTab = getState().centerTab): void {
 	rememberView(`center:${tab}`);
 	if (tab === "letters" && !getState().letters.loaded) void loadLetters();
 	if (tab === "decided" && !getState().decisions.loaded) void loadDecisions();
+}
+
+// --- scheduled tasks (M3 plan, section 9) ---
+
+/** The scheduled tasks page, in place of the session, like the approval center. */
+export function openSchedules(): void {
+	setState({ page: "schedules", drawerOpen: false });
+	rememberView("schedules");
+	if (!getState().schedules) void loadSchedules();
+}
+
+export async function loadSchedules(): Promise<void> {
+	const page = await api<Page<Schedule>>("GET", "/api/schedules");
+	setState({ schedules: page.items });
+}
+
+export interface ScheduleInput {
+	name: string;
+	cron: string;
+	session: string;
+	message: string;
+	permissionMode: PermissionMode | null;
+	catchUp: boolean;
+}
+
+function storeSchedule(schedule: Schedule): void {
+	setState((current) => ({
+		schedules: [...(current.schedules ?? []).filter((item) => item.id !== schedule.id), schedule],
+	}));
+}
+
+export async function saveSchedule(
+	id: string | null,
+	input: Partial<ScheduleInput> & { enabled?: boolean },
+): Promise<Schedule> {
+	const schedule = id
+		? await api<Schedule>("PATCH", `/api/schedules/${id}`, input)
+		: await api<Schedule>("POST", "/api/schedules", input, { idempotent: true });
+	storeSchedule(schedule);
+	return schedule;
+}
+
+export async function runScheduleNow(id: string): Promise<void> {
+	const result = await api<{ schedule: Schedule }>("POST", `/api/schedules/${id}/run`);
+	storeSchedule(result.schedule);
+}
+
+export async function deleteSchedule(id: string): Promise<void> {
+	await api("DELETE", `/api/schedules/${id}`);
+	setState((current) => ({
+		schedules: (current.schedules ?? []).filter((item) => item.id !== id),
+	}));
 }
 
 export async function loadDecisions(more = false): Promise<void> {

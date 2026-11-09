@@ -106,6 +106,9 @@ const FIELD_MESSAGES: Record<string, MessageKey> = {
 	workspaces: "err_field_workspaces",
 	model: "err_field_model",
 	provider: "err_field_model",
+	cron: "err_field_cron",
+	session: "err_field_session",
+	message: "err_field_message",
 };
 
 const CODE_MESSAGES: Record<string, MessageKey> = {
@@ -121,6 +124,7 @@ const CODE_MESSAGES: Record<string, MessageKey> = {
 	"already-delivered": "err_alreadyDelivered",
 	"not-supported": "err_noPicker",
 	"picker-failed": "err_pickerFailed",
+	"schedule-busy": "err_scheduleBusy",
 };
 
 /** What went wrong and what to do, in the interface language (spec 4.1, 12.2); server text is a fallback. */

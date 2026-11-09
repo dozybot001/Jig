@@ -157,6 +157,8 @@ export interface Letter {
 	auto: boolean;
 	/** For a decision letter: the number of the decision it carries. */
 	decision: number | null;
+	/** The scheduled task whose run this letter starts or reports on. */
+	scheduleId: string | null;
 	createdAt: number;
 	deliveredAt: number | null;
 }
@@ -324,7 +326,68 @@ export type ChangeStep =
 	| { action: "add_workspace"; folder: string }
 	| { action: "remove_workspace"; folder: string }
 	| { action: "set_theme"; to: "system" | "light" | "dark" }
-	| { action: "set_language"; to: "system" | "zh" | "en" };
+	| { action: "set_language"; to: "system" | "zh" | "en" }
+	| {
+			action: "create_schedule";
+			name: string;
+			cron: string;
+			session: string;
+			message: string;
+			permission: PermissionMode | null;
+	  }
+	/** Only the fields that change are present; `permission` null means the session's own mode. */
+	| {
+			action: "change_schedule";
+			schedule: string;
+			name?: string;
+			cron?: string;
+			session?: string;
+			message?: string;
+			permission?: PermissionMode | null;
+			catchUp?: boolean;
+			enabled?: boolean;
+	  };
+
+/**
+ * How a scheduled task's latest run went: still running, finished, stopped with an error, stopped by the
+ * person, or skipped (the reason says why).
+ */
+export type ScheduleStatus = "running" | "done" | "error" | "stopped" | "skipped";
+
+/**
+ * Why a run was skipped: the last run was not finished, the session is archived, or the time passed
+ * while Jig was not running or the computer slept and the task skips missed runs.
+ */
+export type ScheduleSkip = "busy" | "archived" | "missed";
+
+/**
+ * A scheduled task (blueprint 6.5, M3 plan section 9): at the times its cron expression names, Jig sends
+ * a standing session a letter. It belongs to that session's team.
+ */
+export interface Schedule {
+	id: string;
+	name: string;
+	/** Five fields, in the computer's time zone. */
+	cron: string;
+	sessionId: string;
+	/** The letter's text: the first line is its summary. */
+	message: string;
+	/** The permission mode for its runs; null uses the session's own. */
+	permissionMode: PermissionMode | null;
+	/** A run missed while Jig was not running or the computer slept runs once afterwards. */
+	catchUp: boolean;
+	enabled: boolean;
+	/** When it runs next; null while it is turned off. */
+	nextRunAt: number | null;
+	lastRunAt: number | null;
+	lastStatus: ScheduleStatus | null;
+	/** The first line of the run's reply, the error, or a ScheduleSkip code. */
+	lastDetail: string | null;
+	/** The letter of the latest run. */
+	lastLetterId: string | null;
+	createdAt: number;
+	updatedAt: number;
+}
 
 /** A phone paired with this Mac through the relay (M3 plan, section 4). */
 export interface Device {

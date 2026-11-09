@@ -7,6 +7,7 @@ import {
 	type LetterKind,
 	letterQuotaOf,
 	permissionModeOf,
+	type Schedule,
 	type Session,
 } from "../../shared/types.ts";
 import { conflict, invalid, JigError } from "../errors.ts";
@@ -83,8 +84,15 @@ export function reasonText(reason: string | null): string {
 	}
 }
 
-/** Who a letter is from: a session, the command line (`jig send`), or the person (a decision). */
-export type Sender = { kind: "session"; session: Session } | { kind: "cli" } | { kind: "person" };
+/**
+ * Who a letter is from: a session, the command line (`jig send`), the person (a decision), or a
+ * scheduled task the person set up, which Jig sends in its name.
+ */
+export type Sender =
+	| { kind: "session"; session: Session }
+	| { kind: "cli" }
+	| { kind: "person" }
+	| { kind: "schedule"; schedule: Schedule };
 
 export interface Outgoing {
 	/** Session id; letters are addressed by id only (blueprint 7.1). */
@@ -97,6 +105,8 @@ export interface Outgoing {
 	auto?: boolean;
 	/** A decision letter: the number of the decision it carries. */
 	decision?: number | null;
+	/** The scheduled task whose run the letter starts or reports on. */
+	schedule?: string | null;
 }
 
 export interface PostHooks {
@@ -294,14 +304,16 @@ export class PostOffice {
 		const base = {
 			threadId,
 			replyTo: repliedTo?.id ?? null,
-			fromKind: sender.kind,
+			fromKind: sender.kind === "schedule" ? ("jig" as const) : sender.kind,
 			fromSession: from,
 			fromName:
 				sender.kind === "session"
 					? sender.session.name
-					: sender.kind === "cli"
-						? "jig send"
-						: "person",
+					: sender.kind === "schedule"
+						? sender.schedule.name
+						: sender.kind === "cli"
+							? "jig send"
+							: "person",
 			toSession: to.id,
 			kind: out.kind,
 			summary,
@@ -309,6 +321,7 @@ export class PostOffice {
 			path,
 			auto: out.auto ?? false,
 			decision: out.decision ?? null,
+			scheduleId: sender.kind === "schedule" ? sender.schedule.id : (out.schedule ?? null),
 		};
 
 		// Jig's automatic letters answer one request each, so they skip the limits (and cannot loop).
@@ -452,7 +465,8 @@ export class PostOffice {
 		auto: boolean,
 		answers: boolean,
 	): { status: "queued" | "held" | "refused"; reason?: LetterReason } {
-		if (sender.kind === "person") return { status: "queued" };
+		// The person's decisions and the tasks they scheduled are theirs: no policy holds them back.
+		if (sender.kind === "person" || sender.kind === "schedule") return { status: "queued" };
 		if (sender.kind === "session" && (auto || answers)) return { status: "queued" };
 		const policy = to.options.receive ?? "accept";
 		if (policy === "refuse") return { status: "refused", reason: "refuse-policy" };

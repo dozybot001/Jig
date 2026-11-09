@@ -2,6 +2,7 @@
 import { keyCommand } from "./key.ts";
 import { remoteCommand } from "./remote.ts";
 import { run } from "./run.ts";
+import { scheduleCommand } from "./schedule.ts";
 import { sendCommand } from "./send.ts";
 import { openCommand, serveCommand } from "./serve.ts";
 
@@ -9,6 +10,7 @@ const commands = [
 	serveCommand(),
 	openCommand(),
 	sendCommand(),
+	scheduleCommand(),
 	remoteCommand(),
 	keyCommand(async () => {
 		const { openRuntime } = await import("../server/runtime.ts");

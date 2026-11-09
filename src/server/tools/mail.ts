@@ -345,7 +345,7 @@ const TEXT = { type: "string" } as const;
 export const manageJigTool: ToolDefinition = {
 	name: "manage_jig",
 	description:
-		"Change Jig itself when the person asks or the work needs it: sessions (create a standing one, or change its name, team, role, model, working folder, permission mode, how it receives letters, letter quota, rights, pinned, archived), teams, and settings. Put every change in one call; Jig checks them, asks the person when a change needs it, and applies all or none. Sessions and teams are named by name or id. API keys, pairing and deleting data are the person's.",
+		"Change Jig itself when the person asks or the work needs it: sessions (create a standing one, or change its name, team, role, model, working folder, permission mode, how it receives letters, letter quota, rights, pinned, archived), teams, scheduled tasks, and settings. Put every change in one call; Jig checks them, asks the person when a change needs it, and applies all or none. Sessions, teams and tasks are named by name or id. API keys, pairing and deleting data are the person's.",
 	parameters: {
 		type: "object",
 		properties: {
@@ -389,6 +389,37 @@ export const manageJigTool: ToolDefinition = {
 						can_manage: { type: "boolean", description: "May use manage_jig." },
 						pinned: { type: "boolean" },
 						archived: { type: "boolean" },
+					},
+					additionalProperties: false,
+				},
+			},
+			schedules: {
+				type: "array",
+				description:
+					"Scheduled tasks: at the times of a cron expression, Jig sends a standing session a letter, and its last reply comes back to the main conversation as the report. Leave out schedule to create one; set enabled to false to turn one off.",
+				items: {
+					type: "object",
+					properties: {
+						schedule: TEXT,
+						name: TEXT,
+						cron: {
+							type: "string",
+							description:
+								'Five fields in this computer\'s time zone: minute, hour, day of the month, month, day of the week. "0 9 * * 1-5" is 9:00 on weekdays.',
+						},
+						session: { type: "string", description: "The standing session the letter goes to." },
+						message: { type: "string", description: "The letter: what to do each time." },
+						permission: {
+							type: "string",
+							enum: ["session", "auto", "manual", "skip"],
+							description:
+								"Permission mode for its runs; session (the default) keeps the session's own.",
+						},
+						catch_up: {
+							type: "boolean",
+							description: "Run once after a time missed while Jig was not running (default true).",
+						},
+						enabled: { type: "boolean" },
 					},
 					additionalProperties: false,
 				},

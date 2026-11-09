@@ -8,6 +8,7 @@ import type {
 	Group,
 	Letter,
 	QueuedMessage,
+	Schedule,
 	Session,
 	ThinkingLevel,
 	ToolCallView,
@@ -124,8 +125,10 @@ export interface AppState {
 	 * The approval center is a page of its own: you go there to clear what waits across sessions, and
 	 * into a session to work on one thing (founder, 2026-11-09). Null shows the session or home.
 	 */
-	page: "center" | null;
+	page: "center" | "schedules" | null;
 	centerTab: CenterTab;
+	/** Scheduled tasks, read when their page first opens; null until then. */
+	schedules: Schedule[] | null;
 	/** The sessions list shows one team's sessions; null shows all (blueprint section 8). */
 	teamFilter: string | null;
 }
@@ -185,6 +188,7 @@ let state: AppState = {
 	decisions: { items: [], nextCursor: null, loaded: false },
 	page: null,
 	centerTab: "pending",
+	schedules: null,
 	teamFilter: null,
 };
 

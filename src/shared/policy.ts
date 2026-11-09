@@ -3,14 +3,14 @@
  * The iPhone app carries the same paragraphs in its string catalog; test/ios.test.ts keeps them equal.
  * A change raises the version and the date; earlier versions stay in Git.
  */
-export const POLICY_VERSION = "1.2";
+export const POLICY_VERSION = "1.3";
 
 export const POLICY = {
 	zh: {
 		date: "2026 年 11 月 9 日",
 		privacy: [
 			"Jig 是在你自己的电脑上运行的软件，iPhone 上的 Jig 只连接你自己电脑上的 Jig。榫卯 Tenon AI 不收集、不接收你在 Jig 里的任何数据，Jig 里没有统计、遥测或上报代码。",
-			"保存在你电脑上的数据：会话、消息、工具调用记录、操作授权、会话之间的信件、你在审批中心做的决定和设置存在 Jig 的数据目录（默认 ~/.jig）里的数据库中；服务商的 API Key 存在系统钥匙串里；超长的命令输出存在数据目录的 tmp 文件夹里。这些数据一直保存，直到你删除。你在设置里指定了审批记录文件时，Jig 把每个决定追加到那个文件里。",
+			"保存在你电脑上的数据：会话、消息、工具调用记录、操作授权、会话之间的信件、你在审批中心做的决定、定时任务和设置存在 Jig 的数据目录（默认 ~/.jig）里的数据库中；服务商的 API Key 存在系统钥匙串里；超长的命令输出存在数据目录的 tmp 文件夹里。这些数据一直保存，直到你删除。你在设置里指定了审批记录文件时，Jig 把每个决定追加到那个文件里。",
 			"手机访问：你在电脑上打开「允许手机访问」后，电脑上的 Jig 连接中继服务，iPhone 上的 Jig 经中继和它通信。默认的中继由榫卯 Tenon AI 运行，你也可以自己部署。两端之间端到端加密，中继只转发密文，看不到也不保存内容。电脑上的 Jig 记下配对的手机：名称、公钥、配对时间和最近连接的时间。iPhone 上的 Jig 把配对信息和自己的密钥存在 iOS 钥匙串里，只存在这台设备上。",
 			"发给第三方的数据：你为会话选的模型服务商会收到发给它的对话内容，包括会话读到的文件和命令输出，这部分适用该服务商的隐私政策。默认服务商 DeepSeek 在中国境内；你选境外服务商时，这些内容会发往境外。会话抓取网页时，网站会收到请求。",
 			"查询、导出与删除：你可以直接查看数据目录里的文件。删除某个服务商的 Key：在设置里删除，或运行 jig key delete；删除配对的手机：在电脑上的「手机访问」里移除，或在 iPhone 上断开配对；删除全部数据：停掉 jig serve 后删除数据目录。",
@@ -25,7 +25,7 @@ export const POLICY = {
 		date: "Nov 9, 2026",
 		privacy: [
 			"Jig runs on your own computer, and Jig on iPhone connects only to Jig on your own computer. Tenon AI does not collect or receive any of your data in Jig, and Jig contains no analytics, telemetry or reporting code.",
-			"Data kept on your computer: sessions, messages, tool call records, permissions you granted, letters between sessions, the decisions you make in the approval center and settings are stored in a database in Jig's data folder (~/.jig by default); provider API keys are stored in the system keychain; very long command output is stored in the tmp folder of the data folder. This data stays until you delete it. If you set a decision log file in Settings, Jig adds each decision to that file.",
+			"Data kept on your computer: sessions, messages, tool call records, permissions you granted, letters between sessions, the decisions you make in the approval center, scheduled tasks and settings are stored in a database in Jig's data folder (~/.jig by default); provider API keys are stored in the system keychain; very long command output is stored in the tmp folder of the data folder. This data stays until you delete it. If you set a decision log file in Settings, Jig adds each decision to that file.",
 			"Phone access: when you turn on phone access on your computer, Jig on the computer connects to a relay, and Jig on iPhone talks to it through the relay. The default relay is run by Tenon AI; you can also run your own. The two ends are encrypted end to end: the relay only passes ciphertext along and can neither read nor keep the content. Jig on the computer records each paired phone: its name, public key, when it was paired and when it last connected. Jig on iPhone keeps the pairing and its own key in the iOS keychain, on that device only.",
 			"Data sent to third parties: the model provider you choose for a session receives the conversation sent to it, including files the session read and command output; that provider's privacy policy applies. The default provider, DeepSeek, is in mainland China; if you choose a provider outside mainland China, this content goes abroad. When a session fetches a web page, that site receives the request.",
 			"Access, export and deletion: you can look at the files in the data folder directly. To delete a provider's key, delete it in Settings or run jig key delete; to remove a paired phone, remove it under Phone access on the computer, or unpair on the iPhone; to delete everything, stop jig serve and delete the data folder.",

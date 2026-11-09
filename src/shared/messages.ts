@@ -147,6 +147,8 @@ export interface LetterRef {
 	/** Jig sent the session's final reply on its behalf. */
 	auto?: boolean;
 	decision?: DecisionRef;
+	/** The scheduled task whose run the letter starts or reports on. */
+	schedule?: { id: string; name: string };
 }
 
 export type EntryBody =

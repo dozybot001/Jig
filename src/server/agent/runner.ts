@@ -15,6 +15,7 @@ import {
 	type ApprovalDecision,
 	type Entry,
 	type Letter,
+	type PermissionMode,
 	permissionModeOf,
 	type QuestionAnswer,
 	type QuestionRequest,
@@ -25,13 +26,14 @@ import {
 	type UsageTotals,
 } from "../../shared/types.ts";
 import { conflict, invalid, JigError } from "../errors.ts";
-import { decisionRef, letterRef, letterText } from "../mail/envelope.ts";
+import { decisionRef, letterRef, letterText, type ScheduleRef } from "../mail/envelope.ts";
 import { BODY_MAX, PostOffice, reasonText, SUMMARY_MAX } from "../mail/post.ts";
 import { Manager } from "../manage.ts";
 import type { ModelGateway, ModelInfo } from "../model/gateway.ts";
 import { resolveWorkingFolder } from "../paths.ts";
 import type { PermissionEngine } from "../permissions/engine.ts";
 import { isInside } from "../permissions/paths.ts";
+import { ScheduleBook } from "../schedules.ts";
 import { type Store, validateSessionName } from "../store.ts";
 import { Jobs } from "../tools/jobs.ts";
 import { settleAnswer } from "../tools/misc.ts";
@@ -116,6 +118,30 @@ interface Live {
 	waiters: Map<string, (answer: Answer | null) => void>;
 }
 
+/** A turn a scheduled task started (M3 plan, section 9). */
+interface ScheduledRun {
+	letterId: string;
+	scheduleId: string;
+	name: string;
+	/** The permission mode for this run; null keeps the session's own. */
+	mode: PermissionMode | null;
+	/** Nobody is there to approve or answer, until the person writes to the session. */
+	unattended: boolean;
+	/** What Jig refused for want of the person, for the report. */
+	refused: string[];
+}
+
+/** One turn of a session: what it sent and read, who started it, and the scheduled run it is. */
+interface Turn {
+	sent: Letter[];
+	read: Map<string, number>;
+	/** The person started it with a message or by continuing. */
+	byPerson: boolean;
+	/** Letters were delivered at least once. */
+	started: boolean;
+	run: ScheduledRun | null;
+}
+
 export interface AgentsOptions {
 	store: Store;
 	gateway: ModelGateway;
@@ -130,6 +156,8 @@ export interface AgentsOptions {
 	post?: PostOffice;
 	/** The longest send_letter and open_session wait for an answer; tests shorten it. */
 	waitMs?: number;
+	/** Scheduled tasks; one is made when not given. */
+	schedules?: ScheduleBook;
 }
 
 const KEEP_RECENT_TOKENS = 20_000;
@@ -214,6 +242,8 @@ export class Agents {
 	readonly #sinceTodo = new Map<string, number>();
 	/** Letters, decision cards and the approval center. */
 	readonly post: PostOffice;
+	/** Scheduled tasks, whose runs end in this runner. */
+	readonly schedules: ScheduleBook;
 	readonly #waitMs: number;
 	/** Each working session's latest written reply in this turn. */
 	readonly #lastText = new Map<string, string>();
@@ -226,7 +256,7 @@ export class Agents {
 	 * Each working session's current turn: the letters it sent, and for each letter it read, how many it
 	 * had sent by then, so Jig can tell what it asked after reading a request.
 	 */
-	readonly #turns = new Map<string, { sent: Letter[]; read: Map<string, number> }>();
+	readonly #turns = new Map<string, Turn>();
 	/** Sessions the person stopped: letters wait until the person writes to them or continues them. */
 	readonly #paused = new Set<string>();
 	readonly #manager: Manager;
@@ -253,10 +283,12 @@ export class Agents {
 		this.#log = options.log ?? ((line) => process.stderr.write(`${line}\n`));
 		this.#draftInterval = options.draftIntervalMs ?? 50;
 		this.post = options.post ?? new PostOffice(options.store, this.#log);
+		this.schedules = options.schedules ?? new ScheduleBook(options.store);
 		this.#waitMs = options.waitMs ?? WAIT_MS;
 		this.post.setHooks({ queued: (letter) => this.#onQueued(letter) });
 		this.#manager = new Manager({
 			store: this.#store,
+			schedules: this.schedules,
 			mainId: () => this.post.mainSessionId(),
 			modelExists: (provider, model) => Boolean(this.#gateway.model(provider, model)),
 			onArchived: (id) => this.archived(id),
@@ -294,7 +326,7 @@ export class Agents {
 		if (this.isRunning(sessionId)) return { queued: this.#store.enqueue(sessionId, text) };
 		this.#dropLeftovers(sessionId, "Not run: the person sent a new message instead of continuing.");
 		const entry = this.#store.appendEntry(sessionId, userEntry(text));
-		this.#start(sessionId);
+		this.#start(sessionId, { byPerson: true });
 		return { entry };
 	}
 
@@ -310,7 +342,7 @@ export class Agents {
 			throw conflict("There is nothing to continue yet.", undefined, "nothing-to-continue");
 		this.#dropReplyQuestions(sessionId);
 		this.#paused.delete(sessionId);
-		this.#start(sessionId, { resume: true });
+		this.#start(sessionId, { resume: true, byPerson: true });
 	}
 
 	/** The person stops a session. Letters that arrive later wait until the person writes or continues. */
@@ -378,9 +410,9 @@ export class Agents {
 	 * when it is restored, and sessions waiting on one of them stop waiting.
 	 */
 	archived(sessionId: string): void {
-		const dropped = new Set(
-			this.post.mail.dropWaiting(sessionId, "archived").map((letter) => letter.id),
-		);
+		const letters = this.post.mail.dropWaiting(sessionId, "archived");
+		for (const letter of letters) this.schedules.finished(letter, "skipped", "archived");
+		const dropped = new Set(letters.map((letter) => letter.id));
 		for (const waiting of [...this.#waits.values()]) {
 			if (waiting.target === sessionId && dropped.has(waiting.letterId)) {
 				waiting.resolve({ kind: "archived" });
@@ -404,6 +436,8 @@ export class Agents {
 		if (ids.includes(this.#store.getSetting<string | null>("mainSessionId", null) ?? "")) {
 			this.#store.setSetting("mainSessionId", null);
 		}
+		// Their scheduled tasks went with them.
+		if (ids.length > 0) this.schedules.refresh();
 		return ids;
 	}
 
@@ -412,12 +446,18 @@ export class Agents {
 		for (const jobs of this.#jobs.values()) jobs.stopAll();
 	}
 
-	#start(sessionId: string, options: { resume?: boolean } = {}): void {
+	#start(sessionId: string, options: { resume?: boolean; byPerson?: boolean } = {}): void {
 		const controller = new AbortController();
 		const live: Live = { controller, done: Promise.resolve(), waiters: new Map() };
 		this.#live.set(sessionId, live);
 		this.#lastText.delete(sessionId);
-		this.#turns.set(sessionId, { sent: [], read: new Map() });
+		this.#turns.set(sessionId, {
+			sent: [],
+			read: new Map(),
+			byPerson: options.byPerson ?? false,
+			started: false,
+			run: null,
+		});
 		live.done = this.#run(sessionId, live, options.resume ?? false)
 			.catch((error: unknown) =>
 				this.#log(`session ${sessionId}: ${(error as Error).stack ?? error}`),
@@ -714,7 +754,7 @@ export class Agents {
 				// In the automatic mode the model asks for a person's approval itself, with `confirm`.
 				const flagged = (row.args as { confirm?: unknown }).confirm === true;
 				const subject = tool.subject(row.args, session, this.#lookup(session));
-				decision = this.#permissions.decide(subject, session, flagged);
+				decision = this.#permissions.decide(subject, this.#withRunMode(session), flagged);
 			} catch (error) {
 				const message =
 					error instanceof ToolInputError
@@ -726,6 +766,22 @@ export class Agents {
 			if (decision.effect === "deny") {
 				results.set(row.id, {
 					result: failure(`Refused by Jig: ${decision.reason}`),
+					status: "denied",
+					started,
+				});
+				continue;
+			}
+			const run = this.#turns.get(sessionId)?.run;
+			if (decision.effect === "ask" && run?.unattended) {
+				// Nobody is there to say yes: refuse now rather than wait (blueprint 6.1, item 6).
+				run.refused.push(decision.request.summary);
+				results.set(row.id, {
+					result: {
+						...failure(
+							`Refused: this turn runs for the scheduled task "${run.name}" and nobody is watching, so nobody can approve it. Do what you can without it; Jig lists what was refused in the report.`,
+						),
+						detail: { code: "unattended" },
+					},
 					status: "denied",
 					started,
 				});
@@ -883,6 +939,14 @@ export class Agents {
 			},
 			setTodos: (todos) => this.#store.setTodos(sessionId, todos),
 			ask: async (request) => {
+				const run = this.#turns.get(sessionId)?.run;
+				if (run?.unattended) {
+					const first = request.questions?.[0]?.question ?? request.question ?? "";
+					run.refused.push(`Question: ${clip(plainLine(first), 200)}`);
+					throw new ToolInputError(
+						`Nobody can answer now: this turn runs for the scheduled task "${run.name}" and nobody is watching. Decide what you can yourself and say in your reply what is still open.`,
+					);
+				}
 				const approval = this.#store.createApproval({
 					sessionId,
 					toolCallId: row.id,
@@ -980,10 +1044,33 @@ export class Agents {
 		for (const id of this.post.mail.sessionsWithQueued()) this.#wake(id);
 	}
 
-	/** Moves queued letters into the transcript; the model reads them, the interface shows letters. */
-	#deliverLetters(sessionId: string): number {
-		const letters = this.post.mail.queuedFor(sessionId);
+	/**
+	 * Moves queued letters into the transcript; the model reads them, the interface shows letters. A
+	 * scheduled task's letter starts a turn of its own: only a turn that Jig started for waiting letters
+	 * takes it, as its first delivery, and one per turn. Its own permission mode and the rule that nobody
+	 * is watching then hold for that turn alone.
+	 */
+	#deliverLetters(sessionId: string, first: boolean): number {
+		const turn = this.#turns.get(sessionId);
+		let letters = this.post.mail.queuedFor(sessionId);
+		let adopted: Letter | null = null;
+		if (first && turn && !turn.byPerson) {
+			adopted = letters.find((letter) => letter.scheduleId !== null) ?? null;
+		}
+		letters = letters.filter((letter) => letter.scheduleId === null || letter === adopted);
 		if (letters.length === 0) return 0;
+		const session = this.#store.getSession(sessionId);
+		if (adopted && turn) {
+			const schedule = this.schedules.find(adopted.scheduleId as string);
+			turn.run = {
+				letterId: adopted.id,
+				scheduleId: adopted.scheduleId as string,
+				name: schedule?.name ?? adopted.fromName,
+				mode: schedule?.permissionMode ?? null,
+				unattended: true,
+				refused: [],
+			};
+		}
 		this.#store.tx(() => {
 			for (const letter of letters) {
 				let decision = null;
@@ -994,10 +1081,16 @@ export class Agents {
 						decision = null;
 					}
 				}
+				const schedule = this.#scheduleRef(letter);
+				const note = letter === adopted && turn?.run ? this.#runNote(session, turn.run) : null;
 				const entry = this.#store.appendEntry(sessionId, {
 					role: "user",
-					message: { role: "user", content: letterText(letter, decision), timestamp: Date.now() },
-					letter: letterRef(letter, decision),
+					message: {
+						role: "user",
+						content: letterText(letter, decision, schedule, note),
+						timestamp: Date.now(),
+					},
+					letter: letterRef(letter, decision, schedule),
 				});
 				this.post.mail.setLetterStatus(letter.id, "delivered", {
 					entryId: entry.id,
@@ -1008,6 +1101,38 @@ export class Agents {
 		});
 		this.post.enterChain(sessionId, letters);
 		return letters.length;
+	}
+
+	/** The scheduled task a letter belongs to, if it still exists. */
+	#scheduleRef(letter: Letter): ScheduleRef | null {
+		if (!letter.scheduleId) return null;
+		const schedule = this.schedules.find(letter.scheduleId);
+		return schedule ? { id: schedule.id, name: schedule.name } : null;
+	}
+
+	/** What Jig tells a session about the scheduled run it is starting. */
+	#runNote(session: Session, run: ScheduledRun): string {
+		const lines = [
+			"This is a scheduled run and nobody is watching: Jig refuses calls that need the person's approval, and questions for them.",
+		];
+		if (run.mode && run.mode !== permissionModeOf(session.options)) {
+			lines.push(`For this run: ${PERMISSION_MODE[run.mode]}`);
+		}
+		const main = this.post.mainSessionId();
+		const mainName = main && main !== session.id ? this.post.sessionName(main) : null;
+		lines.push(
+			mainName
+				? `When you finish, Jig sends your last reply to the main conversation (${mainName}) as the report.`
+				: "Your last reply is the report.",
+		);
+		return lines.join(" ");
+	}
+
+	/** The session as the permission check sees it: with the scheduled run's own mode, if it has one. */
+	#withRunMode(session: Session): Session {
+		const mode = this.#turns.get(session.id)?.run?.mode;
+		if (!mode) return session;
+		return { ...session, options: { ...session.options, permissionMode: mode } };
 	}
 
 	/**
@@ -1028,7 +1153,13 @@ export class Agents {
 		this.post.resetChain(sessionId);
 		const said = this.#lastText.get(sessionId) ?? "";
 		this.#lastText.delete(sessionId);
-		const turn = this.#turns.get(sessionId) ?? { sent: [], read: new Map<string, number>() };
+		const turn: Turn = this.#turns.get(sessionId) ?? {
+			sent: [],
+			read: new Map<string, number>(),
+			byPerson: false,
+			started: true,
+			run: null,
+		};
 		this.#turns.delete(sessionId);
 		const mail = this.post.mail;
 		const session = this.#store.getSession(sessionId);
@@ -1122,8 +1253,60 @@ export class Agents {
 				replyTo,
 			});
 		}
+		// Runs of scheduled tasks this turn read end with it; read from the database, so a run that a
+		// restart interrupted ends with the turn that continues it.
+		let reported = false;
+		for (const letter of mail.scheduledRead(sessionId)) {
+			const run = turn.run?.letterId === letter.id ? turn.run : null;
+			if (this.#finishRun(session, letter, run, { status, detail, said, stopped })) reported = true;
+		}
 		mail.finishRead(sessionId);
-		if (!failed && owed.size === 0) this.#askFromReply(session, said);
+		if (!failed && owed.size === 0 && !reported) this.#askFromReply(session, said);
+	}
+
+	/**
+	 * A scheduled run ended. Its result goes on the task, and to the main conversation as a report, which
+	 * sums it up for the person (M3 plan, decision 3); a run the person stopped needs no report. Returns
+	 * whether a report went out.
+	 */
+	#finishRun(
+		session: Session,
+		letter: Letter,
+		run: ScheduledRun | null,
+		end: { status: SessionStatus; detail: string | null; said: string; stopped: boolean },
+	): boolean {
+		const outcome = end.stopped ? "stopped" : end.status === "error" ? "error" : "done";
+		const first = plainLine(end.said);
+		this.schedules.finished(
+			letter,
+			outcome,
+			outcome === "error" ? end.detail : outcome === "done" ? first || null : null,
+		);
+		const main = this.post.mainSessionId();
+		if (outcome === "stopped" || !main || main === session.id) return false;
+		const name = this.#scheduleRef(letter)?.name ?? letter.fromName;
+		const refused = run?.refused ?? [];
+		const body = [
+			outcome === "error" ? (end.detail ?? "") : "",
+			end.said,
+			refused.length > 0
+				? `Refused because nobody was watching:\n${refused.map((line) => `- ${line}`).join("\n")}`
+				: "",
+		]
+			.filter(Boolean)
+			.join("\n\n");
+		this.#autoLetter(session, main, {
+			kind: outcome === "done" ? "report" : "notice",
+			summary:
+				outcome === "error"
+					? `The scheduled task "${name}" stopped with an error in ${session.name}.`
+					: first ||
+						`${session.name} finished the scheduled task "${name}" without a written reply.`,
+			body,
+			replyTo: null,
+			schedule: letter.scheduleId,
+		});
+		return true;
 	}
 
 	/**
@@ -1163,7 +1346,13 @@ export class Agents {
 	#autoLetter(
 		session: Session,
 		to: string,
-		letter: { kind: "report" | "notice"; summary: string; body: string; replyTo: string | null },
+		letter: {
+			kind: "report" | "notice";
+			summary: string;
+			body: string;
+			replyTo: string | null;
+			schedule?: string | null;
+		},
 	): void {
 		try {
 			this.post.send(
@@ -1175,6 +1364,7 @@ export class Agents {
 					body: clip(letter.body, BODY_MAX),
 					replyTo: letter.replyTo,
 					auto: true,
+					schedule: letter.schedule ?? null,
 				},
 			);
 		} catch (error) {
@@ -1367,10 +1557,16 @@ export class Agents {
 		for (const note of notes) {
 			this.#store.appendEntry(sessionId, userEntry(`[From Jig, not from the person] ${note}`));
 		}
-		const letters = this.#deliverLetters(sessionId);
+		const turn = this.#turns.get(sessionId);
+		const first = turn ? !turn.started : false;
+		if (turn) turn.started = true;
+		const letters = this.#deliverLetters(sessionId, first);
 		const fromPerson = this.#store.deliverQueue(sessionId, userEntry).length;
-		// What the person wrote starts a new chain of hand-offs.
-		if (fromPerson > 0) this.post.resetChain(sessionId);
+		if (fromPerson > 0) {
+			// What the person wrote starts a new chain of hand-offs, and they are watching now.
+			this.post.resetChain(sessionId);
+			if (turn?.run) turn.run.unattended = false;
+		}
 		return letters > 0 || fromPerson > 0 || notes.length > 0;
 	}
 

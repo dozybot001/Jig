@@ -224,4 +224,26 @@ CREATE TABLE devices (
 	last_seen_at INTEGER
 ) STRICT;
 `,
+	// Scheduled tasks (M3 plan, section 9): letters Jig sends a standing session at set times.
+	`
+CREATE TABLE schedules (
+	id TEXT PRIMARY KEY,
+	name TEXT NOT NULL,
+	cron TEXT NOT NULL,
+	session_id TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+	message TEXT NOT NULL,
+	permission_mode TEXT CHECK (permission_mode IN ('auto', 'manual', 'skip')),
+	catch_up INTEGER NOT NULL DEFAULT 1,
+	enabled INTEGER NOT NULL DEFAULT 1,
+	next_run_at INTEGER,
+	last_run_at INTEGER,
+	last_status TEXT CHECK (last_status IN ('running', 'done', 'error', 'stopped', 'skipped')),
+	last_detail TEXT,
+	last_letter_id TEXT,
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL
+) STRICT;
+CREATE UNIQUE INDEX schedules_name ON schedules (name COLLATE NOCASE);
+ALTER TABLE letters ADD COLUMN schedule_id TEXT REFERENCES schedules (id) ON DELETE SET NULL;
+`,
 ];

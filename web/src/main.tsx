@@ -2,6 +2,7 @@ import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { boot } from "./actions.ts";
 import { CenterPage } from "./components/center.tsx";
+import { SchedulesPage } from "./components/schedules.tsx";
 import { SessionView } from "./components/session.tsx";
 import { SettingsDialogs } from "./components/settings.tsx";
 import { Sidebar, SidebarRail, useNarrow } from "./components/sidebar.tsx";
@@ -81,7 +82,13 @@ function App() {
 						onClick={() => setState({ drawerOpen: false })}
 					/>
 				)}
-				{page === "center" ? <CenterPage /> : <SessionView />}
+				{page === "center" ? (
+					<CenterPage />
+				) : page === "schedules" ? (
+					<SchedulesPage />
+				) : (
+					<SessionView />
+				)}
 				<SettingsDialogs />
 			</div>
 		</>

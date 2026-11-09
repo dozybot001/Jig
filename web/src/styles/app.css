@@ -2685,3 +2685,54 @@ button.about-row {
 	border-radius: var(--radius-l);
 	background: #ffffff;
 }
+
+/* Scheduled tasks (M3 plan, section 9): one card per task, its times, session, letter and last run. */
+.schedule-list {
+	display: grid;
+	gap: 10px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.schedule-card {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 6px;
+	padding: 14px 16px;
+}
+.schedule-card p {
+	margin: 0;
+}
+.schedule-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+.schedule-head h3 {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	font-size: var(--fs-m);
+	font-weight: 600;
+}
+.schedule-line {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 12px;
+	color: var(--text-2);
+	font-size: var(--fs-s);
+}
+.schedule-cron {
+	font-family: var(--mono);
+}
+.schedule-message {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.schedule-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 4px;
+}

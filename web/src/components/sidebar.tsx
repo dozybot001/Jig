@@ -5,6 +5,7 @@ import {
 	duplicateSession,
 	exportSession,
 	openCenter,
+	openSchedules,
 	renameGroup,
 	saveSettings,
 	selectSession,
@@ -42,6 +43,7 @@ import {
 	NewWorkspaceIcon,
 	PinIcon,
 	RenameIcon,
+	ScheduleIcon,
 	SearchIcon,
 	SlidersIcon,
 	TeamIcon,
@@ -630,7 +632,10 @@ function nest(list: Session[]): { session: Session; depth: number }[] {
 	return out;
 }
 
-/** The two fixed entries at the top: the main conversation and the approval center (M2 plan, 10). */
+/**
+ * The fixed entries at the top: the main conversation, the approval center (M2 plan, 10) and the
+ * scheduled tasks (M3 plan, 9).
+ */
 function FixedEntries() {
 	useLang();
 	const mainId = useAppState((state) => state.settings?.mainSessionId ?? null);
@@ -638,6 +643,7 @@ function FixedEntries() {
 	const selected = useAppState((state) => (state.page ? null : state.selectedId));
 	const count = useAppState((state) => centerCount(state.center));
 	const open = useAppState((state) => state.page === "center");
+	const onSchedules = useAppState((state) => state.page === "schedules");
 	return (
 		<>
 			{mainId && mainName && (
@@ -671,6 +677,15 @@ function FixedEntries() {
 						<span className="visually-hidden">{t("approvalCount", { n: count })}</span>
 					</>
 				)}
+			</button>
+			<button
+				type="button"
+				className="nav-row"
+				aria-current={onSchedules ? "page" : undefined}
+				onClick={() => openSchedules()}
+			>
+				<ScheduleIcon />
+				<span className="nav-label">{t("schedules")}</span>
 			</button>
 		</>
 	);
@@ -814,6 +829,7 @@ export function SidebarRail() {
 	const hasMain = useAppState((state) => (mainId ? Boolean(state.sessions[mainId]) : false));
 	const count = useAppState((state) => centerCount(state.center));
 	const onCenter = useAppState((state) => state.page === "center");
+	const onSchedules = useAppState((state) => state.page === "schedules");
 	const [dialog, setDialog] = useState<"team" | "workspace" | null>(null);
 	return (
 		<nav className="rail" aria-label={t("sessions")}>
@@ -859,6 +875,15 @@ export function SidebarRail() {
 						{count}
 					</span>
 				)}
+			</Button>
+			<Button
+				variant="icon"
+				aria-label={t("schedules")}
+				title={t("schedules")}
+				aria-current={onSchedules ? "page" : undefined}
+				onClick={() => openSchedules()}
+			>
+				<ScheduleIcon />
 			</Button>
 			<Button
 				variant="icon"

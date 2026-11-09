@@ -8,6 +8,7 @@ import type { Agents } from "../agent/runner.ts";
 import type { EventBus } from "../events.ts";
 import { PostOffice } from "../mail/post.ts";
 import type { ModelGateway } from "../model/gateway.ts";
+import type { Scheduler } from "../schedules.ts";
 import type { Store } from "../store.ts";
 import { agentRoutes } from "./agents.ts";
 import { api } from "./api.ts";
@@ -16,6 +17,7 @@ import { DraftCache, eventRoutes } from "./events.ts";
 import { mailRoutes } from "./mail.ts";
 import { type AppEnv, errorHandler, problemResponse, requestId, titleFor } from "./problem.ts";
 import { providerRoutes } from "./providers.ts";
+import { scheduleRoutes } from "./schedules.ts";
 import {
 	authRoutes,
 	deviceLimits,
@@ -40,6 +42,8 @@ export interface AppOptions {
 	pickFolder?: () => Promise<string | null>;
 	/** Phone access through the relay (M3 plan, section 6). */
 	remote?: RemoteAccess;
+	/** Scheduled tasks (M3 plan, section 9). */
+	scheduler?: Scheduler;
 }
 
 const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Jig</title>
@@ -84,6 +88,7 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 	// The runner's post office, so a released letter or a decision wakes its recipient.
 	app.route("/api", mailRoutes(agents?.post ?? new PostOffice(store, log)));
 	if (bus) app.route("/api", eventRoutes(store, bus, new DraftCache(bus)));
+	if (options.scheduler) app.route("/api", scheduleRoutes(store, options.scheduler));
 
 	const root = options.webRoot;
 	if (root && existsSync(join(root, "index.html"))) {

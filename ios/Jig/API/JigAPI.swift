@@ -108,8 +108,12 @@ struct LetterRef: Decodable, Sendable {
 	let body: String
 
 	struct From: Decodable, Sendable {
+		/// session, person, cli, or jig (a scheduled task).
+		let kind: String?
 		let name: String
 	}
+
+	var sender: String { Sender.name(kind: from.kind, name: from.name) }
 }
 
 /// What the approval center waits on: permission requests and questions, decision cards, held letters.
@@ -202,6 +206,7 @@ struct CardItem: Decodable, Identifiable, Sendable {
 
 struct LetterItem: Decodable, Identifiable, Sendable {
 	let id: String
+	let fromKind: String?
 	let fromName: String
 	let toSession: String
 	let kind: String
@@ -210,6 +215,8 @@ struct LetterItem: Decodable, Identifiable, Sendable {
 	let status: String
 	let statusReason: String?
 	let createdAt: Double
+
+	var sender: String { Sender.name(kind: fromKind, name: fromName) }
 }
 
 /// An RFC 9457 problem from Jig, shown to the person as it came.

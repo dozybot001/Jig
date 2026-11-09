@@ -21,6 +21,7 @@ import {
 	type Approval,
 	type ChangeStep,
 	type Entry,
+	type PermissionMode,
 	type PermissionRequest,
 	type Question,
 	type QuestionRequest,
@@ -249,6 +250,43 @@ export function changeText(step: ChangeStep): string {
 			return t("change_set_language", {
 				to: step.to === "system" ? t("language_system") : step.to === "zh" ? "中文" : "English",
 			});
+		case "create_schedule": {
+			const details = [
+				t("change_detail_cron", { cron: step.cron }),
+				t("change_detail_to", { session: quoted(step.session) }),
+				...(step.permission
+					? [t("change_detail_run_mode", { mode: t(`perm_${step.permission}`) })]
+					: []),
+				t("change_detail_letter", { message: clip(step.message) }),
+			].join(t("listSeparator"));
+			return t("change_create_schedule", { name: quoted(step.name), details });
+		}
+		case "change_schedule": {
+			const runMode = (mode: PermissionMode | null) =>
+				mode ? t(`perm_${mode}`) : t("scheduleModeSession");
+			const details = [
+				...(step.name !== undefined
+					? [t("change_detail_rename", { name: quoted(step.name) })]
+					: []),
+				...(step.cron !== undefined ? [t("change_detail_cron", { cron: step.cron })] : []),
+				...(step.session !== undefined
+					? [t("change_detail_to", { session: quoted(step.session) })]
+					: []),
+				...(step.permission !== undefined
+					? [t("change_detail_run_mode_change", { mode: runMode(step.permission) })]
+					: []),
+				...(step.message !== undefined
+					? [t("change_detail_letter", { message: clip(step.message) })]
+					: []),
+				...(step.catchUp !== undefined
+					? [t(step.catchUp ? "change_detail_catch_up_on" : "change_detail_catch_up_off")]
+					: []),
+				...(step.enabled !== undefined
+					? [t(step.enabled ? "change_detail_on" : "change_detail_off")]
+					: []),
+			].join(t("listSeparator"));
+			return t("change_change_schedule", { name: quoted(step.schedule), details });
+		}
 	}
 }
 
@@ -586,9 +624,11 @@ const ToolCard = memo(function ToolCard({
 	const status = view?.status ?? (result ? (result.isError ? "error" : "done") : "pending");
 	const pending = approvals.some((approval) => approval.status === "pending");
 	const detail = view?.detail as
-		| { diff?: string; added?: number; removed?: number }
+		| { diff?: string; added?: number; removed?: number; code?: string }
 		| null
 		| undefined;
+	// Refused because the turn was a scheduled run with nobody watching (M3 plan, section 9).
+	const unattended = detail?.code === "unattended";
 	const [open, setOpen] = useState(false);
 	const to = call.name === "send_letter" ? (call.arguments as { to?: unknown }).to : undefined;
 	const recipient = useAppState((state) =>
@@ -626,7 +666,9 @@ const ToolCard = memo(function ToolCard({
 							</span>
 						)}
 						{flagged && (
-							<span className={`tool-state tool-state-${status}`}>{t(`tool_${status}`)}</span>
+							<span className={`tool-state tool-state-${status}`}>
+								{status === "denied" && unattended ? t("tool_unattended") : t(`tool_${status}`)}
+							</span>
 						)}
 						<ChevronIcon />
 					</summary>
@@ -952,7 +994,9 @@ function LetterEntry({ letter }: { letter: LetterRef }) {
 			? t("fromCli")
 			: letter.from.kind === "person"
 				? t("you")
-				: (sender ?? letter.from.name);
+				: letter.from.kind === "jig"
+					? t("fromSchedule", { name: t("quoted", { s: letter.from.name }) })
+					: (sender ?? letter.from.name);
 	// An automatic report repeats its first line as the summary; show it once.
 	const body = bodyAfterSummary(letter.body, letter.summary);
 	const kind = t(`letterKind_${letter.kind}`);
@@ -972,6 +1016,11 @@ function LetterEntry({ letter }: { letter: LetterRef }) {
 					<span>{from}</span>
 				)}
 				<span className="tag">{kind}</span>
+				{letter.schedule && letter.from.kind !== "jig" && (
+					<span className="hint">
+						{t("fromSchedule", { name: t("quoted", { s: letter.schedule.name }) })}
+					</span>
+				)}
 				{letter.auto && <span className="hint">{t("sentByJig")}</span>}
 			</div>
 			<p className="letter-summary">{plainLine(letter.summary) || letter.summary}</p>

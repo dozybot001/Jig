@@ -45,6 +45,9 @@ function SenderLink({ letter }: { letter: Letter }) {
 	useLang();
 	if (letter.fromKind === "cli") return <span>{t("fromCli")}</span>;
 	if (letter.fromKind === "person") return <span>{t("you")}</span>;
+	if (letter.fromKind === "jig") {
+		return <span>{t("fromSchedule", { name: t("quoted", { s: letter.fromName }) })}</span>;
+	}
 	return <SessionLink id={letter.fromSession} fallback={letter.fromName} />;
 }
 
@@ -404,6 +407,8 @@ function useSenderName(letter: Letter): string {
 	const name = useSessionName(letter.fromSession);
 	if (letter.fromKind === "cli") return t("fromCli");
 	if (letter.fromKind === "person") return t("you");
+	if (letter.fromKind === "jig")
+		return t("fromSchedule", { name: t("quoted", { s: letter.fromName }) });
 	return name ?? letter.fromName;
 }
 

@@ -5,6 +5,7 @@ import type {
 	Device,
 	Group,
 	Letter,
+	Schedule,
 	Session,
 	SessionEvent,
 } from "../shared/types.ts";
@@ -28,7 +29,9 @@ export type GlobalEvent =
 	/** Archived sessions the person deleted for good. */
 	| { type: "sessionsDeleted"; ids: string[] }
 	/** Paired phones changed, or the relay connection did. */
-	| { type: "devices"; devices: Device[] };
+	| { type: "devices"; devices: Device[] }
+	/** A scheduled task was added, changed, run or removed. */
+	| { type: "schedules"; schedules: Schedule[] };
 
 export type BusEvent =
 	| { scope: "session"; sessionId: string; seq: number; event: SessionEvent }

@@ -16,8 +16,13 @@ export function neutralize(text: string): string {
 function senderLabel(letter: Letter): string {
 	if (letter.fromKind === "cli") return "the command line (jig send)";
 	if (letter.fromKind === "person") return "the person";
+	if (letter.fromKind === "jig")
+		return `the scheduled task '${letter.fromName}' (set up by the person)`;
 	return letter.fromName;
 }
+
+/** The scheduled task a letter belongs to, by id and name. */
+export type ScheduleRef = { id: string; name: string };
 
 /** The decision as Jig recorded it, for a session to rely on. */
 export function decisionRef(card: Card): DecisionRef {
@@ -31,7 +36,11 @@ export function decisionRef(card: Card): DecisionRef {
 }
 
 /** What the interface shows for a delivered letter. */
-export function letterRef(letter: Letter, decision: DecisionRef | null): LetterRef {
+export function letterRef(
+	letter: Letter,
+	decision: DecisionRef | null,
+	schedule: ScheduleRef | null = null,
+): LetterRef {
 	return {
 		id: letter.id,
 		kind: letter.kind,
@@ -40,6 +49,7 @@ export function letterRef(letter: Letter, decision: DecisionRef | null): LetterR
 		body: letter.body,
 		...(letter.auto ? { auto: true } : {}),
 		...(decision ? { decision } : {}),
+		...(schedule ? { schedule } : {}),
 	};
 }
 
@@ -55,9 +65,15 @@ function decisionLines(decision: DecisionRef): string[] {
 
 /**
  * What the model reads for a delivered letter. The closing tag repeats the letter's id, which the sender
- * could not know while writing, so text inside a letter cannot pass itself off as the end of it.
+ * could not know while writing, so text inside a letter cannot pass itself off as the end of it. `note`
+ * is Jig's own line about the letter, such as how a scheduled run works.
  */
-export function letterText(letter: Letter, decision: DecisionRef | null): string {
+export function letterText(
+	letter: Letter,
+	decision: DecisionRef | null,
+	schedule: ScheduleRef | null = null,
+	note: string | null = null,
+): string {
 	if (letter.fromKind === "person" && decision) {
 		return [
 			`<decision number="${decision.number}" from="the person" recorded-by="Jig">`,
@@ -73,6 +89,7 @@ export function letterText(letter: Letter, decision: DecisionRef | null): string
 		`thread="${letter.threadId}"`,
 		...(letter.replyTo ? [`reply-to="${letter.replyTo}"`] : []),
 		...(letter.auto ? ['auto="true"'] : []),
+		...(schedule && letter.fromKind !== "jig" ? [`schedule="${attr(schedule.name)}"`] : []),
 	];
 	const lines = [`<letter ${attributes.join(" ")}>`, neutralize(letter.summary)];
 	if (letter.body) lines.push("", neutralize(letter.body));
@@ -83,6 +100,7 @@ export function letterText(letter: Letter, decision: DecisionRef | null): string
 			...decisionLines(decision),
 		);
 	}
+	if (note) lines.push("", `[Jig] ${note}`);
 	lines.push(`</letter id="${letter.id}">`);
 	return lines.join("\n");
 }

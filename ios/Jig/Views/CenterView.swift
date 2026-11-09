@@ -137,7 +137,7 @@ struct HeldLetterRow: View {
 	var body: some View {
 		VStack(alignment: .leading, spacing: 10) {
 			CardHead(
-				session: "\(letter.fromName) → \(model.name(of: letter.toSession))",
+				session: "\(letter.sender) → \(model.name(of: letter.toSession))",
 				date: letter.createdAt,
 				text: letter.summary
 			)

@@ -95,6 +95,7 @@ export function serveCommand(): Command {
 			const { createApp } = await import("../server/http/app.ts");
 			const { issueLoginToken } = await import("../server/http/security.ts");
 			const { MailStore } = await import("../server/mail/store.ts");
+			const { Scheduler } = await import("../server/schedules.ts");
 
 			const runtime = openRuntime({ env: io.env });
 			const { store, bus, gateway, home } = runtime;
@@ -128,6 +129,8 @@ export function serveCommand(): Command {
 					return handle(request, device.id);
 				},
 			});
+			// Scheduled tasks run from the service, whether or not a page is open (blueprint 6.5).
+			const scheduler = new Scheduler(store, agents.post, agents.schedules, log);
 			const app = createApp({
 				store,
 				gateway,
@@ -138,6 +141,7 @@ export function serveCommand(): Command {
 				webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
 				build: shortCommit(),
 				remote,
+				scheduler,
 			});
 			handle = async (request, device) => app.fetch(request, { device });
 
@@ -160,6 +164,8 @@ export function serveCommand(): Command {
 			// Letters that were waiting when Jig stopped, and letters from `jig send`, start their sessions.
 			agents.wakeQueued();
 			const sweep = setInterval(() => agents.wakeQueued(), LETTER_SWEEP_MS);
+			// Runs missed while Jig was not running are run or skipped now, as each task says.
+			scheduler.start();
 			// Phone access follows the settings, which `jig remote` may change while Jig runs.
 			const syncRemote = () =>
 				void remote.sync().catch((error: Error) => log(`remote access: ${error.message}`));
@@ -179,6 +185,7 @@ export function serveCommand(): Command {
 					io.stderr.write("Stopping Jig…\n");
 					clearInterval(sweep);
 					clearInterval(remoteSweep);
+					scheduler.stop();
 					remote.stop();
 					agents.shutdown();
 					server.close();

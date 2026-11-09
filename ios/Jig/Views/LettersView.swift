@@ -11,7 +11,7 @@ struct LettersView: View {
 					LetterView(letter: letter)
 				} label: {
 					VStack(alignment: .leading, spacing: 3) {
-						Text("\(letter.fromName) → \(model.name(of: letter.toSession))")
+						Text("\(letter.sender) → \(model.name(of: letter.toSession))")
 							.font(.footnote)
 							.foregroundStyle(.secondary)
 						Text(letter.summary)
@@ -44,7 +44,7 @@ struct LetterView: View {
 	var body: some View {
 		ScrollView {
 			VStack(alignment: .leading, spacing: 12) {
-				Text(LetterKind.line(from: letter.fromName, kind: letter.kind))
+				Text(LetterKind.line(from: letter.sender, kind: letter.kind))
 					.font(.footnote)
 					.foregroundStyle(.secondary)
 				Text("To \(model.name(of: letter.toSession)) · \(Date(timeIntervalSince1970: letter.createdAt / 1000).formatted(date: .abbreviated, time: .shortened))")

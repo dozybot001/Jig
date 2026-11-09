@@ -18,6 +18,7 @@ import {
 import { invalid } from "./errors.ts";
 import { resolveWorkingFolder } from "./paths.ts";
 import { isInside } from "./permissions/paths.ts";
+import type { ScheduleBook, ScheduleFields } from "./schedules.ts";
 import { readSettings, resolveLogFile, type Workspace } from "./settings.ts";
 import { type SessionPatch, type Store, validateSessionName } from "./store.ts";
 
@@ -38,6 +39,7 @@ export interface ManagePlan {
 
 export interface ManagerDeps {
 	store: Store;
+	schedules: ScheduleBook;
 	mainId(): string | null;
 	modelExists(provider: string, model: string): boolean;
 	/** A session was archived: letters waiting for it are dropped. */
@@ -448,6 +450,78 @@ export class Manager {
 					},
 				});
 			}
+		}
+
+		// Scheduled tasks: creating and changing one configures; a run mode wider than its session's widens.
+		const book = this.#deps.schedules;
+		for (const change of list(args.schedules, "schedules")) {
+			const ref = text(change, "schedule", 200);
+			const fields: ScheduleFields = {};
+			const name = text(change, "name", 200);
+			const cron = text(change, "cron", 200);
+			const session = text(change, "session", 200);
+			const message = text(change, "message", 20_000);
+			const permission = oneOf(change, "permission", ["session", ...PERMISSION_MODES] as const);
+			const catchUp = flag(change, "catch_up");
+			const enabled = flag(change, "enabled");
+			if (name !== undefined) fields.name = name;
+			if (cron !== undefined) fields.cron = cron;
+			if (session !== undefined) fields.session = session;
+			if (message !== undefined) fields.message = message;
+			if (permission !== undefined) {
+				fields.permissionMode = permission === "session" ? null : permission;
+			}
+			if (catchUp !== undefined) fields.catchUp = catchUp;
+			if (enabled !== undefined) fields.enabled = enabled;
+			const current = ref === undefined ? null : book.find(ref);
+			if (ref !== undefined && !current)
+				throw invalid(`There is no scheduled task "${ref}".`, "schedule");
+			const values = book.values(fields, current);
+			const target = store.getSession(values.sessionId);
+			reach("configure");
+			const mode = values.permissionMode;
+			if (mode && MODE_RANK[mode] > MODE_RANK[permissionModeOf(target.options)]) {
+				const before = current?.permissionMode ?? null;
+				// Wider than the session's own mode, and newly so: the person confirms it.
+				if (!current || before !== mode || current.sessionId !== values.sessionId) {
+					widen("widen-permission", target);
+				}
+			}
+			if (!current) {
+				if (commit) book.create(fields);
+				add(
+					{
+						action: "create_schedule",
+						name: values.name,
+						cron: values.cron,
+						session: target.name,
+						message: values.message,
+						permission: mode,
+					},
+					`Created the scheduled task "${values.name}" (${values.cron}, to "${target.name}").`,
+				);
+				continue;
+			}
+			const step: Extract<ChangeStep, { action: "change_schedule" }> = {
+				action: "change_schedule",
+				schedule: current.name,
+			};
+			if (values.name !== current.name) step.name = values.name;
+			if (values.cron !== current.cron) step.cron = values.cron;
+			if (values.sessionId !== current.sessionId) step.session = target.name;
+			if (values.message !== current.message) step.message = values.message;
+			if (values.permissionMode !== current.permissionMode) step.permission = values.permissionMode;
+			if (values.catchUp !== current.catchUp) step.catchUp = values.catchUp;
+			if (values.enabled !== current.enabled) step.enabled = values.enabled;
+			const changed = Object.keys(step).filter((key) => key !== "action" && key !== "schedule");
+			if (changed.length === 0) continue;
+			if (commit) book.update(current.id, fields);
+			add(
+				step,
+				changed.length === 1 && step.enabled !== undefined
+					? `Turned ${step.enabled ? "on" : "off"} the scheduled task "${current.name}".`
+					: `Changed the scheduled task "${current.name}": ${changed.join(", ")}.`,
+			);
 		}
 
 		const settings = args.settings;

@@ -234,7 +234,7 @@ struct StepView: View {
 				.padding(.leading, 40)
 		case .letter(_, let letter):
 			VStack(alignment: .leading, spacing: 6) {
-				Label(LetterKind.line(from: letter.from.name, kind: letter.kind), systemImage: "envelope")
+				Label(LetterKind.line(from: letter.sender, kind: letter.kind), systemImage: "envelope")
 					.font(.footnote)
 					.foregroundStyle(.secondary)
 				Text(letter.body)
@@ -317,6 +317,19 @@ enum ToolSummary {
 		case "session": String(localized: "Opened \(n) sessions")
 		case "card": String(localized: "Changed the approval center \(n) times")
 		default: String(localized: "\(n) other steps")
+		}
+	}
+}
+
+/// Who wrote a letter, as the Mac names them: a session by its name, you, the command line, or a
+/// scheduled task.
+enum Sender {
+	static func name(kind: String?, name: String) -> String {
+		switch kind {
+		case "person": String(localized: "You")
+		case "cli": String(localized: "Command line")
+		case "jig": String(localized: "Scheduled task “\(name)”")
+		default: name
 		}
 	}
 }
