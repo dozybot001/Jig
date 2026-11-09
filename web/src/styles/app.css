@@ -875,11 +875,6 @@ body.scroll-locked {
 	font: inherit;
 	cursor: pointer;
 }
-@media (hover: hover) {
-	.lockup-button:hover {
-		background: var(--hover);
-	}
-}
 .sidebar-bottom {
 	padding: 8px 10px 14px;
 }
