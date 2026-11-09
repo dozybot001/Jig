@@ -1,16 +1,20 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { Session } from "../../../src/shared/types.ts";
 import {
+	createPairing,
 	deleteArchivedSessions,
 	deleteCustomProvider,
 	deleteKey,
 	loadArchived,
+	loadPhones,
 	openSettings,
+	revokeDevice,
 	saveCustomProvider,
 	saveKey,
 	saveSettings,
+	setPhoneAccess,
 } from "../actions.ts";
-import { t, useLang } from "../i18n.ts";
+import { formatAgo, t, useLang } from "../i18n.ts";
 import { type ProviderSummary, setState, useAppState } from "../state.ts";
 import { ConfirmDialog } from "./dialogs.tsx";
 import {
@@ -22,12 +26,25 @@ import {
 	KeyIcon,
 	LanguageIcon,
 	MailIcon,
+	PhoneIcon,
 	PlusIcon,
 	SlidersIcon,
 	ThemeIcon,
 } from "./icons.tsx";
 import { ModelPicker } from "./session.tsx";
-import { Button, Dialog, ErrorBox, Field, Menu, type MenuEntry, Switch, useAction } from "./ui.tsx";
+import {
+	Button,
+	Dialog,
+	ErrorBox,
+	Field,
+	Menu,
+	type MenuEntry,
+	SettingGroup,
+	SettingRow,
+	Switch,
+	useAction,
+	useNow,
+} from "./ui.tsx";
 
 function ProviderRow({ provider }: { provider: ProviderSummary }) {
 	useLang();
@@ -392,6 +409,7 @@ export function SettingsDialogs() {
 	const which = useAppState((state) => state.settingsDialog);
 	const close = () => setState({ settingsDialog: null });
 	if (which === "defaults") return <DefaultsDialog onClose={close} />;
+	if (which === "phones") return <PhonesDialog onClose={close} />;
 	if (which === "providers" || which === "about") {
 		return (
 			<Dialog
@@ -463,6 +481,7 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 		{ separator: true, id: "line-1" },
 		{ label: t("providersMenu"), icon: <KeyIcon />, onSelect: () => openSettings("providers") },
 		{ label: t("defaultsMenu"), icon: <SlidersIcon />, onSelect: () => openSettings("defaults") },
+		{ label: t("phonesMenu"), icon: <PhoneIcon />, onSelect: () => openSettings("phones") },
 		{
 			label: t("dataMenu"),
 			icon: <DataIcon />,
@@ -559,6 +578,127 @@ function DeleteArchivedDialog({ onClose }: { onClose: () => void }) {
 				</>
 			)}
 			<ErrorBox error={error ?? remove.error} />
+		</Dialog>
+	);
+}
+
+/**
+ * Phone access (M3 plan, sections 4 and 6): turn it on, see the relay connection, pair an iPhone by
+ * QR code and remove paired phones. Everything between the phone and this Mac is end-to-end encrypted.
+ */
+function PhonesDialog({ onClose }: { onClose: () => void }) {
+	useLang();
+	const phones = useAppState((state) => state.phones);
+	const [pairing, setPairing] = useState<{ svg: string; expiresAt: number; before: number } | null>(
+		null,
+	);
+	const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
+	const now = useNow();
+	const switchId = useId();
+	const toggle = useAction((enabled: boolean) => setPhoneAccess(enabled));
+	const pair = useAction(async () => {
+		const result = await createPairing();
+		setPairing({ ...result, before: phones?.devices.length ?? 0 });
+	});
+	// The relay connection changes without an event; look again while the dialog is open.
+	useEffect(() => {
+		void loadPhones();
+		const timer = setInterval(() => void loadPhones(), 3000);
+		return () => clearInterval(timer);
+	}, []);
+	// The code appears below the device list; bring it and its help text into view.
+	const pairingArea = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		if (pairing) pairingArea.current?.scrollIntoView({ block: "nearest" });
+	}, [pairing]);
+	const remote = phones?.remote;
+	const devices = phones?.devices ?? [];
+	const paired = pairing && devices.length > pairing.before ? devices.at(-1) : null;
+	const expired = pairing && !paired && pairing.expiresAt < now;
+	return (
+		<Dialog
+			title={t("phones")}
+			size="l"
+			onClose={onClose}
+			footer={<Button onClick={onClose}>{t("close")}</Button>}
+		>
+			<SettingGroup title={t("phoneAccess")}>
+				<SettingRow label={t("phoneAccessSwitch")} hint={t("phoneAccessHint")} labelId={switchId}>
+					<Switch
+						checked={remote?.enabled ?? false}
+						busy={toggle.busy}
+						labelledBy={switchId}
+						onChange={(value) => void toggle.run(value)}
+					/>
+				</SettingRow>
+				{remote?.enabled && (
+					<SettingRow
+						label={t("relay")}
+						hint={remote.connected ? t("relayConnected") : t("relayConnecting")}
+					>
+						<code className="relay-url">{remote.relayUrl}</code>
+					</SettingRow>
+				)}
+			</SettingGroup>
+			<SettingGroup title={t("pairedPhones")}>
+				{devices.length === 0 && <p className="hint setting-empty">{t("noPairedPhones")}</p>}
+				{devices.map((device) => (
+					<SettingRow
+						key={device.id}
+						label={device.name}
+						hint={
+							device.lastSeenAt
+								? t("lastConnected", { ago: formatAgo(device.lastSeenAt, now) })
+								: t("neverConnected")
+						}
+					>
+						<Button
+							variant="danger"
+							onClick={() => setRemoving({ id: device.id, name: device.name })}
+						>
+							{t("removePhone")}
+						</Button>
+					</SettingRow>
+				))}
+			</SettingGroup>
+			<div className="pairing" ref={pairingArea}>
+				{paired ? (
+					<p role="status">{t("phonePaired", { name: paired.name })}</p>
+				) : pairing && !expired ? (
+					<>
+						<img
+							className="pairing-qr"
+							src={`data:image/svg+xml;utf8,${encodeURIComponent(pairing.svg)}`}
+							alt={t("pairingQr")}
+						/>
+						<p className="hint">{t("pairingHelp")}</p>
+					</>
+				) : (
+					<>
+						{expired && <p className="hint">{t("pairingExpired")}</p>}
+						<Button
+							variant="primary"
+							busy={pair.busy}
+							disabled={!remote?.enabled}
+							onClick={() => void pair.run()}
+						>
+							<PhoneIcon />
+							{t("addIphone")}
+						</Button>
+						{!remote?.enabled && <p className="hint">{t("turnOnFirst")}</p>}
+					</>
+				)}
+			</div>
+			<ErrorBox error={toggle.error ?? pair.error} />
+			{removing && (
+				<ConfirmDialog
+					title={t("removePhoneTitle", { name: removing.name })}
+					body={t("removePhoneBody")}
+					confirmLabel={t("removePhone")}
+					onConfirm={() => revokeDevice(removing.id)}
+					onClose={() => setRemoving(null)}
+				/>
+			)}
 		</Dialog>
 	);
 }

@@ -125,12 +125,89 @@ final class AppModel {
 		return sent
 	}
 
-	/// Allow once or decline a permission request, from the approval center or a session.
-	func answer(_ approvalId: String, allow: Bool) async {
+	enum Decision: String {
+		case allowOnce = "allow_once"
+		case allowAlways = "allow_always"
+		case deny
+	}
+
+	/// Answers a permission request: allow once, always allow this kind, or decline.
+	func answer(_ approvalId: String, _ decision: Decision) async {
+		await attempt { try await $0.post("/api/approvals/\(approvalId)", ["decision": decision.rawValue]) }
+		await refreshCenter()
+	}
+
+	struct Answer: Encodable, Sendable {
+		let choices: [Int]
+		let text: String?
+	}
+
+	private struct Answers: Encodable, Sendable {
+		let answers: [Answer]
+	}
+
+	/// Answers a question card: the options picked and the person's own words, per question.
+	func answer(_ approvalId: String, answers: [Answer]) async -> Bool {
+		var done = false
 		await attempt {
-			try await $0.post("/api/approvals/\(approvalId)", ["decision": allow ? "allow_once" : "deny"])
+			try await $0.post("/api/approvals/\(approvalId)", Answers(answers: answers))
+			done = true
 		}
 		await refreshCenter()
+		return done
+	}
+
+	private struct Decide: Encodable, Sendable {
+		let choice: Int?
+		let note: String?
+	}
+
+	/// Sends the person's decision on a card; it goes back to the sessions that asked.
+	func decide(_ cardId: String, choice: Int?, note: String?) async -> Bool {
+		var done = false
+		await attempt {
+			try await $0.post("/api/cards/\(cardId)/decide", Decide(choice: choice, note: note))
+			done = true
+		}
+		await refreshCenter()
+		return done
+	}
+
+	/// Releases a held letter to its recipient, or refuses it.
+	func settle(_ letterId: String, release: Bool) async {
+		await attempt { try await $0.post("/api/letters/\(letterId)/\(release ? "release" : "refuse")", [String: String]()) }
+		await refreshCenter()
+		await refreshLetters()
+	}
+
+	/// Follows the Mac's event stream and refreshes what changed, so the lists stay current; reconnects
+	/// after a drop. Runs while the app shows its main screens.
+	func followEvents() async {
+		while !Task.isCancelled {
+			guard let client else { return }
+			do {
+				for try await event in client.events() where event.event == "global" {
+					await changed(event.data)
+				}
+			} catch {}
+			try? await Task.sleep(for: .seconds(3))
+		}
+	}
+
+	private func changed(_ data: String) async {
+		guard let type = (try? JSONSerialization.jsonObject(with: Data(data.utf8)) as? [String: Any])?["type"] as? String
+		else { return }
+		switch type {
+		case "sessionSummary", "groups", "sessionsDeleted":
+			await refreshSessions()
+		case "approval", "card":
+			await refreshCenter()
+		case "letter":
+			await refreshCenter()
+			await refreshLetters()
+		default:
+			break
+		}
 	}
 
 	private func attempt(_ work: (JigClient) async throws -> Void) async {

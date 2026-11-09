@@ -87,6 +87,33 @@ struct Center: Decodable, Sendable {
 	var count: Int { approvals.count + cards.count + held.count }
 }
 
+struct Option: Decodable, Hashable, Sendable {
+	let label: String
+	let detail: String?
+
+	private enum Keys: String, CodingKey { case label, detail }
+
+	/// Options come as objects, or as plain strings in questions asked before options had details.
+	init(from decoder: Decoder) throws {
+		if let label = try? decoder.singleValueContainer().decode(String.self) {
+			self.label = label
+			detail = nil
+			return
+		}
+		let container = try decoder.container(keyedBy: Keys.self)
+		label = try container.decode(String.self, forKey: .label)
+		detail = try container.decodeIfPresent(String.self, forKey: .detail)
+	}
+}
+
+struct Question: Decodable, Sendable {
+	let question: String
+	let header: String?
+	let options: [Option]?
+	let recommended: Int?
+	let multiple: Bool?
+}
+
 struct ApprovalItem: Decodable, Identifiable, Sendable {
 	let id: String
 	let sessionId: String
@@ -99,19 +126,28 @@ struct ApprovalItem: Decodable, Identifiable, Sendable {
 		let summary: String?
 		let description: String?
 		let mustConfirm: Bool?
+		let reasons: [String]?
+		let rememberRules: [Rule]?
 		let questions: [Question]?
 		let question: String?
+		let options: [Option]?
+		let fromReply: Bool?
 	}
 
-	struct Question: Decodable, Sendable {
-		let question: String
+	struct Rule: Decodable, Sendable {
+		let tool: String
+		let pattern: String?
 	}
 
-	/// The line the list shows: the command, file or question.
+	/// The questions, whichever form they were saved in (src/shared/types.ts questionsOf).
+	var questions: [Question] {
+		if let questions = request.questions, !questions.isEmpty { return questions }
+		return [Question(question: request.question ?? "", header: nil, options: request.options, recommended: nil, multiple: nil)]
+	}
+
+	/// The line the list shows: what the session wants to do, or its first question.
 	var line: String {
-		if kind == "question" {
-			return request.questions?.first?.question ?? request.question ?? ""
-		}
+		if kind == "question" { return questions.first?.question ?? "" }
 		return request.description ?? request.summary ?? request.tool ?? ""
 	}
 }
@@ -120,7 +156,13 @@ struct CardItem: Decodable, Identifiable, Sendable {
 	let id: String
 	let number: Int
 	let title: String
+	let context: String
+	let options: [Option]
+	let recommended: Int?
+	let deadline: String?
+	let undoable: Bool?
 	let requestedBy: String?
+	let createdBy: String?
 	let createdAt: Double
 }
 
@@ -130,7 +172,9 @@ struct LetterItem: Decodable, Identifiable, Sendable {
 	let toSession: String
 	let kind: String
 	let summary: String
+	let body: String
 	let status: String
+	let statusReason: String?
 	let createdAt: Double
 }
 

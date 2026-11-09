@@ -1,6 +1,15 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "#%lld %@": {
+      "shouldTranslate": false
+    },
+    "#%lld · %@": {
+      "shouldTranslate": false
+    },
+    "%@ · %@": {
+      "shouldTranslate": false
+    },
     "%@ → %@": {
       "shouldTranslate": false
     },
@@ -17,12 +26,32 @@
         }
       }
     },
+    "Add a note (optional)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写一句备注（可选）"
+          }
+        }
+      }
+    },
     "Allow": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "允许"
+          }
+        }
+      }
+    },
+    "Always": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "总是允许"
           }
         }
       }
@@ -37,12 +66,52 @@
         }
       }
     },
+    "Answer": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回答"
+          }
+        }
+      }
+    },
     "Approvals": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "审批"
+          }
+        }
+      }
+    },
+    "Asks every time": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每次确认"
+          }
+        }
+      }
+    },
+    "Can be undone": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可撤回"
+          }
+        }
+      }
+    },
+    "Can't be undone": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可撤回"
           }
         }
       }
@@ -77,6 +146,16 @@
         }
       }
     },
+    "Decision": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "决定"
+          }
+        }
+      }
+    },
     "Decisions for you": {
       "localizations": {
         "zh-Hans": {
@@ -103,6 +182,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "断开连接"
+          }
+        }
+      }
+    },
+    "Due %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "期限 %@"
           }
         }
       }
@@ -190,6 +279,16 @@
         }
       }
     },
+    "Options": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选项"
+          }
+        }
+      }
+    },
     "Or paste the pairing link": {
       "localizations": {
         "zh-Hans": {
@@ -230,6 +329,16 @@
         }
       }
     },
+    "Pick any": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可多选"
+          }
+        }
+      }
+    },
     "Pinned": {
       "localizations": {
         "zh-Hans": {
@@ -246,6 +355,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "等你回答的问题"
+          }
+        }
+      }
+    },
+    "Recommended": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建议"
+          }
+        }
+      }
+    },
+    "Refuse": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拒收"
+          }
+        }
+      }
+    },
+    "Release": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "放行"
           }
         }
       }
@@ -290,6 +429,16 @@
         }
       }
     },
+    "Something else…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他回答…"
+          }
+        }
+      }
+    },
     "That is not a Jig pairing link.": {
       "localizations": {
         "zh-Hans": {
@@ -330,10 +479,23 @@
         }
       }
     },
+    "Your answer": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写下你的回答"
+          }
+        }
+      }
+    },
     "http://127.0.0.1:4791/#t=…": {
       "shouldTranslate": false
     },
     "jig://pair?…": {
+      "shouldTranslate": false
+    },
+    "·": {
       "shouldTranslate": false
     }
   },

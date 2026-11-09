@@ -3,6 +3,7 @@ import type {
 	Approval,
 	ApprovalDecision,
 	Card,
+	Device,
 	Entry,
 	Group,
 	Letter,
@@ -26,6 +27,7 @@ import {
 	type CenterTab,
 	getState,
 	type ModelInfo,
+	type PhonesState,
 	type ProviderSummary,
 	type Settings,
 	setState,
@@ -223,7 +225,8 @@ type GlobalEvent =
 	| { type: "approval"; approval: Approval }
 	| { type: "letter"; letter: Letter }
 	| { type: "card"; card: Card }
-	| { type: "sessionsDeleted"; ids: string[] };
+	| { type: "sessionsDeleted"; ids: string[] }
+	| { type: "devices"; devices: Device[] };
 
 /** Drops deleted sessions from every list; a deleted session that is open closes. */
 function dropSessions(ids: string[]): void {
@@ -252,6 +255,11 @@ function applyGlobalEvent(event: GlobalEvent): void {
 			return;
 		case "sessionsDeleted":
 			dropSessions(event.ids);
+			return;
+		case "devices":
+			setState((current) => ({
+				phones: current.phones ? { ...current.phones, devices: event.devices } : current.phones,
+			}));
 			return;
 		case "sessionSummary":
 			setState((current) => ({
@@ -374,7 +382,7 @@ async function loadTranscript(sessionId: string): Promise<number> {
 }
 
 /** Opens a settings dialog over the conversation; the conversation stays where it is. */
-export function openSettings(dialog: "providers" | "defaults" | "about"): void {
+export function openSettings(dialog: "providers" | "defaults" | "about" | "phones"): void {
 	setState({ settingsDialog: dialog });
 }
 
@@ -707,6 +715,27 @@ export async function saveCustomProvider(id: string, body: unknown): Promise<voi
 export async function deleteCustomProvider(id: string): Promise<void> {
 	await api("DELETE", `/api/providers/${encodeURIComponent(id)}`);
 	await reloadProviders();
+}
+
+// --- phone access (M3 plan, section 6) ---
+
+export async function loadPhones(): Promise<void> {
+	setState({ phones: await api<PhonesState>("GET", "/api/devices") });
+}
+
+export async function setPhoneAccess(enabled: boolean): Promise<void> {
+	const settings = await api<Settings>("PATCH", "/api/settings", { remote: { enabled } });
+	setState({ settings });
+	await loadPhones();
+}
+
+export async function createPairing(): Promise<{ link: string; svg: string; expiresAt: number }> {
+	return api("POST", "/api/devices/pairing");
+}
+
+export async function revokeDevice(id: string): Promise<void> {
+	await api("DELETE", `/api/devices/${id}`);
+	await loadPhones();
 }
 
 export async function saveSettings(patch: Partial<Settings>): Promise<void> {

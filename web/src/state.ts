@@ -3,6 +3,7 @@ import type { AssistantMessage } from "../../src/shared/messages.ts";
 import type {
 	Approval,
 	Card,
+	Device,
 	Entry,
 	Group,
 	Letter,
@@ -19,6 +20,19 @@ export interface Settings {
 	workspaces: Workspace[];
 	mainSessionId: string | null;
 	decisionLog: string | null;
+	/** Phones reach this Mac through the relay (M3 plan, section 6). */
+	remote: { enabled: boolean; relayUrl: string };
+}
+
+/** Paired phones and the relay connection, for the phone access dialog. */
+export interface PhonesState {
+	devices: Device[];
+	remote: {
+		enabled: boolean;
+		connected: boolean;
+		relayUrl: string;
+		desktopId: string | null;
+	} | null;
 }
 
 /** Everything waiting for the person, across sessions (M2 plan, section 5). */
@@ -95,7 +109,8 @@ export interface AppState {
 	hasArchived: boolean;
 	/** The main area shows a session, or the settings page. */
 	/** A settings dialog opened from the settings menu, over the conversation. */
-	settingsDialog: "providers" | "defaults" | "about" | null;
+	settingsDialog: "providers" | "defaults" | "about" | "phones" | null;
+	phones: PhonesState | null;
 	/** A folder the home page should preselect, set when you open a workspace from the sidebar. */
 	homeFolder: string | null;
 	/** Wide screens: the sidebar folded to a narrow rail (remembered in this browser). */
@@ -161,6 +176,7 @@ let state: AppState = {
 	showArchived: false,
 	hasArchived: false,
 	settingsDialog: null,
+	phones: null,
 	homeFolder: null,
 	sidebarCollapsed: rememberedCollapse(),
 	drawerOpen: false,

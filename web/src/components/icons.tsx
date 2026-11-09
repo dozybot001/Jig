@@ -37,6 +37,7 @@ import {
 	Settings,
 	ShieldAlert,
 	SlidersHorizontal,
+	Smartphone,
 	Square,
 	SquarePen,
 	Stamp,
@@ -76,6 +77,7 @@ export const KeyIcon = () => <KeyRound {...props} />;
 export const ShieldIcon = () => <ShieldAlert {...props} />;
 export const QuestionIcon = () => <MessageCircleQuestion {...props} />;
 export const SlidersIcon = () => <SlidersHorizontal {...props} />;
+export const PhoneIcon = () => <Smartphone {...props} />;
 export const MailIcon = () => <Mail {...props} />;
 /** The approval center: everything waiting for the person. */
 export const CenterIcon = () => <Inbox {...props} />;

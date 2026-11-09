@@ -2660,3 +2660,28 @@ button.about-row {
 	background: var(--selected);
 	box-shadow: inset 0 0 0 1px var(--control-strong);
 }
+
+/* Phone access: the relay address, and the pairing QR code on white so any camera reads it. */
+.relay-url {
+	font-family: var(--mono);
+	font-size: var(--fs-s);
+	color: var(--text-2);
+	overflow-wrap: anywhere;
+}
+.setting-empty {
+	padding: 10px 14px;
+}
+.pairing {
+	display: grid;
+	justify-items: center;
+	gap: 10px;
+	margin-top: 16px;
+	text-align: center;
+}
+.pairing-qr {
+	width: 220px;
+	height: 220px;
+	padding: 12px;
+	border-radius: var(--radius-l);
+	background: #ffffff;
+}

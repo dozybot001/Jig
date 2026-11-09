@@ -4,6 +4,8 @@ import Foundation
 /// direct connection to `jig serve` on this Mac (the simulator shares the Mac's network).
 protocol Transport: Sendable {
 	func send(method: String, path: String, body: Data?) async throws -> (Data, Int)
+	/// A streamed response, such as the event stream, as text in the pieces it arrives in.
+	func stream(path: String) -> AsyncThrowingStream<String, any Error>
 }
 
 /// Debug only: talks to `jig serve` on 127.0.0.1 with the cookie a `jig open` link was exchanged for.
@@ -13,6 +15,30 @@ struct DirectTransport: Transport {
 	/// Jig accepts writes only from its own origin.
 	private var origin: String {
 		"\(base.scheme ?? "http")://\(base.host() ?? "127.0.0.1"):\(base.port ?? 80)"
+	}
+
+	func stream(path: String) -> AsyncThrowingStream<String, any Error> {
+		AsyncThrowingStream { continuation in
+			let task = Task {
+				do {
+					guard let url = URL(string: path, relativeTo: base) else { throw URLError(.badURL) }
+					let (bytes, _) = try await URLSession.shared.bytes(from: url)
+					// Whole lines keep the event stream's shape (blank lines end an event) and UTF-8 intact.
+					var line: [UInt8] = []
+					for try await byte in bytes {
+						line.append(byte)
+						if byte == 10 {
+							continuation.yield(String(decoding: line, as: UTF8.self))
+							line = []
+						}
+					}
+					continuation.finish()
+				} catch {
+					continuation.finish(throwing: error)
+				}
+			}
+			continuation.onTermination = { _ in task.cancel() }
+		}
 	}
 
 	func send(method: String, path: String, body: Data?) async throws -> (Data, Int) {
@@ -29,6 +55,36 @@ struct DirectTransport: Transport {
 
 struct JigClient: Sendable {
 	let transport: any Transport
+
+	/// The Mac's event stream: one name and data per event, as the web interface reads them.
+	func events() -> AsyncThrowingStream<(event: String, data: String), any Error> {
+		let raw = transport.stream(path: "/api/events")
+		return AsyncThrowingStream { continuation in
+			let task = Task {
+				var buffer = ""
+				do {
+					for try await piece in raw {
+						buffer += piece
+						while let end = buffer.range(of: "\n\n") {
+							let block = String(buffer[..<end.lowerBound])
+							buffer.removeSubrange(..<end.upperBound)
+							var name = "message"
+							var data: [String] = []
+							for line in block.split(separator: "\n", omittingEmptySubsequences: false) {
+								if line.hasPrefix("event:") { name = line.dropFirst(6).trimmingCharacters(in: .whitespaces) }
+								if line.hasPrefix("data:") { data.append(String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)) }
+							}
+							if !data.isEmpty { continuation.yield((name, data.joined(separator: "\n"))) }
+						}
+					}
+					continuation.finish()
+				} catch {
+					continuation.finish(throwing: error)
+				}
+			}
+			continuation.onTermination = { _ in task.cancel() }
+		}
+	}
 
 	func get<Value: Decodable & Sendable>(_ path: String, as type: Value.Type = Value.self) async throws -> Value {
 		let data = try await call("GET", path, body: nil)

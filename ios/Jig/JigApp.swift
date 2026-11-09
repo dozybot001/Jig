@@ -27,7 +27,10 @@ struct RootView: View {
 				LettersView()
 					.tabItem { Label("Letters", systemImage: "envelope") }
 			}
-			.task { await model.refreshAll() }
+			.task {
+				await model.refreshAll()
+				await model.followEvents()
+			}
 		} else {
 			ConnectView()
 		}

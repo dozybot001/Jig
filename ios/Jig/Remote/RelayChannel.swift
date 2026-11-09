@@ -13,6 +13,8 @@ actor RelayChannel {
 	private var opener: NoiseOpener?
 	private var nextId = 1
 	private var waiting: [Int: CheckedContinuation<(Data, Int), any Error>] = [:]
+	private var streams: [Int: AsyncThrowingStream<String, any Error>.Continuation] = [:]
+	private var streamIds: [UUID: Int] = [:]
 
 	init(pairing: Pairing, key: Curve25519.KeyAgreement.PrivateKey) {
 		self.pairing = pairing
@@ -79,6 +81,50 @@ actor RelayChannel {
 		}
 	}
 
+	/// A streamed request (the event stream): text as it comes, until the Mac ends it or the caller stops.
+	nonisolated func stream(path: String) -> AsyncThrowingStream<String, any Error> {
+		let token = UUID()
+		return AsyncThrowingStream { continuation in
+			let task = Task { await self.open(path: path, token: token, continuation: continuation) }
+			continuation.onTermination = { _ in
+				task.cancel()
+				Task { await self.cancelStream(token) }
+			}
+		}
+	}
+
+	private func open(
+		path: String,
+		token: UUID,
+		continuation: AsyncThrowingStream<String, any Error>.Continuation
+	) async {
+		do {
+			if socket == nil { try await connect() }
+			guard let socket, var cipher = sender else { throw URLError(.networkConnectionLost) }
+			let id = nextId
+			nextId += 1
+			streams[id] = continuation
+			streamIds[token] = id
+			let parts = try noiseSeal(
+				&cipher,
+				JSONSerialization.data(withJSONObject: ["t": "req", "id": id, "method": "GET", "path": path])
+			)
+			sender = cipher
+			for part in parts { try await socket.send(.data(part)) }
+		} catch {
+			continuation.finish(throwing: error)
+		}
+	}
+
+	private func cancelStream(_ token: UUID) async {
+		guard let id = streamIds.removeValue(forKey: token), streams.removeValue(forKey: id) != nil else { return }
+		guard let socket, var cipher = sender,
+			let parts = try? noiseSeal(&cipher, JSONSerialization.data(withJSONObject: ["t": "cancel", "id": id]))
+		else { return }
+		sender = cipher
+		for part in parts { try? await socket.send(.data(part)) }
+	}
+
 	private func listen(_ socket: URLSessionWebSocketTask) async {
 		while true {
 			do {
@@ -99,9 +145,20 @@ actor RelayChannel {
 			let id: Int
 			let status: Int?
 			let body: String?
+			let data: String?
 		}
-		guard let reply = try? JSONDecoder().decode(Reply.self, from: data), reply.t == "res" else { return }
-		waiting.removeValue(forKey: reply.id)?.resume(returning: (Data((reply.body ?? "").utf8), reply.status ?? 0))
+		guard let reply = try? JSONDecoder().decode(Reply.self, from: data) else { return }
+		switch reply.t {
+		case "res":
+			waiting.removeValue(forKey: reply.id)?.resume(returning: (Data((reply.body ?? "").utf8), reply.status ?? 0))
+		case "chunk":
+			streams[reply.id]?.yield(reply.data ?? "")
+		case "end":
+			streams.removeValue(forKey: reply.id)?.finish()
+			streamIds = streamIds.filter { $0.value != reply.id }
+		default:
+			break
+		}
 	}
 
 	private func fail(_ id: Int, _ error: any Error) {
@@ -114,6 +171,9 @@ actor RelayChannel {
 		opener = nil
 		for continuation in waiting.values { continuation.resume(throwing: error) }
 		waiting = [:]
+		for continuation in streams.values { continuation.finish(throwing: error) }
+		streams = [:]
+		streamIds = [:]
 	}
 
 	func close() {
@@ -128,5 +188,9 @@ struct RelayTransport: Transport {
 
 	func send(method: String, path: String, body: Data?) async throws -> (Data, Int) {
 		try await channel.request(method: method, path: path, body: body)
+	}
+
+	func stream(path: String) -> AsyncThrowingStream<String, any Error> {
+		channel.stream(path: path)
 	}
 }
