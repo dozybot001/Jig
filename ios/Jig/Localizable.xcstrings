@@ -1,13 +1,7 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "#%lld %@": {
-      "shouldTranslate": false
-    },
     "#%lld · %@": {
-      "shouldTranslate": false
-    },
-    "%@ · %@": {
       "shouldTranslate": false
     },
     "%@ → %@": {
@@ -15,6 +9,34 @@
     },
     "%lld": {
       "shouldTranslate": false
+    },
+    "%lld other steps": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld other step"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld other steps"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另有 %lld 步"
+          }
+        }
+      }
     },
     "%lld unread": {
       "localizations": {
@@ -26,12 +48,62 @@
         }
       }
     },
+    ", ": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "，"
+          }
+        }
+      }
+    },
+    "A sign-in now lasts 30 minutes (`auth/session.ts`), and all 48 tests pass. Pushing needs your permission.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录有效期改成了 30 分钟（`auth/session.ts`），48 个测试全部通过。推送要你授权。"
+          }
+        }
+      }
+    },
+    "About Jig": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关于 Jig"
+          }
+        }
+      }
+    },
+    "Accent color": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "强调色"
+          }
+        }
+      }
+    },
     "Add a note (optional)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "写一句备注（可选）"
+          }
+        }
+      }
+    },
+    "All fixes go out together.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有修复一起发布。"
           }
         }
       }
@@ -66,6 +138,16 @@
         }
       }
     },
+    "An AI-native multi-agent workbench. In Jig, one person works with a group of agent sessions, which run in Jig on your Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 原生的多 Agent 工作台。在 Jig 里，一个人和一组 Agent 会话一起做事，会话跑在你 Mac 上的 Jig 里。"
+          }
+        }
+      }
+    },
     "Answer": {
       "localizations": {
         "zh-Hans": {
@@ -96,6 +178,46 @@
         }
       }
     },
+    "Black, white and grey": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "黑白灰"
+          }
+        }
+      }
+    },
+    "Both color options are drafted; waiting for your pick.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "两个配色方案都做好了，等你挑选。"
+          }
+        }
+      }
+    },
+    "Both options are drafted. I've asked which one you prefer.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "两个方案都做好了，已经问你选哪个。"
+          }
+        }
+      }
+    },
+    "Buttons and links stand out more.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按钮和链接更醒目。"
+          }
+        }
+      }
+    },
     "Can be undone": {
       "localizations": {
         "zh-Hans": {
@@ -116,6 +238,54 @@
         }
       }
     },
+    "Can't connect": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连不上"
+          }
+        }
+      }
+    },
+    "Can't connect. Check the network; Jig keeps trying.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连不上。请检查网络，Jig 会一直重试。"
+          }
+        }
+      }
+    },
+    "Changed the approval center %lld times": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Changed the approval center once"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Changed the approval center %lld times"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改审批中心 %lld 次"
+          }
+        }
+      }
+    },
     "Connect": {
       "localizations": {
         "zh-Hans": {
@@ -132,6 +302,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "连接这台 Mac"
+          }
+        }
+      }
+    },
+    "Connected": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已连接"
+          }
+        }
+      }
+    },
+    "Connecting…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在连接…"
+          }
+        }
+      }
+    },
+    "Connection": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接"
           }
         }
       }
@@ -176,12 +376,62 @@
         }
       }
     },
-    "Disconnect": {
+    "Demo": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "断开连接"
+            "value": "演示"
+          }
+        }
+      }
+    },
+    "Demo Mac": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "演示用的 Mac"
+          }
+        }
+      }
+    },
+    "Design": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设计"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        }
+      }
+    },
+    "Draft two color options for the home page.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "给首页做两个配色方案。"
+          }
+        }
+      }
+    },
+    "Dropped": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已丢弃"
           }
         }
       }
@@ -196,8 +446,116 @@
         }
       }
     },
+    "Feedback": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "反馈"
+          }
+        }
+      }
+    },
+    "Fetched %lld pages": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Fetched %lld page"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Fetched %lld pages"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "抓取 %lld 个网页"
+          }
+        }
+      }
+    },
+    "Friday": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "周五"
+          }
+        }
+      }
+    },
+    "Held for you": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等你放行"
+          }
+        }
+      }
+    },
+    "In Jig on your Mac, open Settings → Phone access, click Add iPhone, then scan the QR code it shows.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Mac 上的 Jig 里打开 设置 → 手机访问，点「添加 iPhone」，再扫描出现的二维码。"
+          }
+        }
+      }
+    },
     "Jig": {
       "shouldTranslate": false
+    },
+    "Jig on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you can allow operations, answer the sessions' questions, decide on cards, and follow and reply to sessions.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone 上的 Jig 经中继连接你的 Mac，两端之间端到端加密。离开电脑时，你可以在手机上授权操作、回答会话的提问、处理决定卡，看会话的进展并回复。"
+          }
+        }
+      }
+    },
+    "Jig, by Tenon AI": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jig，榫卯 Tenon AI 出品"
+          }
+        }
+      }
+    },
+    "Leave": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出"
+          }
+        }
+      }
+    },
+    "Leave the demo": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出演示"
+          }
+        }
+      }
     },
     "Letters": {
       "localizations": {
@@ -215,6 +573,84 @@
           "stringUnit": {
             "state": "translated",
             "value": "待放行的信"
+          }
+        }
+      }
+    },
+    "Look around with sample data, without a Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用示例数据看看，不需要 Mac。"
+          }
+        }
+      }
+    },
+    "Mac": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac"
+          }
+        }
+      }
+    },
+    "Mac offline": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 不在线"
+          }
+        }
+      }
+    },
+    "Made %lld edits": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Made %lld edit"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Made %lld edits"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑 %lld 处"
+          }
+        }
+      }
+    },
+    "Main": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主对话"
+          }
+        }
+      }
+    },
+    "Make a sign-in last 30 minutes, run the tests, then push.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把登录有效期改成 30 分钟，跑一遍测试，然后推送。"
           }
         }
       }
@@ -239,12 +675,32 @@
         }
       }
     },
+    "Next Monday": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下周一"
+          }
+        }
+      }
+    },
     "No letters yet": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "还没有信件"
+          }
+        }
+      }
+    },
+    "No messages yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有消息"
           }
         }
       }
@@ -259,6 +715,16 @@
         }
       }
     },
+    "Not pushed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有推送。"
+          }
+        }
+      }
+    },
     "Nothing is waiting for you": {
       "localizations": {
         "zh-Hans": {
@@ -269,12 +735,60 @@
         }
       }
     },
-    "On your Mac, turn on phone access with `jig remote on`, then run `jig remote pair` to show the QR code.": {
+    "Notice": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在 Mac 上用 `jig remote on` 打开手机访问，再运行 `jig remote pair` 显示二维码。"
+            "value": "通知"
+          }
+        }
+      }
+    },
+    "OK": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "好"
+          }
+        }
+      }
+    },
+    "One accent color": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加一个强调色"
+          }
+        }
+      }
+    },
+    "Opened %lld sessions": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Opened %lld session"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Opened %lld sessions"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开会话 %lld 个"
           }
         }
       }
@@ -305,6 +819,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "配对"
+          }
+        }
+      }
+    },
+    "Pair again": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新配对"
           }
         }
       }
@@ -349,12 +873,118 @@
         }
       }
     },
+    "Please add the release date to the changelog.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请把发布日期写进更新记录。"
+          }
+        }
+      }
+    },
+    "Privacy Policy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐私政策"
+          }
+        }
+      }
+    },
+    "Publisher": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出品方"
+          }
+        }
+      }
+    },
+    "Push the sign-in fix": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推送登录有效期的修复"
+          }
+        }
+      }
+    },
+    "Pushed to origin/main.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已推送到 origin/main。"
+          }
+        }
+      }
+    },
     "Questions for you": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "等你回答的问题"
+          }
+        }
+      }
+    },
+    "Ran %lld commands": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Ran %lld command"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Ran %lld commands"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行 %lld 条命令"
+          }
+        }
+      }
+    },
+    "Read %lld files": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Read %lld file"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Read %lld files"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取 %lld 个文件"
           }
         }
       }
@@ -379,6 +1009,16 @@
         }
       }
     },
+    "Refused": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已拒收"
+          }
+        }
+      }
+    },
     "Release": {
       "localizations": {
         "zh-Hans": {
@@ -389,12 +1029,100 @@
         }
       }
     },
+    "Release on Friday or next Monday?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "周五发布，还是下周一？"
+          }
+        }
+      }
+    },
+    "Removed on the Mac": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已在 Mac 上移除"
+          }
+        }
+      }
+    },
+    "Report": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回报"
+          }
+        }
+      }
+    },
+    "Request": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请求"
+          }
+        }
+      }
+    },
+    "Retry": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试"
+          }
+        }
+      }
+    },
+    "Sample data: nothing reaches a Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "示例数据，不会发到 Mac。"
+          }
+        }
+      }
+    },
     "Scan the QR code on your Mac": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "扫描 Mac 上的二维码"
+          }
+        }
+      }
+    },
+    "Searched %lld times": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Searched once"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Searched %lld times"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索 %lld 次"
           }
         }
       }
@@ -429,6 +1157,16 @@
         }
       }
     },
+    "Ship the reviewed fixes now; the rest go next week.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先发审过的修复，其余的下周发。"
+          }
+        }
+      }
+    },
     "Something else…": {
       "localizations": {
         "zh-Hans": {
@@ -439,12 +1177,232 @@
         }
       }
     },
+    "Stop": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停下"
+          }
+        }
+      }
+    },
+    "Store": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "商城"
+          }
+        }
+      }
+    },
+    "Tenon AI": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "榫卯 Tenon AI"
+          }
+        }
+      }
+    },
+    "Terms of Service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户协议"
+          }
+        }
+      }
+    },
+    "That didn't go through": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有办成"
+          }
+        }
+      }
+    },
     "That is not a Jig pairing link.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "这不是 Jig 的配对链接。"
+          }
+        }
+      }
+    },
+    "The Mac is not online.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 不在线。"
+          }
+        }
+      }
+    },
+    "The Mac is not online. Keep Jig running on the Mac with phone access on, then scan again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 不在线。请让 Mac 上的 Jig 保持运行并打开手机访问，再扫一次。"
+          }
+        }
+      }
+    },
+    "The Mac is offline. Keep Jig running there with phone access on.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 不在线。请让 Mac 上的 Jig 保持运行，并打开手机访问。"
+          }
+        }
+      }
+    },
+    "The Mac no longer knows this iPhone.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 已经不认这台 iPhone。"
+          }
+        }
+      }
+    },
+    "The Mac no longer knows this iPhone. Pair again to keep using it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 已经不认这台 iPhone，重新配对后才能继续用。"
+          }
+        }
+      }
+    },
+    "The Mac removes this iPhone from its list. To use Jig here again, show a new QR code on the Mac and scan it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 会把这台 iPhone 从列表里移除。之后要在这里用 Jig，需要在 Mac 上重新显示二维码再扫描。"
+          }
+        }
+      }
+    },
+    "The same as the desktop app.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "和电脑端一致。"
+          }
+        }
+      }
+    },
+    "This is sample data. Nothing you do here reaches a Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这是示例数据，你在这里的操作不会发到 Mac。"
+          }
+        }
+      }
+    },
+    "This is the demo: no session received your message.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这是演示，消息没有发给真实的会话。"
+          }
+        }
+      }
+    },
+    "Three things: Store wants to push the sign-in fix, Design asks which accent color to use, and the release date needs your decision (card #12).": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "三件事：商城要推送登录的修复，设计问首页用哪种强调色，发布日期等你决定（决定卡 #12）。"
+          }
+        }
+      }
+    },
+    "To %@ · %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "寄给 %1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "Try the demo": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "看演示"
+          }
+        }
+      }
+    },
+    "Two fixes are still in review. Friday ships sooner; Monday leaves a day for testing.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还有两个修复在审。周五能早点发布；下周一多留一天测试。"
+          }
+        }
+      }
+    },
+    "Unpair": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "断开配对"
+          }
+        }
+      }
+    },
+    "Unpair this iPhone?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "断开这台 iPhone 的配对？"
+          }
+        }
+      }
+    },
+    "Version %@ · Build %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本 %1$@ · 构建 %2$@"
+          }
+        }
+      }
+    },
+    "Version %@ · effective %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本 %1$@ · %2$@生效"
           }
         }
       }
@@ -469,12 +1427,128 @@
         }
       }
     },
+    "Website": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "官网"
+          }
+        }
+      }
+    },
+    "Weekly report": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "周报"
+          }
+        }
+      }
+    },
+    "What needs me today?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天有什么要我处理的？"
+          }
+        }
+      }
+    },
+    "Which color should the home page use?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "首页用哪种颜色？"
+          }
+        }
+      }
+    },
     "Working": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "在干活"
+          }
+        }
+      }
+    },
+    "Working…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在工作…"
+          }
+        }
+      }
+    },
+    "Write this week's report from the merged changes.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "根据本周合并的改动写周报。"
+          }
+        }
+      }
+    },
+    "Wrote %lld files": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Wrote %lld file"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Wrote %lld files"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写入 %lld 个文件"
+          }
+        }
+      }
+    },
+    "Wrote %lld letters": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Wrote %lld letter"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Wrote %lld letters"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发信 %lld 封"
           }
         }
       }
@@ -489,11 +1563,89 @@
         }
       }
     },
+    "Your iPhone and the Mac are encrypted end to end; the relay only passes ciphertext along.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone 和 Mac 之间端到端加密，中继只转发密文。"
+          }
+        }
+      }
+    },
     "http://127.0.0.1:4791/#t=…": {
       "shouldTranslate": false
     },
     "jig://pair?…": {
       "shouldTranslate": false
+    },
+    "policy.date": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nov 9, 2026"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2026 年 11 月 9 日"
+          }
+        }
+      }
+    },
+    "policy.privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jig runs on your own computer, and Jig on iPhone connects only to Jig on your own computer. Tenon AI does not collect or receive any of your data in Jig, and Jig contains no analytics, telemetry or reporting code.\n\nData kept on your computer: sessions, messages, tool call records, permissions you granted, letters between sessions, the decisions you make in the approval center and settings are stored in a database in Jig's data folder (~/.jig by default); provider API keys are stored in the system keychain; very long command output is stored in the tmp folder of the data folder. This data stays until you delete it. If you set a decision log file in Settings, Jig adds each decision to that file.\n\nPhone access: when you turn on phone access on your computer, Jig on the computer connects to a relay, and Jig on iPhone talks to it through the relay. The default relay is run by Tenon AI; you can also run your own. The two ends are encrypted end to end: the relay only passes ciphertext along and can neither read nor keep the content. Jig on the computer records each paired phone: its name, public key, when it was paired and when it last connected. Jig on iPhone keeps the pairing and its own key in the iOS keychain, on that device only.\n\nData sent to third parties: the model provider you choose for a session receives the conversation sent to it, including files the session read and command output; that provider's privacy policy applies. The default provider, DeepSeek, is in mainland China; if you choose a provider outside mainland China, this content goes abroad. When a session fetches a web page, that site receives the request.\n\nAccess, export and deletion: you can look at the files in the data folder directly. To delete a provider's key, delete it in Settings or run jig key delete; to remove a paired phone, remove it under Phone access on the computer, or unpair on the iPhone; to delete everything, stop jig serve and delete the data folder.\n\nContact: support@tenonai.cn."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jig 是在你自己的电脑上运行的软件，iPhone 上的 Jig 只连接你自己电脑上的 Jig。榫卯 Tenon AI 不收集、不接收你在 Jig 里的任何数据，Jig 里没有统计、遥测或上报代码。\n\n保存在你电脑上的数据：会话、消息、工具调用记录、操作授权、会话之间的信件、你在审批中心做的决定和设置存在 Jig 的数据目录（默认 ~/.jig）里的数据库中；服务商的 API Key 存在系统钥匙串里；超长的命令输出存在数据目录的 tmp 文件夹里。这些数据一直保存，直到你删除。你在设置里指定了审批记录文件时，Jig 把每个决定追加到那个文件里。\n\n手机访问：你在电脑上打开「允许手机访问」后，电脑上的 Jig 连接中继服务，iPhone 上的 Jig 经中继和它通信。默认的中继由榫卯 Tenon AI 运行，你也可以自己部署。两端之间端到端加密，中继只转发密文，看不到也不保存内容。电脑上的 Jig 记下配对的手机：名称、公钥、配对时间和最近连接的时间。iPhone 上的 Jig 把配对信息和自己的密钥存在 iOS 钥匙串里，只存在这台设备上。\n\n发给第三方的数据：你为会话选的模型服务商会收到发给它的对话内容，包括会话读到的文件和命令输出，这部分适用该服务商的隐私政策。默认服务商 DeepSeek 在中国境内；你选境外服务商时，这些内容会发往境外。会话抓取网页时，网站会收到请求。\n\n查询、导出与删除：你可以直接查看数据目录里的文件。删除某个服务商的 Key：在设置里删除，或运行 jig key delete；删除配对的手机：在电脑上的「手机访问」里移除，或在 iPhone 上断开配对；删除全部数据：停掉 jig serve 后删除数据目录。\n\n联系我们：support@tenonai.cn。"
+          }
+        }
+      }
+    },
+    "policy.terms": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jig has not been released publicly yet and is for internal use at Tenon AI. After v1 is accepted it will be released under an open source license (MIT or Apache-2.0); that license will then be Jig's terms of service.\n\nJig reads and writes files, runs commands and goes online as you allow. Choose a suitable workspace and permission rules for each session; deleting files, pushing, publishing and similar operations always ask you first."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jig 目前还没有公开发布，只供榫卯 Tenon AI 内部使用。v1 验收后会以开源许可证（MIT 或 Apache-2.0）发布，届时开源许可证就是 Jig 的用户协议。\n\nJig 会按你的授权读写文件、执行命令和访问网络。请为会话选择合适的工作区和权限规则；删除文件、推送、发布等操作每次都会先问你。"
+          }
+        }
+      }
+    },
+    "policy.version": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1.2"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1.2"
+          }
+        }
+      }
     },
     "·": {
       "shouldTranslate": false

@@ -54,12 +54,13 @@ struct CenterView: View {
 				}
 			}
 			.overlay {
-				if model.center?.count == 0 {
+				if model.loaded, model.center?.count == 0 {
 					ContentUnavailableView("Nothing is waiting for you", systemImage: "checkmark.seal")
 				}
 			}
 			.navigationTitle("Approvals")
 			.refreshable { await model.refreshCenter() }
+			.jigChrome()
 		}
 	}
 }
@@ -75,7 +76,7 @@ struct CardHead: View {
 			HStack(spacing: 4) {
 				if !session.isEmpty { Text(session) }
 				Text("·")
-				Text(Date(timeIntervalSince1970: date / 1000), style: .relative)
+				Text(Date(timeIntervalSince1970: date / 1000), format: .relative(presentation: .numeric, unitsStyle: .abbreviated))
 			}
 			.font(.caption)
 			.foregroundStyle(.secondary)

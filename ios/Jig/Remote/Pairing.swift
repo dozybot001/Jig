@@ -32,6 +32,8 @@ struct Pairing: Codable, Sendable {
 	let desktop: String
 	let desktopKey: Data
 	var desktopName: String
+	/// This phone's id on the Mac, from the handshake; with it the phone removes itself when it unpairs.
+	var deviceId: String?
 }
 
 /// The phone's keychain items: its Noise private key and the pairing, this device only, never synced.
@@ -45,6 +47,12 @@ enum Vault {
 		let key = Curve25519.KeyAgreement.PrivateKey()
 		write("noise", key.rawRepresentation)
 		return key
+	}
+
+	/// Unpairing: the pairing and the phone's own key both go; a new pairing starts with a new key.
+	static func forget() {
+		delete("pairing")
+		delete("noise")
 	}
 
 	static var pairing: Pairing? {

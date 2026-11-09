@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { POLICY } from "../../src/shared/policy.ts";
 
 export type Lang = "zh" | "en";
 
@@ -451,18 +452,9 @@ const zh = {
 	privacyPolicy: "隐私政策",
 	terms: "用户协议",
 	docVersion: "版本 {v} · {date}生效",
-	policyDate: "2026 年 11 月 9 日",
-	privacyPolicyBody: [
-		"Jig 是在你自己的电脑上运行的软件。榫卯 Tenon AI 不收集、不接收你在 Jig 里的任何数据，Jig 里没有统计、遥测或上报代码。",
-		"保存在你电脑上的数据：会话、消息、工具调用记录、操作授权、会话之间的信件、你在审批中心做的决定和设置存在 Jig 的数据目录（默认 ~/.jig）里的数据库中；服务商的 API Key 存在系统钥匙串里；超长的命令输出存在数据目录的 tmp 文件夹里。这些数据一直保存，直到你删除。你在设置里指定了审批记录文件时，Jig 把每个决定追加到那个文件里。",
-		"发给第三方的数据：你为会话选的模型服务商会收到发给它的对话内容，包括会话读到的文件和命令输出，这部分适用该服务商的隐私政策。默认服务商 DeepSeek 在中国境内；你选境外服务商时，这些内容会发往境外。会话抓取网页时，网站会收到请求。",
-		"查询、导出与删除：你可以直接查看数据目录里的文件。删除某个服务商的 Key：在设置里删除，或运行 jig key delete；删除全部数据：停掉 jig serve 后删除数据目录。",
-		"联系我们：support@tenonai.cn。",
-	].join("\n\n"),
-	termsBody: [
-		"Jig 目前还没有公开发布，只供榫卯 Tenon AI 内部使用。v1 验收后会以开源许可证（MIT 或 Apache-2.0）发布，届时开源许可证就是 Jig 的用户协议。",
-		"Jig 会按你的授权读写文件、执行命令和访问网络。请为会话选择合适的工作区和权限规则；删除文件、推送、发布等操作每次都会先问你。",
-	].join("\n\n"),
+	policyDate: POLICY.zh.date,
+	privacyPolicyBody: POLICY.zh.privacy.join("\n\n"),
+	termsBody: POLICY.zh.terms.join("\n\n"),
 	// M2: main conversation, approval center, letters
 	mainConversation: "主对话",
 	approvalCenter: "审批中心",
@@ -1045,18 +1037,9 @@ const en: Record<MessageKey, string> = {
 	privacyPolicy: "Privacy Policy",
 	terms: "Terms of Service",
 	docVersion: "Version {v} · effective {date}",
-	policyDate: "Nov 9, 2026",
-	privacyPolicyBody: [
-		"Jig runs on your own computer. Tenon AI does not collect or receive any of your data in Jig, and Jig contains no analytics, telemetry or reporting code.",
-		"Data kept on your computer: sessions, messages, tool call records, permissions you granted, letters between sessions, the decisions you make in the approval center and settings are stored in a database in Jig's data folder (~/.jig by default); provider API keys are stored in the system keychain; very long command output is stored in the tmp folder of the data folder. This data stays until you delete it. If you set a decision log file in Settings, Jig adds each decision to that file.",
-		"Data sent to third parties: the model provider you choose for a session receives the conversation sent to it, including files the session read and command output; that provider's privacy policy applies. The default provider, DeepSeek, is in mainland China; if you choose a provider outside mainland China, this content goes abroad. When a session fetches a web page, that site receives the request.",
-		"Access, export and deletion: you can look at the files in the data folder directly. To delete a provider's key, delete it in Settings or run jig key delete; to delete everything, stop jig serve and delete the data folder.",
-		"Contact: support@tenonai.cn.",
-	].join("\n\n"),
-	termsBody: [
-		"Jig has not been released publicly yet and is for internal use at Tenon AI. After v1 is accepted it will be released under an open source license (MIT or Apache-2.0); that license will then be Jig's terms of service.",
-		"Jig reads and writes files, runs commands and goes online as you allow. Choose a suitable workspace and permission rules for each session; deleting files, pushing, publishing and similar operations always ask you first.",
-	].join("\n\n"),
+	policyDate: POLICY.en.date,
+	privacyPolicyBody: POLICY.en.privacy.join("\n\n"),
+	termsBody: POLICY.en.terms.join("\n\n"),
 	mainConversation: "Main conversation",
 	approvalCenter: "Approval center",
 	approvalCount: "{n} waiting for you",

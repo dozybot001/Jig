@@ -5,14 +5,15 @@ struct SessionsView: View {
 	@Environment(AppModel.self) private var model
 
 	var body: some View {
-		NavigationStack {
+		@Bindable var model = model
+		NavigationStack(path: $model.sessionPath) {
 			List(model.orderedSessions) { session in
 				NavigationLink(value: session) {
 					SessionRow(session: session)
 				}
 			}
 			.overlay {
-				if model.sessions.isEmpty {
+				if model.loaded, model.sessions.isEmpty {
 					ContentUnavailableView("No sessions yet", systemImage: "bubble.left.and.bubble.right")
 				}
 			}
@@ -21,17 +22,7 @@ struct SessionsView: View {
 				SessionView(session: session)
 			}
 			.refreshable { await model.refreshAll() }
-			.toolbar {
-				ToolbarItem(placement: .topBarTrailing) {
-					Menu {
-						Button("Disconnect", systemImage: "xmark.circle", role: .destructive) {
-							model.disconnect()
-						}
-					} label: {
-						Label("Settings", systemImage: "gearshape")
-					}
-				}
-			}
+			.jigChrome()
 		}
 	}
 }

@@ -56,9 +56,15 @@ struct DirectTransport: Transport {
 struct JigClient: Sendable {
 	let transport: any Transport
 
-	/// The Mac's event stream: one name and data per event, as the web interface reads them.
-	func events() -> AsyncThrowingStream<(event: String, data: String), any Error> {
-		let raw = transport.stream(path: "/api/events")
+	/// The Mac's event stream: one name and data per event, as the web interface reads them. With a
+	/// session it also carries that session's record; `after` replays what came after that sequence number.
+	func events(session: String? = nil, after: Int? = nil) -> AsyncThrowingStream<(event: String, data: String), any Error> {
+		var path = "/api/events"
+		if let session {
+			path += "?session=\(session)"
+			if let after { path += "&after=\(after)" }
+		}
+		let raw = transport.stream(path: path)
 		return AsyncThrowingStream { continuation in
 			let task = Task {
 				var buffer = ""
@@ -94,6 +100,10 @@ struct JigClient: Sendable {
 	@discardableResult
 	func post(_ path: String, _ payload: some Encodable & Sendable) async throws -> Data {
 		try await call("POST", path, body: JSONEncoder().encode(payload))
+	}
+
+	func delete(_ path: String) async throws {
+		_ = try await call("DELETE", path, body: nil)
 	}
 
 	private func call(_ method: String, _ path: String, body: Data?) async throws -> Data {

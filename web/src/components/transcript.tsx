@@ -809,7 +809,10 @@ function summarize(steps: Step[]): string {
 	if (parts.length === 0) {
 		parts.push(t(thoughts === 1 ? "sum_think_one" : "sum_think", { n: thoughts }));
 	}
-	return parts.join(t("listSeparator"));
+	// "Read 1 file, ran 2 commands": only the first part keeps its capital (Chinese has none).
+	return parts
+		.map((part, index) => (index === 0 ? part : part.charAt(0).toLowerCase() + part.slice(1)))
+		.join(t("listSeparator"));
 }
 
 function StepView({

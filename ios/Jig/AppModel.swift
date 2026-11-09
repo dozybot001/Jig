@@ -5,19 +5,55 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
+	/// How the connection to the Mac is doing, for the banner and the settings screen.
+	enum Link: Equatable {
+		case connecting
+		case online
+		/// The relay answers, but the Mac is not connected to it.
+		case macOffline
+		/// The Mac refused this phone: it was removed there.
+		case refused
+		/// The relay (or, in Debug, the Mac itself) cannot be reached.
+		case unreachable
+	}
+
 	private(set) var client: JigClient?
+	private var channel: RelayChannel?
 	private(set) var sessions: [SessionSummary] = []
 	private(set) var center: Center?
 	private(set) var letters: [LetterItem] = []
 	/// The Mac this phone is paired with, as the Mac names itself.
 	private(set) var desktopName: String?
+	private(set) var link: Link = .connecting
+	/// Sample data instead of a Mac: a first look without pairing, and what App Review uses.
+	private(set) var isDemo = false
+	/// What the Mac said when it refused a request, shown to the person.
 	var problem: String?
+	var showingSettings = false
+
+	enum Tab: Hashable { case sessions, approvals, letters }
+	/// The tab in front, and the session open in the sessions tab: where a screen can send the person.
+	var tab: Tab = .sessions
+	var sessionPath: [SessionSummary] = []
+	#if DEBUG
+	/// `-JigSession <id>`: the session to open once the list has loaded.
+	private var openAtLaunch = UserDefaults.standard.string(forKey: "JigSession")
+	/// `-JigSettings YES` or `-JigSettings about`: what the settings sheet opens at.
+	let settingsAtLaunch = UserDefaults.standard.string(forKey: "JigSettings")
+	#endif
 
 	private static let directKey = "directBase"
 
 	init() {
+		#if DEBUG
+		// `-JigReset YES` starts as if newly installed: no pairing, no saved address.
+		if UserDefaults.standard.bool(forKey: "JigReset") {
+			Vault.forget()
+			UserDefaults.standard.removeObject(forKey: Self.directKey)
+		}
+		#endif
 		if let pairing = Vault.pairing {
-			client = JigClient(transport: RelayTransport(channel: RelayChannel(pairing: pairing, key: Vault.phoneKey())))
+			use(RelayChannel(pairing: pairing, key: Vault.phoneKey()))
 			desktopName = pairing.desktopName
 		}
 		#if DEBUG
@@ -33,10 +69,22 @@ final class AppModel {
 		if let link = UserDefaults.standard.string(forKey: "JigPairLink") {
 			Task { await pair(with: link) }
 		}
+		// `-JigDemo YES` opens the demo; with `-JigTab`, `-JigSession` and `-JigSettings` a screen of it
+		// (screenshots, including the App Store's).
+		if UserDefaults.standard.bool(forKey: "JigDemo") { startDemo() }
+		switch UserDefaults.standard.string(forKey: "JigTab") {
+		case "approvals": tab = .approvals
+		case "letters": tab = .letters
+		default: break
+		}
+		if settingsAtLaunch != nil { showingSettings = true }
 		#endif
 	}
 
 	var connected: Bool { client != nil }
+
+	/// The lists hold what the Mac has, so an empty one means there is nothing (not that it can't be reached).
+	var loaded: Bool { isDemo || link == .online }
 
 	/// Sessions in the order the Mac's sidebar shows them: pinned first, then the rest.
 	var orderedSessions: [SessionSummary] {
@@ -45,6 +93,11 @@ final class AppModel {
 
 	func name(of sessionId: String) -> String {
 		sessions.first { $0.id == sessionId }?.name ?? ""
+	}
+
+	private func use(_ channel: RelayChannel) {
+		self.channel = channel
+		client = JigClient(transport: RelayTransport(channel: channel))
 	}
 
 	#if DEBUG
@@ -72,24 +125,67 @@ final class AppModel {
 		do {
 			let welcome = try await channel.connect(pairSecret: link.secret)
 			pairing.desktopName = welcome.desktop
+			pairing.deviceId = welcome.device
 			Vault.pairing = pairing
 			desktopName = welcome.desktop
-			client = JigClient(transport: RelayTransport(channel: channel))
+			use(channel)
+			self.link = .online
 			problem = nil
 			await refreshAll()
+		} catch RelayError.macOffline {
+			problem = String(localized: "The Mac is not online. Keep Jig running on the Mac with phone access on, then scan again.")
 		} catch {
 			problem = String(localized: "Pairing did not work. Show a new QR code on the Mac and scan it again.")
 		}
 	}
 
-	func disconnect() {
-		Vault.pairing = nil
-		desktopName = nil
+	/// Unpairs: the Mac removes this phone from its list when it can be reached, and the phone forgets
+	/// the pairing and its key either way.
+	func unpair() async {
+		if let client, let id = Vault.pairing?.deviceId {
+			// The Mac closes this phone's channel as it removes it, so no answer comes back; and an
+			// offline Mac is not waited for long.
+			let removal = Task { try? await client.delete("/api/devices/\(id)") }
+			let limit = Task {
+				try? await Task.sleep(for: .seconds(5))
+				removal.cancel()
+			}
+			await removal.value
+			limit.cancel()
+		}
+		await channel?.close()
+		Vault.forget()
+		#if DEBUG
 		UserDefaults.standard.removeObject(forKey: Self.directKey)
+		#endif
+		reset()
+	}
+
+	func startDemo() {
+		reset()
+		isDemo = true
+		desktopName = String(localized: "Demo Mac")
+		client = JigClient(transport: DemoTransport())
+		link = .online
+	}
+
+	func leaveDemo() {
+		reset()
+	}
+
+	private func reset() {
+		channel = nil
 		client = nil
+		isDemo = false
+		desktopName = nil
+		link = .connecting
 		sessions = []
 		center = nil
 		letters = []
+		problem = nil
+		showingSettings = false
+		tab = .sessions
+		sessionPath = []
 	}
 
 	func refreshAll() async {
@@ -100,6 +196,13 @@ final class AppModel {
 
 	func refreshSessions() async {
 		await attempt { sessions = try await $0.get("/api/sessions?limit=200", as: Page<SessionSummary>.self).items }
+		#if DEBUG
+		if let id = openAtLaunch, let session = sessions.first(where: { $0.id == id }) {
+			openAtLaunch = nil
+			tab = .sessions
+			sessionPath = [session]
+		}
+		#endif
 	}
 
 	func refreshCenter() async {
@@ -123,6 +226,11 @@ final class AppModel {
 			sent = true
 		}
 		return sent
+	}
+
+	/// Stops what the session is doing; your next message sets it going again.
+	func stop(_ sessionId: String) async {
+		await attempt { try await $0.post("/api/sessions/\(sessionId)/stop", [String: String]()) }
 	}
 
 	enum Decision: String {
@@ -180,17 +288,34 @@ final class AppModel {
 		await refreshLetters()
 	}
 
-	/// Follows the Mac's event stream and refreshes what changed, so the lists stay current; reconnects
-	/// after a drop. Runs while the app shows its main screens.
+	/// Follows the Mac's event stream and refreshes what changed, so the lists stay current. After a
+	/// drop it tries again, less often while the Mac is offline, and reloads once it is back.
 	func followEvents() async {
+		var reconnecting = false
 		while !Task.isCancelled {
 			guard let client else { return }
 			do {
-				for try await event in client.events() where event.event == "global" {
-					await changed(event.data)
+				for try await event in client.events() {
+					switch event.event {
+					case "hello":
+						link = .online
+						if reconnecting { await refreshAll() }
+						reconnecting = true
+					case "reset":
+						await refreshAll()
+					case "global":
+						await changed(event.data)
+					default:
+						break
+					}
 				}
-			} catch {}
-			try? await Task.sleep(for: .seconds(3))
+			} catch is CancellationError {
+				return
+			} catch {
+				note(error)
+			}
+			reconnecting = true
+			try? await Task.sleep(for: link == .online ? .seconds(2) : .seconds(8))
 		}
 	}
 
@@ -210,13 +335,27 @@ final class AppModel {
 		}
 	}
 
+	/// Runs a request; a refusal from the Mac is shown to the person, a lost connection goes to the banner.
 	private func attempt(_ work: (JigClient) async throws -> Void) async {
 		guard let client else { return }
 		do {
 			try await work(client)
+			link = .online
 		} catch is CancellationError {
+		} catch let refusal as JigProblem {
+			link = .online
+			problem = refusal.localizedDescription
 		} catch {
-			problem = error.localizedDescription
+			note(error)
+		}
+	}
+
+	private func note(_ error: any Error) {
+		switch error {
+		case RelayError.macOffline: link = .macOffline
+		case RelayError.refused: link = .refused
+		case let error as URLError where error.code == .cancelled: break
+		default: link = .unreachable
 		}
 	}
 }

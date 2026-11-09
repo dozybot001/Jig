@@ -48,8 +48,20 @@ actor RelayChannel {
 		let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
 		let name = await UIDevice.current.name
 		let hello = try JSONEncoder().encode(Hello(pair: pairSecret, name: name, app: version))
-		try await socket.send(.data(initiator.writeFirst(hello)))
-		guard case .data(let reply) = try await socket.receive() else { throw NoiseError.shortMessage }
+		let first = try initiator.writeFirst(hello)
+		let reply: Data
+		do {
+			// Giving up on the handshake closes the socket, which ends the wait at once.
+			reply = try await withTaskCancellationHandler {
+				try await socket.send(.data(first))
+				guard case .data(let data) = try await socket.receive() else { throw NoiseError.shortMessage }
+				return data
+			} onCancel: {
+				socket.cancel(with: .goingAway, reason: nil)
+			}
+		} catch {
+			throw RelayError(closedWith: socket.closeCode) ?? error
+		}
 		let (payload, send, receive) = try initiator.readSecond(reply)
 		let welcome = try JSONDecoder().decode(Welcome.self, from: payload)
 		self.socket = socket
@@ -60,7 +72,9 @@ actor RelayChannel {
 	}
 
 	/// One request to the Mac's local API; the body and status come back as the Mac answered.
+	/// Cancelling the calling task gives up on the answer.
 	func request(method: String, path: String, body: Data?) async throws -> (Data, Int) {
+		try Task.checkCancellation()
 		if socket == nil { try await connect() }
 		guard let socket, var cipher = sender else { throw URLError(.networkConnectionLost) }
 		let id = nextId
@@ -69,15 +83,19 @@ actor RelayChannel {
 		if let body { message["body"] = String(decoding: body, as: UTF8.self) }
 		let parts = try noiseSeal(&cipher, JSONSerialization.data(withJSONObject: message))
 		sender = cipher
-		return try await withCheckedThrowingContinuation { continuation in
-			waiting[id] = continuation
-			Task {
-				do {
-					for part in parts { try await socket.send(.data(part)) }
-				} catch {
-					self.fail(id, error)
+		return try await withTaskCancellationHandler {
+			try await withCheckedThrowingContinuation { continuation in
+				waiting[id] = continuation
+				Task {
+					do {
+						for part in parts { try await socket.send(.data(part)) }
+					} catch {
+						self.fail(id, error)
+					}
 				}
 			}
+		} onCancel: {
+			Task { await self.fail(id, CancellationError()) }
 		}
 	}
 
@@ -133,7 +151,7 @@ actor RelayChannel {
 				self.opener = opener
 				if let message { deliver(message) }
 			} catch {
-				if self.socket === socket { drop(error) }
+				if self.socket === socket { drop(RelayError(closedWith: socket.closeCode) ?? error) }
 				return
 			}
 		}
@@ -182,12 +200,45 @@ actor RelayChannel {
 	}
 }
 
-/// Requests through the relay channel.
+/// Why the relay closed the connection, when it says (src/remote/protocol.ts, relay/relay.ts).
+enum RelayError: LocalizedError, Equatable {
+	/// The Mac is not connected to the relay: asleep, Jig not running, or phone access off.
+	case macOffline
+	/// The Mac closed the channel during the handshake: it no longer knows this phone.
+	case refused
+
+	init?(closedWith code: URLSessionWebSocketTask.CloseCode) {
+		switch code.rawValue {
+		case 4404: self = .macOffline
+		case 1000: self = .refused
+		default: return nil
+		}
+	}
+
+	var errorDescription: String? {
+		switch self {
+		case .macOffline: String(localized: "The Mac is not online.")
+		case .refused: String(localized: "The Mac no longer knows this iPhone.")
+		}
+	}
+}
+
+/// Requests through the relay channel. A request the Mac does not answer within 30 seconds fails, so
+/// a stalled connection never leaves a screen waiting.
 struct RelayTransport: Transport {
 	let channel: RelayChannel
 
 	func send(method: String, path: String, body: Data?) async throws -> (Data, Int) {
-		try await channel.request(method: method, path: path, body: body)
+		try await withThrowingTaskGroup(of: (Data, Int).self) { group in
+			group.addTask { try await channel.request(method: method, path: path, body: body) }
+			group.addTask {
+				try await Task.sleep(for: .seconds(30))
+				throw URLError(.timedOut)
+			}
+			defer { group.cancelAll() }
+			guard let result = try await group.next() else { throw URLError(.timedOut) }
+			return result
+		}
 	}
 
 	func stream(path: String) -> AsyncThrowingStream<String, any Error> {

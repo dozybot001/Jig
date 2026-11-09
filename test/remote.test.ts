@@ -225,6 +225,27 @@ describe("the relay", () => {
 		}
 	});
 
+	test("a phone may remove itself when it unpairs, but no other phone", async () => {
+		const { remote, store, close } = await setup();
+		try {
+			const first = new TestPhone();
+			const one = await first.connect(await pair(remote), { pair: true, name: "one" });
+			const second = new TestPhone();
+			const two = await second.connect(await pair(remote), { pair: true, name: "two" });
+			assert.equal((await first.request("DELETE", `/api/devices/${two.device}`)).status, 403);
+			// The Mac closes the phone's channel as it removes it, so the answer never arrives.
+			void first.request("DELETE", `/api/devices/${one.device}`);
+			assert.equal(await first.closed, 1000);
+			assert.deepEqual(
+				store.listDevices().map((device) => device.name),
+				["two"],
+			);
+			second.close();
+		} finally {
+			await close();
+		}
+	});
+
 	test("a phone for a Mac that is not connected is closed with 4404; a bad hello is refused", async () => {
 		const relay = new Relay({ port: 0, host: "127.0.0.1", log: () => {} });
 		const port = await relay.listen();

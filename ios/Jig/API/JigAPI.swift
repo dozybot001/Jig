@@ -13,6 +13,8 @@ struct SessionSummary: Decodable, Identifiable, Hashable, Sendable {
 	let unread: Int
 	let groupId: String?
 	let parentId: String?
+	/// The sequence number of the session's last event; the event stream resumes after it.
+	let eventSeq: Int?
 }
 
 struct Page<Item: Decodable & Sendable>: Decodable, Sendable {
@@ -25,56 +27,88 @@ struct Transcript: Decodable, Sendable {
 	let entries: [Entry]
 }
 
-/// One entry of a session's record, reduced to what a phone shows: who spoke and the text.
+/// One entry of a session's record, reduced to what a phone shows: who spoke, the text, the tools an
+/// answer used, and the letter a message came in.
 struct Entry: Decodable, Identifiable, Sendable {
 	enum Kind: Sendable { case user, assistant, notice, other }
 
 	let id: String
+	let seq: Int
 	let kind: Kind
 	let text: String
+	/// The tools the assistant called in this message, by name, in order.
+	let tools: [String]
+	/// The letter this message delivered, when it came from another session.
+	let letter: LetterRef?
 
-	private enum Keys: String, CodingKey { case id, role, message, notice }
+	private enum Keys: String, CodingKey { case id, seq, role, message, notice, letter }
 
 	init(from decoder: Decoder) throws {
 		let container = try decoder.container(keyedBy: Keys.self)
 		id = try container.decode(String.self, forKey: .id)
+		seq = try container.decodeIfPresent(Int.self, forKey: .seq) ?? 0
+		letter = try? container.decodeIfPresent(LetterRef.self, forKey: .letter)
 		switch try container.decode(String.self, forKey: .role) {
 		case "user":
 			kind = .user
-			text = try container.decode(Message.self, forKey: .message).text
+			text = try container.decode(MessageText.self, forKey: .message).text
+			tools = []
 		case "assistant":
 			kind = .assistant
-			text = try container.decode(Message.self, forKey: .message).text
+			let message = try container.decode(MessageText.self, forKey: .message)
+			text = message.text
+			tools = message.tools
 		case "notice":
 			kind = .notice
 			text = (try? container.decode(Notice.self, forKey: .notice))?.text ?? ""
+			tools = []
 		default:
 			kind = .other
 			text = ""
-		}
-	}
-
-	private struct Message: Decodable {
-		let text: String
-		private enum Keys: String, CodingKey { case content }
-		private struct Block: Decodable {
-			let type: String
-			let text: String?
-		}
-
-		init(from decoder: Decoder) throws {
-			let container = try decoder.container(keyedBy: Keys.self)
-			if let plain = try? container.decode(String.self, forKey: .content) {
-				text = plain
-				return
-			}
-			let blocks = (try? container.decode([Block].self, forKey: .content)) ?? []
-			text = blocks.compactMap { $0.type == "text" ? $0.text : nil }.joined(separator: "\n\n")
+			tools = []
 		}
 	}
 
 	private struct Notice: Decodable {
 		let text: String?
+	}
+}
+
+/// A message's text blocks joined, and the tools it called; also the shape of an answer still being
+/// written (the event stream's draft).
+struct MessageText: Decodable, Sendable {
+	let text: String
+	let tools: [String]
+
+	private enum Keys: String, CodingKey { case content }
+	private struct Block: Decodable {
+		let type: String
+		let text: String?
+		let name: String?
+	}
+
+	init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: Keys.self)
+		if let plain = try? container.decode(String.self, forKey: .content) {
+			text = plain
+			tools = []
+			return
+		}
+		let blocks = (try? container.decode([Block].self, forKey: .content)) ?? []
+		text = blocks.compactMap { $0.type == "text" ? $0.text : nil }.joined(separator: "\n\n")
+		tools = blocks.compactMap { $0.type == "toolCall" ? $0.name : nil }
+	}
+}
+
+/// Who sent a letter into a session, and what kind it is.
+struct LetterRef: Decodable, Sendable {
+	let kind: String
+	let from: From
+	let summary: String
+	let body: String
+
+	struct From: Decodable, Sendable {
+		let name: String
 	}
 }
 

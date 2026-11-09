@@ -34,7 +34,7 @@ struct ConnectView: View {
 					}
 					.disabled(!ScannerView.available || busy)
 				} footer: {
-					Text("On your Mac, turn on phone access with `jig remote on`, then run `jig remote pair` to show the QR code.")
+					Text("In Jig on your Mac, open Settings → Phone access, click Add iPhone, then scan the QR code it shows.")
 				}
 				Section("Or paste the pairing link") {
 					TextField("jig://pair?…", text: $pairLink, axis: .vertical)
@@ -46,6 +46,12 @@ struct ConnectView: View {
 						if busy { ProgressView() } else { Text("Pair") }
 					}
 					.disabled(pairLink.isEmpty || busy)
+				}
+				Section {
+					Button("Try the demo") { model.startDemo() }
+						.disabled(busy)
+				} footer: {
+					Text("Look around with sample data, without a Mac.")
 				}
 				#if DEBUG
 				Section {
@@ -73,6 +79,9 @@ struct ConnectView: View {
 					Section {
 						Text(problem).foregroundStyle(.red)
 					}
+				}
+				Section {
+					NavigationLink("About Jig") { AboutView() }
 				}
 			}
 			.sheet(isPresented: $scanning) {

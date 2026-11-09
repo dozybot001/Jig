@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { POLICY_VERSION } from "../../../src/shared/policy.ts";
 import type { Session } from "../../../src/shared/types.ts";
 import {
 	createPairing,
@@ -395,7 +396,7 @@ function About() {
 					onClose={() => setDoc(null)}
 					footer={<Button onClick={() => setDoc(null)}>{t("close")}</Button>}
 				>
-					<p className="hint">{t("docVersion", { v: "1.1", date: t("policyDate") })}</p>
+					<p className="hint">{t("docVersion", { v: POLICY_VERSION, date: t("policyDate") })}</p>
 					{paragraphs(doc === "privacy" ? t("privacyPolicyBody") : t("termsBody"))}
 				</Dialog>
 			)}

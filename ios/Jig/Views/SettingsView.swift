@@ -1,0 +1,248 @@
+import SwiftUI
+
+/// Settings, from the button at the top right of each tab: the Mac this phone is paired with, unpairing,
+/// and About. Everything else is set on the Mac (M3 plan, section 7).
+struct SettingsView: View {
+	@Environment(AppModel.self) private var model
+	@Environment(\.dismiss) private var dismiss
+	@State private var confirming = false
+	@State private var leaving = false
+	@State private var path: [String] = []
+
+	var body: some View {
+		NavigationStack(path: $path) {
+			Form {
+				Section {
+					LabeledContent("Mac", value: model.desktopName ?? "")
+					LabeledContent("Connection", value: LinkText.status(model.link, demo: model.isDemo))
+				} footer: {
+					if model.isDemo {
+						Text("This is sample data. Nothing you do here reaches a Mac.")
+					} else {
+						Text("Your iPhone and the Mac are encrypted end to end; the relay only passes ciphertext along.")
+					}
+				}
+				Section {
+					if model.isDemo {
+						Button("Leave the demo") { model.leaveDemo() }
+					} else {
+						Button("Unpair", role: .destructive) { confirming = true }
+							.disabled(leaving)
+					}
+				}
+				Section {
+					NavigationLink("About Jig", value: "about")
+				}
+			}
+			.navigationDestination(for: String.self) { _ in AboutView() }
+			.navigationTitle("Settings")
+			.navigationBarTitleDisplayMode(.inline)
+			.toolbar {
+				ToolbarItem(placement: .confirmationAction) {
+					Button("Done") { dismiss() }
+				}
+			}
+			.confirmationDialog("Unpair this iPhone?", isPresented: $confirming, titleVisibility: .visible) {
+				Button("Unpair", role: .destructive) {
+					leaving = true
+					Task { await model.unpair() }
+				}
+			} message: {
+				Text("The Mac removes this iPhone from its list. To use Jig here again, show a new QR code on the Mac and scan it.")
+			}
+		}
+		#if DEBUG
+		.onAppear { if model.settingsAtLaunch == "about" { path = ["about"] } }
+		#endif
+	}
+}
+
+/// What the connection is doing, in words, for the settings screen and the banner.
+enum LinkText {
+	static func status(_ link: AppModel.Link, demo: Bool) -> String {
+		if demo { return String(localized: "Demo") }
+		switch link {
+		case .connecting: return String(localized: "Connecting…")
+		case .online: return String(localized: "Connected")
+		case .macOffline: return String(localized: "Mac offline")
+		case .refused: return String(localized: "Removed on the Mac")
+		case .unreachable: return String(localized: "Can't connect")
+		}
+	}
+}
+
+/// "About Jig" (spec 2.2–2.3): the lockup, version and build, what Jig is, the publisher and website,
+/// then the privacy policy, terms and feedback.
+struct AboutView: View {
+	private var version: String {
+		let info = Bundle.main.infoDictionary
+		let number = info?["CFBundleShortVersionString"] as? String ?? ""
+		let build = info?["CFBundleVersion"] as? String ?? ""
+		return String(localized: "Version \(number) · Build \(build)")
+	}
+
+	var body: some View {
+		List {
+			Section {
+				VStack(spacing: 10) {
+					Lockup()
+					Text(version)
+						.font(.footnote.monospacedDigit())
+						.foregroundStyle(.secondary)
+				}
+				.frame(maxWidth: .infinity)
+				.padding(.vertical, 8)
+			}
+			Section {
+				Text("An AI-native multi-agent workbench. In Jig, one person works with a group of agent sessions, which run in Jig on your Mac.")
+				Text("Jig on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you can allow operations, answer the sessions' questions, decide on cards, and follow and reply to sessions.")
+			}
+			Section {
+				LabeledContent("Publisher") {
+					HStack(spacing: 6) {
+						Image("TenonMark")
+							.resizable()
+							.frame(width: 18, height: 18)
+							.accessibilityHidden(true)
+						Text("Tenon AI").bold()
+					}
+				}
+				Link(destination: URL(string: "https://tenon.asia/")!) {
+					LabeledContent("Website", value: "tenon.asia")
+				}
+			}
+			Section {
+				NavigationLink("Privacy Policy") { PolicyView(kind: .privacy) }
+				NavigationLink("Terms of Service") { PolicyView(kind: .terms) }
+				Link(destination: URL(string: "mailto:support@tenonai.cn")!) {
+					LabeledContent("Feedback", value: "support@tenonai.cn")
+				}
+			}
+		}
+		.tint(.primary)
+		.navigationTitle("About Jig")
+		.navigationBarTitleDisplayMode(.inline)
+	}
+}
+
+/// The privacy policy or the terms: the same text as Jig on the Mac (src/shared/policy.ts).
+struct PolicyView: View {
+	enum Kind { case privacy, terms }
+	let kind: Kind
+
+	var body: some View {
+		let text = kind == .privacy ? String(localized: "policy.privacy") : String(localized: "policy.terms")
+		ScrollView {
+			VStack(alignment: .leading, spacing: 14) {
+				Text("Version \(String(localized: "policy.version")) · effective \(String(localized: "policy.date"))")
+					.font(.footnote)
+					.foregroundStyle(.secondary)
+				ForEach(Array(text.components(separatedBy: "\n\n").enumerated()), id: \.offset) { _, paragraph in
+					Text(paragraph)
+				}
+			}
+			.textSelection(.enabled)
+			.frame(maxWidth: .infinity, alignment: .leading)
+			.padding()
+		}
+		.navigationTitle(kind == .privacy ? LocalizedStringKey("Privacy Policy") : LocalizedStringKey("Terms of Service"))
+		.navigationBarTitleDisplayMode(.inline)
+	}
+}
+
+/// Jig's full lockup for the About page (spec 1.6, 2.2): the mark, the wordmark and the Tenon mark.
+struct Lockup: View {
+	var body: some View {
+		HStack(alignment: .top, spacing: 8) {
+			JigMark()
+				.frame(width: 44, height: 44)
+			Text("Jig")
+				.font(.system(size: 40, weight: .semibold))
+			Image("TenonMark")
+				.resizable()
+				.frame(width: 14, height: 14)
+				.padding(.top, 6)
+		}
+		.accessibilityElement(children: .ignore)
+		.accessibilityLabel("Jig, by Tenon AI")
+	}
+}
+
+extension View {
+	/// What the first screen of each tab has: the settings button, and a banner while the Mac can't be
+	/// reached or the app shows sample data.
+	func jigChrome() -> some View {
+		modifier(JigChrome())
+	}
+}
+
+private struct JigChrome: ViewModifier {
+	@Environment(AppModel.self) private var model
+
+	func body(content: Content) -> some View {
+		content
+			.safeAreaInset(edge: .bottom, spacing: 0) { Banner() }
+			.toolbar {
+				ToolbarItem(placement: .topBarTrailing) {
+					Button {
+						model.showingSettings = true
+					} label: {
+						Label("Settings", systemImage: "gearshape")
+					}
+				}
+			}
+	}
+}
+
+/// One line about the connection when something needs saying, with what the person can do about it.
+private struct Banner: View {
+	@Environment(AppModel.self) private var model
+
+	var body: some View {
+		if model.isDemo {
+			line(
+				"Sample data: nothing reaches a Mac.",
+				action: ("Leave", { model.leaveDemo() })
+			)
+		} else {
+			switch model.link {
+			case .macOffline:
+				line(
+					"The Mac is offline. Keep Jig running there with phone access on.",
+					action: ("Retry", { Task { await model.refreshAll() } })
+				)
+			case .refused:
+				line(
+					"The Mac no longer knows this iPhone. Pair again to keep using it.",
+					action: ("Pair again", { Task { await model.unpair() } })
+				)
+			case .unreachable:
+				line(
+					"Can't connect. Check the network; Jig keeps trying.",
+					action: ("Retry", { Task { await model.refreshAll() } })
+				)
+			case .connecting, .online:
+				EmptyView()
+			}
+		}
+	}
+
+	private func line(_ text: LocalizedStringKey, action: (LocalizedStringKey, () -> Void)) -> some View {
+		HStack(spacing: 10) {
+			Text(text)
+				.font(.footnote)
+				.frame(maxWidth: .infinity, alignment: .leading)
+			Button(action.0, action: action.1)
+				.font(.footnote.weight(.semibold))
+				.buttonStyle(.borderless)
+				.frame(minHeight: 44)
+		}
+		.tint(.primary)
+		.padding(.horizontal, 16)
+		.padding(.vertical, 2)
+		.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+		.overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.jigControl))
+		.padding(.horizontal)
+		.padding(.bottom, 8)
+	}
+}
