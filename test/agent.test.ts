@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test } from "node:test";
@@ -150,6 +151,49 @@ describe("agent loop", () => {
 		assert.equal(existsSync(join(cwd, "old.txt")), false);
 	});
 
+	test("with full access a commit runs on its own; the push waits for the person's permission", async () => {
+		const { faux, store, agents, session, cwd } = setup();
+		store.updateSession(session.id, { options: { permissionMode: "skip" } });
+		const git = (...args: string[]) =>
+			execFileSync("git", args, {
+				cwd,
+				encoding: "utf8",
+				stdio: ["ignore", "pipe", "pipe"],
+			}).trim();
+		const remote = realpathSync(tempDir("jig-remote-"));
+		execFileSync("git", ["init", "-q", "--bare", remote]);
+		git("init", "-q", "-b", "main");
+		git("remote", "add", "origin", remote);
+		writeFileSync(join(cwd, "a.txt"), "a\n");
+		const commit =
+			'git add -A && git -c user.name=Jig -c user.email=jig@example.com -c commit.gpgsign=false commit -qm "加 a.txt"';
+		faux.setResponses([
+			toolUse(fauxToolCall("shell", { command: commit }, { id: "c1" })),
+			toolUse(fauxToolCall("shell", { command: "git push -q origin main" }, { id: "c2" })),
+			fauxAssistantMessage("已提交并推送。"),
+		]);
+		agents.send(session.id, "改好了就提交、推送");
+		await until(() => store.pendingApprovals(session.id).length === 1);
+		// The commit did not ask; the push is in the approval center and the session shows it waits.
+		const head = git("rev-parse", "HEAD");
+		const [push] = store.pendingApprovals(session.id);
+		assert.ok(push);
+		assert.equal(push.kind, "permission");
+		assert.match(textOf(push.request), /git push -q origin main/);
+		assert.equal((push.request as { mustConfirm: boolean }).mustConfirm, true);
+		assert.equal(store.getSession(session.id).status, "waiting");
+		assert.throws(() =>
+			execFileSync("git", ["--git-dir", remote, "rev-parse", "main"], { stdio: "ignore" }),
+		);
+		agents.answer(push.id, { decision: "allow_once" });
+		await agents.whenIdle(session.id);
+		const pushed = execFileSync("git", ["--git-dir", remote, "rev-parse", "main"], {
+			encoding: "utf8",
+		}).trim();
+		assert.equal(pushed, head);
+		assert.equal(store.getSession(session.id).status, "idle");
+	});
+
 	test("stopping while waiting cancels the approval and leaves a valid transcript", async () => {
 		const { faux, store, agents, session, contexts, capture } = setup();
 		faux.setResponses([
@@ -289,13 +333,13 @@ describe("agent loop", () => {
 		assert.equal(readFileSync(join(cwd, "AGENTS.md"), "utf8"), "Always answer in prose.\n");
 	});
 
-	test("a changed approval mode arrives as an update; the prompt stays the same", async () => {
+	test("a changed permission mode arrives as an update; the prompt stays the same", async () => {
 		const { faux, store, agents, session, contexts, capture } = setup();
 		faux.setResponses([capture(fauxAssistantMessage("ok")), capture(fauxAssistantMessage("ok"))]);
 		agents.send(session.id, "hi");
 		await agents.whenIdle(session.id);
 		const system = textOf(contexts[0]?.messages[0]);
-		assert.match(system, /Approval mode is manual/);
+		assert.match(system, /Permission mode: ask each time\./);
 		store.updateSession(session.id, { options: { permissionMode: "skip" } });
 		agents.send(session.id, "again");
 		await agents.whenIdle(session.id);
@@ -304,7 +348,10 @@ describe("agent loop", () => {
 			.listEntries(session.id, { limit: 50 })
 			.entries.filter((e) => e.role === "system");
 		assert.equal(updates.length, 1);
-		assert.match(textOf(updates[0]), /Approval mode is skip/);
+		assert.match(
+			textOf(updates[0]),
+			/changed the permission mode\. Permission mode: full access\./,
+		);
 	});
 
 	test("a task list left unchanged for many calls gets a reminder; a finished one does not", async () => {
@@ -395,8 +442,8 @@ describe("system prompt", () => {
 		assert.match(text, /负责 Jig 的产品设计。/);
 		assert.match(text, /standing session: this role is yours for the long term/);
 		assert.match(text, /in files in your working folder/);
-		assert.match(text, /Stop for the person only for a decision that only they can make/);
-		assert.match(text, /Approval mode is automatic.*set "confirm": true/);
+		assert.match(text, /Stop for the person only for what only they can decide or do/);
+		assert.match(text, /Permission mode: ask when needed\..*set "confirm": true/);
 	});
 
 	test("a task session ends with a report; a chat without team or role mentions neither", () => {
@@ -409,6 +456,40 @@ describe("system prompt", () => {
 		assert.doesNotMatch(text, /You belong to the team/);
 		assert.doesNotMatch(text, /Your role, as the person wrote it/);
 		assert.match(text, /No working folder/);
+	});
+
+	test("a session asks the person through Jig and makes must-confirm calls, never asks in its reply", () => {
+		const session = {
+			...base,
+			id: "s1",
+			kind: "task",
+			options: { permissionMode: "skip" },
+		} as Session;
+		const alone = systemPrompt(session, { ...snapshot("/tmp/demo"), permissionMode: "skip" });
+		assert.match(
+			alone,
+			/ask through Jig so it waits for them in the approval center: use ask_user\./,
+		);
+		assert.match(alone, /take it instead of offering it; for example, commit/);
+		assert.match(
+			alone,
+			/"Shall I…\?" or "Tell me if you want…", leaves you idle.*Never end a turn on one\./,
+		);
+		assert.match(alone, /When the work calls for one, make the call: Jig shows it to the person/);
+		assert.match(alone, /Do not ask in your reply first\./);
+		assert.match(alone, /Permission mode: full access\. Your other calls run without asking;/);
+		assert.doesNotMatch(alone, /Take extra care/);
+		// A task's report says what is left; what needs the person was raised before it.
+		assert.match(
+			alone,
+			/how you checked it, and what is left\. Raise anything that needs the person/,
+		);
+		assert.doesNotMatch(alone, /what the person needs to do/);
+		const main = { id: "m1", name: "总办" };
+		const withMain = systemPrompt(session, { ...snapshot("/tmp/demo"), main });
+		assert.match(withMain, /approval center: send a request to the main conversation/);
+		const asMain = systemPrompt({ ...session, id: "m1" }, { ...snapshot("/tmp/demo"), main });
+		assert.match(asMain, /approval center: put a card there with post_card/);
 	});
 
 	test("the prompt sent with a turn names the session's team", async () => {

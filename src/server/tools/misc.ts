@@ -65,7 +65,7 @@ export const todoTool: ToolDefinition = {
 export const askUserTool: ToolDefinition = {
 	name: "ask_user",
 	description:
-		"Ask the person a question and wait for the answer. Use it when you cannot go on without a decision only they can make. Offer options when the choices are known; they can still answer in their own words.",
+		"Ask the person a question and wait for the answer. The question waits for them in the approval center and in this conversation. Use it when you cannot go on without a decision only they can make. Offer options when the choices are known; they can still answer in their own words.",
 	parameters: {
 		type: "object",
 		properties: {

@@ -51,11 +51,11 @@ import {
 	transcriptForSummary,
 } from "./context.ts";
 import {
-	APPROVAL_MODE,
 	type ContextSnapshot,
 	loadInstructions,
 	MAIN_ROLE,
 	NAMING_PROMPT,
+	PERMISSION_MODE,
 	type Placement,
 	renderInstructions,
 	type SessionRef,
@@ -1408,7 +1408,7 @@ export class Agents {
 			);
 		}
 		if (told.permissionMode !== mode) {
-			updates.push(`The person changed the approval mode. ${APPROVAL_MODE[mode]}`);
+			updates.push(`The person changed the permission mode. ${PERMISSION_MODE[mode]}`);
 		}
 		const sameMain = (told.main?.id ?? null) === (placement.main?.id ?? null);
 		if (!sameMain) updates.push(mainUpdate(session, told.main, placement.main));
