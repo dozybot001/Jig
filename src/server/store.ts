@@ -16,6 +16,7 @@ import type {
 	SessionKind,
 	SessionOptions,
 	SessionStatus,
+	TaskOutcome,
 	ThinkingLevel,
 	Todo,
 	ToolCallStatus,
@@ -39,6 +40,8 @@ export interface NewSession {
 	thinking?: ThinkingLevel;
 	rules?: PermissionRule[];
 	options?: SessionOptions;
+	/** The session that opens this one (a task it hands out). */
+	parentId?: string | null;
 }
 
 export interface SessionPatch {
@@ -96,6 +99,10 @@ interface SessionRow {
 	context_tokens: number;
 	event_seq: number;
 	message_seq: number;
+	parent_id: string | null;
+	outcome: TaskOutcome | null;
+	interventions: number;
+	letters_sent: number;
 	last_activity_at: number;
 	created_at: number;
 	updated_at: number;
@@ -184,6 +191,10 @@ function toSession(row: SessionRow): Session {
 		},
 		contextTokens: row.context_tokens,
 		eventSeq: row.event_seq,
+		parentId: row.parent_id,
+		outcome: row.outcome,
+		interventions: row.interventions,
+		lettersSent: row.letters_sent,
 		lastActivityAt: row.last_activity_at,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
@@ -322,6 +333,11 @@ export class Store {
 	#publish(event: BusEvent): void {
 		if (this.#pending) this.#pending.push(event);
 		else this.#bus.publish(event);
+	}
+
+	/** Publishes a global event; inside a transaction it waits for the commit. */
+	publish(event: Extract<BusEvent, { scope: "global" }>["event"]): void {
+		this.#publish({ scope: "global", event });
 	}
 
 	/** Publishes an ephemeral event right away (drafts, live tool output). */
@@ -482,12 +498,13 @@ export class Store {
 				throw conflict(`A session named "${name}" already exists.`, { field: "name" });
 			}
 			if (input.groupId) this.getGroup(input.groupId);
+			if (input.parentId) this.getSession(input.parentId);
 			const now = Date.now();
 			const id = newId();
 			this.#q(
 				`INSERT INTO sessions (id, name, kind, group_id, responsibility, cwd, provider, model, thinking,
-					rules, options, last_activity_at, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					rules, options, parent_id, last_activity_at, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			).run(
 				id,
 				name,
@@ -500,6 +517,7 @@ export class Store {
 				input.thinking ?? "medium",
 				JSON.stringify(input.rules ?? []),
 				JSON.stringify(input.options ?? {}),
+				input.parentId ?? null,
 				now,
 				now,
 				now,
@@ -603,6 +621,51 @@ export class Store {
 			);
 			return this.#emitSession(id);
 		});
+	}
+
+	/** Counts a letter against the session's quota. */
+	countLetterSent(id: string): Session {
+		return this.tx(() => {
+			this.#q("UPDATE sessions SET letters_sent = letters_sent + 1 WHERE id = ?").run(id);
+			return this.#emitSession(id);
+		});
+	}
+
+	/** The person wrote or decided: the session may send a full quota of letters again. */
+	resetLettersSent(id: string): void {
+		this.tx(() => {
+			const result = this.#q(
+				"UPDATE sessions SET letters_sent = 0 WHERE id = ? AND letters_sent > 0",
+			).run(id);
+			if (result.changes > 0) this.#emitSession(id);
+		});
+	}
+
+	/** The person stepped in: a message, an approval or an answer (blueprint 6.2, item 9). */
+	addIntervention(id: string): void {
+		this.tx(() => {
+			this.#q("UPDATE sessions SET interventions = interventions + 1 WHERE id = ?").run(id);
+			this.#emitSession(id);
+		});
+	}
+
+	setOutcome(id: string, outcome: TaskOutcome): Session {
+		return this.tx(() => {
+			this.#q("UPDATE sessions SET outcome = ?, updated_at = ? WHERE id = ?").run(
+				outcome,
+				Date.now(),
+				id,
+			);
+			return this.#emitSession(id);
+		});
+	}
+
+	/** Every session that is not archived, oldest first; the directory sessions address letters with. */
+	activeSessions(): Session[] {
+		const rows = this.#q(
+			"SELECT * FROM sessions WHERE archived_at IS NULL ORDER BY created_at, id",
+		).all() as unknown as SessionRow[];
+		return rows.map(toSession);
 	}
 
 	bumpUnread(id: string): Session {
@@ -896,9 +959,19 @@ export class Store {
 		return rows.map(toApproval);
 	}
 
+	/** Every pending approval and question, oldest first, for the approval center. */
+	allPendingApprovals(): Approval[] {
+		const rows = this.#q(
+			"SELECT * FROM approvals WHERE status = 'pending' ORDER BY created_at, id",
+		).all() as unknown as ApprovalRow[];
+		return rows.map(toApproval);
+	}
+
 	#emitApproval(id: string): Approval {
 		const approval = this.getApproval(id);
 		this.appendEvent(approval.sessionId, { type: "approval", approval });
+		// The approval center lists every session's approvals, so it hears about each change too.
+		this.#publish({ scope: "global", event: { type: "approval", approval } });
 		return approval;
 	}
 

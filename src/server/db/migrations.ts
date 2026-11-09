@@ -146,4 +146,61 @@ CREATE TABLE auth_tokens (
 	last_used_at INTEGER
 ) STRICT;
 `,
+	// M2: letters between sessions, decision cards, and the session tree (blueprint sections 6 and 7).
+	`
+ALTER TABLE sessions ADD COLUMN parent_id TEXT REFERENCES sessions (id) ON DELETE SET NULL;
+ALTER TABLE sessions ADD COLUMN outcome TEXT CHECK (outcome IN ('done', 'given_up', 'failed'));
+ALTER TABLE sessions ADD COLUMN interventions INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN letters_sent INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX sessions_parent ON sessions (parent_id) WHERE parent_id IS NOT NULL;
+
+CREATE TABLE letters (
+	id TEXT PRIMARY KEY,
+	thread_id TEXT NOT NULL,
+	reply_to TEXT,
+	from_kind TEXT NOT NULL CHECK (from_kind IN ('session', 'person', 'cli', 'jig')),
+	from_session TEXT REFERENCES sessions (id) ON DELETE SET NULL,
+	from_name TEXT NOT NULL,
+	to_session TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+	kind TEXT NOT NULL CHECK (kind IN ('notice', 'request', 'decision', 'report')),
+	summary TEXT NOT NULL,
+	body TEXT NOT NULL,
+	status TEXT NOT NULL
+		CHECK (status IN ('queued', 'held', 'delivered', 'done', 'refused', 'dropped')),
+	status_reason TEXT,
+	path TEXT NOT NULL DEFAULT '[]',
+	auto INTEGER NOT NULL DEFAULT 0,
+	decision INTEGER,
+	entry_id TEXT,
+	created_at INTEGER NOT NULL,
+	delivered_at INTEGER,
+	updated_at INTEGER NOT NULL
+) STRICT;
+CREATE INDEX letters_inbox ON letters (to_session, status);
+CREATE INDEX letters_time ON letters (created_at, id);
+CREATE INDEX letters_pair ON letters (from_session, to_session, created_at);
+
+CREATE TABLE cards (
+	id TEXT PRIMARY KEY,
+	number INTEGER NOT NULL UNIQUE,
+	created_by TEXT REFERENCES sessions (id) ON DELETE SET NULL,
+	requested_by TEXT REFERENCES sessions (id) ON DELETE SET NULL,
+	title TEXT NOT NULL,
+	context TEXT NOT NULL DEFAULT '',
+	options TEXT NOT NULL DEFAULT '[]',
+	recommended INTEGER,
+	deadline TEXT,
+	sessions TEXT NOT NULL DEFAULT '[]',
+	reversible TEXT NOT NULL DEFAULT '',
+	after TEXT NOT NULL DEFAULT '',
+	status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'decided', 'withdrawn')),
+	choice INTEGER,
+	note TEXT,
+	decided_at INTEGER,
+	withdrawn_reason TEXT,
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL
+) STRICT;
+CREATE INDEX cards_status ON cards (status, updated_at);
+`,
 ];

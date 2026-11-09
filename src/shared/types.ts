@@ -35,7 +35,27 @@ export interface SessionOptions {
 	 * confirmed (spec 21.2) are asked about in every mode.
 	 */
 	permissionMode?: PermissionMode;
+	/** What happens to letters from other sessions: delivered, held for the person, or refused (blueprint 7.1). */
+	receive?: ReceivePolicy;
+	/** Letters the session may send per message or decision from the person; see letterQuotaOf. */
+	letterQuota?: number;
+	/** May put decision cards in the approval center directly, as the main conversation can. */
+	canPostCards?: boolean;
 }
+
+export const RECEIVE_POLICIES = ["accept", "hold", "refuse"] as const;
+export type ReceivePolicy = (typeof RECEIVE_POLICIES)[number];
+
+/** Letters a session may send between two messages or decisions from the person (blueprint 7.1). */
+export const DEFAULT_LETTER_QUOTA = 10;
+export const MAIN_LETTER_QUOTA = 30;
+
+export function letterQuotaOf(options: SessionOptions, isMain: boolean): number {
+	return options.letterQuota ?? (isMain ? MAIN_LETTER_QUOTA : DEFAULT_LETTER_QUOTA);
+}
+
+export const TASK_OUTCOMES = ["done", "given_up", "failed"] as const;
+export type TaskOutcome = (typeof TASK_OUTCOMES)[number];
 
 export const PERMISSION_MODES = ["auto", "manual", "skip"] as const;
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
@@ -91,7 +111,85 @@ export interface Session {
 	contextTokens: number;
 	/** Sequence number of the last durable event; the transcript stream resumes after it. */
 	eventSeq: number;
+	/** The session that opened this one; null when the person opened it. */
+	parentId: string | null;
+	/** How a task session ended, as it recorded with finish_task. */
+	outcome: TaskOutcome | null;
+	/** Times the person stepped in: messages, approvals and answers (evaluation data, blueprint 6.2). */
+	interventions: number;
+	/** Letters sent since the person's last message or decision; the quota counts these. */
+	lettersSent: number;
 	lastActivityAt: number;
+	createdAt: number;
+	updatedAt: number;
+}
+
+export const LETTER_KINDS = ["notice", "request", "decision", "report"] as const;
+export type LetterKind = (typeof LETTER_KINDS)[number];
+export type LetterStatus = "queued" | "held" | "delivered" | "done" | "refused" | "dropped";
+/** Who sent a letter: a session, the person (decisions), the command line (`jig send`) or Jig itself. */
+export type SenderKind = "session" | "person" | "cli" | "jig";
+
+/** A letter between sessions (blueprint section 7). Stored before it is delivered, so a restart loses none. */
+export interface Letter {
+	id: string;
+	threadId: string;
+	replyTo: string | null;
+	fromKind: SenderKind;
+	fromSession: string | null;
+	/** The sender's name when the letter was sent. */
+	fromName: string;
+	toSession: string;
+	kind: LetterKind;
+	/** The first line, understandable on its own. */
+	summary: string;
+	body: string;
+	status: LetterStatus;
+	/** Why the letter was held, refused or dropped. */
+	statusReason: string | null;
+	/** Sessions that sent letters along this chain, oldest first (loop checks, blueprint 7.2). */
+	path: string[];
+	/** Jig sent the session's final reply on its behalf. */
+	auto: boolean;
+	/** For a decision letter: the number of the decision it carries. */
+	decision: number | null;
+	createdAt: number;
+	deliveredAt: number | null;
+}
+
+export interface CardOption {
+	label: string;
+	detail?: string;
+}
+
+export type CardStatus = "pending" | "decided" | "withdrawn";
+
+/** A decision card in the approval center (blueprint 6.4): the six points, options and the person's answer. */
+export interface Card {
+	id: string;
+	/** The decision number sessions quote, #1, #2… */
+	number: number;
+	/** The session that put the card in the approval center. */
+	createdBy: string | null;
+	/** The session whose request the card is; the decision goes back to it. */
+	requestedBy: string | null;
+	title: string;
+	context: string;
+	options: CardOption[];
+	/** Index of the recommended option. */
+	recommended: number | null;
+	deadline: string | null;
+	/** Sessions involved. */
+	sessions: string[];
+	reversible: string;
+	/** Who does what once it is decided. */
+	after: string;
+	status: CardStatus;
+	/** Index of the chosen option; null when the person answered with a note only. */
+	choice: number | null;
+	note: string | null;
+	decidedAt: number | null;
+	withdrawnReason: string | null;
 	createdAt: number;
 	updatedAt: number;
 }

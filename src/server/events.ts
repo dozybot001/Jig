@@ -1,5 +1,5 @@
 import type { AssistantMessage } from "../shared/messages.ts";
-import type { Group, Session, SessionEvent } from "../shared/types.ts";
+import type { Approval, Card, Group, Letter, Session, SessionEvent } from "../shared/types.ts";
 
 /** Ephemeral updates: not stored, not replayed; a reconnecting client gets a fresh snapshot instead. */
 export type LiveEvent =
@@ -7,10 +7,16 @@ export type LiveEvent =
 	| { type: "draftCleared" }
 	| { type: "toolOutput"; toolCallId: string; output: string };
 
-/** Sidebar-level updates. Volatile: after a reconnect the client reloads the list. */
+/**
+ * Updates every tab hears: the sidebar, the approval center and the letters list. Volatile: after a
+ * reconnect the client reloads them.
+ */
 export type GlobalEvent =
 	| { type: "sessionSummary"; session: Session }
-	| { type: "groups"; groups: Group[] };
+	| { type: "groups"; groups: Group[] }
+	| { type: "approval"; approval: Approval }
+	| { type: "letter"; letter: Letter }
+	| { type: "card"; card: Card };
 
 export type BusEvent =
 	| { scope: "session"; sessionId: string; seq: number; event: SessionEvent }

@@ -1,0 +1,599 @@
+import { appendFileSync, existsSync } from "node:fs";
+import {
+	type Approval,
+	type Card,
+	type CardOption,
+	type Letter,
+	type LetterKind,
+	letterQuotaOf,
+	permissionModeOf,
+	type Session,
+} from "../../shared/types.ts";
+import { conflict, invalid, JigError } from "../errors.ts";
+import type { Store } from "../store.ts";
+import { type CardFields, MailStore } from "./store.ts";
+
+export const SUMMARY_MAX = 200;
+export const BODY_MAX = 20_000;
+const MINUTE = 60_000;
+/** Letters one session may send per minute. */
+const SEND_RATE = 5;
+/** The same letter twice within this time is dropped. */
+const DUPLICATE_WINDOW = 10 * MINUTE;
+/** Letters one session may send another within DUPLICATE_WINDOW. */
+const PAIR_LIMIT = 10;
+/** Letters in one chain of hand-offs. */
+const MAX_HOPS = 8;
+/** A session that already sent this many letters in a chain is not written to again in it. */
+const MAX_VISITS = 3;
+const OPTIONS_MAX = 6;
+
+/**
+ * Why a letter was not delivered, as a code: the interface explains it in the person's language, and
+ * `reasonText` explains it to the model.
+ */
+export type LetterReason =
+	| "quota"
+	| "rate"
+	| "duplicate"
+	| "pair-limit"
+	| "hops"
+	| "loop"
+	| "refuse-policy"
+	| "hold-policy"
+	| "lower-rank"
+	| "person-refused";
+
+export function reasonText(reason: string | null): string {
+	switch (reason) {
+		case "quota":
+			return "you have used up your letters until the person writes to you again";
+		case "rate":
+			return "you sent too many letters in the last minute; put what you have to say in one letter";
+		case "duplicate":
+			return "the same letter was already sent a moment ago";
+		case "pair-limit":
+			return "you sent this session too many letters in the last ten minutes";
+		case "hops":
+			return `this chain of hand-offs is already ${MAX_HOPS} letters long; stop and report to whoever started it`;
+		case "loop":
+			return "this chain keeps coming back to the same session; stop and report instead of sending it on";
+		case "refuse-policy":
+			return "the session does not accept letters";
+		case "hold-policy":
+			return "the session holds letters until the person releases them";
+		case "lower-rank":
+			return "the session has more permissions than you, so the person releases your letters to it first";
+		case "person-refused":
+			return "the person refused it";
+		default:
+			return reason ?? "";
+	}
+}
+
+/** Who a letter is from: a session, the command line (`jig send`), or the person (a decision). */
+export type Sender = { kind: "session"; session: Session } | { kind: "cli" } | { kind: "person" };
+
+export interface Outgoing {
+	/** Session id; letters are addressed by id only (blueprint 7.1). */
+	to: string;
+	kind: LetterKind;
+	summary: string;
+	body?: string;
+	replyTo?: string | null;
+	/** Jig sends the session's final reply on its behalf. */
+	auto?: boolean;
+	/** A decision letter: the number of the decision it carries. */
+	decision?: number | null;
+}
+
+export interface PostHooks {
+	/** A letter waits for its recipient: hand it to a call that waits for it, or start the session. */
+	queued(letter: Letter): void;
+}
+
+/** The fields a session writes for a decision card; omitted fields keep their value on update. */
+export interface CardInput {
+	title?: string;
+	context?: string;
+	options?: CardOption[];
+	recommended?: number | null;
+	deadline?: string | null;
+	sessions?: string[];
+	reversible?: string;
+	after?: string;
+	/** The session whose request this is; the decision goes back to it. */
+	requestedBy?: string | null;
+	/** Numbers of pending cards this one replaces; they are withdrawn. */
+	replaces?: number[];
+}
+
+/** Permission level for the hold rule: a chat, then manual, automatic and skip approval (blueprint 7.1). */
+function rank(session: Session): number {
+	if (!session.cwd) return 0;
+	return { manual: 1, auto: 2, skip: 3 }[permissionModeOf(session.options)];
+}
+
+const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
+
+function limited(value: unknown, field: string, max: number, required: boolean): string {
+	if (value === undefined || value === null) {
+		if (required) throw invalid(`${field} is required.`, field);
+		return "";
+	}
+	if (typeof value !== "string") throw invalid(`${field} must be text.`, field);
+	const text = value.trim();
+	if (required && !text) throw invalid(`${field} cannot be empty.`, field);
+	if ([...text].length > max) throw invalid(`${field} can be at most ${max} characters.`, field);
+	return text;
+}
+
+/**
+ * Letters between sessions and decision cards for the person (blueprint sections 6.3, 6.4 and 7). Every
+ * check a letter passes lives here: the address, the recipient's policy, the quota, rate limits,
+ * duplicates and the length of a chain of hand-offs. The agent runner delivers what is queued.
+ */
+export class PostOffice {
+	readonly mail: MailStore;
+	readonly #store: Store;
+	readonly #log: (line: string) => void;
+	#hooks: PostHooks = { queued: () => {} };
+	/** When each session sent its recent letters, for the per-minute limit. */
+	readonly #sent = new Map<string, number[]>();
+	/** The chain each working session is in: senders so far, oldest first. */
+	readonly #chains = new Map<string, string[]>();
+
+	constructor(store: Store, log: (line: string) => void = () => {}) {
+		this.#store = store;
+		this.mail = new MailStore(store);
+		this.#log = log;
+	}
+
+	setHooks(hooks: PostHooks): void {
+		this.#hooks = hooks;
+	}
+
+	/** The main conversation, if one is set and still there. */
+	mainSessionId(): string | null {
+		const id = this.#store.getSetting<string | null>("mainSessionId", null);
+		if (!id) return null;
+		try {
+			return this.#store.getSession(id).archivedAt === null ? id : null;
+		} catch {
+			return null;
+		}
+	}
+
+	/** Sessions that may put cards in the approval center: the main conversation and those allowed to. */
+	canPostCards(session: Session): boolean {
+		return session.id === this.mainSessionId() || session.options.canPostCards === true;
+	}
+
+	letterQuota(session: Session): number {
+		return letterQuotaOf(session.options, session.id === this.mainSessionId());
+	}
+
+	// --- chains of hand-offs ---
+
+	/** Letters reached the session; letters it now sends continue the longest chain among them. */
+	enterChain(sessionId: string, letters: Letter[]): void {
+		let longest = this.#chains.get(sessionId) ?? [];
+		for (const letter of letters) if (letter.path.length > longest.length) longest = letter.path;
+		this.#chains.set(sessionId, longest);
+	}
+
+	/** The person wrote or decided, or the turn ended: what the session sends next starts a new chain. */
+	resetChain(sessionId: string): void {
+		this.#chains.delete(sessionId);
+	}
+
+	// --- letters ---
+
+	send(sender: Sender, out: Outgoing): Letter {
+		const summary = oneLine(limited(out.summary, "summary", SUMMARY_MAX * 4, true));
+		if ([...summary].length > SUMMARY_MAX) {
+			throw invalid(`The summary can be at most ${SUMMARY_MAX} characters.`, "summary");
+		}
+		const body = limited(out.body, "body", BODY_MAX, false);
+		let to: Session;
+		try {
+			to = this.#store.getSession(out.to);
+		} catch {
+			throw invalid(`There is no session with the id ${out.to}.`, "to");
+		}
+		const from = sender.kind === "session" ? sender.session.id : null;
+		if (from === to.id) throw invalid("A session cannot send a letter to itself.", "to");
+		if (to.archivedAt !== null) {
+			throw conflict(
+				`${to.name} is archived and cannot receive letters.`,
+				undefined,
+				"session-archived",
+			);
+		}
+		if (out.kind === "decision") this.#checkRelay(sender, out.decision);
+		let threadId: string | null = null;
+		let repliedTo: Letter | null = null;
+		if (out.replyTo) {
+			try {
+				repliedTo = this.mail.getLetter(out.replyTo);
+			} catch {
+				throw invalid(`There is no letter ${out.replyTo}.`, "replyTo");
+			}
+			if (from !== null && repliedTo.toSession !== from && repliedTo.fromSession !== from) {
+				throw invalid("You can only reply to a letter you sent or received.", "replyTo");
+			}
+			threadId = repliedTo.threadId;
+		}
+		const path = from ? [...(this.#chains.get(from) ?? []), from] : [];
+		const base = {
+			threadId,
+			replyTo: repliedTo?.id ?? null,
+			fromKind: sender.kind,
+			fromSession: from,
+			fromName:
+				sender.kind === "session"
+					? sender.session.name
+					: sender.kind === "cli"
+						? "jig send"
+						: "person",
+			toSession: to.id,
+			kind: out.kind,
+			summary,
+			body,
+			path,
+			auto: out.auto ?? false,
+			decision: out.decision ?? null,
+		};
+
+		if (sender.kind === "session") {
+			const current = this.#store.getSession(sender.session.id);
+			const stop = out.auto
+				? this.#duplicate(current.id, to.id, summary, body)
+					? ({ status: "dropped", reason: "duplicate" } as const)
+					: null
+				: this.#limits(current, to, path, summary, body);
+			if (stop) {
+				return this.mail.addLetter({ ...base, status: stop.status, statusReason: stop.reason });
+			}
+		}
+		const policy = this.#policy(sender, to, repliedTo, out.auto ?? false);
+		const letter = this.#store.tx(() => {
+			const letter = this.mail.addLetter({
+				...base,
+				status: policy.status,
+				statusReason: policy.reason ?? null,
+			});
+			if (sender.kind === "session" && !out.auto && policy.status !== "refused") {
+				this.#store.countLetterSent(sender.session.id);
+			}
+			return letter;
+		});
+		if (sender.kind === "session" && !out.auto && policy.status !== "refused") {
+			this.#recordSend(sender.session.id);
+		}
+		if (letter.status === "queued") this.#hooks.queued(letter);
+		return this.mail.getLetter(letter.id);
+	}
+
+	/** The person lets a held letter through. */
+	release(letterId: string): Letter {
+		const letter = this.mail.getLetter(letterId);
+		if (letter.status !== "held") {
+			throw conflict("This letter is not waiting for you.", undefined, "already-answered");
+		}
+		const released = this.mail.setLetterStatus(letterId, "queued", { reason: null });
+		this.#hooks.queued(released);
+		return this.mail.getLetter(letterId);
+	}
+
+	/** The person turns a held letter away. */
+	refuse(letterId: string): Letter {
+		const letter = this.mail.getLetter(letterId);
+		if (letter.status !== "held") {
+			throw conflict("This letter is not waiting for you.", undefined, "already-answered");
+		}
+		return this.mail.setLetterStatus(letterId, "refused", { reason: "person-refused" });
+	}
+
+	/** Only a decision the person made can be relayed as a decision letter. */
+	#checkRelay(sender: Sender, number: number | null | undefined): void {
+		if (sender.kind === "person") return;
+		if (typeof number !== "number") {
+			throw invalid("A decision letter must name the decision's number.", "decision");
+		}
+		let card: Card;
+		try {
+			card = this.mail.cardByNumber(number);
+		} catch {
+			throw invalid(`There is no decision #${number}.`, "decision");
+		}
+		if (card.status !== "decided") {
+			throw invalid(`#${number} has not been decided by the person.`, "decision");
+		}
+	}
+
+	#duplicate(from: string, to: string, summary: string, body: string): boolean {
+		return this.mail
+			.recentBetween(from, to, Date.now() - DUPLICATE_WINDOW)
+			.some((letter) => letter.summary === summary && letter.body === body);
+	}
+
+	/** The anti-runaway rules (blueprint 7.1 and 7.2), in the order a person would want to hear them. */
+	#limits(
+		from: Session,
+		to: Session,
+		path: string[],
+		summary: string,
+		body: string,
+	): { status: "refused" | "dropped"; reason: LetterReason } | null {
+		if (from.lettersSent >= this.letterQuota(from)) return { status: "refused", reason: "quota" };
+		const recent = (this.#sent.get(from.id) ?? []).filter((time) => time > Date.now() - MINUTE);
+		if (recent.length >= SEND_RATE) return { status: "refused", reason: "rate" };
+		if (path.length > MAX_HOPS) return { status: "refused", reason: "hops" };
+		if (path.filter((id) => id === to.id).length >= MAX_VISITS) {
+			return { status: "refused", reason: "loop" };
+		}
+		const between = this.mail.recentBetween(from.id, to.id, Date.now() - DUPLICATE_WINDOW);
+		if (between.some((letter) => letter.summary === summary && letter.body === body)) {
+			return { status: "dropped", reason: "duplicate" };
+		}
+		if (between.length >= PAIR_LIMIT) return { status: "dropped", reason: "pair-limit" };
+		return null;
+	}
+
+	#recordSend(sessionId: string): void {
+		const now = Date.now();
+		const recent = (this.#sent.get(sessionId) ?? []).filter((time) => time > now - MINUTE);
+		recent.push(now);
+		this.#sent.set(sessionId, recent);
+	}
+
+	/** The recipient's receive policy, and the hold for letters from sessions with fewer permissions. */
+	#policy(
+		sender: Sender,
+		to: Session,
+		repliedTo: Letter | null,
+		auto: boolean,
+	): { status: "queued" | "held" | "refused"; reason?: LetterReason } {
+		if (sender.kind === "person") return { status: "queued" };
+		const policy = to.options.receive ?? "accept";
+		if (policy === "refuse") return { status: "refused", reason: "refuse-policy" };
+		if (policy === "hold") return { status: "held", reason: "hold-policy" };
+		if (sender.kind !== "session") return { status: "queued" };
+		const from = sender.session;
+		const exempt =
+			from.id === this.mainSessionId() ||
+			from.parentId === to.id ||
+			to.parentId === from.id ||
+			auto ||
+			repliedTo?.fromSession === to.id;
+		if (!exempt && rank(from) < rank(to)) return { status: "held", reason: "lower-rank" };
+		return { status: "queued" };
+	}
+
+	// --- the approval center ---
+
+	/** Everything waiting for the person: approvals and questions, decision cards and held letters. */
+	center(): { approvals: Approval[]; cards: Card[]; held: Letter[] } {
+		return {
+			approvals: this.#store.allPendingApprovals(),
+			cards: this.mail.pendingCards(),
+			held: this.mail.heldLetters(),
+		};
+	}
+
+	postCard(session: Session, input: CardInput): Card {
+		this.#requireMaintainer(session);
+		const fields = this.#cardFields(input, null);
+		const requestedBy = input.requestedBy ? this.#sessionId(input.requestedBy) : session.id;
+		return this.#store.tx(() => {
+			const card = this.mail.addCard(session.id, requestedBy, fields);
+			for (const number of input.replaces ?? []) {
+				const old = this.#card(number);
+				if (old.status === "pending")
+					this.mail.withdrawCard(old.id, `Merged into #${card.number}.`);
+			}
+			return this.mail.getCard(card.id);
+		});
+	}
+
+	updateCard(session: Session, number: number, input: CardInput): Card {
+		this.#requireMaintainer(session);
+		const card = this.#pending(number);
+		return this.mail.updateCardFields(card.id, this.#cardFields(input, card));
+	}
+
+	withdrawCard(session: Session, number: number, reason: string): Card {
+		this.#requireMaintainer(session);
+		const card = this.#pending(number);
+		return this.mail.withdrawCard(card.id, limited(reason, "reason", 500, true));
+	}
+
+	/**
+	 * The person decides. The decision is recorded as theirs, goes to the session whose request it was and
+	 * to the session that put up the card, and is added to the decision log file if one is set.
+	 */
+	decide(cardId: string, choice: number | null, note: string | null): Card {
+		const card = this.mail.getCard(cardId);
+		if (card.status !== "pending") {
+			throw conflict("This card was already decided or withdrawn.", undefined, "already-answered");
+		}
+		if (
+			choice !== null &&
+			(!Number.isInteger(choice) || choice < 0 || choice >= card.options.length)
+		) {
+			throw invalid("Choose one of the card's options.", "choice");
+		}
+		const text = note?.trim() ? limited(note, "note", 4000, false) : null;
+		if (choice === null && !text) throw invalid("Choose an option or write a note.", "note");
+		const decided = this.mail.decideCard(card.id, choice, text);
+		const chosen = choice === null ? null : (card.options[choice]?.label ?? null);
+		const body = [
+			`The person decided #${card.number}: ${card.title}`,
+			chosen ? `Chosen: ${chosen}` : "No option chosen; see the note.",
+			text ? `Note: ${text}` : null,
+		]
+			.filter(Boolean)
+			.join("\n");
+		const recipients = [...new Set([card.requestedBy, card.createdBy])].filter(
+			(id): id is string => id !== null,
+		);
+		for (const id of recipients) {
+			try {
+				const session = this.#store.getSession(id);
+				if (session.archivedAt !== null) continue;
+				this.#store.resetLettersSent(id);
+				this.resetChain(id);
+				this.send(
+					{ kind: "person" },
+					{
+						to: id,
+						kind: "decision",
+						summary: `#${card.number} ${oneLine(card.title)}`.slice(0, SUMMARY_MAX),
+						body,
+						decision: card.number,
+					},
+				);
+			} catch (error) {
+				if (!(error instanceof JigError)) throw error;
+				this.#log(`decision #${card.number}: could not reach ${id}: ${error.message}`);
+			}
+		}
+		this.#appendLog(decided);
+		return decided;
+	}
+
+	#appendLog(card: Card): void {
+		const path = this.#store.getSetting<string | null>("decisionLog", null);
+		if (!path) return;
+		const english = this.#store.getSetting<string>("language", "system") === "en";
+		const requester = card.requestedBy ? this.#nameOf(card.requestedBy) : null;
+		const chosen = card.choice === null ? null : (card.options[card.choice]?.label ?? null);
+		const time = new Date(card.decidedAt ?? Date.now());
+		const pad = (n: number) => String(n).padStart(2, "0");
+		const stamp = `${time.getFullYear()}-${pad(time.getMonth() + 1)}-${pad(time.getDate())} ${pad(time.getHours())}:${pad(time.getMinutes())}`;
+		const parts = english
+			? [
+					stamp,
+					`#${card.number}`,
+					oneLine(card.title),
+					`Chosen: ${chosen ?? "(note only)"}`,
+					...(card.note ? [`Note: ${oneLine(card.note)}`] : []),
+					...(requester ? [`Requested by: ${requester}`] : []),
+					"Decided by the person in Jig",
+				]
+			: [
+					stamp,
+					`#${card.number}`,
+					oneLine(card.title),
+					`选择：${chosen ?? "（只写了备注）"}`,
+					...(card.note ? [`备注：${oneLine(card.note)}`] : []),
+					...(requester ? [`提出：${requester}`] : []),
+					"本人在 Jig 里决定",
+				];
+		try {
+			const header = existsSync(path) ? "" : english ? "# Decisions\n\n" : "# 决定记录\n\n";
+			appendFileSync(path, `${header}- ${parts.join(" · ")}\n`, { mode: 0o600 });
+		} catch (error) {
+			this.#log(`decision log ${path}: ${(error as Error).message}`);
+		}
+	}
+
+	#nameOf(sessionId: string): string | null {
+		try {
+			return this.#store.getSession(sessionId).name;
+		} catch {
+			return null;
+		}
+	}
+
+	#requireMaintainer(session: Session): void {
+		if (!this.canPostCards(session)) {
+			throw conflict(
+				"Only the main conversation, or a session the person allowed, can put cards in the approval center.",
+				undefined,
+				"not-allowed",
+			);
+		}
+	}
+
+	#card(number: number): Card {
+		try {
+			return this.mail.cardByNumber(number);
+		} catch {
+			throw invalid(`There is no card #${number}.`, "number");
+		}
+	}
+
+	#pending(number: number): Card {
+		const card = this.#card(number);
+		if (card.status !== "pending") {
+			throw conflict(`#${number} was already decided or withdrawn.`, undefined, "already-answered");
+		}
+		return card;
+	}
+
+	#sessionId(id: unknown): string {
+		if (typeof id !== "string") throw invalid("A session id must be text.", "sessions");
+		try {
+			return this.#store.getSession(id).id;
+		} catch {
+			throw invalid(`There is no session with the id ${id}.`, "sessions");
+		}
+	}
+
+	/** Checks a card's six points; on update, missing fields keep the card's current values. */
+	#cardFields(input: CardInput, current: Card | null): CardFields {
+		const options =
+			input.options === undefined
+				? (current?.options ?? [])
+				: (() => {
+						if (!Array.isArray(input.options) || input.options.length > OPTIONS_MAX) {
+							throw invalid(`Give at most ${OPTIONS_MAX} options.`, "options");
+						}
+						return input.options.map((option, index) => {
+							const label = limited(option?.label, `options[${index}].label`, 200, true);
+							const detail = limited(option?.detail, `options[${index}].detail`, 1000, false);
+							return detail ? { label, detail } : { label };
+						});
+					})();
+		const recommended =
+			input.recommended === undefined ? (current?.recommended ?? null) : input.recommended;
+		if (
+			recommended !== null &&
+			(!Number.isInteger(recommended) || recommended < 0 || recommended >= options.length)
+		) {
+			throw invalid("recommended must be the index of one of the options.", "recommended");
+		}
+		const sessions =
+			input.sessions === undefined
+				? (current?.sessions ?? [])
+				: [...new Set(input.sessions.map((id) => this.#sessionId(id)))];
+		const deadline =
+			input.deadline === undefined
+				? (current?.deadline ?? null)
+				: limited(input.deadline, "deadline", 100, false) || null;
+		return {
+			title:
+				input.title === undefined && current
+					? current.title
+					: limited(input.title, "title", 300, true),
+			context:
+				input.context === undefined
+					? (current?.context ?? "")
+					: limited(input.context, "context", 10_000, false),
+			options,
+			recommended,
+			deadline,
+			sessions,
+			reversible:
+				input.reversible === undefined && current
+					? current.reversible
+					: limited(input.reversible, "reversible", 500, true),
+			after:
+				input.after === undefined && current
+					? current.after
+					: limited(input.after, "after", 2000, true),
+		};
+	}
+}

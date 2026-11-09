@@ -119,9 +119,31 @@ export interface Notice {
 	timestamp: number;
 }
 
+/** A decision the person made in the approval center, as delivered to a session. */
+export interface DecisionRef {
+	number: number;
+	title: string;
+	/** The option the person chose; null when they answered with a note only. */
+	choice: string | null;
+	note: string | null;
+	decidedAt: number;
+}
+
+/** A letter delivered into a transcript. The interface shows it as a letter; the model reads `message`. */
+export interface LetterRef {
+	id: string;
+	kind: "notice" | "request" | "decision" | "report";
+	from: { kind: "session" | "person" | "cli" | "jig"; sessionId: string | null; name: string };
+	summary: string;
+	body: string;
+	/** Jig sent the session's final reply on its behalf. */
+	auto?: boolean;
+	decision?: DecisionRef;
+}
+
 export type EntryBody =
 	| { role: "system"; message: SystemMessage }
-	| { role: "user"; message: UserMessage }
+	| { role: "user"; message: UserMessage; letter?: LetterRef }
 	| { role: "assistant"; message: AssistantMessage }
 	| { role: "toolResult"; message: ToolResultMessage }
 	| { role: "compaction"; compaction: CompactionRecord }
