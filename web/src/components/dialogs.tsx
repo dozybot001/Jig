@@ -22,6 +22,8 @@ import {
 	ErrorBox,
 	Field,
 	Select,
+	SettingGroup,
+	SettingRow,
 	Switch,
 	Toggletip,
 	useAction,
@@ -76,14 +78,12 @@ export function AllowedList({
 	useLang();
 	const headingId = useId();
 	return (
-		<section className="rules" aria-labelledby={headingId}>
-			<div className="rules-head">
-				<span className="field-label">
-					<span id={headingId}>{t("allowedTitle")}</span>
-					<Toggletip label={t("allowedTitle")} text={t("allowedHelp")} />
-				</span>
-			</div>
-			<div className="rules-list">
+		<section className="setting-group" aria-labelledby={headingId}>
+			<h3 className="setting-group-title">
+				<span id={headingId}>{t("allowedTitle")}</span>
+				<Toggletip label={t("allowedTitle")} text={t("allowedHelp")} />
+			</h3>
+			<div className="setting-box">
 				{rules.length === 0 ? (
 					<p className="rules-empty">{t("noAllowed")}</p>
 				) : (
@@ -257,6 +257,8 @@ export function SessionSettingsDialog({
 	const compactErrorId = useId();
 	const quotaId = useId();
 	const receiveId = useId();
+	const postId = useId();
+	const organizeId = useId();
 	const save = useAction(async () => {
 		await updateSession(session.id, {
 			responsibility,
@@ -299,7 +301,10 @@ export function SessionSettingsDialog({
 				</>
 			}
 		>
-			<Field label={t("responsibility")} htmlFor={roleId}>
+			<section className="setting-group">
+				<h3 className="setting-group-title">
+					<label htmlFor={roleId}>{t("responsibility")}</label>
+				</h3>
 				<textarea
 					id={roleId}
 					className="textarea textarea-large"
@@ -307,68 +312,68 @@ export function SessionSettingsDialog({
 					value={responsibility}
 					onChange={(event) => setResponsibility(event.target.value)}
 				/>
-			</Field>
+			</section>
 			<AllowedList rules={rules} onChange={setRules} />
-			<h3 className="field-heading">{t("lettersSection")}</h3>
-			<Field label={t("receive")} labelId={receiveId}>
-				<Select
-					labelledBy={receiveId}
-					value={receive}
-					options={RECEIVE_POLICIES.map((policy) => ({
-						value: policy,
-						label: t(`receive_${policy}`),
-						hint: t(`receive_${policy}_hint`),
-					}))}
-					onChange={(value) => setReceive(value as ReceivePolicy)}
-				/>
-			</Field>
-			<Field label={t("letterQuota")} htmlFor={quotaId} info={t("letterQuotaHelp")}>
-				<input
-					id={quotaId}
-					className="input"
-					inputMode="numeric"
-					placeholder={String(letterQuotaOf({}, isMain))}
-					aria-describedby={`${quotaId}-left`}
-					value={quota}
-					onChange={(event) => setQuota(event.target.value.replace(/[^\d]/g, "").slice(0, 3))}
-				/>
-				<span id={`${quotaId}-left`} className="hint">
-					{t("lettersLeft", { n: left })}
-				</span>
-			</Field>
-			{!isMain && (
-				<>
-					<Switch
-						label={t("canPostCards")}
-						info={t("canPostCardsHint")}
-						checked={canPost}
-						onChange={setCanPost}
+			<SettingGroup title={t("lettersSection")}>
+				<SettingRow label={t("receive")} labelId={receiveId} hint={t(`receive_${receive}_hint`)}>
+					<Select
+						labelledBy={receiveId}
+						value={receive}
+						options={RECEIVE_POLICIES.map((policy) => ({
+							value: policy,
+							label: t(`receive_${policy}`),
+							hint: t(`receive_${policy}_hint`),
+						}))}
+						onChange={(value) => setReceive(value as ReceivePolicy)}
 					/>
-					<Switch
-						label={t("canOrganize")}
-						info={t("canOrganizeHint")}
-						checked={canOrganize}
-						onChange={setCanOrganize}
+				</SettingRow>
+				<SettingRow
+					label={t("letterQuota")}
+					htmlFor={quotaId}
+					info={t("letterQuotaHelp")}
+					hint={t("lettersLeft", { n: left })}
+				>
+					<input
+						id={quotaId}
+						className="input input-number"
+						inputMode="numeric"
+						placeholder={String(letterQuotaOf({}, isMain))}
+						value={quota}
+						onChange={(event) => setQuota(event.target.value.replace(/[^\d]/g, "").slice(0, 3))}
 					/>
-				</>
-			)}
-			<Field
-				label={t("compactAt")}
-				htmlFor={compactId}
-				info={t("compactAtHelp")}
-				error={fieldError(save.error, "options")}
-				errorId={compactErrorId}
-			>
-				<input
-					id={compactId}
-					className="input"
-					inputMode="numeric"
-					aria-invalid={fieldError(save.error, "options") ? "true" : undefined}
-					aria-describedby={fieldError(save.error, "options") ? compactErrorId : undefined}
-					value={compactAt}
-					onChange={(event) => setCompactAt(event.target.value.replace(/[^\d]/g, ""))}
-				/>
-			</Field>
+				</SettingRow>
+				{!isMain && (
+					<>
+						<SettingRow label={t("canPostCards")} labelId={postId} hint={t("canPostCardsHint")}>
+							<Switch labelledBy={postId} checked={canPost} onChange={setCanPost} />
+						</SettingRow>
+						<SettingRow label={t("canOrganize")} labelId={organizeId} hint={t("canOrganizeHint")}>
+							<Switch labelledBy={organizeId} checked={canOrganize} onChange={setCanOrganize} />
+						</SettingRow>
+					</>
+				)}
+			</SettingGroup>
+			<SettingGroup title={t("contextSection")}>
+				<SettingRow
+					label={t("compactAt")}
+					htmlFor={compactId}
+					info={t("compactAtHelp")}
+					hint={t("compactAtHint")}
+					error={fieldError(save.error, "options")}
+					errorId={compactErrorId}
+				>
+					<input
+						id={compactId}
+						className="input input-number"
+						inputMode="numeric"
+						placeholder={t("automatic")}
+						aria-invalid={fieldError(save.error, "options") ? "true" : undefined}
+						aria-describedby={fieldError(save.error, "options") ? compactErrorId : undefined}
+						value={compactAt}
+						onChange={(event) => setCompactAt(event.target.value.replace(/[^\d]/g, ""))}
+					/>
+				</SettingRow>
+			</SettingGroup>
 			<ErrorBox error={generalError(save.error, ["options"])} />
 		</Dialog>
 	);

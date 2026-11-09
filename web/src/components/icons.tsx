@@ -1,4 +1,5 @@
 import {
+	Archive,
 	ArrowUp,
 	Ban,
 	Check,
@@ -8,7 +9,9 @@ import {
 	CircleCheck,
 	CircleDot,
 	Code,
+	Copy,
 	Database,
+	Download,
 	FileText,
 	Folder,
 	FolderPlus,
@@ -25,6 +28,7 @@ import {
 	Minimize2,
 	PanelLeftClose,
 	PanelLeftOpen,
+	PencilLine,
 	Pin,
 	Play,
 	Plus,
@@ -91,6 +95,12 @@ export const ThemeIcon = () => <SunMoon {...props} />;
 export const LanguageIcon = () => <Languages {...props} />;
 /** Jig's data on this computer. */
 export const DataIcon = () => <Database {...props} />;
+/** The session menu: pin, rename, copy, export, archive. */
+export const MenuPinIcon = () => <Pin {...props} />;
+export const RenameIcon = () => <PencilLine {...props} />;
+export const CopyIcon = () => <Copy {...props} />;
+export const ExportIcon = () => <Download {...props} />;
+export const ArchiveIcon = () => <Archive {...props} />;
 /** A decision the person made. */
 export const DecisionIcon = () => <Stamp {...props} />;
 export const CollapseIcon = () => <PanelLeftClose {...props} />;

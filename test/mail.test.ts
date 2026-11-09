@@ -489,7 +489,7 @@ describe("decision cards", () => {
 		}
 		assert.equal(store.getSession(product.id).lettersSent, 0);
 		const text = readFileSync(log, "utf8");
-		assert.match(text, /^# 决定记录/);
+		assert.match(text, /^# 审批记录/);
 		assert.match(
 			text,
 			/#1 · Jig 的许可证用 MIT 还是 Apache-2\.0？ · 选择：MIT · 备注：先用 MIT · 提出：产品会话 · 本人在 Jig 里决定/,

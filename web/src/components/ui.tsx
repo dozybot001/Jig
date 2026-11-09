@@ -165,17 +165,38 @@ export function Switch({
 	checked,
 	onChange,
 	label,
+	labelledBy,
 	disabled,
 	busy,
 	info,
 }: {
 	checked: boolean;
 	onChange: (value: boolean) => void;
-	label: string;
+	/** Shown beside the switch; in a setting row the row's name labels it instead (`labelledBy`). */
+	label?: string;
+	labelledBy?: string;
 	disabled?: boolean;
 	busy?: boolean;
 	info?: string;
 }) {
+	if (labelledBy) {
+		return (
+			<button
+				type="button"
+				role="switch"
+				aria-checked={checked}
+				aria-labelledby={labelledBy}
+				className="switch"
+				disabled={disabled || busy}
+				aria-busy={busy ? "true" : undefined}
+				onClick={() => onChange(!checked)}
+			>
+				<span className="switch-track" aria-hidden="true">
+					<span className="switch-thumb" />
+				</span>
+			</button>
+		);
+	}
 	return (
 		<span className="field-label">
 			<button
@@ -192,7 +213,7 @@ export function Switch({
 				</span>
 				<span>{label}</span>
 			</button>
-			{info && <Toggletip label={label} text={info} />}
+			{info && label && <Toggletip label={label} text={info} />}
 		</span>
 	);
 }
@@ -812,6 +833,76 @@ export function Dialog({
 				<div className="dialog-footer">{footer}</div>
 			</div>
 		</dialog>
+	);
+}
+
+/** Settings that belong together, under a small title, in one rounded box of rows. */
+export function SettingGroup({
+	title,
+	info,
+	children,
+}: {
+	title: string;
+	info?: string;
+	children: ReactNode;
+}) {
+	const id = useId();
+	return (
+		<section className="setting-group" aria-labelledby={id}>
+			<h3 className="setting-group-title">
+				<span id={id}>{title}</span>
+				{info && <Toggletip label={title} text={info} />}
+			</h3>
+			<div className="setting-box">{children}</div>
+		</section>
+	);
+}
+
+/**
+ * One setting: its name and a short explanation on the left, the control on the right, sized to what
+ * it holds. Give `htmlFor` for an input, or `labelId` for a control labelled by the name.
+ */
+export function SettingRow({
+	label,
+	hint,
+	info,
+	htmlFor,
+	labelId,
+	error,
+	errorId,
+	children,
+}: {
+	label: string;
+	hint?: string;
+	info?: string;
+	htmlFor?: string;
+	labelId?: string;
+	error?: string | null;
+	errorId?: string;
+	children: ReactNode;
+}) {
+	return (
+		<div className="setting-row">
+			<div className="setting-text">
+				<span className="setting-label">
+					{htmlFor ? (
+						<label htmlFor={htmlFor} id={labelId}>
+							{label}
+						</label>
+					) : (
+						<span id={labelId}>{label}</span>
+					)}
+					{info && <Toggletip label={label} text={info} />}
+				</span>
+				{hint && <span className="hint">{hint}</span>}
+				{error && (
+					<span id={errorId} className="field-error">
+						{error}
+					</span>
+				)}
+			</div>
+			<div className="setting-control">{children}</div>
+		</div>
 	);
 }
 

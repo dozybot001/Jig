@@ -1754,21 +1754,75 @@ body.scroll-locked {
 	gap: 6px;
 	margin-top: 8px;
 }
-.rules {
+/*
+ * Settings dialogs: groups under a small title, each a rounded box of rows; a row has the name and a
+ * short explanation on the left and a control sized to its value on the right (as in Codex's settings).
+ */
+.setting-group {
 	display: grid;
 	gap: 8px;
 }
-.rules-head {
-	display: flex;
+.setting-group-title {
+	display: inline-flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
+	gap: 2px;
+	margin: 0;
+	font-size: var(--fs-s);
+	font-weight: 600;
+	color: var(--text-2);
 }
-.rules-list {
+.setting-box {
 	display: grid;
 	border: 1px solid var(--border);
 	border-radius: var(--radius-l);
 	overflow: hidden;
+}
+.setting-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	min-height: 56px;
+	padding: 10px 14px;
+}
+.setting-row + .setting-row {
+	border-top: 1px solid var(--border);
+}
+.setting-text {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+.setting-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	font-weight: 500;
+}
+.setting-control {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 8px;
+}
+.setting-control .select-trigger {
+	width: 9em;
+}
+.input-number {
+	width: 7em;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+@media (max-width: 480px) {
+	.setting-row:not(:has(.switch)) {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 8px;
+	}
+	.setting-control .select-trigger,
+	.input-number {
+		width: 100%;
+	}
 }
 .rules-empty {
 	margin: 0;

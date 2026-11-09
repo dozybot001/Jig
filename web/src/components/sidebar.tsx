@@ -24,21 +24,27 @@ import {
 import { Snippet } from "./content.tsx";
 import { ConfirmDialog, GroupDialog, NewSessionDialog, SessionSettingsDialog } from "./dialogs.tsx";
 import {
+	ArchiveIcon,
 	CenterIcon,
 	ChatIcon,
 	CloseIcon,
 	CodeIcon,
 	CollapseIcon,
 	ComposeIcon,
+	CopyIcon,
 	ExpandIcon,
+	ExportIcon,
 	FolderIcon,
 	JigMark,
 	MainIcon,
+	MenuPinIcon,
 	NewTeamIcon,
 	NewWorkspaceIcon,
 	PinIcon,
 	PlusIcon,
+	RenameIcon,
 	SearchIcon,
+	SlidersIcon,
 	TeamIcon,
 } from "./icons.tsx";
 import { SettingsMenu } from "./settings.tsx";
@@ -531,36 +537,45 @@ function SessionRow({
 							// The session itself.
 							{
 								label: session.pinned ? t("unpin") : t("pin"),
+								icon: <MenuPinIcon />,
 								onSelect: () => void updateSession(session.id, { pinned: !session.pinned }),
 							},
-							{ label: t("rename"), onSelect: () => setRenaming(true) },
-							{ label: t("duplicate"), onSelect: () => void copy.run() },
+							{ label: t("rename"), icon: <RenameIcon />, onSelect: () => setRenaming(true) },
+							{ label: t("duplicate"), icon: <CopyIcon />, onSelect: () => void copy.run() },
 							{ separator: true, id: "role" },
 							// Its place and its settings.
 							...(session.archivedAt === null
 								? [
 										{
 											label: isMain ? t("unsetMain") : t("setMain"),
+											icon: <MainIcon />,
 											onSelect: () => void setMainSession(isMain ? null : session.id),
 										},
 									]
 								: []),
-							{ label: t("sessionSettings"), onSelect: () => setSettingsOpen(true) },
+							{
+								label: t("sessionSettings"),
+								icon: <SlidersIcon />,
+								onSelect: () => setSettingsOpen(true),
+							},
 							{ separator: true, id: "move" },
 							// Where it goes.
-							{ label: t("moveToTeam"), items: teams },
+							{ label: t("moveToTeam"), icon: <TeamIcon />, items: teams },
 							{
 								label: t("exportAs"),
+								icon: <ExportIcon />,
 								items: [{ label: t("exportMarkdown"), onSelect: () => void download.run() }],
 							},
 							{ separator: true, id: "archive" },
 							session.archivedAt
 								? {
 										label: t("unarchive"),
+										icon: <ArchiveIcon />,
 										onSelect: () => void updateSession(session.id, { archived: false }),
 									}
 								: {
 										label: t("archive"),
+										icon: <ArchiveIcon />,
 										onSelect: () => void updateSession(session.id, { archived: true }),
 									},
 						]}

@@ -569,7 +569,7 @@ export class PostOffice {
 					"本人在 Jig 里决定",
 				];
 		try {
-			const header = existsSync(path) ? "" : english ? "# Decisions\n\n" : "# 决定记录\n\n";
+			const header = existsSync(path) ? "" : english ? "# Approval log\n\n" : "# 审批记录\n\n";
 			appendFileSync(path, `${header}- ${parts.join(" · ")}\n`, { mode: 0o600 });
 		} catch (error) {
 			this.#log(`decision log ${path}: ${(error as Error).message}`);
