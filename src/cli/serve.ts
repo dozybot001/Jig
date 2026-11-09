@@ -9,6 +9,8 @@ import type { Command } from "./run.ts";
 
 export const DEFAULT_PORT = 4777;
 const EVENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+/** How often the service looks for letters from `jig send`, which writes to the database directly. */
+const LETTER_SWEEP_MS = 2000;
 
 const SERVE_HELP = `Usage: jig serve [options]
 
@@ -136,6 +138,9 @@ export function serveCommand(): Command {
 				runtime.close();
 				return EXIT_ERROR;
 			}
+			// Letters that were waiting when Jig stopped, and letters from `jig send`, start their sessions.
+			agents.wakeQueued();
+			const sweep = setInterval(() => agents.wakeQueued(), LETTER_SWEEP_MS);
 			const info: ServeFile = { port, pid: process.pid, startedAt: Date.now() };
 			writeFileSync(serveFile(home), JSON.stringify(info), { mode: 0o600 });
 
@@ -148,6 +153,7 @@ export function serveCommand(): Command {
 			return await new Promise<number>((resolve) => {
 				const stop = () => {
 					io.stderr.write("Stopping Jig…\n");
+					clearInterval(sweep);
 					agents.shutdown();
 					server.close();
 					// Open event streams would keep the process alive; end them too.
@@ -161,6 +167,17 @@ export function serveCommand(): Command {
 			});
 		},
 	};
+}
+
+/** True when a Jig service is running for this data directory. */
+export function serviceRunning(home: string): boolean {
+	try {
+		const info = JSON.parse(readFileSync(serveFile(home), "utf8")) as ServeFile;
+		process.kill(info.pid, 0);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 export function openCommand(): Command {

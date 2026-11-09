@@ -304,3 +304,123 @@ describe("api: providers and keys", () => {
 		assert.equal(unknownModel.status, 400);
 	});
 });
+
+describe("api: approval center and letters", () => {
+	async function twoSessions(call: ReturnType<typeof setup>["call"]) {
+		const main = await (await call("POST", "/api/sessions", { name: "总办" })).json();
+		const product = await (await call("POST", "/api/sessions", { name: "Jig · 开发" })).json();
+		return { main, product };
+	}
+
+	test("the main conversation is a setting; an archived session cannot be it", async () => {
+		const { call } = setup();
+		const { main, product } = await twoSessions(call);
+		const settings = await (
+			await call("PATCH", "/api/settings", { mainSessionId: main.id })
+		).json();
+		assert.equal(settings.mainSessionId, main.id);
+		await call("PATCH", `/api/sessions/${product.id}`, { archived: true });
+		const refused = await call("PATCH", "/api/settings", { mainSessionId: product.id });
+		assert.equal(refused.status, 400);
+		const cleared = await (await call("PATCH", "/api/settings", { mainSessionId: null })).json();
+		assert.equal(cleared.mainSessionId, null);
+	});
+
+	test("the decision log must be a Markdown file in an existing folder", async () => {
+		const { call } = setup();
+		const folder = realpathSync(tempDir());
+		assert.equal((await call("PATCH", "/api/settings", { decisionLog: "notes.md" })).status, 400);
+		assert.equal(
+			(await call("PATCH", "/api/settings", { decisionLog: `${folder}/notes.txt` })).status,
+			400,
+		);
+		assert.equal(
+			(await call("PATCH", "/api/settings", { decisionLog: `${folder}/missing/notes.md` })).status,
+			400,
+		);
+		const ok = await (
+			await call("PATCH", "/api/settings", { decisionLog: `${folder}/decisions.md` })
+		).json();
+		assert.equal(ok.decisionLog, `${folder}/decisions.md`);
+	});
+
+	test("letter options on a session are checked", async () => {
+		const { call } = setup();
+		const { product } = await twoSessions(call);
+		const updated = await (
+			await call("PATCH", `/api/sessions/${product.id}`, {
+				options: { receive: "hold", letterQuota: 5, canPostCards: true },
+			})
+		).json();
+		assert.deepEqual(
+			[updated.options.receive, updated.options.letterQuota, updated.options.canPostCards],
+			["hold", 5, true],
+		);
+		for (const options of [{ receive: "maybe" }, { letterQuota: 0 }, { canPostCards: "yes" }]) {
+			assert.equal((await call("PATCH", `/api/sessions/${product.id}`, { options })).status, 400);
+		}
+	});
+
+	test("the person decides a card; held letters are released or refused", async () => {
+		const { store, call } = setup();
+		const { main, product } = await twoSessions(call);
+		await call("PATCH", "/api/settings", { mainSessionId: main.id });
+		await call("PATCH", `/api/sessions/${product.id}`, { options: { receive: "hold" } });
+		const { PostOffice } = await import("../src/server/mail/post.ts");
+		const post = new PostOffice(store);
+		const card = post.postCard(store.getSession(main.id), {
+			title: "要不要发布 0.2.0？",
+			options: [{ label: "发布" }, { label: "再等等" }],
+			recommended: 0,
+			reversible: "标签推送后不改写",
+			after: "Jig · 开发打标签并推送",
+			requestedBy: product.id,
+		});
+		const first = post.send(
+			{ kind: "session", session: store.getSession(main.id) },
+			{ to: product.id, kind: "notice", summary: "第一封" },
+		);
+		const second = post.send(
+			{ kind: "session", session: store.getSession(main.id) },
+			{ to: product.id, kind: "notice", summary: "第二封" },
+		);
+
+		const center = await (await call("GET", "/api/center")).json();
+		assert.equal(center.cards.length, 1);
+		assert.equal(center.held.length, 2);
+
+		const empty = await call("POST", `/api/cards/${card.id}/decide`, {});
+		assert.equal(empty.status, 400);
+		const decided = await (
+			await call("POST", `/api/cards/${card.id}/decide`, { choice: 0, note: "今天发" })
+		).json();
+		assert.equal(decided.status, "decided");
+		const again = await call("POST", `/api/cards/${card.id}/decide`, { choice: 1 });
+		assert.equal(again.status, 409);
+		assert.equal((await again.json()).type, problemType("already-answered"));
+
+		assert.equal(
+			(await (await call("POST", `/api/letters/${first.id}/release`)).json()).status,
+			"queued",
+		);
+		assert.equal(
+			(await (await call("POST", `/api/letters/${second.id}/refuse`)).json()).status,
+			"refused",
+		);
+		assert.equal((await call("POST", `/api/letters/${second.id}/release`)).status, 409);
+
+		const letters = await (await call("GET", `/api/letters?session=${product.id}&limit=2`)).json();
+		assert.equal(letters.items.length, 2);
+		assert.notEqual(letters.nextCursor, null);
+		const rest = await (
+			await call("GET", `/api/letters?session=${product.id}&limit=2&cursor=${letters.nextCursor}`)
+		).json();
+		// Three letters involve the product session: the decision, the released and the refused one.
+		assert.equal(rest.items.length, 1);
+		const decisions = await (await call("GET", "/api/cards?status=decided")).json();
+		assert.deepEqual(
+			decisions.items.map((c: { number: number }) => c.number),
+			[1],
+		);
+	});
+});

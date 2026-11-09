@@ -37,8 +37,8 @@ export interface SessionOptions {
 	permissionMode?: PermissionMode;
 	/** What happens to letters from other sessions: delivered, held for the person, or refused (blueprint 7.1). */
 	receive?: ReceivePolicy;
-	/** Letters the session may send per message or decision from the person; see letterQuotaOf. */
-	letterQuota?: number;
+	/** Letters the session may send per message or decision from the person; null or absent: the default. */
+	letterQuota?: number | null;
 	/** May put decision cards in the approval center directly, as the main conversation can. */
 	canPostCards?: boolean;
 }

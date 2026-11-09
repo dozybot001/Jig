@@ -5,11 +5,13 @@ import { Hono } from "hono";
 import { VERSION } from "../../shared/version.ts";
 import type { Agents } from "../agent/runner.ts";
 import type { EventBus } from "../events.ts";
+import { PostOffice } from "../mail/post.ts";
 import type { ModelGateway } from "../model/gateway.ts";
 import type { Store } from "../store.ts";
 import { agentRoutes } from "./agents.ts";
 import { api } from "./api.ts";
 import { DraftCache, eventRoutes } from "./events.ts";
+import { mailRoutes } from "./mail.ts";
 import { type AppEnv, errorHandler, problemResponse, requestId, titleFor } from "./problem.ts";
 import { providerRoutes } from "./providers.ts";
 import { authRoutes, localOnly, requireBrowser, securityHeaders } from "./security.ts";
@@ -63,6 +65,8 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 	);
 	if (gateway) app.route("/api", providerRoutes(store, gateway));
 	if (agents) app.route("/api", agentRoutes(store, agents, log));
+	// The runner's post office, so a released letter or a decision wakes its recipient.
+	app.route("/api", mailRoutes(agents?.post ?? new PostOffice(store, log)));
 	if (bus) app.route("/api", eventRoutes(store, bus, new DraftCache(bus)));
 
 	const root = options.webRoot;

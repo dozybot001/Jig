@@ -146,6 +146,10 @@ export class MailStore {
 		this.#store = store;
 	}
 
+	get db() {
+		return this.#store.db;
+	}
+
 	#q(sql: string): StatementSync {
 		let statement = this.#statements.get(sql);
 		if (!statement) {

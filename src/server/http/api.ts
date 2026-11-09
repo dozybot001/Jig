@@ -1,6 +1,20 @@
+import { existsSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { Hono } from "hono";
-import type { PermissionRule, Session, ThinkingLevel, Transcript } from "../../shared/types.ts";
-import { PERMISSION_MODES, SESSION_KINDS, THINKING_LEVELS } from "../../shared/types.ts";
+import type {
+	PermissionRule,
+	Session,
+	SessionOptions,
+	ThinkingLevel,
+	Transcript,
+} from "../../shared/types.ts";
+import {
+	PERMISSION_MODES,
+	RECEIVE_POLICIES,
+	SESSION_KINDS,
+	THINKING_LEVELS,
+} from "../../shared/types.ts";
 import { invalid } from "../errors.ts";
 import { type ExportLanguage, exportFileName, sessionMarkdown } from "../export.ts";
 import { pickFolder } from "../folder-picker.ts";
@@ -46,6 +60,10 @@ export const SETTING_DEFAULTS = {
 	theme: "system" as "system" | "light" | "dark",
 	language: "system" as "system" | "zh" | "en",
 	workspaces: [] as Workspace[],
+	/** The main conversation (blueprint section 5). */
+	mainSessionId: null as string | null,
+	/** A Markdown file each decision is added to (blueprint 6.4, item 14). */
+	decisionLog: null as string | null,
 };
 
 export type Settings = typeof SETTING_DEFAULTS;
@@ -57,7 +75,30 @@ export function readSettings(store: Store): Settings {
 		theme: store.getSetting("theme", SETTING_DEFAULTS.theme),
 		language: store.getSetting("language", SETTING_DEFAULTS.language),
 		workspaces: store.getSetting("workspaces", SETTING_DEFAULTS.workspaces),
+		mainSessionId: store.getSetting("mainSessionId", SETTING_DEFAULTS.mainSessionId),
+		decisionLog: store.getSetting("decisionLog", SETTING_DEFAULTS.decisionLog),
 	};
+}
+
+/** The decision log must be a Markdown file in an existing folder; `~` is expanded. */
+export function resolveLogFile(path: string): string {
+	const expanded = path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(2)) : path;
+	if (!isAbsolute(expanded))
+		throw invalid("The decision log must be an absolute path.", "decisionLog");
+	if (!/\.(md|markdown)$/i.test(expanded)) {
+		throw invalid("The decision log must be a Markdown file (.md).", "decisionLog");
+	}
+	let folder: string;
+	try {
+		folder = realpathSync(dirname(expanded));
+	} catch {
+		throw invalid(`The folder ${dirname(path)} does not exist.`, "decisionLog");
+	}
+	const file = join(folder, basename(expanded));
+	if (existsSync(file) && !statSync(file).isFile()) {
+		throw invalid(`${path} is not a file.`, "decisionLog");
+	}
+	return file;
 }
 
 /** Checks that a provider and model exist; supplied by the model layer. */
@@ -250,10 +291,26 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 				throw invalid("compactAt must be a whole number of at least 10000, or null.", "options");
 			}
 			const permissionMode = optEnum(options, "permissionMode", PERMISSION_MODES);
-			patch.options = {
-				...(compactAt !== undefined ? { compactAt: compactAt as number | null } : {}),
-				...(permissionMode !== undefined ? { permissionMode } : {}),
-			};
+			const receive = optEnum(options, "receive", RECEIVE_POLICIES);
+			const letterQuota = options.letterQuota;
+			if (
+				letterQuota !== undefined &&
+				letterQuota !== null &&
+				(typeof letterQuota !== "number" ||
+					!Number.isInteger(letterQuota) ||
+					letterQuota < 1 ||
+					letterQuota > 100)
+			) {
+				throw invalid("letterQuota must be a whole number from 1 to 100, or null.", "options");
+			}
+			const canPostCards = optBoolean(options, "canPostCards");
+			const next: SessionOptions = {};
+			if (compactAt !== undefined) next.compactAt = compactAt as number | null;
+			if (permissionMode !== undefined) next.permissionMode = permissionMode;
+			if (receive !== undefined) next.receive = receive;
+			if (letterQuota !== undefined) next.letterQuota = letterQuota as number | null;
+			if (canPostCards !== undefined) next.canPostCards = canPostCards;
+			patch.options = next;
 		}
 		const pinned = optBoolean(fields, "pinned");
 		if (pinned !== undefined) patch.pinned = pinned;
@@ -376,6 +433,15 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		if (workspaces) {
 			store.setSetting("workspaces", parseWorkspaces(workspaces, readSettings(store).workspaces));
 		}
+		const main = optNullableString(fields, "mainSessionId", 100);
+		if (main !== undefined) {
+			if (main !== null && store.getSession(main).archivedAt !== null) {
+				throw invalid("An archived session cannot be the main conversation.", "mainSessionId");
+			}
+			store.setSetting("mainSessionId", main);
+		}
+		const log = optNullableString(fields, "decisionLog", 4096);
+		if (log !== undefined) store.setSetting("decisionLog", log ? resolveLogFile(log) : null);
 		return c.json(readSettings(store));
 	});
 
