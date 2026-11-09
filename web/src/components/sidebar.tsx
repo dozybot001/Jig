@@ -41,7 +41,6 @@ import {
 	NewTeamIcon,
 	NewWorkspaceIcon,
 	PinIcon,
-	PlusIcon,
 	RenameIcon,
 	SearchIcon,
 	SlidersIcon,
@@ -347,7 +346,7 @@ function Teams() {
 					title={t("newGroup")}
 					onClick={() => setDialog({ kind: "create" })}
 				>
-					<PlusIcon />
+					<NewTeamIcon />
 				</Button>
 			</div>
 			{groups.length === 0 ? (
@@ -400,7 +399,7 @@ function Workspaces() {
 					title={t("newWorkspace")}
 					onClick={() => setCreating(true)}
 				>
-					<PlusIcon />
+					<NewWorkspaceIcon />
 				</Button>
 			</div>
 			{workspaces.length === 0 ? (
@@ -1042,7 +1041,7 @@ export function Sidebar() {
 								void selectSession(null);
 							}}
 						>
-							<PlusIcon />
+							<ComposeIcon />
 						</Button>
 					</div>
 					{listed.length === 0 ? (
