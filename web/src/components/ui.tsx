@@ -316,8 +316,13 @@ export function Select({
 		return () => document.removeEventListener("mousedown", onDown);
 	}, [open]);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: keeps the active option visible when it changes
+	// Keys move the active option and the list scrolls to keep it in view. The pointer only marks the
+	// option under it: scrolling then would move the list under the pointer (founder, 2026-11-09).
+	const byKey = useRef(false);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: runs when the active option changes
 	useEffect(() => {
+		if (!byKey.current) return;
+		byKey.current = false;
 		list.current?.querySelector(".active")?.scrollIntoView({ block: "nearest" });
 	}, [active]);
 
@@ -349,6 +354,7 @@ export function Select({
 			return;
 		}
 		event.preventDefault();
+		byKey.current = true;
 		if (event.key === "ArrowDown") setActive((i) => Math.min(options.length - 1, i + 1));
 		else if (event.key === "ArrowUp") setActive((i) => Math.max(0, i - 1));
 		else if (event.key === "Home") setActive(0);

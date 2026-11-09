@@ -139,12 +139,51 @@ function InlineRename({
 	);
 }
 
+/** What a dragged session row carries: the session's id. */
+const SESSION_DRAG = "application/x-jig-session";
+
+/**
+ * Lets a row take a session dragged from the sessions list: dropped on a team it joins the team, on a
+ * workspace it works in that folder. The session menu and the composer do the same without dragging
+ * (WCAG 2.5.7).
+ */
+function useSessionDrop(apply: (sessionId: string) => Promise<unknown>) {
+	const [over, setOver] = useState(false);
+	const drop = useAction(apply);
+	const carries = (event: React.DragEvent) => event.dataTransfer.types.includes(SESSION_DRAG);
+	return {
+		error: drop.error,
+		props: {
+			"data-drop": over ? "true" : undefined,
+			onDragOver: (event: React.DragEvent) => {
+				if (!carries(event)) return;
+				event.preventDefault();
+				event.dataTransfer.dropEffect = "move";
+				if (!over) setOver(true);
+			},
+			onDragLeave: (event: React.DragEvent) => {
+				// Moving onto a part of the row is not leaving it.
+				const next = event.relatedTarget as Node | null;
+				if (!next || !event.currentTarget.contains(next)) setOver(false);
+			},
+			onDrop: (event: React.DragEvent) => {
+				if (!carries(event)) return;
+				event.preventDefault();
+				setOver(false);
+				const id = event.dataTransfer.getData(SESSION_DRAG);
+				if (id) void drop.run(id);
+			},
+		},
+	};
+}
+
 /** A saved workspace: click to start a session there, double-click or the menu to rename. */
 function WorkspaceRow({ workspace, all }: { workspace: Workspace; all: Workspace[] }) {
 	useLang();
 	const [renaming, setRenaming] = useState(false);
+	const drop = useSessionDrop((id) => updateSession(id, { cwd: workspace.path }));
 	return (
-		<div className="session-item">
+		<div className="session-item" {...drop.props}>
 			{renaming ? (
 				<InlineRename
 					icon={<FolderIcon />}
@@ -192,6 +231,11 @@ function WorkspaceRow({ workspace, all }: { workspace: Workspace; all: Workspace
 					/>
 				</span>
 			)}
+			{drop.error !== null && drop.error !== undefined && (
+				<div className="row-error">
+					<ErrorBox error={drop.error} />
+				</div>
+			)}
 		</div>
 	);
 }
@@ -215,8 +259,9 @@ function TeamRow({
 }) {
 	useLang();
 	const [renaming, setRenaming] = useState(false);
+	const drop = useSessionDrop((id) => updateSession(id, { groupId: group.id }));
 	return (
-		<div className="session-item">
+		<div className="session-item" {...drop.props}>
 			{renaming ? (
 				<InlineRename
 					icon={<TeamIcon />}
@@ -255,6 +300,11 @@ function TeamRow({
 						]}
 					/>
 				</span>
+			)}
+			{drop.error !== null && drop.error !== undefined && (
+				<div className="row-error">
+					<ErrorBox error={drop.error} />
+				</div>
 			)}
 		</div>
 	);
@@ -419,6 +469,11 @@ function SessionRow({
 					type="button"
 					className="session-row"
 					aria-current={selected ? "true" : undefined}
+					draggable
+					onDragStart={(event) => {
+						event.dataTransfer.setData(SESSION_DRAG, session.id);
+						event.dataTransfer.effectAllowed = "move";
+					}}
 					onClick={() => {
 						closeDrawer();
 						void selectSession(session.id);

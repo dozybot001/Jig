@@ -755,6 +755,8 @@ body.scroll-locked {
 
 .sidebar {
 	display: grid;
+	/* One column that never grows with its content: a long name is cut, it never widens the sidebar. */
+	grid-template-columns: minmax(0, 1fr);
 	grid-template-rows: auto auto minmax(0, 1fr) auto;
 	min-height: 0;
 	background: var(--bg-side);
@@ -770,6 +772,7 @@ body.scroll-locked {
 }
 .sidebar-nav {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 6px;
 	padding: 4px 10px 16px;
 }
@@ -1991,6 +1994,7 @@ button.about-row {
 	flex: none;
 }
 .nav-detail {
+	flex: 0 1 auto;
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -2345,4 +2349,10 @@ button.about-row {
 }
 [data-more="true"] {
 	mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
+}
+
+/* A team or workspace row that a dragged session would land on. */
+.session-item[data-drop="true"] > .session-row {
+	background: var(--selected);
+	box-shadow: inset 0 0 0 1px var(--control-strong);
 }
