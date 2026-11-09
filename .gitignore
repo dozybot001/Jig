@@ -7,3 +7,8 @@ coverage/
 !.env.example
 .DS_Store
 web/dist/
+
+# iOS
+ios/**/xcuserdata/
+*.xcuserstate
+ios/build/
