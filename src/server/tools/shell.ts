@@ -22,6 +22,11 @@ export const shellTool: ToolDefinition = {
 		type: "object",
 		properties: {
 			command: { type: "string", description: "The command line to run." },
+			description: {
+				type: "string",
+				description:
+					"What the command is for, in a few words in the language the person writes in. Jig shows it to the person when it asks for their permission.",
+			},
 			timeout_seconds: { type: "integer", minimum: 1, maximum: MAX_TIMEOUT },
 			background: { type: "boolean", description: "Start the command and return at once." },
 			confirm: CONFIRM_ARGUMENT,
@@ -33,6 +38,10 @@ export const shellTool: ToolDefinition = {
 	needsFolder: true,
 	subject(args) {
 		return { kind: "command", tool: "shell", command: str(args, "command", true) };
+	},
+	preview(args) {
+		const description = typeof args.description === "string" ? args.description.trim() : "";
+		return description ? { description: description.slice(0, 300) } : {};
 	},
 	async run(args, ctx): Promise<ToolResult> {
 		const command = str(args, "command", true);

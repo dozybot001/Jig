@@ -19,6 +19,7 @@ import {
 	Button,
 	Dialog,
 	describeError,
+	describeRule,
 	ErrorBox,
 	Field,
 	Select,
@@ -38,28 +39,6 @@ function fieldError(error: unknown, field: string): string | null {
 function generalError(error: unknown, fields: string[]): unknown {
 	if (error instanceof ApiError && error.field && fields.includes(error.field)) return null;
 	return error;
-}
-
-/** One remembered approval in plain words: "运行 npm install", "访问 github.com"… */
-function describeRule(rule: PermissionRule): string {
-	const pattern = rule.pattern ?? "";
-	const what =
-		rule.pattern === "**" && rule.tool === "write"
-			? t("ruleWriteAll")
-			: rule.pattern === "**" && rule.tool === "edit"
-				? t("ruleEditAll")
-				: rule.pattern === "**"
-					? t("allFilesInFolder", { tool: rule.tool })
-					: rule.tool === "shell" && pattern
-						? t("ruleRun", { p: pattern })
-						: rule.tool === "web_fetch" && pattern
-							? t("ruleFetch", { p: pattern })
-							: rule.tool === "read" && pattern
-								? t("ruleRead", { p: pattern })
-								: `${rule.tool}${pattern ? ` ${pattern}` : ""}`;
-	if (rule.effect === "deny") return t("ruleDeny", { rule: what });
-	if (rule.effect === "ask") return t("ruleAsk", { rule: what });
-	return what;
 }
 
 /**

@@ -22,6 +22,7 @@ const MAX_LINE_CHARS = 2000;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_DIFF_CHARS = 200_000;
+const MAX_PREVIEW_CHARS = 40_000;
 const IMAGE_TYPES: Record<string, string> = {
 	".png": "image/png",
 	".jpg": "image/jpeg",
@@ -64,6 +65,62 @@ function diffDetail(path: string, before: string, after: string, created: boolea
 		else if (line.startsWith("-") && !line.startsWith("---")) removed++;
 	}
 	return { path, diff: patch, added, removed, created, truncated };
+}
+
+/** A preview patch for a permission card: the change without its file header, capped. */
+function previewPatch(before: string, after: string): string {
+	const patch = createTwoFilesPatch("", "", before, after, "", "", { context: 3 });
+	const hunks = patch.slice(Math.max(0, patch.indexOf("\n@@") + 1));
+	return hunks.length > MAX_PREVIEW_CHARS ? `${hunks.slice(0, MAX_PREVIEW_CHARS)}\n…` : hunks;
+}
+
+type Replacement =
+	| { ok: true; updated: string; count: number; start: number }
+	| { ok: false; error: string };
+
+/**
+ * Replaces old_text in a file's text the way edit does: once, where it matches exactly one place, or
+ * everywhere with replace_all. Models write \n; a file's \r\n line endings are kept.
+ */
+function replaceText(
+	body: string,
+	oldText: string,
+	newText: string,
+	replaceAll: boolean,
+	shown: string,
+): Replacement {
+	let from = oldText;
+	let to = newText;
+	if (body.includes("\r\n")) {
+		if (!from.includes("\r\n")) from = from.replace(/\n/g, "\r\n");
+		if (!to.includes("\r\n")) to = to.replace(/\n/g, "\r\n");
+	}
+	if (replaceAll) {
+		const count = countOccurrences(body, from);
+		if (count === 0) {
+			return {
+				ok: false,
+				error: `old_text was not found in ${shown}. Read the file again and copy the text exactly.`,
+			};
+		}
+		return { ok: true, updated: body.split(from).join(to), count, start: body.indexOf(from) };
+	}
+	const match = findUnique(body, from);
+	if (!match.ok) {
+		return {
+			ok: false,
+			error:
+				match.reason === "ambiguous"
+					? `old_text appears ${match.count} times in ${shown}. Include more surrounding lines so it matches once, or set replace_all.`
+					: `old_text was not found in ${shown}. Read the file again and copy the text exactly, including indentation.`,
+		};
+	}
+	return {
+		ok: true,
+		updated: body.slice(0, match.start) + to + body.slice(match.end),
+		count: 1,
+		start: match.start,
+	};
 }
 
 function splitLines(content: string): string[] {
@@ -176,6 +233,16 @@ export const writeTool: ToolDefinition = {
 		const path = pathArg(args, session);
 		return { kind: "write", tool: "write", paths: [path], summary: display(path, session) };
 	},
+	preview(args, session) {
+		try {
+			const path = pathArg(args, session);
+			const content = str(args, "content", true);
+			const before = existsSync(path) && statSync(path).isFile() ? readFileSync(path, "utf8") : "";
+			return { diff: previewPatch(before, content) };
+		} catch {
+			return {};
+		}
+	},
 	async run(args, ctx): Promise<ToolResult> {
 		const path = pathArg(args, ctx.session);
 		const shown = display(path, ctx.session);
@@ -221,11 +288,25 @@ export const editTool: ToolDefinition = {
 		const path = pathArg(args, session);
 		return { kind: "write", tool: "edit", paths: [path], summary: display(path, session) };
 	},
+	preview(args, session) {
+		try {
+			const path = pathArg(args, session);
+			const oldText = str(args, "old_text", true);
+			const newText = str(args, "new_text", true);
+			if (!oldText || oldText === newText) return {};
+			const body = readFileSync(path, "utf8").replace(/^\uFEFF/, "");
+			const replaceAll = bool(args, "replace_all") ?? false;
+			const result = replaceText(body, oldText, newText, replaceAll, display(path, session));
+			return result.ok ? { diff: previewPatch(body, result.updated) } : {};
+		} catch {
+			return {};
+		}
+	},
 	async run(args, ctx): Promise<ToolResult> {
 		const path = pathArg(args, ctx.session);
 		const shown = display(path, ctx.session);
-		let oldText = str(args, "old_text", true);
-		let newText = str(args, "new_text", true);
+		const oldText = str(args, "old_text", true);
+		const newText = str(args, "new_text", true);
 		const replaceAll = bool(args, "replace_all") ?? false;
 		if (oldText.length === 0) return errorResult("old_text is empty. Use write to create a file.");
 		if (oldText === newText) return errorResult("old_text and new_text are the same.");
@@ -234,38 +315,11 @@ export const editTool: ToolDefinition = {
 		if (problem) return errorResult(problem);
 
 		const raw = readFileSync(path, "utf8");
-		const bom = raw.startsWith("﻿") ? "﻿" : "";
+		const bom = raw.startsWith("\uFEFF") ? "\uFEFF" : "";
 		const body = raw.slice(bom.length);
-		// Models write \n; keep a file's \r\n line endings intact.
-		if (body.includes("\r\n")) {
-			if (!oldText.includes("\r\n")) oldText = oldText.replace(/\n/g, "\r\n");
-			if (!newText.includes("\r\n")) newText = newText.replace(/\n/g, "\r\n");
-		}
-
-		let updated: string;
-		let count = 1;
-		let start: number;
-		if (replaceAll) {
-			count = countOccurrences(body, oldText);
-			if (count === 0) {
-				return errorResult(
-					`old_text was not found in ${shown}. Read the file again and copy the text exactly.`,
-				);
-			}
-			start = body.indexOf(oldText);
-			updated = body.split(oldText).join(newText);
-		} else {
-			const match = findUnique(body, oldText);
-			if (!match.ok) {
-				return errorResult(
-					match.reason === "ambiguous"
-						? `old_text appears ${match.count} times in ${shown}. Include more surrounding lines so it matches once, or set replace_all.`
-						: `old_text was not found in ${shown}. Read the file again and copy the text exactly, including indentation.`,
-				);
-			}
-			start = match.start;
-			updated = body.slice(0, match.start) + newText + body.slice(match.end);
-		}
+		const replaced = replaceText(body, oldText, newText, replaceAll, shown);
+		if (!replaced.ok) return errorResult(replaced.error);
+		const { updated, count, start } = replaced;
 		writeFileSync(path, bom + updated);
 		ctx.readState.record(path, bom + updated);
 

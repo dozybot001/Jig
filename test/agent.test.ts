@@ -10,7 +10,7 @@ import { MemoryKeyStore } from "../src/server/keys.ts";
 import { ModelGateway } from "../src/server/model/gateway.ts";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "../src/server/model/testing.ts";
 import { PermissionEngine } from "../src/server/permissions/engine.ts";
-import type { Entry, Session } from "../src/shared/types.ts";
+import type { Entry, PermissionRequest, Session } from "../src/shared/types.ts";
 import { newStore, tempDir } from "./helpers/store.ts";
 
 type Context = { messages: { role: string; content: unknown; toolsAdded?: { name: string }[] }[] };
@@ -192,6 +192,44 @@ describe("agent loop", () => {
 		}).trim();
 		assert.equal(pushed, head);
 		assert.equal(store.getSession(session.id).status, "idle");
+	});
+
+	test("a permission request shows what the call is for and the change it would make", async () => {
+		const { faux, store, agents, session, cwd } = setup();
+		store.updateSession(session.id, { options: { permissionMode: "manual" } });
+		writeFileSync(join(cwd, "a.txt"), "one\ntwo\n");
+		faux.setResponses([
+			toolUse(fauxToolCall("read", { path: "a.txt" }, { id: "r1" })),
+			toolUse(
+				fauxToolCall("edit", { path: "a.txt", old_text: "two", new_text: "deux" }, { id: "e1" }),
+			),
+			toolUse(
+				fauxToolCall(
+					"shell",
+					{ command: "touch b.txt", description: "建一个空文件" },
+					{ id: "s1" },
+				),
+			),
+			fauxAssistantMessage("好了"),
+		]);
+		agents.send(session.id, "改一下");
+		await until(() => store.pendingApprovals(session.id).length === 1);
+		const [edit] = store.pendingApprovals(session.id);
+		assert.ok(edit);
+		const request = edit.request as PermissionRequest;
+		assert.equal(request.summary, "a.txt");
+		// The change itself, without a file header: the card names the file above it.
+		assert.match(request.diff ?? "", /^@@ -1,2 \+1,2 @@\n one\n-two\n\+deux/);
+		assert.equal(readFileSync(join(cwd, "a.txt"), "utf8"), "one\ntwo\n");
+		agents.answer(edit.id, { decision: "allow_once" });
+		await until(() => store.pendingApprovals(session.id).some((a) => a.id !== edit.id));
+		const [shell] = store.pendingApprovals(session.id);
+		assert.ok(shell);
+		assert.equal((shell.request as PermissionRequest).description, "建一个空文件");
+		agents.answer(shell.id, { decision: "allow_once" });
+		await agents.whenIdle(session.id);
+		assert.equal(readFileSync(join(cwd, "a.txt"), "utf8"), "one\ndeux\n");
+		assert.ok(existsSync(join(cwd, "b.txt")));
 	});
 
 	test("stopping while waiting cancels the approval and leaves a valid transcript", async () => {

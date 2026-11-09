@@ -1575,6 +1575,25 @@ body.scroll-locked {
 .request-question {
 	white-space: pre-wrap;
 }
+/* What the call is for, under the headline; a task's brief can be long and scrolls inside. */
+.request-description {
+	max-height: 7.5em;
+	margin-top: -6px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	color: var(--text-2);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+.request-list {
+	display: grid;
+	gap: 4px;
+	margin: 0;
+	padding-left: 18px;
+}
+.request-card .diff {
+	max-height: 260px;
+}
 .request-code {
 	max-height: 180px;
 	overflow: auto;

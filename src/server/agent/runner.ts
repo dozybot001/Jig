@@ -199,6 +199,16 @@ export class Agents {
 	readonly #turns = new Map<string, { sent: Letter[]; read: Map<string, number> }>();
 	/** Sessions the person stopped: letters wait until the person writes to them or continues them. */
 	readonly #paused = new Set<string>();
+	/** A session's or team's name by id, for what the person reads on permission cards. */
+	readonly #names = (id: string): string | null => {
+		const session = this.post.sessionName(id);
+		if (session) return session;
+		try {
+			return this.#store.getGroup(id).name;
+		} catch {
+			return null;
+		}
+	};
 	/** Letters handed to a waiting tool call, by the call's id, until the call's result is stored. */
 	readonly #handed = new Map<string, string>();
 
@@ -648,7 +658,7 @@ export class Agents {
 			try {
 				// In the automatic mode the model asks for a person's approval itself, with `confirm`.
 				const flagged = (row.args as { confirm?: unknown }).confirm === true;
-				const subject = tool.subject(row.args, session, (id) => this.post.sessionName(id));
+				const subject = tool.subject(row.args, session, this.#names);
 				decision = this.#permissions.decide(subject, session, flagged);
 			} catch (error) {
 				const message =
@@ -672,7 +682,8 @@ export class Agents {
 					sessionId,
 					toolCallId: row.id,
 					kind: "permission",
-					request: decision.request,
+					// What the call is for and what it would change, so the person decides on what they see.
+					request: { ...decision.request, ...tool.preview?.(row.args, session, this.#names) },
 				});
 				const answer = await this.#waitFor(sessionId, approval.id, live);
 				if (!answer || answer.decision === "deny" || answer.decision === undefined) {

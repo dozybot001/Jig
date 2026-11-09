@@ -276,7 +276,20 @@ export interface PermissionRequest {
 	reasons?: ConfirmReason[];
 	/** The same in English words, on requests saved before the reasons had codes. */
 	reason?: string;
+	/** What the call is for, in the session's words, such as a command's purpose or a task's brief. */
+	description?: string;
+	/** The change an edit or write would make, as a unified patch, so the person sees it first. */
+	diff?: string;
+	/** The changes organize_sessions would make, with names in place of ids, for the interface to word. */
+	organize?: OrganizeStep[];
 }
+
+/** One change organize_sessions would make, as the person reads it on the permission card. */
+export type OrganizeStep =
+	| { action: "rename_session"; from: string; to: string }
+	| { action: "create_team"; name: string }
+	| { action: "rename_team"; from: string; to: string }
+	| { action: "move_to_team"; sessions: string[]; team: string | null };
 
 export interface QuestionRequest {
 	question: string;

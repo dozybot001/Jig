@@ -18,6 +18,7 @@ import {
 import type {
 	Approval,
 	Entry,
+	OrganizeStep,
 	PermissionRequest,
 	QuestionRequest,
 	ToolCallView,
@@ -37,7 +38,7 @@ import {
 	SendIcon,
 	ShieldIcon,
 } from "./icons.tsx";
-import { Button, CardHead, ErrorBox, useAction, useNow } from "./ui.tsx";
+import { Button, CardHead, describeRule, ErrorBox, useAction, useNow } from "./ui.tsx";
 
 function resultText(result: ToolResultMessage | undefined): string {
 	if (!result) return "";
@@ -132,8 +133,31 @@ function permissionHeadline(request: PermissionRequest): string {
 			.join(t("listSeparator"));
 	}
 	if (request.reason) return request.reason;
+	// A task session is named in the line itself; there is no command or file to show under it.
+	if (request.tool === "open_session") {
+		return t("ask_open_session_named", { name: t("quoted", { s: request.summary }) });
+	}
 	const key = `ask_${request.tool}`;
 	return hasMessage(key) ? t(key) : request.tool;
+}
+
+/** One change organize_sessions would make, in the person's language. */
+function organizeText(step: OrganizeStep): string {
+	const quoted = (name: string) => t("quoted", { s: name });
+	switch (step.action) {
+		case "rename_session":
+			return t("organize_rename_session", { from: quoted(step.from), to: quoted(step.to) });
+		case "create_team":
+			return t("organize_create_team", { name: quoted(step.name) });
+		case "rename_team":
+			return t("organize_rename_team", { from: quoted(step.from), to: quoted(step.to) });
+		case "move_to_team": {
+			const sessions = step.sessions.map(quoted).join(t("enumSeparator"));
+			return step.team === null
+				? t("organize_leave_team", { sessions })
+				: t("organize_move_to_team", { sessions, team: quoted(step.team) });
+		}
+	}
 }
 
 /**
@@ -168,13 +192,8 @@ export function PermissionCard({ approval, session }: { approval: Approval; sess
 			</p>
 		);
 	}
-	const rules = request.rememberRules
-		?.map((rule) =>
-			rule.pattern === "**"
-				? t("allFilesInFolder", { tool: rule.tool })
-				: (rule.pattern ?? rule.tool),
-		)
-		.join(", ");
+	// "Always allow" names what it remembers the way the session settings list it.
+	const rules = request.rememberRules?.map(describeRule).join(t("listSeparator"));
 	const headline = permissionHeadline(request);
 	return (
 		<section className="card request-card" aria-label={headline}>
@@ -194,9 +213,24 @@ export function PermissionCard({ approval, session }: { approval: Approval; sess
 				}
 			/>
 			<p className="request-title">{headline}</p>
-			<ScrollBlock className="code request-code" label={headline}>
-				{request.summary}
-			</ScrollBlock>
+			{request.description && (
+				<Capped className="request-description" label={headline}>
+					{request.description}
+				</Capped>
+			)}
+			{request.tool === "open_session" ? null : request.organize ? (
+				<ul className="request-list">
+					{request.organize.map((step, index) => (
+						// biome-ignore lint/suspicious/noArrayIndexKey: the changes are fixed and in order
+						<li key={index}>{organizeText(step)}</li>
+					))}
+				</ul>
+			) : (
+				<ScrollBlock className="code request-code" label={headline}>
+					{request.summary}
+				</ScrollBlock>
+			)}
+			{request.diff && <Diff patch={request.diff} />}
 			{denying && (
 				<input
 					className="input"

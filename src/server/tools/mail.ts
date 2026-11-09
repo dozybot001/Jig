@@ -1,4 +1,4 @@
-import type { CardOption, Letter, TaskOutcome } from "../../shared/types.ts";
+import type { CardOption, Letter, OrganizeStep, TaskOutcome } from "../../shared/types.ts";
 import { TASK_OUTCOMES } from "../../shared/types.ts";
 import { JigError } from "../errors.ts";
 import { decisionReport, directoryLine, neutralize } from "../mail/envelope.ts";
@@ -276,8 +276,11 @@ export const openSessionTool: ToolDefinition = {
 	readOnly: false,
 	needsFolder: false,
 	subject(args) {
-		const name = str(args, "name", true);
-		return { kind: "act", tool: "open_session", summary: `Open the task session "${name}"` };
+		return { kind: "act", tool: "open_session", summary: str(args, "name", true) };
+	},
+	preview(args) {
+		const brief = typeof args.brief === "string" ? args.brief.trim() : "";
+		return brief ? { description: brief.length > 600 ? `${brief.slice(0, 600)}…` : brief } : {};
 	},
 	async run(args, ctx): Promise<ToolResult> {
 		const folder = str(args, "folder");
@@ -370,6 +373,25 @@ function organizeChanges(args: Record<string, unknown>): OrganizeChange[] {
 }
 
 /** One line per change, with session names, for the person's approval and the result. */
+/** A change as the person reads it on the permission card: names in place of ids. */
+function organizeStep(change: OrganizeChange, names: (id: string) => string | null): OrganizeStep {
+	const name = (id: string) => names(id) ?? id;
+	switch (change.action) {
+		case "rename_session":
+			return { action: "rename_session", from: name(change.session), to: change.name };
+		case "create_team":
+			return { action: "create_team", name: change.name };
+		case "rename_team":
+			return { action: "rename_team", from: name(change.team), to: change.name };
+		case "move_to_team":
+			return {
+				action: "move_to_team",
+				sessions: change.sessions.map(name),
+				team: change.team === null ? null : name(change.team),
+			};
+	}
+}
+
 function describeChange(change: OrganizeChange, names: (id: string) => string | null): string {
 	const name = (id: string) => `"${names(id) ?? id}"`;
 	switch (change.action) {
@@ -436,6 +458,13 @@ export const organizeSessionsTool: ToolDefinition = {
 			tool: "organize_sessions",
 			summary: `Organize sessions:\n${lines.join("\n")}`,
 		};
+	},
+	preview(args, _session, names) {
+		try {
+			return { organize: organizeChanges(args).map((change) => organizeStep(change, names)) };
+		} catch {
+			return {};
+		}
 	},
 	async run(args, ctx): Promise<ToolResult> {
 		const done = attempt(() => ctx.mail.organize(organizeChanges(args)));

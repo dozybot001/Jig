@@ -1,5 +1,12 @@
 import type { ImageBlock, JsonObject, TextBlock } from "../../shared/messages.ts";
-import type { Letter, Session, SessionStatus, TaskOutcome, Todo } from "../../shared/types.ts";
+import type {
+	Letter,
+	PermissionRequest,
+	Session,
+	SessionStatus,
+	TaskOutcome,
+	Todo,
+} from "../../shared/types.ts";
 import type { Outgoing, PostOffice } from "../mail/post.ts";
 import type { Subject } from "../permissions/engine.ts";
 import type { Jobs } from "./jobs.ts";
@@ -92,8 +99,20 @@ export interface ToolDefinition {
 	 * turns a session id into its name, so a request the person reads says which sessions it means.
 	 */
 	subject(args: JsonObject, session: Session, names?: (id: string) => string | null): Subject;
+	/**
+	 * What the person sees besides the call itself when Jig asks for permission: its purpose, the change
+	 * it would make. Never throws; a call without a preview is asked about as it is.
+	 */
+	preview?(
+		args: JsonObject,
+		session: Session,
+		names: (id: string) => string | null,
+	): PermissionPreview;
 	run(args: JsonObject, ctx: ToolContext): Promise<ToolResult>;
 }
+
+/** The parts of a permission request a tool fills in (see PermissionRequest). */
+export type PermissionPreview = Pick<PermissionRequest, "description" | "diff" | "organize">;
 
 /** What a session may do beyond its tools' own checks. */
 export interface Roles {

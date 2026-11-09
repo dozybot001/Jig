@@ -9,8 +9,9 @@ import {
 	useRef,
 	useState,
 } from "react";
+import type { PermissionRule } from "../../../src/shared/types.ts";
 import { ApiError } from "../api.ts";
-import { type MessageKey, t } from "../i18n.ts";
+import { hasMessage, type MessageKey, t } from "../i18n.ts";
 import { CloseIcon, InfoIcon, SubmenuIcon } from "./icons.tsx";
 
 /** Places a top-layer popover next to its trigger, flipping above when there is no room below (spec 5.9). */
@@ -977,4 +978,28 @@ export function CardHead({
 			{tags && <span className="card-head-tags">{tags}</span>}
 		</div>
 	);
+}
+
+/** One remembered approval in plain words: "运行 npm install", "访问 github.com"… */
+export function describeRule(rule: PermissionRule): string {
+	const pattern = rule.pattern ?? "";
+	const what =
+		rule.pattern === "**" && rule.tool === "write"
+			? t("ruleWriteAll")
+			: rule.pattern === "**" && rule.tool === "edit"
+				? t("ruleEditAll")
+				: rule.pattern === "**"
+					? t("allFilesInFolder", { tool: rule.tool })
+					: rule.tool === "shell" && pattern
+						? t("ruleRun", { p: pattern })
+						: rule.tool === "web_fetch" && pattern
+							? t("ruleFetch", { p: pattern })
+							: rule.tool === "read" && pattern
+								? t("ruleRead", { p: pattern })
+								: !pattern && hasMessage(`ask_${rule.tool}`)
+									? t(`ask_${rule.tool}` as MessageKey)
+									: `${rule.tool}${pattern ? ` ${pattern}` : ""}`;
+	if (rule.effect === "deny") return t("ruleDeny", { rule: what });
+	if (rule.effect === "ask") return t("ruleAsk", { rule: what });
+	return what;
 }

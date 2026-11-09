@@ -411,7 +411,9 @@ describe("task sessions", () => {
 		// Manual approval: opening a session is asked about before the call runs.
 		await until(() => store.pendingApprovals(parent.id).length === 1);
 		const [first] = store.pendingApprovals(parent.id);
-		assert.match(textOf(first?.request), /Open the task session \\"外面\\"/);
+		// The card names the session to open and shows its brief.
+		assert.equal((first?.request as { summary?: string } | undefined)?.summary, "外面");
+		assert.equal((first?.request as { description?: string } | undefined)?.description, "x");
 		agents.answer(first?.id as string, { decision: "allow_once" });
 		await until(() =>
 			store.pendingApprovals(parent.id).some((a) => textOf(a.request).includes("里面")),
@@ -987,6 +989,12 @@ describe("organizing sessions", () => {
 		const summary = String((approval?.request as { summary?: string } | undefined)?.summary);
 		assert.match(summary, /Move "甲", "乙" into the team "产品"/);
 		assert.match(summary, /Rename "甲" to "甲 · 产品"/);
+		// The interface words the same changes in the person's language from these steps.
+		assert.deepEqual((approval?.request as { organize?: unknown } | undefined)?.organize, [
+			{ action: "create_team", name: "产品" },
+			{ action: "move_to_team", sessions: ["甲", "乙"], team: "产品" },
+			{ action: "rename_session", from: "甲", to: "甲 · 产品" },
+		]);
 		agents.answer(approval?.id as string, { decision: "allow_once" });
 		await until(() => store.pendingApprovals(main.id).length === 1);
 		const [second] = store.pendingApprovals(main.id);
