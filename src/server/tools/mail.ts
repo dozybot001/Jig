@@ -336,8 +336,6 @@ export const openSessionTool: ToolDefinition = {
 	},
 };
 
-const ORGANIZE_ACTIONS = ["rename_session", "create_team", "rename_team", "move_to_team"] as const;
-
 const TEXT = { type: "string" } as const;
 
 /**

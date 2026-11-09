@@ -3,7 +3,6 @@ import type {
 	PermissionRule,
 	Session,
 	SessionOptions,
-	ThinkingLevel,
 	Transcript,
 } from "../../shared/types.ts";
 import {
