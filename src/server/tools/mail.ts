@@ -512,14 +512,12 @@ const CARD_PROPERTIES = {
 	title: { type: "string", description: "The question to decide, short enough for one line." },
 	context: {
 		type: "string",
-		description:
-			"What the person needs to know to decide without opening any session, in two or three short sentences. Do not repeat the options, the deadline or whether it can be undone.",
+		description: "What the person needs to know to decide, in two or three short sentences.",
 	},
 	options: {
 		type: "array",
 		maxItems: 6,
-		description:
-			"The choices. Do not add one for other answers: the person can always write a note.",
+		description: "The choices; the person can also answer with a note.",
 		items: {
 			type: "object",
 			properties: {
@@ -614,7 +612,7 @@ function cardText(number: number, title: string, verb: string): ToolResult {
 export const postCardTool: ToolDefinition = {
 	name: "post_card",
 	description:
-		"Put a decision card in the approval center for the person. Keep it short enough to take in at a glance: the question in one line, a few sentences of context, the options with the one you recommend, the deadline if there is one, and whether it can be undone. Say each thing once. The person's decision goes to the requesting session and to you.",
+		"Put a decision card in the approval center for the person. Their decision goes to the requesting session and to you.",
 	parameters: {
 		type: "object",
 		properties: {

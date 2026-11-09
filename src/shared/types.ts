@@ -311,6 +311,11 @@ export interface QuestionOption {
 
 export interface QuestionRequest {
 	questions?: Question[];
+	/**
+	 * Asked at the end of a reply rather than with ask_user. Jig put it in the approval center; the answer
+	 * goes to the session as the person's message.
+	 */
+	fromReply?: boolean;
 	/** One question with plain options, as asked before a card could hold several. */
 	question?: string;
 	options?: string[];

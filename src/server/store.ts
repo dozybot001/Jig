@@ -1288,8 +1288,10 @@ export class Store {
 	 */
 	recoverAfterRestart(): string[] {
 		return this.tx(() => {
+			// A question Jig took from a reply has no call behind it: it still waits for the person.
 			const affected = this.#q(
-				"SELECT id FROM sessions WHERE status IN ('working', 'waiting')",
+				`SELECT id FROM sessions WHERE status = 'working' OR (status = 'waiting' AND id NOT IN
+					(SELECT session_id FROM approvals WHERE status = 'pending' AND tool_call_id IS NULL))`,
 			).all() as { id: string }[];
 			const now = Date.now();
 			const running = this.#q("SELECT id FROM tool_calls WHERE status = 'running'").all() as {
@@ -1300,9 +1302,9 @@ export class Store {
 				id: string;
 			}[];
 			for (const call of waiting) this.updateToolCall(call.id, { status: "pending" });
-			const pending = this.#q("SELECT id FROM approvals WHERE status = 'pending'").all() as {
-				id: string;
-			}[];
+			const pending = this.#q(
+				"SELECT id FROM approvals WHERE status = 'pending' AND tool_call_id IS NOT NULL",
+			).all() as { id: string }[];
 			for (const approval of pending) this.cancelApproval(approval.id);
 			for (const session of affected) {
 				this.#q(

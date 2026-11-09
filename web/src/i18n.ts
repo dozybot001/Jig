@@ -190,6 +190,7 @@ const zh = {
 	// approvals
 	approvalTitle: "需要你授权",
 	waitingOnYou: "在等你",
+	askedInReply: "在回复里问你",
 	confirmEachTime: "每次确认",
 	confirmEachTimeHint: "这类操作每次都要你确认，不能设为总是允许",
 	ask_shell: "运行命令",
@@ -711,6 +712,7 @@ const en: Record<MessageKey, string> = {
 	linesRemoved: "−{n}",
 	approvalTitle: "Needs your permission",
 	waitingOnYou: "Waiting on you",
+	askedInReply: "Asked in a reply",
 	confirmEachTime: "Asks every time",
 	confirmEachTimeHint: "Operations like this ask every time and can't be always allowed",
 	ask_shell: "Run a command",

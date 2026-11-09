@@ -70,6 +70,27 @@ import {
 } from "./prompt.ts";
 
 /** What a session is told when the person's main conversation changes. */
+const OFFER =
+	/如需|需要的话|要不要|是否需要|告诉我|说一声|let me know|tell me if|shall i|should i|would you like|do you want/i;
+
+/**
+ * The question a reply ends with, if it ends with one: its last paragraph (outside code) when that asks
+ * something or offers a next step. A session that asks the person this way goes idle, so Jig puts the
+ * question in the approval center for it (blueprint principle 8: Jig carries this, not a prompt rule).
+ */
+export function askedInReply(text: string): string | null {
+	const prose = text.replace(/```[\s\S]*?(```|$)/g, "").trim();
+	const last =
+		prose
+			.split(/\n\s*\n/)
+			.at(-1)
+			?.trim() ?? "";
+	if (!last) return null;
+	const end = last.replace(/[\s*_`)\]）」』"'”’]+$/u, "");
+	if (!/[?？]$/.test(end) && !OFFER.test(last)) return null;
+	return last.length > 600 ? `…${last.slice(-600)}` : last;
+}
+
 function mainUpdate(session: Session, before: SessionRef | null, now: SessionRef | null): string {
 	if (now?.id === session.id) return `The person made you their main conversation.\n${MAIN_ROLE}`;
 	if (before?.id === session.id) {
@@ -252,6 +273,7 @@ export class Agents {
 		if (session.archivedAt !== null)
 			throw conflict("This session is archived. Restore it first.", undefined, "session-archived");
 		// The person stepped in: a full quota of letters again, and a new chain of hand-offs (blueprint 7.1).
+		this.#dropReplyQuestions(sessionId);
 		this.#paused.delete(sessionId);
 		this.#store.resetLettersSent(sessionId);
 		this.#store.addIntervention(sessionId);
@@ -273,6 +295,7 @@ export class Agents {
 		const entries = this.#store.contextEntries(sessionId);
 		if (entries.length === 0)
 			throw conflict("There is nothing to continue yet.", undefined, "nothing-to-continue");
+		this.#dropReplyQuestions(sessionId);
 		this.#paused.delete(sessionId);
 		this.#start(sessionId, { resume: true });
 	}
@@ -301,6 +324,12 @@ export class Agents {
 				answer: settled.text,
 				...(settled.answers ? { answers: settled.answers } : {}),
 			};
+			if ((approval.request as QuestionRequest).fromReply) {
+				// Nothing waits for it: the answer is the person's next message to the session.
+				const resolved = this.#store.resolveApproval(approvalId, answer);
+				this.send(approval.sessionId, settled.text);
+				return resolved;
+			}
 		}
 		const resolved = this.#store.resolveApproval(approvalId, answer);
 		this.#store.addIntervention(approval.sessionId);
@@ -1139,6 +1168,40 @@ export class Agents {
 			});
 		}
 		mail.finishRead(sessionId);
+		if (!failed && owed.size === 0) this.#askFromReply(session, said);
+	}
+
+	/**
+	 * A code session's last reply that nobody else reads, ending with a question or an offer, becomes a
+	 * question in the approval center, and the session shows that it waits. The latest such question
+	 * replaces an older one; the person's next message, or continuing, takes it away.
+	 */
+	#askFromReply(session: Session, said: string): void {
+		if (!session.cwd || session.archivedAt !== null || session.id === this.post.mainSessionId()) {
+			return;
+		}
+		const older = this.#replyQuestions(session.id);
+		const asked = askedInReply(said);
+		if (asked) {
+			for (const approval of older) this.#store.cancelApproval(approval.id);
+			this.#store.createApproval({
+				sessionId: session.id,
+				toolCallId: null,
+				kind: "question",
+				request: { questions: [{ question: asked }], fromReply: true },
+			});
+		}
+		if (asked || older.length > 0) this.#store.setStatus(session.id, "waiting", null);
+	}
+
+	#replyQuestions(sessionId: string): Approval[] {
+		return this.#store
+			.pendingApprovals(sessionId)
+			.filter((approval) => (approval.request as QuestionRequest).fromReply === true);
+	}
+
+	#dropReplyQuestions(sessionId: string): void {
+		for (const approval of this.#replyQuestions(sessionId)) this.#store.cancelApproval(approval.id);
 	}
 
 	/** A letter Jig sends on a session's behalf at the end of its turn. */

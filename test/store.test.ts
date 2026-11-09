@@ -197,6 +197,21 @@ describe("transcript and events", () => {
 		);
 	});
 
+	test("restart recovery keeps a question taken from a reply waiting for the person", () => {
+		const { store } = newStore();
+		const session = store.createSession(sessionInput());
+		const approval = store.createApproval({
+			sessionId: session.id,
+			toolCallId: null,
+			kind: "question",
+			request: { questions: [{ question: "推吗？" }], fromReply: true },
+		});
+		store.setStatus(session.id, "waiting");
+		assert.deepEqual(store.recoverAfterRestart(), []);
+		assert.equal(store.getApproval(approval.id).status, "pending");
+		assert.equal(store.getSession(session.id).status, "waiting");
+	});
+
 	test("restart recovery marks in-flight work for review and does not redo it", () => {
 		const { store } = newStore();
 		const session = store.createSession(sessionInput());

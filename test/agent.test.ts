@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, test } from "node:test";
 import { SUMMARY_HEADING } from "../src/server/agent/context.ts";
 import { systemPrompt } from "../src/server/agent/prompt.ts";
-import { Agents } from "../src/server/agent/runner.ts";
+import { Agents, askedInReply } from "../src/server/agent/runner.ts";
 import { MemoryKeyStore } from "../src/server/keys.ts";
 import { ModelGateway } from "../src/server/model/gateway.ts";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "../src/server/model/testing.ts";
@@ -339,6 +339,60 @@ describe("agent loop", () => {
 		assert.match(textOf(contexts[0]?.messages.at(-1)), /The person answered: 先停一下/);
 	});
 
+	test("Jig finds the question a reply ends with, outside code and closing marks", () => {
+		assert.equal(askedInReply("做完了。\n\n要我顺便更新文档吗？"), "要我顺便更新文档吗？");
+		assert.equal(askedInReply("Done.\n\n**Shall I push it?**"), "**Shall I push it?**");
+		assert.equal(askedInReply("没有推送；需要的话说一声。"), "没有推送；需要的话说一声。");
+		assert.equal(askedInReply("做完了，测试都通过。"), null);
+		assert.equal(askedInReply("改成这样：\n\n```js\nconst ok = a ? b : c?\n```"), null);
+		assert.equal(askedInReply(""), null);
+	});
+
+	test("a question left at the end of a reply goes to the approval center; answering it continues the session", async () => {
+		const { faux, store, agents, session, contexts, capture } = setup();
+		faux.setResponses([
+			fauxAssistantMessage("改好了，检查都通过。\n\n没有推送。要推到 Gitee 和 GitHub 吗？"),
+			capture(fauxAssistantMessage("好，推送了。")),
+		]);
+		agents.send(session.id, "改一下按钮");
+		await agents.whenIdle(session.id);
+		const [card] = store.pendingApprovals(session.id);
+		assert.ok(card);
+		assert.equal(card.toolCallId, null);
+		assert.deepEqual(card.request, {
+			questions: [{ question: "没有推送。要推到 Gitee 和 GitHub 吗？" }],
+			fromReply: true,
+		});
+		assert.equal(store.getSession(session.id).status, "waiting");
+		agents.answer(card.id, { answers: [{ choices: [], text: "推吧" }] });
+		await agents.whenIdle(session.id);
+		assert.match(textOf(contexts[0]?.messages.at(-1)), /推吧/);
+		assert.equal(store.pendingApprovals(session.id).length, 0);
+		assert.equal(store.getSession(session.id).status, "idle");
+	});
+
+	test("writing to the session takes the question away; replies without a question or in chats leave none", async () => {
+		const { faux, store, agents, session } = setup();
+		faux.setResponses([
+			fauxAssistantMessage("如需推送，告诉我即可。"),
+			fauxAssistantMessage("好的，先不推。"),
+		]);
+		agents.send(session.id, "改一下");
+		await agents.whenIdle(session.id);
+		const [card] = store.pendingApprovals(session.id);
+		assert.ok(card);
+		agents.send(session.id, "先不推");
+		await agents.whenIdle(session.id);
+		assert.equal(store.getApproval(card.id).status, "cancelled");
+		assert.equal(store.pendingApprovals(session.id).length, 0);
+		// A chat without a working folder talks with the person; its questions stay in the conversation.
+		const chat = setup({ cwd: false });
+		chat.faux.setResponses([fauxAssistantMessage("你好！今天想聊点什么？")]);
+		chat.agents.send(chat.session.id, "你好");
+		await chat.agents.whenIdle(chat.session.id);
+		assert.equal(chat.store.pendingApprovals(chat.session.id).length, 0);
+	});
+
 	test("stopping while waiting cancels the approval and leaves a valid transcript", async () => {
 		const { faux, store, agents, session, contexts, capture } = setup();
 		faux.setResponses([
@@ -603,7 +657,7 @@ describe("system prompt", () => {
 		assert.match(text, /No working folder/);
 	});
 
-	test("a session asks the person through Jig and makes must-confirm calls, never asks in its reply", () => {
+	test("a session stops only for the person's decisions and makes must-confirm calls itself", () => {
 		const session = {
 			...base,
 			id: "s1",
@@ -611,30 +665,20 @@ describe("system prompt", () => {
 			options: { permissionMode: "skip" },
 		} as Session;
 		const alone = systemPrompt(session, { ...snapshot("/tmp/demo"), permissionMode: "skip" });
-		assert.match(
-			alone,
-			/ask through Jig so it waits for them in the approval center: use ask_user\./,
-		);
+		assert.match(alone, /only they can decide or do: ask with ask_user\./);
 		assert.match(alone, /take it instead of offering it; for example, commit/);
-		assert.match(
-			alone,
-			/"Shall I…\?" or "Tell me if you want…", leaves you idle.*Never end a turn on one\./,
-		);
-		assert.match(alone, /When the work calls for one, make the call: Jig shows it to the person/);
-		assert.match(alone, /Do not ask in your reply first\./);
+		assert.match(alone, /When the work calls for one, make the call: Jig asks the person/);
 		assert.match(alone, /Permission mode: full access\. Your other calls run without asking;/);
 		assert.doesNotMatch(alone, /Take extra care/);
-		// A task's report says what is left; what needs the person was raised before it.
-		assert.match(
-			alone,
-			/how you checked it, and what is left\. Raise anything that needs the person/,
-		);
+		assert.match(alone, /how you checked it, and what is left\./);
 		assert.doesNotMatch(alone, /what the person needs to do/);
+		// Jig catches questions left in replies, so the prompt carries no rule about them (principle 8).
+		assert.doesNotMatch(alone, /Never end a turn/);
 		const main = { id: "m1", name: "总办" };
 		const withMain = systemPrompt(session, { ...snapshot("/tmp/demo"), main });
-		assert.match(withMain, /approval center: send a request to the main conversation/);
+		assert.match(withMain, /decide or do: send a request to the main conversation/);
 		const asMain = systemPrompt({ ...session, id: "m1" }, { ...snapshot("/tmp/demo"), main });
-		assert.match(asMain, /approval center: put a card there with post_card/);
+		assert.match(asMain, /decide or do: put a card in the approval center with post_card/);
 	});
 
 	test("the prompt sent with a turn names the session's team", async () => {

@@ -365,7 +365,14 @@ export function QuestionCard({ approval, session }: { approval: Approval; sessio
 				icon={<QuestionIcon />}
 				parts={
 					session
-						? [session, t("waitingOnYou"), formatAgo(approval.createdAt, now)]
+						? [
+								session,
+								// A question Jig took from the end of a reply, not one asked with ask_user.
+								t(
+									(approval.request as QuestionRequest).fromReply ? "askedInReply" : "waitingOnYou",
+								),
+								formatAgo(approval.createdAt, now),
+							]
 						: [t("questionTitle")]
 				}
 			/>
