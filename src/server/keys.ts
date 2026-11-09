@@ -12,8 +12,15 @@ export const KEYCHAIN_SERVICE = "asia.tenon.jig";
 
 /** The operating system keychain (macOS Keychain, Windows Credential Manager, Secret Service). */
 export class KeychainStore implements KeyStore {
-	#entry(provider: string): AsyncEntry {
-		return new AsyncEntry(KEYCHAIN_SERVICE, `provider:${provider}`);
+	readonly #prefix: string;
+
+	/** `prefix` keeps different kinds apart: "provider" for API keys, "remote" for the relay keys. */
+	constructor(prefix = "provider") {
+		this.#prefix = prefix;
+	}
+
+	#entry(name: string): AsyncEntry {
+		return new AsyncEntry(KEYCHAIN_SERVICE, `${this.#prefix}:${name}`);
 	}
 
 	get(provider: string): Promise<string | null> {

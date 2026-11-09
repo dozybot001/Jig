@@ -11,6 +11,8 @@ export const DEFAULT_PORT = 4777;
 const EVENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 /** How often the service looks for letters from `jig send`, which writes to the database directly. */
 const LETTER_SWEEP_MS = 2000;
+/** How often the service checks whether phone access was turned on or off. */
+const REMOTE_SYNC_MS = 5000;
 
 const SERVE_HELP = `Usage: jig serve [options]
 
@@ -114,6 +116,18 @@ export function serveCommand(): Command {
 				version: VERSION,
 				log,
 			});
+			const { RemoteAccess } = await import("../remote/access.ts");
+			const { KeychainStore } = await import("../server/keys.ts");
+			// A paired phone's requests run in-process against the same app, as that device.
+			let handle: ((request: Request, device: string) => Promise<Response>) | null = null;
+			const remote = new RemoteAccess(store, new KeychainStore("remote"), {
+				version: VERSION,
+				log,
+				handle: async (request, device) => {
+					if (!handle) throw new Error("Jig is still starting.");
+					return handle(request, device.id);
+				},
+			});
 			const app = createApp({
 				store,
 				gateway,
@@ -123,7 +137,9 @@ export function serveCommand(): Command {
 				security: { port },
 				webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
 				build: shortCommit(),
+				remote,
 			});
+			handle = async (request, device) => app.fetch(request, { device });
 
 			const server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port });
 			const started = await new Promise<boolean>((resolve) => {
@@ -144,6 +160,11 @@ export function serveCommand(): Command {
 			// Letters that were waiting when Jig stopped, and letters from `jig send`, start their sessions.
 			agents.wakeQueued();
 			const sweep = setInterval(() => agents.wakeQueued(), LETTER_SWEEP_MS);
+			// Phone access follows the settings, which `jig remote` may change while Jig runs.
+			const syncRemote = () =>
+				void remote.sync().catch((error: Error) => log(`remote access: ${error.message}`));
+			syncRemote();
+			const remoteSweep = setInterval(syncRemote, REMOTE_SYNC_MS);
 			const info: ServeFile = { port, pid: process.pid, startedAt: Date.now() };
 			writeFileSync(serveFile(home), JSON.stringify(info), { mode: 0o600 });
 
@@ -157,6 +178,8 @@ export function serveCommand(): Command {
 				const stop = () => {
 					io.stderr.write("Stopping Jig…\n");
 					clearInterval(sweep);
+					clearInterval(remoteSweep);
+					remote.stop();
 					agents.shutdown();
 					server.close();
 					// Open event streams would keep the process alive; end them too.

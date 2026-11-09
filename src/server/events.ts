@@ -1,5 +1,13 @@
 import type { AssistantMessage } from "../shared/messages.ts";
-import type { Approval, Card, Group, Letter, Session, SessionEvent } from "../shared/types.ts";
+import type {
+	Approval,
+	Card,
+	Device,
+	Group,
+	Letter,
+	Session,
+	SessionEvent,
+} from "../shared/types.ts";
 
 /** Ephemeral updates: not stored, not replayed; a reconnecting client gets a fresh snapshot instead. */
 export type LiveEvent =
@@ -18,7 +26,9 @@ export type GlobalEvent =
 	| { type: "letter"; letter: Letter }
 	| { type: "card"; card: Card }
 	/** Archived sessions the person deleted for good. */
-	| { type: "sessionsDeleted"; ids: string[] };
+	| { type: "sessionsDeleted"; ids: string[] }
+	/** Paired phones changed, or the relay connection did. */
+	| { type: "devices"; devices: Device[] };
 
 export type BusEvent =
 	| { scope: "session"; sessionId: string; seq: number; event: SessionEvent }

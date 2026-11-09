@@ -39,6 +39,8 @@ export interface ApiDeps {
 	pickFolder?: () => Promise<string | null>;
 	/** A session was archived: the runner drops letters waiting for it. */
 	onArchived?: (sessionId: string) => void;
+	/** Phone access was turned on or off, or the relay changed. */
+	onRemoteChanged?: () => void;
 }
 
 const RULE_EFFECTS = ["allow", "ask", "deny"] as const;
@@ -389,6 +391,25 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		}
 		const log = optNullableString(fields, "decisionLog", 4096);
 		if (log !== undefined) store.setSetting("decisionLog", log ? resolveLogFile(log) : null);
+		const remote = optObject(fields, "remote");
+		if (remote) {
+			// Remote access is changed on the Mac only (M3 plan, section 4).
+			if (c.env?.device) throw invalid("Phone access can only be changed on the Mac.", "remote");
+			const enabled = optBoolean(remote, "enabled");
+			const relayUrl = optString(remote, "relayUrl", 500);
+			if (
+				relayUrl !== undefined &&
+				!/^wss:\/\/|^ws:\/\/(127\.0\.0\.1|localhost)[:/]/.test(relayUrl)
+			) {
+				throw invalid("The relay must be a wss:// address (ws:// only on this Mac).", "remote");
+			}
+			const current = readSettings(store).remote;
+			store.setSetting("remote", {
+				enabled: enabled ?? current.enabled,
+				relayUrl: relayUrl ?? current.relayUrl,
+			});
+			deps.onRemoteChanged?.();
+		}
 		return c.json(readSettings(store));
 	});
 

@@ -4,6 +4,7 @@ import { messageText } from "../shared/messages.ts";
 import type {
 	Approval,
 	ApprovalDecision,
+	Device,
 	Entry,
 	Group,
 	Page,
@@ -201,6 +202,28 @@ function toSession(row: SessionRow): Session {
 	};
 }
 
+interface DeviceRow {
+	id: string;
+	name: string;
+	public_key: string;
+	push_token: string | null;
+	push: number;
+	created_at: number;
+	last_seen_at: number | null;
+}
+
+function toDevice(row: DeviceRow): Device {
+	return {
+		id: row.id,
+		name: row.name,
+		publicKey: row.public_key,
+		push: row.push === 1,
+		canPush: row.push_token !== null,
+		createdAt: row.created_at,
+		lastSeenAt: row.last_seen_at,
+	};
+}
+
 function toGroup(row: GroupRow): Group {
 	return {
 		id: row.id,
@@ -382,6 +405,87 @@ export class Store {
 
 	pruneEvents(olderThan: number): void {
 		this.#q("DELETE FROM session_events WHERE created_at < ?").run(olderThan);
+	}
+
+	// --- devices (M3 plan, section 4) ---
+
+	listDevices(): Device[] {
+		const rows = this.#q(
+			"SELECT * FROM devices ORDER BY created_at, id",
+		).all() as unknown as DeviceRow[];
+		return rows.map(toDevice);
+	}
+
+	deviceByKey(publicKey: string): Device | null {
+		const row = this.#q("SELECT * FROM devices WHERE public_key = ?").get(publicKey) as
+			| DeviceRow
+			| undefined;
+		return row ? toDevice(row) : null;
+	}
+
+	addDevice(name: string, publicKey: string): Device {
+		return this.tx(() => {
+			const id = newId();
+			const now = Date.now();
+			this.#q(
+				"INSERT INTO devices (id, name, public_key, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)",
+			).run(id, name, publicKey, now, now);
+			this.#devicesChanged();
+			return this.#device(id);
+		});
+	}
+
+	updateDevice(
+		id: string,
+		patch: { name?: string; push?: boolean; pushToken?: string | null },
+	): Device {
+		return this.tx(() => {
+			const current = this.#device(id);
+			this.#q("UPDATE devices SET name = ?, push = ? WHERE id = ?").run(
+				patch.name ?? current.name,
+				(patch.push ?? current.push) ? 1 : 0,
+				id,
+			);
+			if (patch.pushToken !== undefined) {
+				this.#q("UPDATE devices SET push_token = ? WHERE id = ?").run(patch.pushToken, id);
+			}
+			this.#devicesChanged();
+			return this.#device(id);
+		});
+	}
+
+	/** A paired phone connected; noted at most once a minute. */
+	touchDevice(id: string): void {
+		const now = Date.now();
+		this.#q(
+			"UPDATE devices SET last_seen_at = ? WHERE id = ? AND (last_seen_at IS NULL OR last_seen_at < ?)",
+		).run(now, id, now - 60_000);
+	}
+
+	deleteDevice(id: string): void {
+		this.tx(() => {
+			this.#device(id);
+			this.#q("DELETE FROM devices WHERE id = ?").run(id);
+			this.#devicesChanged();
+		});
+	}
+
+	/** The APNs token of a device that takes notifications, for the push step. */
+	pushTokenOf(id: string): string | null {
+		const row = this.#q("SELECT push_token, push FROM devices WHERE id = ?").get(id) as
+			| { push_token: string | null; push: number }
+			| undefined;
+		return row && row.push === 1 ? row.push_token : null;
+	}
+
+	#device(id: string): Device {
+		const row = this.#q("SELECT * FROM devices WHERE id = ?").get(id) as DeviceRow | undefined;
+		if (!row) throw notFound("Device", id);
+		return toDevice(row);
+	}
+
+	#devicesChanged(): void {
+		this.publish({ type: "devices", devices: this.listDevices() });
 	}
 
 	// --- groups ---

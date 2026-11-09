@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
+import type { RemoteAccess } from "../../remote/access.ts";
 import { VERSION } from "../../shared/version.ts";
 import type { Agents } from "../agent/runner.ts";
 import type { EventBus } from "../events.ts";
@@ -10,11 +11,18 @@ import type { ModelGateway } from "../model/gateway.ts";
 import type { Store } from "../store.ts";
 import { agentRoutes } from "./agents.ts";
 import { api } from "./api.ts";
+import { deviceRoutes } from "./devices.ts";
 import { DraftCache, eventRoutes } from "./events.ts";
 import { mailRoutes } from "./mail.ts";
 import { type AppEnv, errorHandler, problemResponse, requestId, titleFor } from "./problem.ts";
 import { providerRoutes } from "./providers.ts";
-import { authRoutes, localOnly, requireBrowser, securityHeaders } from "./security.ts";
+import {
+	authRoutes,
+	deviceLimits,
+	localOnly,
+	requireBrowser,
+	securityHeaders,
+} from "./security.ts";
 
 export interface AppOptions {
 	store: Store;
@@ -30,6 +38,8 @@ export interface AppOptions {
 	build?: string | null;
 	/** Replaces the system folder picker; tests use it so they never open a window. */
 	pickFolder?: () => Promise<string | null>;
+	/** Phone access through the relay (M3 plan, section 6). */
+	remote?: RemoteAccess;
 }
 
 const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Jig</title>
@@ -52,6 +62,7 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 		app.use("*", requireBrowser(store, options.security.port));
 		app.route("/api", authRoutes(store, options.security.port));
 	}
+	app.use("*", deviceLimits());
 	app.get("/api/health", (c) =>
 		c.json({ ok: true, version: VERSION, build: options.build ?? null }),
 	);
@@ -62,8 +73,12 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 			...(gateway ? { checkModel: (p: string, m: string) => gateway.check(p, m) } : {}),
 			...(options.pickFolder ? { pickFolder: options.pickFolder } : {}),
 			...(agents ? { onArchived: (id: string) => agents.archived(id) } : {}),
+			...(options.remote
+				? { onRemoteChanged: () => void options.remote?.sync().catch((e: Error) => log(e.message)) }
+				: {}),
 		}),
 	);
+	app.route("/api", deviceRoutes(store, options.remote));
 	if (gateway) app.route("/api", providerRoutes(store, gateway));
 	if (agents) app.route("/api", agentRoutes(store, agents, log));
 	// The runner's post office, so a released letter or a decision wakes its recipient.

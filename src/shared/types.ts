@@ -326,6 +326,20 @@ export type ChangeStep =
 	| { action: "set_theme"; to: "system" | "light" | "dark" }
 	| { action: "set_language"; to: "system" | "zh" | "en" };
 
+/** A phone paired with this Mac through the relay (M3 plan, section 4). */
+export interface Device {
+	id: string;
+	name: string;
+	/** The phone's Noise static key, base64url. */
+	publicKey: string;
+	/** Whether Jig sends it notifications. */
+	push: boolean;
+	/** The phone has given an APNs token. */
+	canPush: boolean;
+	createdAt: number;
+	lastSeenAt: number | null;
+}
+
 /** One question a session asks the person with ask_user; a card holds up to four. */
 export interface Question {
 	question: string;

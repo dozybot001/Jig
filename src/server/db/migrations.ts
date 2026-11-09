@@ -212,4 +212,16 @@ ALTER TABLE cards ADD COLUMN undoable INTEGER;
 UPDATE sessions SET rules = replace(rules, '"tool":"organize_sessions"', '"tool":"manage_jig","pattern":"organize"')
 WHERE rules LIKE '%"tool":"organize_sessions"%';
 `,
+	// Phones paired through the relay (M3 plan, section 4): their Noise static keys, never a secret.
+	`
+CREATE TABLE devices (
+	id TEXT PRIMARY KEY,
+	name TEXT NOT NULL,
+	public_key TEXT NOT NULL UNIQUE,
+	push_token TEXT,
+	push INTEGER NOT NULL DEFAULT 1,
+	created_at INTEGER NOT NULL,
+	last_seen_at INTEGER
+) STRICT;
+`,
 ];

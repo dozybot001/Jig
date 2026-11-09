@@ -32,7 +32,14 @@ export const SETTING_DEFAULTS = {
 	mainSessionId: null as string | null,
 	/** A Markdown file each decision is added to (blueprint 6.4, item 14). */
 	decisionLog: null as string | null,
+	/** Phones reach this Mac through the relay (blueprint 6.7, M3 plan section 6). */
+	remote: { enabled: false, relayUrl: "wss://relay.tenonai.cn" } as RemoteSettings,
 };
+
+export interface RemoteSettings {
+	enabled: boolean;
+	relayUrl: string;
+}
 
 export type Settings = typeof SETTING_DEFAULTS;
 
@@ -44,6 +51,7 @@ export function readSettings(store: Store): Settings {
 		workspaces: store.getSetting("workspaces", SETTING_DEFAULTS.workspaces),
 		mainSessionId: store.getSetting("mainSessionId", SETTING_DEFAULTS.mainSessionId),
 		decisionLog: store.getSetting("decisionLog", SETTING_DEFAULTS.decisionLog),
+		remote: { ...SETTING_DEFAULTS.remote, ...store.getSetting("remote", SETTING_DEFAULTS.remote) },
 	};
 }
 

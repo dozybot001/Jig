@@ -35,6 +35,8 @@ export function issueLoginToken(store: Store): string {
 export function localOnly(port: number): MiddlewareHandler<AppEnv> {
 	const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
 	return async (c, next) => {
+		// A paired phone's request, handed over in-process by the relay connector.
+		if (c.env?.device) return next();
 		const host = c.req.header("Host") ?? "";
 		if (!hosts.has(host)) {
 			return problemResponse(
@@ -117,6 +119,7 @@ const OPEN_PATHS = new Set(["/api/auth/exchange", "/api/health"]);
 export function requireBrowser(store: Store, port: number): MiddlewareHandler<AppEnv> {
 	return async (c, next) => {
 		if (!c.req.path.startsWith("/api/") || OPEN_PATHS.has(c.req.path)) return next();
+		if (c.env?.device) return next();
 		const token = getCookie(c, cookieName(port));
 		if (!token || !store.touchBrowserToken(hashToken(token), Date.now() + BROWSER_TTL_MS)) {
 			return problemResponse(
@@ -170,4 +173,31 @@ export function authRoutes(store: Store, port: number): Hono<AppEnv> {
 	});
 
 	return app;
+}
+
+/**
+ * What a paired phone may not do through the relay (M3 plan, section 4): manage API keys, add or revoke
+ * devices, or change remote access. Those stay on the Mac.
+ */
+export function deviceLimits(): MiddlewareHandler<AppEnv> {
+	return async (c, next) => {
+		if (!c.env?.device) return next();
+		const { method, path } = c.req;
+		const write = method !== "GET" && method !== "HEAD";
+		if (
+			(path.startsWith("/api/providers") && write) ||
+			path === "/api/devices/pairing" ||
+			(path.startsWith("/api/devices/") && method === "DELETE") ||
+			path.startsWith("/api/auth/")
+		) {
+			return problemResponse(
+				c,
+				403,
+				"mac-only",
+				titleFor(403),
+				"Only Jig on the Mac can do this: API keys, devices and remote access stay there.",
+			);
+		}
+		await next();
+	};
 }
