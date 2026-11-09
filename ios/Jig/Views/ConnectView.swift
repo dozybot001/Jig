@@ -4,7 +4,9 @@ import SwiftUI
 struct ConnectView: View {
 	@Environment(AppModel.self) private var model
 	@State private var link = ""
+	@State private var pairLink = ""
 	@State private var busy = false
+	@State private var scanning = false
 
 	var body: some View {
 		NavigationStack {
@@ -23,6 +25,27 @@ struct ConnectView: View {
 					}
 					.frame(maxWidth: .infinity)
 					.padding(.vertical, 12)
+				}
+				Section {
+					Button {
+						scanning = true
+					} label: {
+						Label("Scan the QR code on your Mac", systemImage: "qrcode.viewfinder")
+					}
+					.disabled(!ScannerView.available || busy)
+				} footer: {
+					Text("On your Mac, turn on phone access with `jig remote on`, then run `jig remote pair` to show the QR code.")
+				}
+				Section("Or paste the pairing link") {
+					TextField("jig://pair?…", text: $pairLink, axis: .vertical)
+						.textInputAutocapitalization(.never)
+						.autocorrectionDisabled()
+					Button {
+						pair(pairLink)
+					} label: {
+						if busy { ProgressView() } else { Text("Pair") }
+					}
+					.disabled(pairLink.isEmpty || busy)
 				}
 				#if DEBUG
 				Section {
@@ -52,6 +75,21 @@ struct ConnectView: View {
 					}
 				}
 			}
+			.sheet(isPresented: $scanning) {
+				ScannerView { code in
+					scanning = false
+					pair(code)
+				}
+				.ignoresSafeArea()
+			}
+		}
+	}
+
+	private func pair(_ text: String) {
+		busy = true
+		Task {
+			await model.pair(with: text)
+			busy = false
 		}
 	}
 }

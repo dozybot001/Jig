@@ -180,6 +180,46 @@
         }
       }
     },
+    "On your Mac, turn on phone access with `jig remote on`, then run `jig remote pair` to show the QR code.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Mac 上用 `jig remote on` 打开手机访问，再运行 `jig remote pair` 显示二维码。"
+          }
+        }
+      }
+    },
+    "Or paste the pairing link": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "或者粘贴配对链接"
+          }
+        }
+      }
+    },
+    "Pair": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配对"
+          }
+        }
+      }
+    },
+    "Pairing did not work. Show a new QR code on the Mac and scan it again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配对没有成功。请在 Mac 上重新显示二维码，再扫一次。"
+          }
+        }
+      }
+    },
     "Paste the whole link that `jig open` prints.": {
       "localizations": {
         "zh-Hans": {
@@ -210,6 +250,16 @@
         }
       }
     },
+    "Scan the QR code on your Mac": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "扫描 Mac 上的二维码"
+          }
+        }
+      }
+    },
     "Send": {
       "localizations": {
         "zh-Hans": {
@@ -236,6 +286,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "设置"
+          }
+        }
+      }
+    },
+    "That is not a Jig pairing link.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这不是 Jig 的配对链接。"
           }
         }
       }
@@ -271,6 +331,9 @@
       }
     },
     "http://127.0.0.1:4791/#t=…": {
+      "shouldTranslate": false
+    },
+    "jig://pair?…": {
       "shouldTranslate": false
     }
   },

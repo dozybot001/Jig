@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+import { RELAY_URL } from "../remote/protocol.ts";
 import { type CliIo, EXIT_ERROR, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
 import { serviceRunning } from "./serve.ts";
@@ -45,8 +46,8 @@ export function remoteCommand(): Command {
 				throw new UsageError("jig remote needs one of on, off, status or pair");
 			}
 			const relay = values.relay;
-			if (relay !== undefined && !/^wss:\/\/|^ws:\/\/(127\.0\.0\.1|localhost)[:/]/.test(relay)) {
-				throw new UsageError("--relay must be a wss:// address (ws:// only on this Mac)");
+			if (relay !== undefined && !RELAY_URL.test(relay)) {
+				throw new UsageError("--relay must be a wss:// address (ws:// only inside this network)");
 			}
 
 			const { jigHome, dbPath } = await import("../server/paths.ts");

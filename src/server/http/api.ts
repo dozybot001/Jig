@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { RELAY_URL } from "../../remote/protocol.ts";
 import type { PermissionRule, Session, SessionOptions, Transcript } from "../../shared/types.ts";
 import {
 	PERMISSION_MODES,
@@ -397,11 +398,11 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			if (c.env?.device) throw invalid("Phone access can only be changed on the Mac.", "remote");
 			const enabled = optBoolean(remote, "enabled");
 			const relayUrl = optString(remote, "relayUrl", 500);
-			if (
-				relayUrl !== undefined &&
-				!/^wss:\/\/|^ws:\/\/(127\.0\.0\.1|localhost)[:/]/.test(relayUrl)
-			) {
-				throw invalid("The relay must be a wss:// address (ws:// only on this Mac).", "remote");
+			if (relayUrl !== undefined && !RELAY_URL.test(relayUrl)) {
+				throw invalid(
+					"The relay must be a wss:// address (ws:// only inside this network).",
+					"remote",
+				);
 			}
 			const current = readSettings(store).remote;
 			store.setSetting("remote", {

@@ -9,11 +9,17 @@ final class AppModel {
 	private(set) var sessions: [SessionSummary] = []
 	private(set) var center: Center?
 	private(set) var letters: [LetterItem] = []
+	/// The Mac this phone is paired with, as the Mac names itself.
+	private(set) var desktopName: String?
 	var problem: String?
 
 	private static let directKey = "directBase"
 
 	init() {
+		if let pairing = Vault.pairing {
+			client = JigClient(transport: RelayTransport(channel: RelayChannel(pairing: pairing, key: Vault.phoneKey())))
+			desktopName = pairing.desktopName
+		}
 		#if DEBUG
 		// The cookie survives in the shared cookie store; the address is all the app has to remember.
 		if let saved = UserDefaults.standard.string(forKey: Self.directKey), let base = URL(string: saved) {
@@ -22,6 +28,10 @@ final class AppModel {
 		// `-JigDirectLink <link>` at launch connects at once (simulator runs and UI tests).
 		if let link = UserDefaults.standard.string(forKey: "JigDirectLink") {
 			Task { await connectDirect(link: link) }
+		}
+		// `-JigPairLink <jig://pair?…>` pairs through the relay at launch, as scanning would.
+		if let link = UserDefaults.standard.string(forKey: "JigPairLink") {
+			Task { await pair(with: link) }
 		}
 		#endif
 	}
@@ -51,7 +61,30 @@ final class AppModel {
 	}
 	#endif
 
+	/// Pairs with the Mac whose QR code (or its link) this is: handshake with its secret, then keep it.
+	func pair(with text: String) async {
+		guard let link = PairingLink(text.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+			problem = String(localized: "That is not a Jig pairing link.")
+			return
+		}
+		var pairing = Pairing(relay: link.relay, desktop: link.desktop, desktopKey: link.key, desktopName: link.name)
+		let channel = RelayChannel(pairing: pairing, key: Vault.phoneKey())
+		do {
+			let welcome = try await channel.connect(pairSecret: link.secret)
+			pairing.desktopName = welcome.desktop
+			Vault.pairing = pairing
+			desktopName = welcome.desktop
+			client = JigClient(transport: RelayTransport(channel: channel))
+			problem = nil
+			await refreshAll()
+		} catch {
+			problem = String(localized: "Pairing did not work. Show a new QR code on the Mac and scan it again.")
+		}
+	}
+
 	func disconnect() {
+		Vault.pairing = nil
+		desktopName = nil
 		UserDefaults.standard.removeObject(forKey: Self.directKey)
 		client = nil
 		sessions = []

@@ -19,6 +19,13 @@ export function desktopIdOf(publicKey: Buffer): string {
 
 export const prologueFor = (desktopId: string) => Buffer.from(PROLOGUE_PREFIX + desktopId);
 
+/**
+ * A relay address Jig accepts: wss:// anywhere, ws:// only inside this network (this Mac, `.local`
+ * names, private addresses), for a test relay. The channel is end-to-end encrypted either way.
+ */
+export const RELAY_URL =
+	/^wss:\/\/[^/\s]+|^ws:\/\/(127\.0\.0\.1|localhost|[\w-]+\.local|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?(\/|$)/;
+
 /** What the pairing QR code carries. */
 export interface PairingLink {
 	relay: string;
