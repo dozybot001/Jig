@@ -56,7 +56,6 @@ export const SETTING_DEFAULTS = {
 		model: "deepseek-v4-pro",
 		thinking: "medium",
 	} as DefaultModel,
-	defaultRules: [] as PermissionRule[],
 	theme: "system" as "system" | "light" | "dark",
 	language: "system" as "system" | "zh" | "en",
 	workspaces: [] as Workspace[],
@@ -71,7 +70,6 @@ export type Settings = typeof SETTING_DEFAULTS;
 export function readSettings(store: Store): Settings {
 	return {
 		defaultModel: store.getSetting("defaultModel", SETTING_DEFAULTS.defaultModel),
-		defaultRules: store.getSetting("defaultRules", SETTING_DEFAULTS.defaultRules),
 		theme: store.getSetting("theme", SETTING_DEFAULTS.theme),
 		language: store.getSetting("language", SETTING_DEFAULTS.language),
 		workspaces: store.getSetting("workspaces", SETTING_DEFAULTS.workspaces),
@@ -248,7 +246,8 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			provider,
 			model,
 			thinking: optEnum(fields, "thinking", THINKING_LEVELS) ?? settings.defaultModel.thinking,
-			rules: settings.defaultRules,
+			// New sessions start with no remembered approvals; "always allow" adds them.
+			rules: [],
 			options: { permissionMode: "auto" },
 		});
 		return c.json(session, 201);
@@ -433,8 +432,6 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			deps.checkModel?.(value.provider, value.model);
 			store.setSetting("defaultModel", value);
 		}
-		const rules = optArray(fields, "defaultRules");
-		if (rules) store.setSetting("defaultRules", parseRules(rules));
 		const theme = optEnum(fields, "theme", ["system", "light", "dark"] as const);
 		if (theme) store.setSetting("theme", theme);
 		const language = optEnum(fields, "language", ["system", "zh", "en"] as const);

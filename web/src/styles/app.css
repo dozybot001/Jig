@@ -1219,6 +1219,15 @@ body.scroll-locked {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+/* The right of a session's header: marks, then status and usage. It shrinks long before the title. */
+.session-aside {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	flex: 0 100 auto;
+	min-width: 0;
+}
 .model-picker {
 	display: flex;
 	gap: 6px;
@@ -1756,22 +1765,24 @@ body.scroll-locked {
 	padding: 14px 16px;
 	color: var(--text-3);
 }
-.rule-row {
-	display: grid;
-	grid-template-columns: 96px 128px minmax(0, 1fr) var(--cell);
-	gap: 6px;
+/* One remembered approval per line: what it allows, and a button to stop allowing it. */
+.allowed-row {
+	display: flex;
 	align-items: center;
-	padding: 8px 8px 8px 10px;
+	gap: 8px;
+	min-height: 44px;
+	padding: 6px 8px 6px 14px;
 	border-top: 1px solid var(--border);
 }
-.rule-row:first-child {
+.allowed-row:first-child {
 	border-top: none;
 }
-.rule-row .select-trigger,
-.rule-row .input {
-	min-height: 32px;
-	border-color: transparent;
-	background: var(--surface-2);
+.allowed-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-family: var(--mono);
+	font-size: var(--fs-s);
+	overflow-wrap: anywhere;
 }
 
 /* About: lockup and version, two short paragraphs, then one list of the publisher's details. */
@@ -1963,13 +1974,6 @@ button.about-row {
 	}
 	.model-grid {
 		grid-template-columns: 1fr 1fr;
-	}
-	.rule-row {
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--cell);
-	}
-	.rule-row .input {
-		grid-column: 1 / -1;
-		order: 1;
 	}
 	.field-row {
 		grid-template-columns: minmax(0, 1fr);

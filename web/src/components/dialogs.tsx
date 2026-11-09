@@ -13,7 +13,7 @@ import { createGroup, createSession, renameGroup, updateSession } from "../actio
 import { ApiError } from "../api.ts";
 import { t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
-import { CloseIcon, PlusIcon } from "./icons.tsx";
+import { CloseIcon } from "./icons.tsx";
 import { ModelPicker } from "./session.tsx";
 import {
 	Button,
@@ -28,8 +28,6 @@ import {
 } from "./ui.tsx";
 import { WorkspacePicker } from "./workspaces.tsx";
 
-const TOOLS = ["*", "read", "write", "edit", "glob", "grep", "shell", "web_fetch"];
-
 function fieldError(error: unknown, field: string): string | null {
 	if (!(error instanceof ApiError) || error.field !== field) return null;
 	return describeError(error);
@@ -40,11 +38,35 @@ function generalError(error: unknown, fields: string[]): unknown {
 	return error;
 }
 
+/** One remembered approval in plain words: "运行 npm install", "访问 github.com"… */
+function describeRule(rule: PermissionRule): string {
+	const pattern = rule.pattern ?? "";
+	const what =
+		rule.pattern === "**" && rule.tool === "write"
+			? t("ruleWriteAll")
+			: rule.pattern === "**" && rule.tool === "edit"
+				? t("ruleEditAll")
+				: rule.pattern === "**"
+					? t("allFilesInFolder", { tool: rule.tool })
+					: rule.tool === "shell" && pattern
+						? t("ruleRun", { p: pattern })
+						: rule.tool === "web_fetch" && pattern
+							? t("ruleFetch", { p: pattern })
+							: rule.tool === "read" && pattern
+								? t("ruleRead", { p: pattern })
+								: `${rule.tool}${pattern ? ` ${pattern}` : ""}`;
+	if (rule.effect === "deny") return t("ruleDeny", { rule: what });
+	if (rule.effect === "ask") return t("ruleAsk", { rule: what });
+	return what;
+}
+
 /**
- * Permission rules as one list: the heading and "Add rule" on a line, then a row per rule (effect,
- * tool, optional scope, delete). An empty list says what happens without rules.
+ * What "always allow" on an approval card remembered for this session, one line each, each removable.
+ * Rules are no longer written by hand (founder, 2026-11-09): the approval mode decides how much Jig
+ * asks, and this list holds the exceptions the person granted. Operations that must be confirmed never
+ * get here.
  */
-export function RulesEditor({
+export function AllowedList({
 	rules,
 	onChange,
 }: {
@@ -53,61 +75,26 @@ export function RulesEditor({
 }) {
 	useLang();
 	const headingId = useId();
-	const update = (index: number, patch: Partial<PermissionRule>) =>
-		onChange(rules.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)));
 	return (
 		<section className="rules" aria-labelledby={headingId}>
 			<div className="rules-head">
 				<span className="field-label">
-					<span id={headingId}>{t("rules")}</span>
-					<Toggletip label={t("rules")} text={t("rulesHelp")} />
+					<span id={headingId}>{t("allowedTitle")}</span>
+					<Toggletip label={t("allowedTitle")} text={t("allowedHelp")} />
 				</span>
-				<Button onClick={() => onChange([...rules, { effect: "allow", tool: "shell" }])}>
-					<PlusIcon />
-					{t("addRule")}
-				</Button>
 			</div>
 			<div className="rules-list">
 				{rules.length === 0 ? (
-					<p className="rules-empty">{t("noRules")}</p>
+					<p className="rules-empty">{t("noAllowed")}</p>
 				) : (
 					rules.map((rule, index) => (
-						// biome-ignore lint/suspicious/noArrayIndexKey: rules have no identity besides their position
-						<div key={index} className="rule-row">
-							<Select
-								label={t("effect")}
-								value={rule.effect}
-								options={(["allow", "ask", "deny"] as const).map((e) => ({
-									value: e,
-									label: t(`effect_${e}`),
-								}))}
-								onChange={(value) => update(index, { effect: value as PermissionRule["effect"] })}
-							/>
-							<Select
-								label={t("tool")}
-								value={rule.tool}
-								options={TOOLS.map((tool) => ({ value: tool, label: tool }))}
-								onChange={(value) => update(index, { tool: value })}
-							/>
-							<input
-								className="input"
-								aria-label={t("pattern")}
-								placeholder={t("pattern")}
-								value={rule.pattern ?? ""}
-								onChange={(event) => {
-									const pattern = event.target.value;
-									const { pattern: _drop, ...rest } = rule;
-									onChange(
-										rules.map((r, i) =>
-											i === index ? (pattern ? { ...rest, pattern } : rest) : r,
-										),
-									);
-								}}
-							/>
+						// biome-ignore lint/suspicious/noArrayIndexKey: remembered approvals have no identity besides their position
+						<div key={index} className="allowed-row">
+							<span className="allowed-text">{describeRule(rule)}</span>
 							<Button
 								variant="icon"
-								aria-label={t("deleteRule")}
-								title={t("deleteRule")}
+								aria-label={t("removeAllowed", { rule: describeRule(rule) })}
+								title={t("removeAllowed", { rule: describeRule(rule) })}
 								onClick={() => onChange(rules.filter((_, i) => i !== index))}
 							>
 								<CloseIcon />
@@ -318,7 +305,7 @@ export function SessionSettingsDialog({
 					onChange={(event) => setResponsibility(event.target.value)}
 				/>
 			</Field>
-			<RulesEditor rules={rules} onChange={setRules} />
+			<AllowedList rules={rules} onChange={setRules} />
 			<h3 className="field-heading">{t("lettersSection")}</h3>
 			<Field label={t("receive")} labelId={receiveId}>
 				<Select

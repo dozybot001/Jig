@@ -6,7 +6,6 @@ import type {
 	Entry,
 	Group,
 	Letter,
-	PermissionRule,
 	QueuedMessage,
 	Session,
 	ThinkingLevel,
@@ -15,7 +14,6 @@ import type {
 
 export interface Settings {
 	defaultModel: { provider: string; model: string; thinking: ThinkingLevel };
-	defaultRules: PermissionRule[];
 	theme: "system" | "light" | "dark";
 	language: "system" | "zh" | "en";
 	workspaces: Workspace[];

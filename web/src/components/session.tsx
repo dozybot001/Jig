@@ -190,8 +190,11 @@ function SessionHeader({ session }: { session: Session }) {
 	return (
 		<header className="session-header">
 			<SidebarToggle />
+			{/* The title takes the left; marks, status and usage sit on the right and give way first. */}
 			<div className="session-title">
 				<h1>{session.name}</h1>
+			</div>
+			<div className="session-aside">
 				{isMain && <span className="tag">{t("mainConversation")}</span>}
 				{session.outcome && <span className="tag">{t(`outcome_${session.outcome}`)}</span>}
 				{parentId && parent && (

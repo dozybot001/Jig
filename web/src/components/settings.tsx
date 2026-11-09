@@ -9,7 +9,7 @@ import {
 } from "../actions.ts";
 import { t, useLang } from "../i18n.ts";
 import { type ProviderSummary, setState, useAppState } from "../state.ts";
-import { ConfirmDialog, RulesEditor } from "./dialogs.tsx";
+import { ConfirmDialog } from "./dialogs.tsx";
 import {
 	ChevronIcon,
 	GearIcon,
@@ -245,20 +245,17 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 	useLang();
 	const settings = useAppState((state) => state.settings);
 	const [model, setModel] = useState(settings?.defaultModel);
-	const [rules, setRules] = useState(settings?.defaultRules ?? []);
 	const [log, setLog] = useState(settings?.decisionLog ?? "");
 	const logId = useId();
 	const save = useAction(async () => {
 		await saveSettings({
 			...(model ? { defaultModel: model } : {}),
-			defaultRules: rules,
 			decisionLog: log.trim() || null,
 		});
 		onClose();
 	});
 	const dirty =
 		JSON.stringify(model) !== JSON.stringify(settings?.defaultModel) ||
-		JSON.stringify(rules) !== JSON.stringify(settings?.defaultRules ?? []) ||
 		log.trim() !== (settings?.decisionLog ?? "");
 	return (
 		<Dialog
@@ -293,8 +290,6 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 					/>
 				</Field>
 			)}
-			<RulesEditor rules={rules} onChange={setRules} />
-			<p className="hint">{t("defaultRulesBody")}</p>
 			<Field label={t("decisionLog")} htmlFor={logId} info={t("decisionLogHelp")}>
 				<input
 					id={logId}

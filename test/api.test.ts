@@ -223,11 +223,6 @@ describe("api: groups, settings, search", () => {
 		assert.equal(saved.theme, "dark");
 		assert.equal(saved.language, "zh");
 		assert.equal((await call("PATCH", "/api/settings", { theme: "blue" })).status, 400);
-		assert.equal(
-			(await call("PATCH", "/api/settings", { defaultRules: [{ effect: "maybe", tool: "shell" }] }))
-				.status,
-			400,
-		);
 	});
 
 	test("search caps the query length", async () => {
