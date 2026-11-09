@@ -48,7 +48,8 @@ export type LetterReason =
 	| "refuse-policy"
 	| "hold-policy"
 	| "lower-rank"
-	| "person-refused";
+	| "person-refused"
+	| "archived";
 
 export function reasonText(reason: string | null): string {
 	switch (reason) {
@@ -74,6 +75,8 @@ export function reasonText(reason: string | null): string {
 			return "the session has more permissions than you, so the person releases your letters to it first";
 		case "person-refused":
 			return "the person refused it";
+		case "archived":
+			return "the session was archived before it read the letter";
 		default:
 			return reason ?? "";
 	}
@@ -123,6 +126,27 @@ function rank(session: Session): number {
 }
 
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
+
+/**
+ * Whether a letter from `from` answers a request `to` sent it and is still waiting on: it replies to that
+ * request and is not a request itself (a question back is not the answer). Only the first answer counts,
+ * because it closes the request.
+ */
+function answersOpenRequest(
+	from: Session,
+	to: Session,
+	repliedTo: Letter | null,
+	kind: LetterKind,
+): boolean {
+	return (
+		repliedTo !== null &&
+		kind !== "request" &&
+		repliedTo.kind === "request" &&
+		repliedTo.fromSession === to.id &&
+		repliedTo.toSession === from.id &&
+		repliedTo.status === "delivered"
+	);
+}
 
 function limited(value: unknown, field: string, max: number, required: boolean): string {
 	if (value === undefined || value === null) {
@@ -265,7 +289,7 @@ export class PostOffice {
 			decision: out.decision ?? null,
 		};
 
-		// Jig's automatic reports answer one request each, so they skip the limits (and cannot loop).
+		// Jig's automatic letters answer one request each, so they skip the limits (and cannot loop).
 		if (sender.kind === "session" && !out.auto) {
 			const current = this.#store.getSession(sender.session.id);
 			const stop = this.#limits(current, to, path, summary, body, repliedTo?.id ?? null);
@@ -273,7 +297,12 @@ export class PostOffice {
 				return this.mail.addLetter({ ...base, status: stop.status, statusReason: stop.reason });
 			}
 		}
-		const policy = this.#policy(sender, to, repliedTo, out.auto ?? false);
+		// The first answer to a request the recipient is still waiting on closes that request.
+		const answers =
+			sender.kind === "session" &&
+			!out.auto &&
+			answersOpenRequest(sender.session, to, repliedTo, out.kind);
+		const policy = this.#policy(sender, to, out.auto ?? false, answers);
 		const letter = this.#store.tx(() => {
 			const letter = this.mail.addLetter({
 				...base,
@@ -283,6 +312,7 @@ export class PostOffice {
 			if (sender.kind === "session" && !out.auto && policy.status !== "refused") {
 				this.#store.countLetterSent(sender.session.id);
 			}
+			if (answers && repliedTo) this.mail.closeRequest(repliedTo.id);
 			return letter;
 		});
 		if (sender.kind === "session" && !out.auto && policy.status !== "refused") {
@@ -297,6 +327,14 @@ export class PostOffice {
 		const letter = this.mail.getLetter(letterId);
 		if (letter.status !== "held") {
 			throw conflict("This letter is not waiting for you.", undefined, "already-answered");
+		}
+		const to = this.#store.getSession(letter.toSession);
+		if (to.archivedAt !== null) {
+			throw conflict(
+				`${to.name} is archived and cannot receive letters. Restore it first.`,
+				undefined,
+				"session-archived",
+			);
 		}
 		const released = this.mail.setLetterStatus(letterId, "queued", { reason: null });
 		this.#hooks.queued(released);
@@ -329,6 +367,18 @@ export class PostOffice {
 		}
 	}
 
+	/**
+	 * Why a letter from `from` to a session that does not exist yet would not go out, or null.
+	 * open_session asks before it opens one, so a refused brief leaves no session behind.
+	 */
+	blockedNew(from: Session): LetterReason | null {
+		const current = this.#store.getSession(from.id);
+		if (current.lettersSent >= this.letterQuota(current)) return "quota";
+		if (this.#recent(from.id).length >= TOTAL_RATE) return "burst";
+		if ((this.#chains.get(from.id) ?? []).length + 1 > MAX_HOPS) return "hops";
+		return null;
+	}
+
 	/** The anti-runaway rules (blueprint 7.1 and 7.2), in the order a person would want to hear them. */
 	#limits(
 		from: Session,
@@ -344,9 +394,7 @@ export class PostOffice {
 		const same = (letter: Letter) =>
 			letter.summary === summary && letter.body === body && letter.replyTo === replyTo;
 		if (between.some(same)) return { status: "dropped", reason: "duplicate" };
-		const recent = (this.#sent.get(from.id) ?? []).filter(
-			(sent) => sent.time > Date.now() - MINUTE,
-		);
+		const recent = this.#recent(from.id);
 		if (recent.filter((sent) => sent.to === to.id).length >= PAIR_RATE) {
 			return { status: "refused", reason: "rate" };
 		}
@@ -359,39 +407,38 @@ export class PostOffice {
 		return null;
 	}
 
+	/** The session's letters in the last minute, and to whom. */
+	#recent(sessionId: string): { to: string; time: number }[] {
+		const since = Date.now() - MINUTE;
+		return (this.#sent.get(sessionId) ?? []).filter((sent) => sent.time > since);
+	}
+
 	#recordSend(sessionId: string, to: string): void {
-		const now = Date.now();
-		const recent = (this.#sent.get(sessionId) ?? []).filter((sent) => sent.time > now - MINUTE);
-		recent.push({ to, time: now });
+		const recent = this.#recent(sessionId);
+		recent.push({ to, time: Date.now() });
 		this.#sent.set(sessionId, recent);
 	}
 
-	/** The recipient's receive policy, and the hold for letters from sessions with fewer permissions. */
+	/**
+	 * The recipient's receive policy, and the hold for letters from sessions with fewer permissions. Both
+	 * are for letters the recipient did not ask for: Jig's automatic letters and the first answer to a
+	 * request it is still waiting on go straight through.
+	 */
 	#policy(
 		sender: Sender,
 		to: Session,
-		repliedTo: Letter | null,
 		auto: boolean,
+		answers: boolean,
 	): { status: "queued" | "held" | "refused"; reason?: LetterReason } {
 		if (sender.kind === "person") return { status: "queued" };
+		if (sender.kind === "session" && (auto || answers)) return { status: "queued" };
 		const policy = to.options.receive ?? "accept";
 		if (policy === "refuse") return { status: "refused", reason: "refuse-policy" };
 		if (policy === "hold") return { status: "held", reason: "hold-policy" };
 		if (sender.kind !== "session") return { status: "queued" };
 		const from = sender.session;
-		// One answer to a request the recipient itself sent is expected; replying to any old letter is not
-		// a way around the hold.
-		const answersRequest =
-			repliedTo !== null &&
-			repliedTo.fromSession === to.id &&
-			repliedTo.kind === "request" &&
-			!this.mail.answered(repliedTo.id, from.id);
 		const exempt =
-			from.id === this.mainSessionId() ||
-			from.parentId === to.id ||
-			to.parentId === from.id ||
-			auto ||
-			answersRequest;
+			from.id === this.mainSessionId() || from.parentId === to.id || to.parentId === from.id;
 		if (!exempt && rank(from) < rank(to)) return { status: "held", reason: "lower-rank" };
 		return { status: "queued" };
 	}

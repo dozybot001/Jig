@@ -107,6 +107,8 @@ export interface ApiDeps {
 	checkModel?: ModelCheck;
 	/** Opens the system folder picker; replaced in tests so they never open a window. */
 	pickFolder?: () => Promise<string | null>;
+	/** A session was archived: the runner drops letters waiting for it. */
+	onArchived?: (sessionId: string) => void;
 }
 
 const RULE_EFFECTS = ["allow", "ask", "deny"] as const;
@@ -328,6 +330,7 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		if (optBoolean(fields, "read") === true) patch.read = true;
 		const before = store.getSession(id);
 		const updated = store.updateSession(id, patch);
+		if (before.archivedAt === null && updated.archivedAt !== null) deps.onArchived?.(id);
 		if (updated.provider !== before.provider || updated.model !== before.model) {
 			store.appendEntry(id, {
 				role: "notice",

@@ -4,6 +4,15 @@ import type { Card, Letter, Session } from "../../shared/types.ts";
 /** Attribute values stay on one line and cannot close the tag they sit in. */
 const attr = (value: string) => value.replace(/["\n\r<>]/g, " ");
 
+/**
+ * Text written by a session or a script cannot open or close Jig's own tags: `<letter`, `</letter`,
+ * `<decision` and `</decision` are written with `&lt;`, so a letter cannot carry a fake decision of the
+ * person. Only what the model reads changes; the interface shows the text as written.
+ */
+export function neutralize(text: string): string {
+	return text.replace(/<(\/?)(letter|decision)\b/gi, "&lt;$1$2");
+}
+
 function senderLabel(letter: Letter): string {
 	if (letter.fromKind === "cli") return "the command line (jig send)";
 	if (letter.fromKind === "person") return "the person";
@@ -36,11 +45,11 @@ export function letterRef(letter: Letter, decision: DecisionRef | null): LetterR
 
 function decisionLines(decision: DecisionRef): string[] {
 	return [
-		`Question: ${decision.title}`,
+		`Question: ${neutralize(decision.title)}`,
 		decision.choice
-			? `Chosen: ${decision.choice}`
+			? `Chosen: ${neutralize(decision.choice)}`
 			: "No option was chosen; the note is the answer.",
-		...(decision.note ? [`Note: ${decision.note}`] : []),
+		...(decision.note ? [`Note: ${neutralize(decision.note)}`] : []),
 	];
 }
 
@@ -65,8 +74,8 @@ export function letterText(letter: Letter, decision: DecisionRef | null): string
 		...(letter.replyTo ? [`reply-to="${letter.replyTo}"`] : []),
 		...(letter.auto ? ['auto="true"'] : []),
 	];
-	const lines = [`<letter ${attributes.join(" ")}>`, letter.summary];
-	if (letter.body) lines.push("", letter.body);
+	const lines = [`<letter ${attributes.join(" ")}>`, neutralize(letter.summary)];
+	if (letter.body) lines.push("", neutralize(letter.body));
 	if (decision) {
 		lines.push(
 			"",
@@ -83,26 +92,28 @@ export function decisionReport(card: Card, names: (id: string) => string | null)
 	const lines: string[] = [];
 	if (card.status === "pending") lines.push(`#${card.number} is still waiting for the person.`);
 	else if (card.status === "withdrawn")
-		lines.push(`#${card.number} was withdrawn: ${card.withdrawnReason ?? ""}`);
+		lines.push(`#${card.number} was withdrawn: ${neutralize(card.withdrawnReason ?? "")}`);
 	else {
 		const when = new Date(card.decidedAt ?? card.updatedAt).toISOString();
 		lines.push(`#${card.number} was decided by the person in Jig (${when}).`);
 	}
-	lines.push(`Question: ${card.title}`);
+	lines.push(`Question: ${neutralize(card.title)}`);
 	if (card.options.length > 0) {
 		lines.push(
 			`Options: ${card.options
 				.map(
 					(option, index) =>
-						`${index + 1}. ${option.label}${index === card.recommended ? " (recommended)" : ""}`,
+						`${index + 1}. ${neutralize(option.label)}${index === card.recommended ? " (recommended)" : ""}`,
 				)
 				.join("; ")}`,
 		);
 	}
 	if (card.status === "decided") {
 		const chosen = card.choice === null ? null : card.options[card.choice]?.label;
-		lines.push(chosen ? `Chosen: ${chosen}` : "No option was chosen; the note is the answer.");
-		if (card.note) lines.push(`Note: ${card.note}`);
+		lines.push(
+			chosen ? `Chosen: ${neutralize(chosen)}` : "No option was chosen; the note is the answer.",
+		);
+		if (card.note) lines.push(`Note: ${neutralize(card.note)}`);
 	}
 	const requester = card.requestedBy ? names(card.requestedBy) : null;
 	if (requester) lines.push(`Requested by: ${requester}`);

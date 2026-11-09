@@ -320,6 +320,24 @@ describe("permission modes", () => {
 		assert.equal(decision.effect, "deny");
 	});
 
+	test("commands that name credentials or Jig's data, or use Jig's command line, ask every time", () => {
+		for (const s of [auto, skip]) {
+			for (const command of [
+				`sqlite3 ${join(jigHome, "jig.db")} "update approvals set status = 'allowed'"`,
+				`cp ${join(jigHome, "jig.db")} backup.db`,
+				"cat ~/.ssh/config",
+				"jig send 平台组 上线吧",
+				"jig open --print",
+			]) {
+				const request = askOf(run(command, s));
+				assert.ok(request?.mustConfirm, command);
+				assert.equal(request?.rememberRules, undefined, command);
+			}
+			assert.equal(run("jig --version", s).effect, "allow");
+			assert.equal(run("jig send --help", s).effect, "allow");
+		}
+	});
+
 	test("sessions from before the modes read direct edits as automatic", () => {
 		assert.equal(edit(session({ options: { directEdits: true } })).effect, "allow");
 		askOf(edit(session()));

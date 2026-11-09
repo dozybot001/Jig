@@ -1,7 +1,7 @@
 import type { CardOption, Letter, TaskOutcome } from "../../shared/types.ts";
 import { TASK_OUTCOMES } from "../../shared/types.ts";
 import { JigError } from "../errors.ts";
-import { decisionReport, directoryLine } from "../mail/envelope.ts";
+import { decisionReport, directoryLine, neutralize } from "../mail/envelope.ts";
 import { type CardInput, reasonText } from "../mail/post.ts";
 import {
 	bool,
@@ -44,34 +44,34 @@ function nameOf(mail: MailContext, id: string): string {
 	return mail.post.sessionName(id) ?? id;
 }
 
+/** What a waiting call returns. The other session's words cannot pass for Jig's own tags. */
 function waitText(name: string, result: WaitResult): ToolResult {
 	switch (result.kind) {
 		case "letter": {
 			const letter = result.letter;
+			const words = neutralize(`${letter.summary}${letter.body ? `\n\n${letter.body}` : ""}`);
 			return {
-				content: [
-					text(
-						`${name} wrote back (letter ${letter.id}, ${letter.kind}):\n${letter.summary}${letter.body ? `\n\n${letter.body}` : ""}`,
-					),
-				],
+				content: [text(`${name} wrote back (letter ${letter.id}, ${letter.kind}):\n${words}`)],
 			};
 		}
-		case "ended":
+		case "ended": {
+			const said = neutralize(result.text.trim());
 			if (result.stopped) {
 				return errorResult(
-					`The person stopped ${name} before it finished.${result.text.trim() ? ` Its last reply:\n${result.text.trim()}` : ""}`,
+					`The person stopped ${name} before it finished.${said ? ` Its last reply:\n${said}` : ""} When it goes on, its reply comes to you as a letter.`,
 				);
 			}
 			if (result.status === "error") {
-				return errorResult(`${name} stopped with an error: ${result.detail ?? "unknown error"}`);
+				return errorResult(
+					`${name} stopped with an error: ${result.detail ?? "unknown error"}\nWhen it goes on, its reply comes to you as a letter.`,
+				);
 			}
 			return {
 				content: [
-					text(
-						`${name} finished its turn. Its last reply:\n${result.text.trim() || "(no written reply)"}`,
-					),
+					text(`${name} finished its turn. Its last reply:\n${said || "(no written reply)"}`),
 				],
 			};
+		}
 		case "timeout":
 			return {
 				content: [
@@ -98,6 +98,8 @@ function waitText(name: string, result: WaitResult): ToolResult {
 			};
 		case "stopped":
 			return errorResult(`Stopped while waiting for ${name}.`);
+		case "archived":
+			return errorResult(`${name} was archived before it read the letter; it will not answer.`);
 	}
 }
 
@@ -159,7 +161,7 @@ export const listSessionsTool: ToolDefinition = {
 export const sendLetterTool: ToolDefinition = {
 	name: "send_letter",
 	description:
-		"Send a letter to another session by its id. A notice is for information; a request asks the recipient to do or answer something, and its final reply comes back to you as a letter; a report gives the result of something you were asked. With wait, this call waits until the recipient writes back or finishes its turn (at most 30 minutes) and returns its answer. Write the summary so it makes sense on its own, and do not write only to acknowledge or thank.",
+		"Send a letter to another session by its id. A notice is for information; a request asks the recipient to do or answer something, and its final reply comes back to you as a letter; a report gives the result of something you were asked. When you answer a letter, give its id as reply_to. With wait, this call waits until the recipient replies to this letter or finishes its turn (at most 30 minutes) and returns its answer. Write the summary so it makes sense on its own, and do not write only to acknowledge or thank.",
 	parameters: {
 		type: "object",
 		properties: {
@@ -295,6 +297,8 @@ export const openSessionTool: ToolDefinition = {
 			name: opened.session.name,
 			letterId: opened.letter.id,
 		};
+		const problem = sentText(ctx.mail, opened.letter);
+		if (problem) return { ...problem, detail };
 		if (bool(args, "wait")) {
 			return { ...waitText(opened.session.name, await ctx.mail.wait(opened.letter)), detail };
 		}

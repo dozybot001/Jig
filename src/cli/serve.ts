@@ -92,6 +92,7 @@ export function serveCommand(): Command {
 			const { PermissionEngine } = await import("../server/permissions/engine.ts");
 			const { createApp } = await import("../server/http/app.ts");
 			const { issueLoginToken } = await import("../server/http/security.ts");
+			const { MailStore } = await import("../server/mail/store.ts");
 
 			const runtime = openRuntime({ env: io.env });
 			const { store, bus, gateway, home } = runtime;
@@ -102,6 +103,8 @@ export function serveCommand(): Command {
 				);
 			}
 			store.pruneEvents(Date.now() - EVENT_RETENTION_MS);
+			// Answers handed to a waiting call whose result was never stored come back as letters.
+			new MailStore(store).requeueHandedOff();
 			const log = (line: string) => io.stderr.write(`${line}\n`);
 			const agents = new Agents({
 				store,

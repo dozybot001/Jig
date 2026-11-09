@@ -191,6 +191,12 @@ export class PermissionEngine {
 		for (const argv of commands) {
 			const reason = mustConfirmReason(argv);
 			if (reason) reasons.add(reason);
+			// File tools cannot touch these places at all; a command that names one asks every time.
+			const secret = pathArguments(argv).some((arg) => {
+				const path = resolvePath(arg, cwd);
+				return path !== null && isSecretPath(path, this.#secrets);
+			});
+			if (secret) reasons.add("touches credentials or Jig's own data");
 		}
 		if (privileged) reasons.add("runs with administrator rights");
 		for (const target of redirectTargets) {

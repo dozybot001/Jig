@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+import type { Sender } from "../server/mail/post.ts";
 import type { LetterKind } from "../shared/types.ts";
 import { type CliIo, EXIT_ERROR, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
@@ -9,8 +10,9 @@ const HELP = `Usage: jig send [options] <session> <message>
 Send a letter to a session, from a script, CI or a git hook. <session> is the
 session's id or name. Use - as the message to read it from standard input; the
 first line is the summary. The letter is marked as coming from the command
-line, not from you. A running Jig delivers it within a few seconds; otherwise
-it waits until Jig starts.
+line, not from you; run inside a session's shell, it comes from that session
+and counts against its letters. A running Jig delivers it within a few
+seconds; otherwise it waits until Jig starts.
 
 Options:
   -k, --kind <kind>  notice, request or report (default: notice)
@@ -74,6 +76,17 @@ export function sendCommand(): Command {
 						return EXIT_ERROR;
 					}
 				}
+				// Inside a session's shell the letter is that session's, with its quota, limits and hold.
+				const fromId = io.env.JIG_SESSION?.trim();
+				let sender: Sender = { kind: "cli" };
+				if (fromId) {
+					try {
+						sender = { kind: "session", session: store.getSession(fromId) };
+					} catch {
+						io.stderr.write(`jig: JIG_SESSION names no session (${fromId})\n`);
+						return EXIT_ERROR;
+					}
+				}
 				const [first = "", ...rest] = message.split("\n");
 				const line = first.trim();
 				const summary =
@@ -83,16 +96,13 @@ export function sendCommand(): Command {
 				const body = summary === line ? rest.join("\n").trim() : message;
 				let letter: ReturnType<InstanceType<typeof PostOffice>["send"]>;
 				try {
-					letter = new PostOffice(store).send(
-						{ kind: "cli" },
-						{ to: session.id, kind, summary, body },
-					);
+					letter = new PostOffice(store).send(sender, { to: session.id, kind, summary, body });
 				} catch (error) {
 					if (!(error instanceof JigError)) throw error;
 					io.stderr.write(`jig: ${error.message}\n`);
 					return EXIT_ERROR;
 				}
-				if (letter.status === "refused") {
+				if (letter.status === "refused" || letter.status === "dropped") {
 					io.stderr.write(
 						`jig: ${session.name} did not take the letter: ${reasonText(letter.statusReason)}\n`,
 					);

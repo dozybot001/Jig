@@ -37,6 +37,23 @@ const send = (argv: string[], env: Record<string, string>, stdin?: string[]) => 
 };
 
 describe("jig send", () => {
+	test("inside a session's shell the letter comes from that session, with its limits", async () => {
+		const { dir, created, letters } = home([sessionInput("平台组"), sessionInput("产品会话")]);
+		const from = created[1] as { id: string };
+		const env = { JIG_HOME: dir, JIG_SESSION: from.id };
+		const result = await send(["平台组", "构建好了"], env);
+		assert.equal(result.code, 0);
+		const [letter] = letters();
+		assert.equal(letter?.fromKind, "session");
+		assert.equal(letter?.fromSession, from.id);
+		const again = await send(["平台组", "构建好了"], env);
+		assert.equal(again.code, 1);
+		assert.match(again.stderr.text(), /already sent/);
+		const unknown = await send(["平台组", "构建好了"], { JIG_HOME: dir, JIG_SESSION: "nope" });
+		assert.equal(unknown.code, 1);
+		assert.match(unknown.stderr.text(), /JIG_SESSION names no session/);
+	});
+
 	test("sends a letter by name; the first line is the summary; it is marked as from the command line", async () => {
 		const { dir, letters } = home([sessionInput("平台组")]);
 		const result = await send(["平台组", "main 上的构建失败了\n失败的测试：api"], {

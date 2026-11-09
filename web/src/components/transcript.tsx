@@ -646,7 +646,7 @@ function LetterEntry({ letter }: { letter: LetterRef }) {
 					<span>{from}</span>
 				)}
 				<span className="tag">{kind}</span>
-				{letter.auto && <span className="hint">{t("autoReport")}</span>}
+				{letter.auto && <span className="hint">{t("sentByJig")}</span>}
 			</div>
 			<p className="letter-summary">{letter.summary}</p>
 			{body && (

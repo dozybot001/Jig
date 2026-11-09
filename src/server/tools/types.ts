@@ -39,7 +39,9 @@ export type WaitResult =
 	/** The recipient is not running (it needs the person first); the letter waits for it. */
 	| { kind: "not-running"; status: SessionStatus }
 	/** This session was stopped while it waited. */
-	| { kind: "stopped" };
+	| { kind: "stopped" }
+	/** The person archived the recipient before it read the letter. */
+	| { kind: "archived" };
 
 export interface OpenInput {
 	name: string;

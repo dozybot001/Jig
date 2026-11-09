@@ -254,8 +254,10 @@ export class MailStore {
 	}
 
 	/**
-	 * Requests a session has read and not finished with: delivered, from another session. Kept in the
-	 * database, so a reply that was owed when Jig stopped is still owed after it starts again.
+	 * Requests from other sessions that a session has read and not answered yet. A request stays open
+	 * until the session answers it or finishes a turn normally, so a turn that ended with an error, was
+	 * stopped, or is waiting for answers of its own still owes the requester a reply. Kept in the
+	 * database, so what was owed when Jig stopped is still owed after it starts again.
 	 */
 	openRequests(sessionId: string): Letter[] {
 		const rows = this.#q(
@@ -265,32 +267,53 @@ export class MailStore {
 		return rows.map(toLetter);
 	}
 
-	/** Whether one session wrote to another (in any way that was not refused or dropped) since a time. */
-	wroteSince(from: string, to: string, since: number): boolean {
-		const row = this.#q(
-			`SELECT 1 FROM letters WHERE from_session = ? AND to_session = ? AND created_at >= ?
-				AND status NOT IN ('refused', 'dropped') LIMIT 1`,
-		).get(from, to, since);
-		return row !== undefined;
+	/** The request was answered: it is done. */
+	closeRequest(id: string): void {
+		if (this.#letterRow(id).status === "delivered") this.setLetterStatus(id, "done");
 	}
 
-	/** Whether a session already answered a letter (once is what the hold rule lets through). */
-	answered(letterId: string, by: string): boolean {
-		const row = this.#q(
-			`SELECT 1 FROM letters WHERE reply_to = ? AND from_session = ?
-				AND status NOT IN ('refused', 'dropped') LIMIT 1`,
-		).get(letterId, by);
-		return row !== undefined;
-	}
-
-	/** Everything a session has read is done once its turn ends. */
-	finishDelivered(sessionId: string): void {
+	/** At the end of a turn, what the session read is done, except requests it still owes a reply. */
+	finishRead(sessionId: string): void {
 		const rows = this.#q(
-			"SELECT id FROM letters WHERE to_session = ? AND status = 'delivered'",
+			`SELECT id FROM letters WHERE to_session = ? AND status = 'delivered'
+				AND NOT (kind = 'request' AND from_kind = 'session')`,
 		).all(sessionId) as { id: string }[];
 		this.#store.tx(() => {
 			for (const row of rows) this.setLetterStatus(row.id, "done");
 		});
+	}
+
+	/** A letter handed to a waiting tool call reached the transcript with that call's result. */
+	setLetterEntry(id: string, entryId: string): void {
+		this.#q("UPDATE letters SET entry_id = ?, updated_at = ? WHERE id = ?").run(
+			entryId,
+			Date.now(),
+			id,
+		);
+	}
+
+	/**
+	 * After a restart: letters handed to a waiting tool call whose result was never stored are delivered
+	 * again as ordinary letters, so the answer is not lost.
+	 */
+	requeueHandedOff(): number {
+		const rows = this.#q(
+			"SELECT id FROM letters WHERE status = 'delivered' AND entry_id IS NULL",
+		).all() as { id: string }[];
+		this.#store.tx(() => {
+			for (const row of rows) this.setLetterStatus(row.id, "queued");
+		});
+		return rows.length;
+	}
+
+	/** Letters waiting for a session that was archived: they will not be delivered. */
+	dropWaiting(sessionId: string, reason: string): Letter[] {
+		const rows = this.#q(
+			"SELECT id FROM letters WHERE to_session = ? AND status IN ('queued', 'held')",
+		).all(sessionId) as { id: string }[];
+		return this.#store.tx(() =>
+			rows.map((row) => this.setLetterStatus(row.id, "dropped", { reason })),
+		);
 	}
 
 	/** Letters from one session to another since a time, refused ones left out. */

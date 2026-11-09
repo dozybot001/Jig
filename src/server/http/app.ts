@@ -61,6 +61,7 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 			store,
 			...(gateway ? { checkModel: (p: string, m: string) => gateway.check(p, m) } : {}),
 			...(options.pickFolder ? { pickFolder: options.pickFolder } : {}),
+			...(agents ? { onArchived: (id: string) => agents.archived(id) } : {}),
 		}),
 	);
 	if (gateway) app.route("/api", providerRoutes(store, gateway));

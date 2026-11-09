@@ -306,6 +306,12 @@ export function mustConfirmReason(argv: string[]): string | null {
 		args.some((arg) => prefixes.some((prefix) => arg.startsWith(prefix)));
 
 	if (["rm", "rmdir", "unlink", "shred", "srm", "trash"].includes(name)) return "deletes files";
+	// Jig's own command line sends letters and manages keys and the service; sessions use their tools.
+	if (name === "jig") {
+		const informational =
+			has("--help", "-h") || args.every((arg) => ["--version", "-v", "--json"].includes(arg));
+		if (!informational) return "uses Jig's own command line";
+	}
 	if (name === "find" && has("-delete")) return "deletes files";
 	if (name === "rsync" && hasPrefix("--delete", "--remove-source-files")) return "deletes files";
 	if (name === "git") {

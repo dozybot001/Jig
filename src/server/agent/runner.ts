@@ -21,7 +21,7 @@ import {
 } from "../../shared/types.ts";
 import { conflict, invalid, JigError } from "../errors.ts";
 import { decisionRef, letterRef, letterText } from "../mail/envelope.ts";
-import { BODY_MAX, PostOffice, SUMMARY_MAX } from "../mail/post.ts";
+import { BODY_MAX, PostOffice, reasonText, SUMMARY_MAX } from "../mail/post.ts";
 import type { ModelGateway, ModelInfo } from "../model/gateway.ts";
 import { resolveWorkingFolder } from "../paths.ts";
 import type { PermissionEngine } from "../permissions/engine.ts";
@@ -105,6 +105,9 @@ const MAX_STEPS = 500;
 const TODO_REMINDER_AFTER = 12;
 /** How long a session waits for another one's answer (blueprint 7.1: one wait, no polling). */
 const WAIT_MS = 30 * 60 * 1000;
+/** The result of a call that was running when Jig stopped (blueprint 7.3). */
+const RESTARTED =
+	"Jig restarted while this call was running. It may or may not have finished; check the current state before running it again.";
 
 const firstLine = (text: string) => (text.trim().split("\n")[0] ?? "").trim();
 const clip = (text: string, max: number) =>
@@ -180,11 +183,20 @@ export class Agents {
 	readonly #waitMs: number;
 	/** Each working session's latest written reply in this turn. */
 	readonly #lastText = new Map<string, string>();
-	/** Sessions blocked in send_letter or open_session, and the session each waits for. */
+	/** Sessions blocked in send_letter or open_session: the session, letter and tool call each waits on. */
 	readonly #waits = new Map<
 		string,
-		{ target: string; letterId: string; resolve: (result: WaitResult) => void }
+		{ target: string; letterId: string; callId: string; resolve: (result: WaitResult) => void }
 	>();
+	/**
+	 * Each working session's current turn: the letters it sent, and for each letter it read, how many it
+	 * had sent by then, so Jig can tell what it asked after reading a request.
+	 */
+	readonly #turns = new Map<string, { sent: Letter[]; read: Map<string, number> }>();
+	/** Sessions the person stopped: letters wait until the person writes to them or continues them. */
+	readonly #paused = new Set<string>();
+	/** Letters handed to a waiting tool call, by the call's id, until the call's result is stored. */
+	readonly #handed = new Map<string, string>();
 
 	constructor(options: AgentsOptions) {
 		this.#store = options.store;
@@ -218,6 +230,7 @@ export class Agents {
 		if (session.archivedAt !== null)
 			throw conflict("This session is archived. Restore it first.", undefined, "session-archived");
 		// The person stepped in: a full quota of letters again, and a new chain of hand-offs (blueprint 7.1).
+		this.#paused.delete(sessionId);
 		this.#store.resetLettersSent(sessionId);
 		this.#store.addIntervention(sessionId);
 		this.post.resetChain(sessionId);
@@ -238,11 +251,16 @@ export class Agents {
 		const entries = this.#store.contextEntries(sessionId);
 		if (entries.length === 0)
 			throw conflict("There is nothing to continue yet.", undefined, "nothing-to-continue");
+		this.#paused.delete(sessionId);
 		this.#start(sessionId, { resume: true });
 	}
 
+	/** The person stops a session. Letters that arrive later wait until the person writes or continues. */
 	stop(sessionId: string): void {
-		this.#live.get(sessionId)?.controller.abort();
+		const live = this.#live.get(sessionId);
+		if (!live) return;
+		this.#paused.add(sessionId);
+		live.controller.abort();
 	}
 
 	/** Records the person's answer to a permission request or a question, and lets the session go on. */
@@ -270,6 +288,8 @@ export class Agents {
 			throw conflict("Wait until the session stops working.", undefined, "session-busy");
 		const session = this.#store.getSession(sessionId);
 		const model = this.#requireModel(session);
+		// Compacting does not change where the session stands: one that needs review or failed still does.
+		const keep = session.status === "needs_review" || session.status === "error";
 		const controller = new AbortController();
 		const done = this.#compact(session, model, controller.signal, true).then(() => {});
 		this.#live.set(sessionId, { controller, done, waiters: new Map() });
@@ -278,8 +298,24 @@ export class Agents {
 			await done;
 		} finally {
 			this.#live.delete(sessionId);
-			this.#store.setStatus(sessionId, "idle");
+			if (keep) this.#store.setStatus(sessionId, session.status, session.statusDetail);
+			else this.#store.setStatus(sessionId, "idle");
 			this.#wake(sessionId);
+		}
+	}
+
+	/**
+	 * The person archived a session. Letters waiting for it are dropped, so they do not linger or arrive
+	 * when it is restored, and sessions waiting on one of them stop waiting.
+	 */
+	archived(sessionId: string): void {
+		const dropped = new Set(
+			this.post.mail.dropWaiting(sessionId, "archived").map((letter) => letter.id),
+		);
+		for (const waiting of [...this.#waits.values()]) {
+			if (waiting.target === sessionId && dropped.has(waiting.letterId)) {
+				waiting.resolve({ kind: "archived" });
+			}
 		}
 	}
 
@@ -293,6 +329,7 @@ export class Agents {
 		const live: Live = { controller, done: Promise.resolve(), waiters: new Map() };
 		this.#live.set(sessionId, live);
 		this.#lastText.delete(sessionId);
+		this.#turns.set(sessionId, { sent: [], read: new Map() });
 		live.done = this.#run(sessionId, live, options.resume ?? false)
 			.catch((error: unknown) =>
 				this.#log(`session ${sessionId}: ${(error as Error).stack ?? error}`),
@@ -309,11 +346,15 @@ export class Agents {
 		return { canPostCards: this.post.canPostCards(session) };
 	}
 
-	/** The conversation moves on: calls left over from an interrupted run will not be run later. */
+	/**
+	 * The conversation moves on: calls left over from an interrupted run will not be run later. Calls that
+	 * were running when Jig stopped may have finished, so they say that rather than "not run".
+	 */
 	#dropLeftovers(sessionId: string, reason: string): void {
 		this.#store.tx(() => {
 			for (const call of this.#store.toolCallsByStatus(sessionId, ["pending", "needs_review"])) {
-				this.#finishCall(call, failure(reason), "error", Date.now());
+				const text = call.status === "needs_review" ? RESTARTED : reason;
+				this.#finishCall(call, failure(text), "error", Date.now());
 			}
 		});
 	}
@@ -609,22 +650,19 @@ export class Agents {
 			resultMessageId: entry.id,
 			finishedAt: Date.now(),
 		});
+		// A letter this call waited for is now in the transcript, inside the result.
+		const handed = this.#handed.get(row.id);
+		if (handed) {
+			this.#handed.delete(row.id);
+			this.post.mail.setLetterEntry(handed, entry.id);
+		}
 	}
 
 	/** After a restart: calls that were running get an honest "unknown" result; calls that never ran are checked again. */
 	async #resumeCalls(sessionId: string, live: Live): Promise<void> {
 		const unknown = this.#store.toolCallsByStatus(sessionId, ["needs_review"]);
 		this.#store.tx(() => {
-			for (const call of unknown) {
-				this.#finishCall(
-					call,
-					failure(
-						"Jig restarted while this call was running. It may or may not have finished; check the current state before running it again.",
-					),
-					"error",
-					Date.now(),
-				);
-			}
+			for (const call of unknown) this.#finishCall(call, failure(RESTARTED), "error", Date.now());
 		});
 		const pending = this.#store.toolCallsByStatus(sessionId, ["pending"]);
 		if (pending.length > 0)
@@ -689,32 +727,51 @@ export class Agents {
 				if (!answer?.answer) throw new ToolInputError("Stopped before the person answered.");
 				return answer.answer;
 			},
-			mail: this.#mailContext(sessionId, live),
+			mail: this.#mailContext(sessionId, live, row.id),
 		};
 	}
 
 	// --- letters (blueprint section 7) ---
 
-	#mailContext(sessionId: string, live: Live): MailContext {
+	#mailContext(sessionId: string, live: Live, callId: string): MailContext {
 		return {
 			post: this.post,
 			canPostCards: this.post.canPostCards(this.#store.getSession(sessionId)),
-			send: (out) =>
-				this.post.send({ kind: "session", session: this.#store.getSession(sessionId) }, out),
-			wait: (letter) => this.#awaitReply(sessionId, letter, live),
+			send: (out) => {
+				const session = this.#store.getSession(sessionId);
+				return this.#sent(sessionId, this.post.send({ kind: "session", session }, out));
+			},
+			wait: (letter) => this.#awaitReply(sessionId, letter, live, callId),
 			open: (input) => this.#openChild(this.#store.getSession(sessionId), input),
 			finish: (outcome) => this.#store.setOutcome(sessionId, outcome),
 		};
 	}
 
-	/** A letter is queued: it answers a session that waits for its sender, or it wakes the recipient. */
+	/** Notes a letter the session sent in this turn, for what Jig sends on its behalf at the end. */
+	#sent(sessionId: string, letter: Letter): Letter {
+		this.#turns.get(sessionId)?.sent.push(letter);
+		return letter;
+	}
+
+	/** Notes that the session read a letter in this turn. */
+	#read(sessionId: string, letterId: string): void {
+		const turn = this.#turns.get(sessionId);
+		turn?.read.set(letterId, turn.sent.length);
+	}
+
+	/**
+	 * A letter is queued: a reply to the letter a session waits on goes to that waiting call; anything
+	 * else wakes the recipient (or reaches it between tool calls).
+	 */
 	#onQueued(letter: Letter): void {
 		const waiting = this.#waits.get(letter.toSession);
-		if (waiting && letter.fromSession !== null && waiting.target === letter.fromSession) {
+		if (waiting && letter.fromSession === waiting.target && letter.replyTo === waiting.letterId) {
 			this.post.mail.setLetterStatus(letter.id, "delivered", {
 				entryId: null,
 				deliveredAt: Date.now(),
 			});
+			this.#handed.set(waiting.callId, letter.id);
+			this.#read(letter.toSession, letter.id);
 			waiting.resolve({ kind: "letter", letter: this.post.mail.getLetter(letter.id) });
 			return;
 		}
@@ -723,11 +780,11 @@ export class Agents {
 
 	/**
 	 * Starts a session that has letters waiting, when it is free: idle, or stopped by an error. A session
-	 * that needs review waits for the person (blueprint 7.3); one that is working gets its letters
-	 * between tool calls.
+	 * that needs review (blueprint 7.3) or that the person stopped waits for the person; one that is
+	 * working gets its letters between tool calls.
 	 */
 	#wake(sessionId: string): void {
-		if (this.isRunning(sessionId)) return;
+		if (this.isRunning(sessionId) || this.#paused.has(sessionId)) return;
 		let session: Session;
 		try {
 			session = this.#store.getSession(sessionId);
@@ -769,6 +826,7 @@ export class Agents {
 					entryId: entry.id,
 					deliveredAt: Date.now(),
 				});
+				this.#read(sessionId, letter.id);
 			}
 		});
 		this.post.enterChain(sessionId, letters);
@@ -776,10 +834,13 @@ export class Agents {
 	}
 
 	/**
-	 * The turn is over. Sessions waiting for this one get its last reply; sessions whose request it read
-	 * and did not answer get that reply as a report (blueprint 6.3, item 11); and the letters it read are
-	 * done. What is owed is read from the database, so a restart in the middle loses no report. Reports
-	 * never ask for reports, so this cannot loop.
+	 * The turn is over (blueprint 6.3, item 11). Sessions waiting for this one get its last reply. Every
+	 * session whose request it read and has not answered hears how the turn ended: when the turn finished
+	 * normally and nothing it asked others is still open, its last reply goes back as the report and the
+	 * request is done; after an error, a stop, or while it waits for answers of its own, a notice says so
+	 * and the request stays open, so the real result still follows. A task session's opener hears about
+	 * every turn (M2 plan, section 6). What is owed is read from the database, so a restart in the middle
+	 * loses nothing. Jig's letters never ask for more letters, so this cannot loop.
 	 */
 	#endTurn(
 		sessionId: string,
@@ -790,58 +851,133 @@ export class Agents {
 		this.post.resetChain(sessionId);
 		const said = this.#lastText.get(sessionId) ?? "";
 		this.#lastText.delete(sessionId);
-		const answered = new Set<string>();
+		const turn = this.#turns.get(sessionId) ?? { sent: [], read: new Map<string, number>() };
+		this.#turns.delete(sessionId);
+		const mail = this.post.mail;
+		const session = this.#store.getSession(sessionId);
+		const failed = stopped || status === "error";
+		const open = (letter: Letter) =>
+			["queued", "held", "delivered"].includes(mail.getLetter(letter.id).status);
+
+		const sawEnd = new Set<string>();
 		for (const [waiter, waiting] of [...this.#waits]) {
 			if (waiting.target !== sessionId) continue;
-			// A letter still queued is read in the next turn, which starts at once: wait for that one,
-			// unless the person stopped this session.
-			if (!stopped && this.post.mail.getLetter(waiting.letterId).status === "queued") continue;
-			answered.add(waiter);
+			if (mail.getLetter(waiting.letterId).status === "queued") {
+				// A letter not read yet starts the next turn at once: wait for that turn. Not when the
+				// person stopped this session or archived it.
+				if (session.archivedAt !== null) {
+					waiting.resolve({ kind: "archived" });
+					continue;
+				}
+				if (!stopped) continue;
+			}
+			sawEnd.add(waiter);
 			waiting.resolve({ kind: "ended", status, text: said, detail, stopped });
 		}
-		const open = new Map<string, Letter>();
-		for (const request of this.post.mail.openRequests(sessionId)) {
-			if (request.fromSession) open.set(request.fromSession, request);
+
+		const owed = new Map<string, Letter[]>();
+		for (const request of mail.openRequests(sessionId)) {
+			if (!request.fromSession) continue;
+			owed.set(request.fromSession, [...(owed.get(request.fromSession) ?? []), request]);
 		}
-		if (open.size > 0) {
-			const session = this.#store.getSession(sessionId);
-			const summary = stopped
-				? `${session.name} was stopped by the person before it finished.`
-				: status === "error"
-					? `${session.name} stopped with an error.`
-					: firstLine(said) || `${session.name} finished without a written reply.`;
-			const body = status === "error" && !stopped ? (detail ?? "") : said;
-			for (const [requester, request] of open) {
-				if (answered.has(requester)) continue;
-				// It wrote back on its own after reading the request: that is the answer.
-				const since = request.deliveredAt ?? request.createdAt;
-				if (this.post.mail.wroteSince(sessionId, requester, since)) continue;
-				try {
-					this.post.send(
-						{ kind: "session", session },
-						{
-							to: requester,
-							kind: "report",
-							summary: clip(summary, SUMMARY_MAX),
-							body: clip(body, BODY_MAX),
-							replyTo: request.id,
-							auto: true,
-						},
-					);
-				} catch (error) {
-					if (!(error instanceof JigError)) throw error;
-					this.#log(`session ${sessionId}: no report to ${requester}: ${error.message}`);
-				}
+		if (session.parentId && !owed.has(session.parentId)) owed.set(session.parentId, []);
+
+		for (const [requester, requests] of owed) {
+			const close = () => {
+				for (const request of requests) mail.closeRequest(request.id);
+			};
+			let target: Session | null = null;
+			try {
+				target = this.#store.getSession(requester);
+			} catch {
+				target = null;
 			}
+			if (!target || target.archivedAt !== null) {
+				close();
+				continue;
+			}
+			// What it sent after reading these requests (all of this turn for requests read earlier).
+			const since =
+				requests.length === 0
+					? 0
+					: Math.min(...requests.map((request) => turn.read.get(request.id) ?? 0));
+			const after = turn.sent.slice(since);
+			// A question back or work handed on that is still open: its reply is not the answer yet.
+			const asking = after.some((letter) => letter.kind === "request" && open(letter));
+			const finished = !failed && !asking;
+			// It saw the end through its wait; a normal end answered it.
+			if (sawEnd.has(requester)) {
+				if (finished) close();
+				continue;
+			}
+			const wrote = after.filter(
+				(letter) =>
+					letter.toSession === requester &&
+					letter.status !== "refused" &&
+					letter.status !== "dropped",
+			);
+			const replyTo = requests.at(-1)?.id ?? null;
+			if (finished) {
+				// A task session that already reported to its opener in this turn has said it.
+				if (requests.length === 0 && wrote.some((letter) => letter.kind === "report")) continue;
+				this.#autoLetter(session, requester, {
+					kind: "report",
+					summary: firstLine(said) || `${session.name} finished without a written reply.`,
+					body: said,
+					replyTo,
+				});
+				close();
+				continue;
+			}
+			// Waiting for answers and already in touch with the requester: nothing to add.
+			if (!failed && wrote.length > 0) continue;
+			const follows = `When ${session.name} goes on, its reply comes to you.`;
+			this.#autoLetter(session, requester, {
+				kind: "notice",
+				summary: stopped
+					? `The person stopped ${session.name} before it finished.`
+					: status === "error"
+						? `${session.name} stopped with an error.`
+						: firstLine(said) || `${session.name} is waiting for answers from other sessions.`,
+				body: [status === "error" && !stopped ? (detail ?? "") : said, follows]
+					.filter(Boolean)
+					.join("\n\n"),
+				replyTo,
+			});
 		}
-		this.post.mail.finishDelivered(sessionId);
+		mail.finishRead(sessionId);
+	}
+
+	/** A letter Jig sends on a session's behalf at the end of its turn. */
+	#autoLetter(
+		session: Session,
+		to: string,
+		letter: { kind: "report" | "notice"; summary: string; body: string; replyTo: string | null },
+	): void {
+		try {
+			this.post.send(
+				{ kind: "session", session },
+				{
+					to,
+					kind: letter.kind,
+					summary: clip(letter.summary, SUMMARY_MAX),
+					body: clip(letter.body, BODY_MAX),
+					replyTo: letter.replyTo,
+					auto: true,
+				},
+			);
+		} catch (error) {
+			if (!(error instanceof JigError)) throw error;
+			this.#log(`session ${session.id}: no ${letter.kind} to ${to}: ${error.message}`);
+		}
 	}
 
 	/**
-	 * Waits until the recipient of `letter` writes back or ends its turn, at most `waitMs`. Refuses to wait
-	 * when the recipient already waits for this session, directly or through others: neither could go on.
+	 * Waits until the recipient of `letter` replies to it or ends its turn, at most `waitMs`. Refuses to
+	 * wait when the recipient already waits for this session, directly or through others: neither could
+	 * go on.
 	 */
-	#awaitReply(sessionId: string, letter: Letter, live: Live): Promise<WaitResult> {
+	#awaitReply(sessionId: string, letter: Letter, live: Live, callId: string): Promise<WaitResult> {
 		const target = letter.toSession;
 		for (let at: string | undefined = target, hops = 0; at && hops < 100; hops++) {
 			if (at === sessionId) return Promise.resolve({ kind: "cycle" });
@@ -864,7 +1000,7 @@ export class Agents {
 			};
 			const onAbort = () => finish({ kind: "stopped" });
 			const timer = setTimeout(() => finish({ kind: "timeout" }), this.#waitMs);
-			this.#waits.set(sessionId, { target, letterId: letter.id, resolve: finish });
+			this.#waits.set(sessionId, { target, letterId: letter.id, callId, resolve: finish });
 			if (signal.aborted) onAbort();
 			else signal.addEventListener("abort", onAbort, { once: true });
 		});
@@ -877,6 +1013,14 @@ export class Agents {
 	#openChild(parent: Session, input: OpenInput): { session: Session; letter: Letter } {
 		const brief = input.brief.trim();
 		if (!brief) throw invalid("The brief is empty.", "brief");
+		if ([...brief].length > BODY_MAX) {
+			throw invalid(`The brief can be at most ${BODY_MAX} characters.`, "brief");
+		}
+		// The brief must be able to go out before there is a session to send it to.
+		const blocked = this.post.blockedNew(parent);
+		if (blocked) {
+			throw conflict(`Not opened: ${reasonText(blocked)}.`, undefined, "letter-refused");
+		}
 		let cwd = parent.cwd;
 		if (input.cwd === null) cwd = null;
 		else if (input.cwd !== undefined) {
@@ -912,14 +1056,17 @@ export class Agents {
 			options: { permissionMode: permissionModeOf(parent.options) },
 			parentId: parent.id,
 		});
-		const letter = this.post.send(
-			{ kind: "session", session: parent },
-			{
-				to: session.id,
-				kind: "request",
-				summary: clip(firstLine(brief), SUMMARY_MAX),
-				body: brief,
-			},
+		const letter = this.#sent(
+			parent.id,
+			this.post.send(
+				{ kind: "session", session: parent },
+				{
+					to: session.id,
+					kind: "request",
+					summary: clip(firstLine(brief), SUMMARY_MAX),
+					body: brief,
+				},
+			),
 		);
 		return { session: this.#store.getSession(session.id), letter };
 	}
@@ -1185,7 +1332,10 @@ export class Agents {
 				"compacted",
 				`Earlier history was summarized to save context (${session.contextTokens} tokens before).`,
 			);
-			this.#store.setContextSnapshot(session.id, takeSnapshot(session, this.#home));
+			this.#store.setContextSnapshot(
+				session.id,
+				takeSnapshot(session, this.#home, this.#placement(session)),
+			);
 			this.#store.setContextTokens(
 				session.id,
 				remaining.reduce((sum, entry) => sum + estimateTokens(entry), Math.ceil(text.length / 4)),
