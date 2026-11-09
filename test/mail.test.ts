@@ -154,19 +154,47 @@ describe("sending letters", () => {
 		);
 	});
 
-	test("more than five letters a minute are refused; the same letter twice is dropped", () => {
+	test("one session gets at most three letters a minute from another; many sessions can each get one", () => {
+		const { post, make } = setup();
+		const a = make("总办", { options: { permissionMode: "auto", letterQuota: 50 } });
+		const b = make("平台组");
+		const send = (to: Session, summary: string) =>
+			post.send({ kind: "session", session: a }, letter(to, { summary }));
+		for (const summary of ["一", "二", "三"]) assert.equal(send(b, summary).status, "queued");
+		const fourth = send(b, "四");
+		assert.equal(fourth.status, "refused");
+		assert.equal(fourth.statusReason, "rate");
+		// The main conversation writing to each session once is fine, up to twenty letters a minute.
+		const others = Array.from({ length: 18 }, (_, i) => make(`会话 ${i}`));
+		for (const other of others.slice(0, 17))
+			assert.equal(send(other, "请报一下进度").status, "queued");
+		const burst = send(others[17] as Session, "请报一下进度");
+		assert.equal(burst.status, "refused");
+		assert.equal(burst.statusReason, "burst");
+	});
+
+	test("the same letter twice is dropped; the same words answering another letter are not", () => {
 		const { post, make } = setup();
 		const a = make("产品会话");
 		const b = make("平台组");
-		const c = make("法务组");
-		const send = (to: Session, summary: string) =>
-			post.send({ kind: "session", session: a }, letter(to, { summary }));
-		assert.equal(send(b, "一").status, "queued");
-		assert.equal(send(b, "一").statusReason, "duplicate");
-		for (const summary of ["二", "三", "四", "五"]) assert.equal(send(c, summary).status, "queued");
-		const sixth = send(c, "六");
-		assert.equal(sixth.status, "refused");
-		assert.equal(sixth.statusReason, "rate");
+		assert.equal(
+			post.send({ kind: "session", session: a }, letter(b, { summary: "一" })).status,
+			"queued",
+		);
+		assert.equal(
+			post.send({ kind: "session", session: a }, letter(b, { summary: "一" })).statusReason,
+			"duplicate",
+		);
+		const first = post.send({ kind: "session", session: b }, letter(a, { summary: "问题一" }));
+		const second = post.send({ kind: "session", session: b }, letter(a, { summary: "问题二" }));
+		const reply = (to: Letter) =>
+			post.send(
+				{ kind: "session", session: a },
+				{ to: b.id, kind: "report", summary: "收到，已处理", replyTo: to.id },
+			);
+		assert.equal(reply(first).status, "queued");
+		assert.equal(reply(second).status, "queued");
+		assert.equal(reply(second).statusReason, "duplicate");
 	});
 
 	test("a chain that keeps coming back to the same session is stopped", () => {
@@ -251,7 +279,7 @@ describe("sending letters", () => {
 		assert.equal(post.send({ kind: "session", session: child }, letter(skip)).status, "queued");
 	});
 
-	test("an answer to the recipient's own letter is not held", () => {
+	test("one answer to the recipient's own request is not held; more letters on that thread are", () => {
 		const { post, make } = setup();
 		const chat = make("聊天", { cwd: null });
 		const code1 = make("产品会话");
@@ -261,6 +289,21 @@ describe("sending letters", () => {
 			{ to: code1.id, kind: "report", summary: "答复", replyTo: question.id },
 		);
 		assert.equal(answer.status, "queued");
+		const again = post.send(
+			{ kind: "session", session: chat },
+			{ to: code1.id, kind: "report", summary: "再补充一点", replyTo: question.id },
+		);
+		assert.equal(again.statusReason, "lower-rank");
+		// Replying to a notice is not a way around the hold either.
+		const notice = post.send(
+			{ kind: "session", session: code1 },
+			{ to: chat.id, kind: "notice", summary: "通知一下" },
+		);
+		const reply = post.send(
+			{ kind: "session", session: chat },
+			{ to: code1.id, kind: "report", summary: "知道了，顺便……", replyTo: notice.id },
+		);
+		assert.equal(reply.statusReason, "lower-rank");
 	});
 
 	test("a session cannot pass off a decision the person did not make", () => {

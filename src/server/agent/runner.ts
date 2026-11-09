@@ -178,14 +178,13 @@ export class Agents {
 	/** Letters, decision cards and the approval center. */
 	readonly post: PostOffice;
 	readonly #waitMs: number;
-	/** Requests each working session owes an answer to: requester → the request letter. */
-	readonly #owed = new Map<string, Map<string, string>>();
-	/** Letters delivered in each session's current turn; they are done when the turn ends. */
-	readonly #turnLetters = new Map<string, string[]>();
 	/** Each working session's latest written reply in this turn. */
 	readonly #lastText = new Map<string, string>();
 	/** Sessions blocked in send_letter or open_session, and the session each waits for. */
-	readonly #waits = new Map<string, { target: string; resolve: (result: WaitResult) => void }>();
+	readonly #waits = new Map<
+		string,
+		{ target: string; letterId: string; resolve: (result: WaitResult) => void }
+	>();
 
 	constructor(options: AgentsOptions) {
 		this.#store = options.store;
@@ -700,17 +699,8 @@ export class Agents {
 		return {
 			post: this.post,
 			canPostCards: this.post.canPostCards(this.#store.getSession(sessionId)),
-			send: (out) => {
-				const letter = this.post.send(
-					{ kind: "session", session: this.#store.getSession(sessionId) },
-					out,
-				);
-				// Writing back to a session whose request started this turn is the answer; no automatic report.
-				if (letter.status !== "refused" && letter.status !== "dropped") {
-					this.#owed.get(sessionId)?.delete(letter.toSession);
-				}
-				return letter;
-			},
+			send: (out) =>
+				this.post.send({ kind: "session", session: this.#store.getSession(sessionId) }, out),
 			wait: (letter) => this.#awaitReply(sessionId, letter, live),
 			open: (input) => this.#openChild(this.#store.getSession(sessionId), input),
 			finish: (outcome) => this.#store.setOutcome(sessionId, outcome),
@@ -725,7 +715,6 @@ export class Agents {
 				entryId: null,
 				deliveredAt: Date.now(),
 			});
-			this.#owed.get(letter.fromSession)?.delete(letter.toSession);
 			waiting.resolve({ kind: "letter", letter: this.post.mail.getLetter(letter.id) });
 			return;
 		}
@@ -783,24 +772,14 @@ export class Agents {
 			}
 		});
 		this.post.enterChain(sessionId, letters);
-		const owed = this.#owed.get(sessionId) ?? new Map<string, string>();
-		for (const letter of letters) {
-			if (letter.kind === "request" && letter.fromKind === "session" && letter.fromSession) {
-				owed.set(letter.fromSession, letter.id);
-			}
-		}
-		if (owed.size > 0) this.#owed.set(sessionId, owed);
-		this.#turnLetters.set(sessionId, [
-			...(this.#turnLetters.get(sessionId) ?? []),
-			...letters.map((letter) => letter.id),
-		]);
 		return letters.length;
 	}
 
 	/**
-	 * The turn is over. Letters it read are done; sessions waiting for this one get its last reply; and
-	 * sessions whose request started the turn get that reply as a report, unless this session already
-	 * wrote back to them (blueprint 6.3, item 11). Reports never ask for reports, so this cannot loop.
+	 * The turn is over. Sessions waiting for this one get its last reply; sessions whose request it read
+	 * and did not answer get that reply as a report (blueprint 6.3, item 11); and the letters it read are
+	 * done. What is owed is read from the database, so a restart in the middle loses no report. Reports
+	 * never ask for reports, so this cannot loop.
 	 */
 	#endTurn(
 		sessionId: string,
@@ -808,54 +787,54 @@ export class Agents {
 		detail: string | null,
 		stopped: boolean,
 	): void {
-		for (const id of this.#turnLetters.get(sessionId) ?? []) {
-			try {
-				if (this.post.mail.getLetter(id).status === "delivered") {
-					this.post.mail.setLetterStatus(id, "done");
-				}
-			} catch {
-				// The letter is gone with its session.
-			}
-		}
-		this.#turnLetters.delete(sessionId);
 		this.post.resetChain(sessionId);
 		const said = this.#lastText.get(sessionId) ?? "";
 		this.#lastText.delete(sessionId);
 		const answered = new Set<string>();
 		for (const [waiter, waiting] of [...this.#waits]) {
 			if (waiting.target !== sessionId) continue;
+			// A letter still queued is read in the next turn, which starts at once: wait for that one,
+			// unless the person stopped this session.
+			if (!stopped && this.post.mail.getLetter(waiting.letterId).status === "queued") continue;
 			answered.add(waiter);
 			waiting.resolve({ kind: "ended", status, text: said, detail, stopped });
 		}
-		const owed = this.#owed.get(sessionId);
-		this.#owed.delete(sessionId);
-		if (!owed || owed.size === 0) return;
-		const session = this.#store.getSession(sessionId);
-		const summary = stopped
-			? `${session.name} was stopped by the person before it finished.`
-			: status === "error"
-				? `${session.name} stopped with an error.`
-				: firstLine(said) || `${session.name} finished without a written reply.`;
-		const body = status === "error" && !stopped ? (detail ?? "") : said;
-		for (const [requester, letterId] of owed) {
-			if (answered.has(requester)) continue;
-			try {
-				this.post.send(
-					{ kind: "session", session },
-					{
-						to: requester,
-						kind: "report",
-						summary: clip(summary, SUMMARY_MAX),
-						body: clip(body, BODY_MAX),
-						replyTo: letterId,
-						auto: true,
-					},
-				);
-			} catch (error) {
-				if (!(error instanceof JigError)) throw error;
-				this.#log(`session ${sessionId}: no report to ${requester}: ${error.message}`);
+		const open = new Map<string, Letter>();
+		for (const request of this.post.mail.openRequests(sessionId)) {
+			if (request.fromSession) open.set(request.fromSession, request);
+		}
+		if (open.size > 0) {
+			const session = this.#store.getSession(sessionId);
+			const summary = stopped
+				? `${session.name} was stopped by the person before it finished.`
+				: status === "error"
+					? `${session.name} stopped with an error.`
+					: firstLine(said) || `${session.name} finished without a written reply.`;
+			const body = status === "error" && !stopped ? (detail ?? "") : said;
+			for (const [requester, request] of open) {
+				if (answered.has(requester)) continue;
+				// It wrote back on its own after reading the request: that is the answer.
+				const since = request.deliveredAt ?? request.createdAt;
+				if (this.post.mail.wroteSince(sessionId, requester, since)) continue;
+				try {
+					this.post.send(
+						{ kind: "session", session },
+						{
+							to: requester,
+							kind: "report",
+							summary: clip(summary, SUMMARY_MAX),
+							body: clip(body, BODY_MAX),
+							replyTo: request.id,
+							auto: true,
+						},
+					);
+				} catch (error) {
+					if (!(error instanceof JigError)) throw error;
+					this.#log(`session ${sessionId}: no report to ${requester}: ${error.message}`);
+				}
 			}
 		}
+		this.post.mail.finishDelivered(sessionId);
 	}
 
 	/**
@@ -885,7 +864,7 @@ export class Agents {
 			};
 			const onAbort = () => finish({ kind: "stopped" });
 			const timer = setTimeout(() => finish({ kind: "timeout" }), this.#waitMs);
-			this.#waits.set(sessionId, { target, resolve: finish });
+			this.#waits.set(sessionId, { target, letterId: letter.id, resolve: finish });
 			if (signal.aborted) onAbort();
 			else signal.addEventListener("abort", onAbort, { once: true });
 		});

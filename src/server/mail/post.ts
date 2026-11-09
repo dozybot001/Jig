@@ -16,8 +16,13 @@ import { type CardFields, MailStore } from "./store.ts";
 export const SUMMARY_MAX = 200;
 export const BODY_MAX = 20_000;
 const MINUTE = 60_000;
-/** Letters one session may send per minute. */
-const SEND_RATE = 5;
+/** Letters one session may send the same session per minute; more should go in one letter. */
+const PAIR_RATE = 3;
+/**
+ * Letters one session may send per minute in all. High enough for the main conversation to write to
+ * each session once; the quota bounds the total anyway.
+ */
+const TOTAL_RATE = 20;
 /** The same letter twice within this time is dropped. */
 const DUPLICATE_WINDOW = 10 * MINUTE;
 /** Letters one session may send another within DUPLICATE_WINDOW. */
@@ -35,6 +40,7 @@ const OPTIONS_MAX = 6;
 export type LetterReason =
 	| "quota"
 	| "rate"
+	| "burst"
 	| "duplicate"
 	| "pair-limit"
 	| "hops"
@@ -49,7 +55,9 @@ export function reasonText(reason: string | null): string {
 		case "quota":
 			return "you have used up your letters until the person writes to you again";
 		case "rate":
-			return "you sent too many letters in the last minute; put what you have to say in one letter";
+			return "you sent this session several letters in the last minute; put what you have to say in one letter";
+		case "burst":
+			return `you sent ${TOTAL_RATE} letters in the last minute; wait a moment before sending more`;
 		case "duplicate":
 			return "the same letter was already sent a moment ago";
 		case "pair-limit":
@@ -138,8 +146,8 @@ export class PostOffice {
 	readonly #store: Store;
 	readonly #log: (line: string) => void;
 	#hooks: PostHooks = { queued: () => {} };
-	/** When each session sent its recent letters, for the per-minute limit. */
-	readonly #sent = new Map<string, number[]>();
+	/** Each session's letters in the last minute, and to whom, for the per-minute limits. */
+	readonly #sent = new Map<string, { to: string; time: number }[]>();
 	/** The chain each working session is in: senders so far, oldest first. */
 	readonly #chains = new Map<string, string[]>();
 
@@ -257,13 +265,10 @@ export class PostOffice {
 			decision: out.decision ?? null,
 		};
 
-		if (sender.kind === "session") {
+		// Jig's automatic reports answer one request each, so they skip the limits (and cannot loop).
+		if (sender.kind === "session" && !out.auto) {
 			const current = this.#store.getSession(sender.session.id);
-			const stop = out.auto
-				? this.#duplicate(current.id, to.id, summary, body)
-					? ({ status: "dropped", reason: "duplicate" } as const)
-					: null
-				: this.#limits(current, to, path, summary, body);
+			const stop = this.#limits(current, to, path, summary, body, repliedTo?.id ?? null);
 			if (stop) {
 				return this.mail.addLetter({ ...base, status: stop.status, statusReason: stop.reason });
 			}
@@ -281,7 +286,7 @@ export class PostOffice {
 			return letter;
 		});
 		if (sender.kind === "session" && !out.auto && policy.status !== "refused") {
-			this.#recordSend(sender.session.id);
+			this.#recordSend(sender.session.id, to.id);
 		}
 		if (letter.status === "queued") this.#hooks.queued(letter);
 		return this.mail.getLetter(letter.id);
@@ -324,12 +329,6 @@ export class PostOffice {
 		}
 	}
 
-	#duplicate(from: string, to: string, summary: string, body: string): boolean {
-		return this.mail
-			.recentBetween(from, to, Date.now() - DUPLICATE_WINDOW)
-			.some((letter) => letter.summary === summary && letter.body === body);
-	}
-
 	/** The anti-runaway rules (blueprint 7.1 and 7.2), in the order a person would want to hear them. */
 	#limits(
 		from: Session,
@@ -337,26 +336,33 @@ export class PostOffice {
 		path: string[],
 		summary: string,
 		body: string,
+		replyTo: string | null,
 	): { status: "refused" | "dropped"; reason: LetterReason } | null {
 		if (from.lettersSent >= this.letterQuota(from)) return { status: "refused", reason: "quota" };
-		const recent = (this.#sent.get(from.id) ?? []).filter((time) => time > Date.now() - MINUTE);
-		if (recent.length >= SEND_RATE) return { status: "refused", reason: "rate" };
+		const between = this.mail.recentBetween(from.id, to.id, Date.now() - DUPLICATE_WINDOW);
+		// The same words answering a different letter are not a duplicate.
+		const same = (letter: Letter) =>
+			letter.summary === summary && letter.body === body && letter.replyTo === replyTo;
+		if (between.some(same)) return { status: "dropped", reason: "duplicate" };
+		const recent = (this.#sent.get(from.id) ?? []).filter(
+			(sent) => sent.time > Date.now() - MINUTE,
+		);
+		if (recent.filter((sent) => sent.to === to.id).length >= PAIR_RATE) {
+			return { status: "refused", reason: "rate" };
+		}
+		if (recent.length >= TOTAL_RATE) return { status: "refused", reason: "burst" };
 		if (path.length > MAX_HOPS) return { status: "refused", reason: "hops" };
 		if (path.filter((id) => id === to.id).length >= MAX_VISITS) {
 			return { status: "refused", reason: "loop" };
-		}
-		const between = this.mail.recentBetween(from.id, to.id, Date.now() - DUPLICATE_WINDOW);
-		if (between.some((letter) => letter.summary === summary && letter.body === body)) {
-			return { status: "dropped", reason: "duplicate" };
 		}
 		if (between.length >= PAIR_LIMIT) return { status: "dropped", reason: "pair-limit" };
 		return null;
 	}
 
-	#recordSend(sessionId: string): void {
+	#recordSend(sessionId: string, to: string): void {
 		const now = Date.now();
-		const recent = (this.#sent.get(sessionId) ?? []).filter((time) => time > now - MINUTE);
-		recent.push(now);
+		const recent = (this.#sent.get(sessionId) ?? []).filter((sent) => sent.time > now - MINUTE);
+		recent.push({ to, time: now });
 		this.#sent.set(sessionId, recent);
 	}
 
@@ -373,12 +379,19 @@ export class PostOffice {
 		if (policy === "hold") return { status: "held", reason: "hold-policy" };
 		if (sender.kind !== "session") return { status: "queued" };
 		const from = sender.session;
+		// One answer to a request the recipient itself sent is expected; replying to any old letter is not
+		// a way around the hold.
+		const answersRequest =
+			repliedTo !== null &&
+			repliedTo.fromSession === to.id &&
+			repliedTo.kind === "request" &&
+			!this.mail.answered(repliedTo.id, from.id);
 		const exempt =
 			from.id === this.mainSessionId() ||
 			from.parentId === to.id ||
 			to.parentId === from.id ||
 			auto ||
-			repliedTo?.fromSession === to.id;
+			answersRequest;
 		if (!exempt && rank(from) < rank(to)) return { status: "held", reason: "lower-rank" };
 		return { status: "queued" };
 	}

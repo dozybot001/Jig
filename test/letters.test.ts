@@ -248,6 +248,110 @@ describe("letters between sessions", () => {
 	});
 });
 
+describe("letters across failures", () => {
+	test("a report owed when Jig stopped is still sent once the session finishes", async () => {
+		const { store, agents, make, script, entries } = harness();
+		const a = make("产品会话");
+		const b = make("平台组");
+		script(b, [fauxAssistantMessage("清单看完了，没有问题")]);
+		script(a, [fauxAssistantMessage("好的")]);
+		// The state a restart leaves: the request was delivered, the session is marked for review, and
+		// this runner never saw the delivery.
+		store.appendEntry(b.id, {
+			role: "user",
+			message: { role: "user", content: "早先的消息", timestamp: Date.now() },
+		});
+		const request = agents.post.mail.addLetter({
+			fromKind: "session",
+			fromSession: a.id,
+			fromName: a.name,
+			toSession: b.id,
+			kind: "request",
+			summary: "请看一下发布清单",
+			body: "",
+			status: "queued",
+			path: [a.id],
+		});
+		const entry = store.appendEntry(b.id, {
+			role: "user",
+			message: {
+				role: "user",
+				content: "<letter>请看一下发布清单</letter>",
+				timestamp: Date.now(),
+			},
+		});
+		agents.post.mail.setLetterStatus(request.id, "delivered", {
+			entryId: entry.id,
+			deliveredAt: Date.now(),
+		});
+		store.setStatus(b.id, "needs_review");
+		agents.continue(b.id);
+		await until(() => entries(a).some((e) => e.role === "user" && e.letter?.kind === "report"));
+		const report = entries(a).find((e) => e.role === "user" && e.letter?.kind === "report");
+		assert.equal(report?.role === "user" && report.letter?.summary, "清单看完了，没有问题");
+		assert.equal(agents.post.mail.getLetter(request.id).status, "done");
+		await until(() => !agents.isRunning(a.id));
+	});
+
+	test("two requests answered with the same words both get their report", async () => {
+		const { agents, make, script } = harness();
+		const a = make("总办");
+		const b = make("平台组");
+		script(b, [fauxAssistantMessage("完成。"), fauxAssistantMessage("完成。")]);
+		script(a, [fauxAssistantMessage("好"), fauxAssistantMessage("好")]);
+		const reports = () =>
+			agents.post.mail
+				.listLetters({ limit: 20 })
+				.items.filter((l) => l.fromSession === b.id && l.auto && l.status !== "dropped");
+		agents.post.send(
+			{ kind: "session", session: a },
+			{ to: b.id, kind: "request", summary: "任务一" },
+		);
+		await until(() => reports().length === 1 && !agents.isRunning(a.id) && !agents.isRunning(b.id));
+		agents.post.send(
+			{ kind: "session", session: a },
+			{ to: b.id, kind: "request", summary: "任务二" },
+		);
+		await until(() => reports().length === 2);
+	});
+
+	test("a wait outlasts a failed turn when its letter was not read yet", async () => {
+		const { agents, make, script, seen, said } = harness();
+		const a = make("甲");
+		const b = make("乙");
+		let release: () => void = () => {};
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		script(b, [
+			async () => {
+				await gate;
+				return fauxAssistantMessage([], { stopReason: "error", errorMessage: "服务商出错" });
+			},
+			fauxAssistantMessage("第二轮看到了甲的信"),
+		] as never);
+		script(a, [
+			toolUse(
+				fauxToolCall(
+					"send_letter",
+					{ to: b.id, kind: "request", summary: "在吗", wait: true },
+					{ id: "a1" },
+				),
+			),
+			fauxAssistantMessage("甲结束"),
+		]);
+		agents.send(b.id, "开始");
+		await until(() => agents.isRunning(b.id));
+		agents.send(a.id, "问乙");
+		await until(() =>
+			agents.post.mail.listLetters({ limit: 5 }).items.some((l) => l.status === "queued"),
+		);
+		release();
+		await until(() => said(a).some((text) => text.includes("甲结束")));
+		assert.match(lastTool(seen.get("甲")?.[1]), /第二轮看到了甲的信/);
+	});
+});
+
 describe("task sessions", () => {
 	test("open_session starts a child with the parent's permissions; with wait its reply returns", async () => {
 		const { store, agents, make, script, seen, said, folder } = harness();
