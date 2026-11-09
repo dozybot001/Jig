@@ -120,7 +120,9 @@ export function ModelPicker({
 				busy={busy}
 				options={info.thinkingLevels.map((level) => ({
 					value: level,
-					label: grid ? t(`thinking_${level}`) : `${t("thinking")}：${t(`thinking_${level}`)}`,
+					label: grid
+						? t(`thinking_${level}`)
+						: t("thinkingLevel", { level: t(`thinking_${level}`) }),
 				}))}
 				onChange={(value) => onChange({ thinking: value as ThinkingLevel })}
 			/>
