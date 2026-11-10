@@ -138,12 +138,12 @@
         }
       }
     },
-    "An AI-native multi-agent workbench. Jig organizes agent sessions the session engineering way: the main conversation coordinates, and the other sessions each own an area and report back up. The sessions run in Jig on your Mac.": {
+    "An AI-native multi-agent workbench. Jig organizes agent sessions the session engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center. The sessions run in Jig on your Mac.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI 原生的多 Agent 工作台。Jig 按 session engineering 的做法组织 Agent 会话：主对话统筹，其他会话各管一块，做完逐级回报。会话跑在你 Mac 上的 Jig 里。"
+            "value": "AI 原生的多 Agent 工作台。Jig 按 session engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。会话跑在你 Mac 上的 Jig 里。"
           }
         }
       }

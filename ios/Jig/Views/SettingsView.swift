@@ -94,7 +94,7 @@ struct AboutView: View {
 				.padding(.vertical, 8)
 			}
 			Section {
-				Text("An AI-native multi-agent workbench. Jig organizes agent sessions the session engineering way: the main conversation coordinates, and the other sessions each own an area and report back up. The sessions run in Jig on your Mac.")
+				Text("An AI-native multi-agent workbench. Jig organizes agent sessions the session engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center. The sessions run in Jig on your Mac.")
 				Text("Jig on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions' questions and decide on cards, and you can follow and reply to sessions.")
 			}
 			Section {

@@ -1,6 +1,6 @@
 # Jig 对外介绍
 
-版本 0.5（2026-11-10）。官网产品库、README、App Store 描述和各渠道介绍 Jig 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
+版本 0.6（2026-11-11）。官网产品库、README、App Store 描述和各渠道介绍 Jig 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
 
 ## 一、定义
 
@@ -10,11 +10,11 @@
 
 ## 二、一段话简介
 
-定义之后接这一段。官网的 `summary`、README 第二段、商店描述的开头都用它：
+定义之后接这一句。官网的 `summary`、README 第二段、关于页定义之后、商店描述的开头都用它；页面的 meta description 写成「Jig 是 AI 原生的多 Agent 工作台，」再接这一句。介绍要短：会话怎样分主次、信件、本机运行这些细节放在详情页的段落里，不塞进简介。
 
-> 按 session engineering 的做法组织 Agent 会话：主对话统筹，其他会话各管一块，做完逐级回报。你只对接主对话，要你授权和决定的事都汇到审批中心，不用逐个进入会话。
+> 按 session engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。
 
-> Agent sessions organized the session engineering way: the main conversation coordinates, and the other sessions each own an area and report back up. You deal only with the main conversation, and everything that needs your approval or decision comes to the approval center, so you don't have to open each session.
+> Agent sessions organized the session engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center.
 
 **讲给谁**：现在只供榫卯内部使用；开源后面向一个人带一组 Agent 会话做事的开发者和一人公司。
 
@@ -62,9 +62,9 @@ Jig 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 
 **`storyIntro`**
 
-> 一个 Agent 已经能独立做完一件事，会话一多，限制就变成了人能跟住几个会话。Jig 按 session engineering 的做法把会话分成主次：你把要做的事告诉主对话，它交给管这块事的常设会话，或者开一个任务会话去做；结果用信件一级级回报，回到主对话汇总。会话停下来要你授权、回答或决定的事，都汇到审批中心，你在那里处理。会话在你电脑上的 Jig 服务里运行，网页关了也照常干活。
+> 会话一多，限制就成了人能跟住几个会话。Jig 把会话分成主次：你把事情告诉主对话，它分给其他会话去做，结果逐级回报到主对话。要你授权、回答或决定的事，都汇到审批中心。
 
-> An agent can already finish a piece of work on its own; with many sessions, the limit becomes how many of them a person can keep track of. Jig sorts sessions the session engineering way, into a main conversation and the sessions under it. You tell the main conversation what you want; it hands the work to the standing session that owns that area, or opens a task session for it, and the results come back up as letters to be summed up in the main conversation. Whatever a session stops to ask you, an approval, an answer or a decision, comes to the approval center, and you handle it there. Sessions run in the Jig service on your computer and keep working when the web page is closed.
+> With many sessions, the limit becomes how many of them a person can keep track of. Jig sorts sessions into a main conversation and the sessions under it: you tell the main conversation what you want, it hands the work to other sessions, and the results come back up to it. Whatever needs your approval, answer or decision comes to the approval center.
 
 **`problem`**
 
@@ -111,6 +111,7 @@ Jig 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 
 ## 修改记录
 
+- **0.6（2026-11-11）** 创始人说「Jig 的介绍太冗长」，平台组把官网的摘要和首屏介绍压短（官网提交 b863499），本文第二、六节同步成新写法；README 和关于页的简介跟着换成同一句。
 - **0.5（2026-11-10）** Jig 已在官网公开（官网提交 c2d865f）。产品库取消了公开标记，删去 `featured` 一行；记下详情页的分段和导航。
 - **0.4（2026-11-09）** 截图按官网详情页的版面重拍：审批中心（一张授权卡加一张决定卡）、主对话、代码会话里的授权卡、信件列表，2560×1440；第七节写明每张的位置和中英文 alt。
 - **0.3（2026-11-09）** 按创始人给的方向重写定位：Jig 推的是 session engineering 的做法，会话分主次，人只对接主对话、在审批中心处理要人做的事，不用逐个进入会话。重写第二、三、五、六节，第七节写明四种截图画面。
