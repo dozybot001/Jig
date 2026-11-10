@@ -1,6 +1,6 @@
 # Jig 对外介绍
 
-版本 0.7（2026-11-11）。官网产品库、README、App Store 描述和各渠道介绍 Jig 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
+版本 0.8（2026-11-11）。官网产品库、README、App Store 描述和各渠道介绍 Jig 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
 
 ## 一、定义
 
@@ -10,7 +10,7 @@
 
 ## 二、一段话简介
 
-定义之后接这一句。官网的 `summary`、README 第二段、关于页定义之后、商店描述的开头都用它；页面的 meta description 写成「Jig 是 AI 原生的多 Agent 工作台，」再接这一句。介绍要短：会话怎样分主次、信件、本机运行这些细节放在详情页的段落里，不塞进简介。
+定义之后接这一句。README 第二段、关于页定义之后、商店描述的开头都用它。官网的摘要和 meta description 按产品页的主张另写，见第六节。介绍要短：会话怎样分主次、信件、手机审批这些细节放在产品页的主张里，不塞进简介。
 
 > 按 session engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。
 
@@ -38,83 +38,79 @@ Jig 的特点不在单个会话多能干，而在一组会话怎样组织、人�
   - 定时任务：按时以定时任务的名义给一个常设会话寄信，会话无人值守地做完，回报寄给主对话。讲主次结构时可以带上。
 - **写手机时**：会话仍在 Mac 上的 Jig 里运行，手机经中继连到这台 Mac，所以 Mac 上要开着 Jig。只有 iPhone 应用。推送还没做，不写「有事提醒你」「通知到手机」。API Key、配对和移除手机只在 Mac 上操作。
 - **写模型时**：模型接入用开源库 pi-ai；Agent 循环、工具和权限是 Jig 自己写的，所以不写「基于 Pi Agent」。设置里列出 pi-ai 内置的 33 个服务商入口，来自 23 家（同一家的不同地区、套餐分开列），还能添加兼容 OpenAI 接口的服务商或本机运行的模型。每个会话单独选，默认 DeepSeek。
-- **没实现，不写**：推送、开机启动、费用上限、产物、MCP、联网搜索、导入现有的说明和技能。也不写 A2A：会话之间用 Jig 自己的信件传话，没有实现 A2A 协议。
+- **没实现，不写**：推送、开机启动、费用上限、产物、MCP、联网搜索、导入现有的说明和技能。
+- **A2A**：按创始人 11-11 的定稿，指会话之间的异步信箱，也就是 Jig 的信件。Jig 没有实现 A2A 协议，不写成支持或兼容 A2A 协议。
 
 ## 五、不写什么
 
 - 不提 Claude、Claude Code 或 Anthropic 的产品来对比、说明来历或暗示合作（蓝图第十二节）。Anthropic 只作为服务商之一出现。
-- 不写「个人版某某」「AI 员工」「内阁」「指挥官」这类比喻（规范 14.2）。博客里拿历史制度作对照是论述内容，产品文案不搬过来。不写效率数字和没验证过的效果。
+- 产品页的五条主张和界面那句是创始人 11-11 的定稿，照原样用，「坐进办公室当老板」「打破工位枷锁」是他定的说法。此外不另加比喻（规范 14.2）：不写「个人版某某」「AI 员工」「内阁」「指挥官」这类说法，博客里拿历史制度作对照是论述内容，产品文案不搬过来；要加新的比喻先问创始人。不写效率数字和没验证过的效果。
 - 不写「人完全不用进会话」这样绝对的话：方向要在主对话里说，会话也随时能点开看。写「不用逐个进入会话」。
 - 不写成已经开源、上架或可以下载：现在只供榫卯内部使用，v1 验收后开源。
 - 不写榫卯已经用 Jig 运转公司：M4 验收时才把榫卯的会话组织搬到 Jig 上。
 
-## 六、产品库条目
+## 六、官网产品页
 
-供官网 `content/products.json` 使用，字段名同其他产品，英文是对应的译文。2026-11-09 已在官网公开（官网仓库提交 c2d865f）：https://tenon.asia/products/jig/ ，中文是 /zh/products/jig/。产品库里的产品都公开，没有单独的公开标记。
-
-详情页的分段和导航（中文 / 英文）：审批中心 / Approval center（decisions「要你处理的事汇到一处」，要点 features「审批中心的卡片」）、会话结构 / Structure（decisions「主次结构」）、信件 / Letters、规则 / Rules（decisions「结构由 Jig 执行」）、本机运行 / On your computer。导航写「会话结构」，因为「主次结构」是那段的标题，官网的译文表一个中文只对一个英文。结尾链接官网博客的两篇 session engineering 文章。
+2026-11-11 按创始人定的结构重做（官网提交 5d7cd3e）：https://tenon.asia/products/jig/ ，中文是 /zh/products/jig/。七个产品的页面结构相同：产品标志、一句话定义、链接、产品大图、导航条、带图的主张、界面那句、底部邀请卡片。Jig 没有公开入口，链接和邀请卡片指向官网博客的两篇 session engineering 文章。英文是官网的译文。
 
 | 字段 | 中文 | English |
 | --- | --- | --- |
 | `slug`、`name` | `jig`、Jig | |
 | `category` | `developer` | |
 | `kind`、`tagline`、`storyTitle` | AI 原生的多 Agent 工作台 | An AI-native multi-agent workbench |
-| `summary` | 第二节的一段话 | |
+| `summary`（首页卡片） | 为 session engineering 而生。你只对接主对话，授权和决定都在审批中心，手机上也能处理。 | Born for session engineering. You deal only with the main conversation, and approvals and decisions sit in the approval center, on your phone too. |
+| meta description | Jig 是 AI 原生的多 Agent 工作台，为 session engineering 而生：你只对接主对话，授权和决定都在审批中心，手机上也能处理。 | Jig is an AI-native multi-agent workbench, born for session engineering: you deal only with the main conversation, and approvals and decisions sit in the approval center, on your phone too. |
 | `status` | 开发中 · 内部使用 | In development · internal use |
-| `url`、`cta`、`links` | 现在没有公开入口。v1 验收开源后是 GitHub 仓库 `https://github.com/dozybot001/Jig`，按钮「查看源代码」 | View source code |
+| 链接 | Session engineering、Session engineering（二） | Session engineering, Session engineering, part 2 |
+| 邀请卡片 | 了解 session engineering | Read about session engineering |
+| `url`、`cta` | 现在没有公开入口。v1 验收开源后是 GitHub 仓库 `https://github.com/dozybot001/Jig`，按钮「查看源代码」 | View source code |
 | `color` | Jig 不设主题色，用中性灰（同 IntHub 的 `#858585`） | |
+| `showcase.caption` | Jig 实际界面 · 本地演示数据 | Jig's actual interface · local demo data |
 
-**`storyIntro`**
+**主张**：创始人 11-11 定稿，照原样用。导航条用「短名」，配图见第七节。
 
-> 会话一多，限制就成了人能跟住几个会话。Jig 把会话分成主次：你把事情告诉主对话，它分给其他会话去做，结果逐级回报到主对话。要你授权、回答或决定的事，都汇到审批中心。
+| | 标题 | 正文 | 短名 | 配图 |
+| --- | --- | --- | --- | --- |
+| 1 | 为 session engineering 而生 | 按这套理念构建，并且处处为它优化。 | Session engineering | `main` |
+| 2 | 出色的多 Agent 协作体验 | 基于异步信箱机制 A2A，让 Agent 交流很无感。 | 多 Agent 协作 | `letters` |
+| 3 | 真正坐进办公室当老板 | 授权与决定都在审批中心，你的操作才有实权。 | 审批中心 | `permission` |
+| 4 | 随时随地，打破工位枷锁 | 手机也能审批，人不在电脑前，授权和决定照样处理。 | 手机审批 | `phone` |
+| 5 | 模型随你选 | 接入库用开源的 pi-ai，支持超级多家模型服务商。 | 模型随你选 | `models` |
 
-> With many sessions, the limit becomes how many of them a person can keep track of. Jig sorts sessions into a main conversation and the sessions under it: you tell the main conversation what you want, it hands the work to other sessions, and the results come back up to it. Whatever needs your approval, answer or decision comes to the approval center.
+| | Title | Body | Nav |
+| --- | --- | --- | --- |
+| 1 | Born for session engineering | Built on the idea and tuned for it throughout. | Session engineering |
+| 2 | Multi-agent collaboration done well | Agents talk through A2A, an asynchronous mailbox, and you hardly notice it happening. | Multi-agent collaboration |
+| 3 | Take the boss’s chair for real | Approvals and decisions all sit in the approval center, and only your actions carry real authority. | Approval center |
+| 4 | Anywhere, anytime, off the desk | Approve from your phone. Away from the computer, approvals and decisions still get handled. | On your phone |
+| 5 | Your choice of model | Model access is built on the open-source pi-ai library, with a huge range of model providers supported. | Your choice of model |
 
-**`problem`**
+**界面那句**（有界面的 Tenon 产品共用）：优雅克制的用户页面，顺畅丝滑的用户体验。/ An elegant, restrained interface. A smooth, effortless experience.
 
-1. 会话一多，人要逐个切进去，先想起它负责什么、做到了哪、在等你什么，再回答。要你处理的事散在各个会话里，切换就省不掉。
-   With many sessions, you open them one by one and recall what each owns, how far it got and what it is waiting for before you can answer. As long as what needs you is spread across sessions, the switching does not go away.
-2. Jig 让会话之间自己分派和回报，把要你处理的事收到一处。
-   Jig lets sessions hand off work and report among themselves, and gathers what needs you in one place.
+**核对过的事实**，改主张时对照：
 
-**`decisions`**
-
-| 标题 | 正文 |
-| --- | --- |
-| 主次结构 | 主对话统筹：替你分派、转达、汇总回报，并维护审批中心。常设会话按团队各管一块事，任务会话为一件事开设、做完回报。会话分聊天和代码两种，区别只在有没有工作区。 |
-| A main conversation over the rest | The main conversation coordinates: it hands out work, relays, sums up reports and keeps the approval center. Standing sessions each own an area within a team; a task session is opened for one job and reports when it is done. Sessions are chats or code sessions; the only difference is whether they have a workspace. |
-| 要你处理的事汇到一处 | 要你授权的操作、要你回答的问题和要你定的事都在审批中心。决定卡写明建议、期限和能否撤回；你的决定由 Jig 记为本人，送回提出的会话。 |
-| What needs you comes to one place | Operations that need your approval, questions for you and decisions all wait in the approval center. A decision card shows the recommendation, the deadline and whether it can be undone; Jig records your decision as yours and sends it back to the session that asked. |
-| 结构由 Jig 执行 | 回报自动寄回请求方，决定标明出自你本人，删除、推送、发布等操作每次都问你，会话之间的信有额度和转发次数限制。这些由 Jig 的代码执行，不靠提示词。 |
-| Jig enforces the structure | Reports go back to whoever asked, decisions are marked as yours, deleting, pushing, publishing and similar operations ask you every time, and letters between sessions are limited in number and in how far they are passed on. Jig's code does this, not a prompt. |
-
-**`features`**
-
-| 标题 | 正文 |
-| --- | --- |
-| 会话之间的信件 | 会话之间互相寄通知、请求和回报。信存进数据库，Jig 重启不丢；会话做完别人请求的事，最后的回复自动作为回报寄回。 |
-| Letters between sessions | Sessions send each other notices, requests and reports. Letters are stored in a database and survive a restart; when a session finishes what another asked for, its last reply goes back as the report. |
-| 审批中心的卡片 | 授权卡用一句话写明是什么操作，附上用途和命令，改文件的附改动预览；提问卡一张最多四个问题，选项可以附说明、标出建议项；暂存的信放不放行也在这里定。 |
-| Cards in the approval center | A permission card names the operation in one line, with its purpose and the command; edits come with a preview of the change. A question card holds up to four questions, and their options can carry a note and a recommendation. Held letters are released or refused here too. |
-| 在你的电脑上运行 | 会话在你电脑上的 Jig 服务里运行，网页关了也照常干活。会话、信件和设置存在你的电脑上，Jig 不收集任何数据。每个会话单独选服务商和模型，默认用 DeepSeek。 |
-| Runs on your computer | Sessions run in the Jig service on your computer and keep working when the web page is closed. Sessions, letters and settings stay on your computer, and Jig collects no data. Each session has its own provider and model; DeepSeek is the default. |
-
-**`showcase`**：主图用审批中心，alt 见第七节；`caption`「Jig 实际界面 · 本地演示数据」/ "Jig's actual interface · local demo data"。
+- 第 2 条：信件存进数据库，由 Jig 排队、暂存和投递，寄信的会话不用等对方回复。A2A 的含义见第四节。
+- 第 3 条：授权卡要你本人点，决定由 Jig 记为出自你本人；其他会话的信、网页和工具结果都不算授权。
+- 第 4、5 条：见第四节「写手机时」「写模型时」。pi-ai 是 MIT 许可的开源库。
 
 ## 七、标识与截图
 
 - **产品图形**：三道平行线组成的 J，单色：浅色主题用近黑，深色主题反白，不另设主题色（蓝图第十二节）。文件是 `web/public/icons/jig-mark.svg`，字标是「Jig」，组合标志按规范第 1 节，右上是 Tenon 小标。
-- **截图**：真实界面加本地演示数据：用临时数据目录，不读真实的 `~/.jig`；模型回复由脚本模拟，会话、信件和卡片都由 Jig 自己的代码生成。1280×720 的窗口按 2 倍截取，2560×1440 PNG，中英文、深浅色各一套，文件名 `jig-{画面}-{zh|en}-{light|dark}.png`。四种画面讲同一件事：你让统筹上线首页改版、修好登录问题，统筹分给网站和后端。
+- **截图**：真实界面加本地演示数据：用临时数据目录，不读真实的 `~/.jig`；模型回复由脚本模拟，会话、信件和卡片都由 Jig 自己的代码生成。网页是 1280×720 的窗口按 2 倍截取，2560×1440 PNG；iPhone 是模拟器 iPhone 17 Pro 的竖屏原图，1206×2622 PNG，调试版应用直接连同一个演示服务，状态栏统一为 9:41、满格、满电。中英文、深浅色各一套，文件名 `jig-{画面}-{zh|en}-{light|dark}.png`。六种画面讲同一件事：你让统筹上线首页改版、修好登录问题，统筹分给网站和后端。
+- **文件**：`phone` 和 `models` 的原图在本仓库 [docs/screenshots/](screenshots/)。前四种的原图没有入库，官网仓库的 `dist/assets/products/` 里有转好的 WebP。
 
 | 画面 | 官网上的位置 | alt |
 | --- | --- | --- |
-| `approval` | 首屏主图，也用在产品卡片上 | Jig 审批中心：网站等你授权推送，后端提出、经统筹放进来的决定卡 / Jig's approval center: Website waiting for you to approve a push, and a decision card raised by Backend through the coordinator |
-| `main` | 「主次结构」一段 | Jig 主对话：统筹把首页改版和登录问题分给网站和后端，收到后端的回报后汇总给你 / Jig's main conversation: the coordinator hands the redesign and the sign-in fix to Website and Backend, and sums up once Backend reports back |
-| `permission` | 「结构由 Jig 执行」一段 | Jig 代码会话：网站改好首页、跑完测试，推送前停下来等你授权 / A code session in Jig: Website finished the page and ran the tests, then stopped to ask before pushing |
-| `letters` | 「会话之间的信件」一段 | Jig 信件列表：会话之间的请求、回报和通知，以及命令行寄来的信 / Jig's letters: requests, reports and notices between sessions, and a letter from the command line |
+| `approval` | 产品大图，也用在首页卡片上 | Jig 审批中心：网站等你授权推送，后端提出、经统筹放进来的决定卡 / Jig's approval center: Website waiting for you to approve a push, and a decision card raised by Backend through the coordinator |
+| `main` | 主张 1 | Jig 主对话：统筹把首页改版和登录问题分给网站和后端，收到后端的回报后汇总给你 / Jig's main conversation: the coordinator hands the redesign and the sign-in fix to Website and Backend, and sums up once Backend reports back |
+| `letters` | 主张 2 | Jig 信件列表：会话之间的请求、回报和通知，以及命令行寄来的信 / Jig's letters: requests, reports and notices between sessions, and a letter from the command line |
+| `permission` | 主张 3 | Jig 代码会话：网站改好首页、跑完测试，推送前停下来等你授权 / A code session in Jig: Website finished the page and ran the tests, then stopped to ask before pushing |
+| `phone` | 主张 4 | Jig iPhone 应用的审批页：网站等你允许推送首页改版，后端提出的决定也在这里 / Approvals in Jig on iPhone: Website waiting for you to allow pushing the home page redesign, and a decision raised by Backend |
+| `models` | 主张 5 | Jig 给后端会话选服务商：国内、境外分组列出，没设密钥的会标出 / Choosing a provider for the Backend session in Jig: providers grouped into Mainland China and Outside mainland China, with the ones that have no key marked |
 
 ## 修改记录
 
+- **0.8（2026-11-11）** 官网产品页按创始人定的结构重做（官网提交 5d7cd3e）。第六节改记新页面：创始人定稿的五条主张、界面那句、导航、链接和邀请卡片，去掉页面上已不显示的首屏介绍、问题、设计和要点；第二节写明官网的摘要按主张另写；第四节按创始人的决定写明 A2A 指会话之间的异步信箱；第五节写明定稿里的比喻照原样用；第七节加上手机审批和模型选择两种截图，原图放在 `docs/screenshots/`。
 - **0.7（2026-11-11）** 创始人说「Jig 的手机审批很快就上了，没必要过于强调现在没上就不能写」（平台组会话）。第四节由「只写已经发布的」改成已经实现的能力都能写、不加「目前」「暂未」，放开手机审批和定时任务；写明写手机和模型时要守的事实，A2A 列入不写。
 - **0.6（2026-11-11）** 创始人说「Jig 的介绍太冗长」，平台组把官网的摘要和首屏介绍压短（官网提交 b863499），本文第二、六节同步成新写法；README 和关于页的简介跟着换成同一句。
 - **0.5（2026-11-10）** Jig 已在官网公开（官网提交 c2d865f）。产品库取消了公开标记，删去 `featured` 一行；记下详情页的分段和导航。
