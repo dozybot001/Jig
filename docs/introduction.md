@@ -1,6 +1,6 @@
 # Jig 对外介绍
 
-版本 0.10（2026-11-11）。官网产品库、README、App Store 描述和各渠道介绍 Jig 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
+版本 0.11（2026-11-11）。官网产品库、README、App Store 描述和各渠道介绍 Jig 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
 
 ## 一、定义
 
@@ -52,7 +52,7 @@ Jig 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 
 ## 六、官网产品页
 
-2026-11-11 按创始人定的结构重做（官网提交 5d7cd3e），之后按他的调整取消了导航条（703d757），第 4、5 条配上截图（4477683），Session Engineering 按专有名词大写（9beb0ff）：https://tenon.asia/products/jig/ ，中文是 /zh/products/jig/。七个产品的页面结构相同：产品标志、一句话定义、链接、产品大图、带图的主张、界面那句、底部邀请卡片。首页的产品卡片单行滚动，卡片上只有标志和一句话定义。Jig 没有公开入口，链接和邀请卡片指向官网博客的两篇 Session Engineering 文章。英文是官网的译文。
+2026-11-11 按创始人定的结构重做（官网提交 5d7cd3e），之后按他的调整取消了导航条（703d757），第 4、5 条配上截图（4477683），Session Engineering 按专有名词大写（9beb0ff），界面那句改成「交互界面」（efc1d4e）：https://tenon.asia/products/jig/ ，中文是 /zh/products/jig/。七个产品的页面结构相同：产品标志、一句话定义、链接、产品大图、带图的主张、界面那句、底部邀请卡片。首页的产品卡片单行滚动，卡片上只有标志和一句话定义。Jig 没有公开入口，链接和邀请卡片指向官网博客的两篇 Session Engineering 文章。英文是官网的译文。
 
 | 字段 | 中文 | English |
 | --- | --- | --- |
@@ -83,7 +83,7 @@ Jig 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 | 4 | Anywhere, anytime, off the desk | Approve from your phone. Away from the computer, approvals and decisions still get handled. |
 | 5 | Your choice of model | Model access is built on the open-source pi-ai library, with a huge range of model providers supported. |
 
-**界面那句**（有界面的 Tenon 产品共用）：优雅克制的用户页面，顺畅丝滑的用户体验。/ An elegant, restrained interface. A smooth, effortless experience.
+**界面那句**（有界面的 Tenon 产品共用）：优雅克制的交互界面，顺畅丝滑的用户体验。/ An elegant, restrained interface. A smooth, effortless experience.
 
 **核对过的事实**，改主张时对照：
 
@@ -108,6 +108,7 @@ Jig 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 
 ## 修改记录
 
+- **0.11（2026-11-11）** 创始人把界面那句改为「优雅克制的交互界面，顺畅丝滑的用户体验。」（原「用户页面」，总办转达；官网提交 efc1d4e，产品规范 14.2.1 同步）。第六节跟着改，英文不变。
 - **0.10（2026-11-11）** 创始人定「session engineering 换成 Session Engineering。专有名词」（总办转达，官网提交 9beb0ff）。全文改成大写，第五节加上这条写法；README、蓝图、更新记录和网页、iPhone 关于页的介绍一起改了。
 - **0.9（2026-11-11）** 官网按创始人的调整更新产品页（官网提交 703d757、4477683、5d6faa1）：取消导航条，第 4、5 条配上手机审批和模型选择的截图，产品目录只留在用的字段，首页卡片只有标志和一句话定义。第六、七节同步这些变化；第四节不再提已删掉的 `status`；第五节和主张注明规范 14.2.1。
 - **0.8（2026-11-11）** 官网产品页按创始人定的结构重做（官网提交 5d7cd3e）。第六节改记新页面：创始人定稿的五条主张、界面那句、导航、链接和邀请卡片，去掉页面上已不显示的首屏介绍、问题、设计和要点；第二节写明官网的摘要按主张另写；第四节按创始人的决定写明 A2A 指会话之间的异步信箱；第五节写明定稿里的比喻照原样用；第七节加上手机审批和模型选择两种截图，原图放在 `docs/screenshots/`。
