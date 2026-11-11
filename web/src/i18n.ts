@@ -398,7 +398,7 @@ const zh = {
 	version: "版本 {v}",
 	build: "构建 {b}",
 	aboutBody:
-		"AI 原生的多 Agent 工作台。Jig 按 session engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。\n\n会话按团队组织：常设会话长期负责一块事，任务会话为一件事开设，做完回报。会话跑在你电脑上的 Jig 服务里，网页关了也照常干活。",
+		"AI 原生的多 Agent 工作台。Jig 按 Session Engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。\n\n会话按团队组织：常设会话长期负责一块事，任务会话为一件事开设，做完回报。会话跑在你电脑上的 Jig 服务里，网页关了也照常干活。",
 	publisher: "出品方",
 	publisherName: "榫卯 Tenon AI",
 	website: "官网",
@@ -1051,7 +1051,7 @@ const en: Record<MessageKey, string> = {
 	version: "Version {v}",
 	build: "Build {b}",
 	aboutBody:
-		"An AI-native multi-agent workbench. Jig organizes agent sessions the session engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center.\n\nSessions are organized in teams: a standing session owns an area for the long term, and a task session is opened for one job and reports when it is done. Sessions run in the Jig service on your computer and keep working when the page is closed.",
+		"An AI-native multi-agent workbench. Jig organizes agent sessions the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center.\n\nSessions are organized in teams: a standing session owns an area for the long term, and a task session is opened for one job and reports when it is done. Sessions run in the Jig service on your computer and keep working when the page is closed.",
 	publisher: "Publisher",
 	publisherName: "Tenon AI",
 	website: "Website",

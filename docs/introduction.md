@@ -1,6 +1,6 @@
 # Jig 对外介绍
 
-版本 0.9（2026-11-11）。官网产品库、README、App Store 描述和各渠道介绍 Jig 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
+版本 0.10（2026-11-11）。官网产品库、README、App Store 描述和各渠道介绍 Jig 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
 
 ## 一、定义
 
@@ -12,9 +12,9 @@
 
 定义之后接这一句。README 第二段、关于页定义之后、商店描述的开头都用它。官网的摘要和 meta description 按产品页的主张另写，见第六节。介绍要短：会话怎样分主次、信件、手机审批这些细节放在产品页的主张里，不塞进简介。
 
-> 按 session engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。
+> 按 Session Engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。
 
-> Agent sessions organized the session engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center.
+> Agent sessions organized the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center.
 
 **讲给谁**：现在只供榫卯内部使用；开源后面向一个人带一组 Agent 会话做事的开发者和一人公司。
 
@@ -22,7 +22,7 @@
 
 Jig 的特点不在单个会话多能干，而在一组会话怎样组织、人怎样和它们打交道。写文案时按下面几条取舍，不必逐条写出来：
 
-1. **Session engineering**：一个 Agent 已经能独立做完一件事，会话一多，限制就变成了人能跟住几个会话。Session engineering 围绕这个限制组织工作：事情怎样分给会话，会话之间怎样交接，人每次要重新读多少东西。Jig 是照这套做法做的工作台。做法的来历见官网博客的两篇 session engineering 文章，详情页可以链接过去。
+1. **Session Engineering**：一个 Agent 已经能独立做完一件事，会话一多，限制就变成了人能跟住几个会话。Session Engineering 围绕这个限制组织工作：事情怎样分给会话，会话之间怎样交接，人每次要重新读多少东西。Jig 是照这套做法做的工作台。做法的来历见官网博客的两篇 Session Engineering 文章，详情页可以链接过去。
 2. **主次结构**：主对话统筹，替你分派、转达、汇总回报，并维护审批中心；常设会话按团队各管一块事；任务会话为一件事开设，做完回报。结果用信件一级级回到主对话。
 3. **人只处理要人处理的事**：人管方向、决定和授权。方向在主对话里说一句；要你授权的操作、要你回答的问题和要你定的事都汇到审批中心。其他会话不用逐个进去看，想看时随时能点开。
 4. **结构由 Jig 的代码保证**：回报自动寄回请求方，决定标明出自你本人，删除、推送、发布等操作每次都问你，会话之间的信有额度和转发次数限制。这些由 Jig 执行，不靠提示词让模型自觉。
@@ -45,30 +45,31 @@ Jig 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 
 - 不提 Claude、Claude Code 或 Anthropic 的产品来对比、说明来历或暗示合作（蓝图第十二节）。Anthropic 只作为服务商之一出现。
 - 产品页的五条主张和界面那句是创始人 11-11 的定稿，照原样用（规范 14.2.1），「坐进办公室当老板」「打破工位枷锁」是他定的说法。此外不另加比喻（规范 14.2）：不写「个人版某某」「AI 员工」「内阁」「指挥官」这类说法，博客里拿历史制度作对照是论述内容，产品文案不搬过来；要加新的比喻先问创始人。不写效率数字和没验证过的效果。
+- 不把 Session Engineering 写成小写：它是专有名词，两个词首字母都大写，中文里也这样写（创始人 11-11：「session engineering 换成 Session Engineering。专有名词」）。Prompt Engineering 这类同类术语也大写（官网 7302151）。
 - 不写「人完全不用进会话」这样绝对的话：方向要在主对话里说，会话也随时能点开看。写「不用逐个进入会话」。
 - 不写成已经开源、上架或可以下载：现在只供榫卯内部使用，v1 验收后开源。
 - 不写榫卯已经用 Jig 运转公司：M4 验收时才把榫卯的会话组织搬到 Jig 上。
 
 ## 六、官网产品页
 
-2026-11-11 按创始人定的结构重做（官网提交 5d7cd3e），之后按他的调整取消了导航条（703d757），第 4、5 条配上截图（4477683）：https://tenon.asia/products/jig/ ，中文是 /zh/products/jig/。七个产品的页面结构相同：产品标志、一句话定义、链接、产品大图、带图的主张、界面那句、底部邀请卡片。首页的产品卡片单行滚动，卡片上只有标志和一句话定义。Jig 没有公开入口，链接和邀请卡片指向官网博客的两篇 session engineering 文章。英文是官网的译文。
+2026-11-11 按创始人定的结构重做（官网提交 5d7cd3e），之后按他的调整取消了导航条（703d757），第 4、5 条配上截图（4477683），Session Engineering 按专有名词大写（9beb0ff）：https://tenon.asia/products/jig/ ，中文是 /zh/products/jig/。七个产品的页面结构相同：产品标志、一句话定义、链接、产品大图、带图的主张、界面那句、底部邀请卡片。首页的产品卡片单行滚动，卡片上只有标志和一句话定义。Jig 没有公开入口，链接和邀请卡片指向官网博客的两篇 Session Engineering 文章。英文是官网的译文。
 
 | 字段 | 中文 | English |
 | --- | --- | --- |
 | `slug`、`name` | `jig`、Jig | |
 | `category` | `developer` | |
 | `tagline`（一句话定义） | AI 原生的多 Agent 工作台 | An AI-native multi-agent workbench |
-| `showcase.summary`（结构化数据的描述） | 为 session engineering 而生。你只对接主对话，授权和决定都在审批中心，手机上也能处理。 | Born for session engineering. You deal only with the main conversation, and approvals and decisions sit in the approval center, on your phone too. |
-| meta description | Jig 是 AI 原生的多 Agent 工作台，为 session engineering 而生：你只对接主对话，授权和决定都在审批中心，手机上也能处理。 | Jig is an AI-native multi-agent workbench, born for session engineering: you deal only with the main conversation, and approvals and decisions sit in the approval center, on your phone too. |
-| 链接 | Session engineering、Session engineering（二） | Session engineering, Session engineering, part 2 |
-| 邀请卡片 | 了解 session engineering | Read about session engineering |
+| `showcase.summary`（结构化数据的描述） | 为 Session Engineering 而生。你只对接主对话，授权和决定都在审批中心，手机上也能处理。 | Born for Session Engineering. You deal only with the main conversation, and approvals and decisions sit in the approval center, on your phone too. |
+| meta description | Jig 是 AI 原生的多 Agent 工作台，为 Session Engineering 而生：你只对接主对话，授权和决定都在审批中心，手机上也能处理。 | Jig is an AI-native multi-agent workbench, born for Session Engineering: you deal only with the main conversation, and approvals and decisions sit in the approval center, on your phone too. |
+| 链接 | Session Engineering、Session Engineering（二） | Session Engineering, Session Engineering, part 2 |
+| 邀请卡片 | 了解 Session Engineering | Read about Session Engineering |
 | `url` | 现在为空。v1 验收开源后填 GitHub 仓库 `https://github.com/dozybot001/Jig` | |
 
 **主张**：创始人 11-11 定稿，照原样用（规范 14.2.1）。配图见第七节。
 
 | | 标题 | 正文 | 配图 |
 | --- | --- | --- | --- |
-| 1 | 为 session engineering 而生 | 按这套理念构建，并且处处为它优化。 | `main` |
+| 1 | 为 Session Engineering 而生 | 按这套理念构建，并且处处为它优化。 | `main` |
 | 2 | 出色的多 Agent 协作体验 | 基于异步信箱机制 A2A，让 Agent 交流很无感。 | `letters` |
 | 3 | 真正坐进办公室当老板 | 授权与决定都在审批中心，你的操作才有实权。 | `permission` |
 | 4 | 随时随地，打破工位枷锁 | 手机也能审批，人不在电脑前，授权和决定照样处理。 | `phone` |
@@ -76,7 +77,7 @@ Jig 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 
 | | Title | Body |
 | --- | --- | --- |
-| 1 | Born for session engineering | Built on the idea and tuned for it throughout. |
+| 1 | Born for Session Engineering | Built on the idea and tuned for it throughout. |
 | 2 | Multi-agent collaboration done well | Agents talk through A2A, an asynchronous mailbox, and you hardly notice it happening. |
 | 3 | Take the boss’s chair for real | Approvals and decisions all sit in the approval center, and only your actions carry real authority. |
 | 4 | Anywhere, anytime, off the desk | Approve from your phone. Away from the computer, approvals and decisions still get handled. |
@@ -107,12 +108,13 @@ Jig 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 
 ## 修改记录
 
+- **0.10（2026-11-11）** 创始人定「session engineering 换成 Session Engineering。专有名词」（总办转达，官网提交 9beb0ff）。全文改成大写，第五节加上这条写法；README、蓝图、更新记录和网页、iPhone 关于页的介绍一起改了。
 - **0.9（2026-11-11）** 官网按创始人的调整更新产品页（官网提交 703d757、4477683、5d6faa1）：取消导航条，第 4、5 条配上手机审批和模型选择的截图，产品目录只留在用的字段，首页卡片只有标志和一句话定义。第六、七节同步这些变化；第四节不再提已删掉的 `status`；第五节和主张注明规范 14.2.1。
 - **0.8（2026-11-11）** 官网产品页按创始人定的结构重做（官网提交 5d7cd3e）。第六节改记新页面：创始人定稿的五条主张、界面那句、导航、链接和邀请卡片，去掉页面上已不显示的首屏介绍、问题、设计和要点；第二节写明官网的摘要按主张另写；第四节按创始人的决定写明 A2A 指会话之间的异步信箱；第五节写明定稿里的比喻照原样用；第七节加上手机审批和模型选择两种截图，原图放在 `docs/screenshots/`。
 - **0.7（2026-11-11）** 创始人说「Jig 的手机审批很快就上了，没必要过于强调现在没上就不能写」（平台组会话）。第四节由「只写已经发布的」改成已经实现的能力都能写、不加「目前」「暂未」，放开手机审批和定时任务；写明写手机和模型时要守的事实，A2A 列入不写。
 - **0.6（2026-11-11）** 创始人说「Jig 的介绍太冗长」，平台组把官网的摘要和首屏介绍压短（官网提交 b863499），本文第二、六节同步成新写法；README 和关于页的简介跟着换成同一句。
 - **0.5（2026-11-10）** Jig 已在官网公开（官网提交 c2d865f）。产品库取消了公开标记，删去 `featured` 一行；记下详情页的分段和导航。
 - **0.4（2026-11-09）** 截图按官网详情页的版面重拍：审批中心（一张授权卡加一张决定卡）、主对话、代码会话里的授权卡、信件列表，2560×1440；第七节写明每张的位置和中英文 alt。
-- **0.3（2026-11-09）** 按创始人给的方向重写定位：Jig 推的是 session engineering 的做法，会话分主次，人只对接主对话、在审批中心处理要人做的事，不用逐个进入会话。重写第二、三、五、六节，第七节写明四种截图画面。
+- **0.3（2026-11-09）** 按创始人给的方向重写定位：Jig 推的是 Session Engineering 的做法，会话分主次，人只对接主对话、在审批中心处理要人做的事，不用逐个进入会话。重写第二、三、五、六节，第七节写明四种截图画面。
 - **0.2（2026-11-09）** 记下产品库条目的现状（官网提交 0c2d448，不公开），以及改了本文要把提交号告诉平台组。
 - **0.1（2026-11-09）** 首版。创始人定 Jig 纳入 Tenon 产品库，让 Jig 会话给平台组写文案指导。
