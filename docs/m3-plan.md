@@ -46,7 +46,7 @@ flowchart LR
 - 电脑连接时用自己的私钥签名证明是这个电脑 id；同一电脑 id 只保留最新的一条连接。手机连接时只说明要找哪个电脑 id，身份由端到端握手确认。
 - 限流：每个连接的帧率和流量有上限；单帧不超过 1 MB；空闲连接定时心跳。
 - 不写内容日志；访问日志只记连接时间、电脑 id 的哈希、流量大小，按规范 15.5 保存。上线前把访问日志和保存期限写进隐私政策和数据清单（规范 11.3）。法务组 2026-11-14 定了隐私政策要改的两处：「不收集、不接收你在 Jig 里的任何数据」改成「……你在 Jig 里的内容」；加一句连接日志，照中继实际记的字段写，法务组给的句子是「中继服务器为保障网络安全记录连接日志（时间、IP 地址），不含内容，保存 6 个月后自动删除」。
-- APNs 的密钥（.p8）存在中继服务器上，按服务器部署规范作为密钥管理，不进仓库。用全团队共用的「Tenon Push」（Key ID `29U5SL6CG8`，沙盒和生产都可用，2026-11-14 新建，本机一份在 `~/.tenon-keys/apns/`）；WeSaid 换上它以后撤掉旧的「WeSaid Push」。Jig 的 App ID（`cn.tenonai.apps.jig` 和通知扩展的 `cn.tenonai.apps.jig.push`）已在 Apple 后台注册（2026-11-14，前者打开了 Push Notifications）；注册前 Apple 回 `TopicDisallowed`，注册后用模拟器的令牌向沙盒发静默通知被接受。
+- APNs 的密钥（.p8）存在中继服务器上，按服务器部署规范作为密钥管理，不进仓库。用全团队共用的「Tenon Push」（Key ID `29U5SL6CG8`，沙盒和生产都可用，2026-11-14 新建，本机一份在 `~/.tenon-keys/apns/`）；WeSaid 已换上它（2026-11-15），旧的「WeSaid Push」已在 Apple 后台撤销。Jig 的 App ID（`cn.tenonai.apps.jig` 和通知扩展的 `cn.tenonai.apps.jig.push`）已在 Apple 后台注册（2026-11-14，前者打开了 Push Notifications）；注册前 Apple 回 `TopicDisallowed`，注册后用模拟器的令牌向沙盒发静默通知被接受。
 - 部署参数（安全组 2026-11-14）：宿主机端口 `127.0.0.1:7290`，容器 UID/GID 70980（产品规范 A.3），独立的 bridge 网络，非 root、只读根文件系统。Caddy 站点配置放在仓库里，发布脚本装到 `/etc/caddy/sites-enabled/jig-relay.caddy`，先 `caddy validate` 再 reload，站点块里 `import access_log`；解析生效之前不把 `relay.tenonai.cn` 写进站点地址。根域名已有 CAA，子域名沿用。首次上线前发安全组验收：安全头和 HSTS、Origin 和鉴权、连接数和消息大小限制、日志里没有令牌和内容、容器权限、APNs 密钥文件的权限。
 - 按 `~/memory/server-deployment.md` 部署：本地构建不可变的发布包、上传、候选槽、切流和回滚；域名解析与证书由安全组负责（会话分工 2.1）。
 
