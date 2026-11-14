@@ -654,7 +654,7 @@ const zh = {
 	chosenMark: "（你选的）",
 	decisionLog: "审批记录文件",
 	decisionLogHelp: "每做一个决定，Jig 在这个 Markdown 文件末尾加一行，不改已有内容。留空就不同步。",
-	decisionLogPlaceholder: "例如 ~/Tenon-AI/docs/decisions.md",
+	decisionLogPlaceholder: "例如 ~/notes/decisions.md",
 };
 
 export type MessageKey = keyof typeof zh;
