@@ -4,7 +4,7 @@
 
 ## 一、结论
 
-- **不 fork，也不在现成项目上构建。** 按 [M1 实现计划](m1-plan.md)自己写服务、Agent 循环、工具、权限和界面，参照下面这些项目的设计，没有复制代码。
+- **不 fork，也不在现成项目上构建。** 按 [M1 实现计划](archive/m1-plan.md)自己写服务、Agent 循环、工具、权限和界面，参照下面这些项目的设计，没有复制代码。
   - 产品形态最接近的 Paseo、T3 Code 只包装 Claude Code、Codex 等外部命令行，没有自己的 Agent 循环。
   - 技术形态最接近的 OpenCode 自带循环、模型可换，但新版绑定 Effect 和 Bun，界面用 SolidJS，约 1.1 万个文件；fork 等于接手它的循环。
   - OpenClaw 是多渠道的个人助理网关，体量过大。pi 的 `apps/p2` 技术栈和 Jig 最像（Node、React 19、pi），但 README 写明是原型，很快删除。

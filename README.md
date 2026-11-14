@@ -25,7 +25,7 @@ Jig 不收集任何数据，也不含统计、遥测或上报代码。会话、�
 
 - [产品蓝图](docs/blueprint.md)：为什么做、做什么、不做什么、怎么验收
 - [对外介绍](docs/introduction.md)：官网、商店和各渠道介绍 Jig 时用的定义、简介和能写的能力
-- 实现计划：[M1](docs/m1-plan.md)、[M2](docs/m2-plan.md)、[M3](docs/m3-plan.md)
+- 实现计划：[M1](docs/archive/m1-plan.md)、[M2](docs/archive/m2-plan.md)、[M3](docs/archive/m3-plan.md)
 - [可借鉴的开源项目](docs/prior-art.md)
 - [数据清单](docs/data-inventory.md)：Jig 在你电脑上存了哪些数据、怎么删除
 - [更新记录](CHANGELOG.md)

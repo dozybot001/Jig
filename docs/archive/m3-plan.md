@@ -1,6 +1,6 @@
 # Jig M3 实现计划
 
-版本 0.6（2026-11-14）。依据[产品蓝图](blueprint.md) 0.26 第六（6.1 第 1、6 条，6.5，6.7）、八、九、十一节，以及 [M2 实现计划](m2-plan.md)第十三节挪到 M3 的内容；第三节的决定由创始人 2026-11-09 确认。技术栈和开发约定见 [AGENTS.md](../AGENTS.md)。
+版本 0.6（2026-11-14）。依据[产品蓝图](../blueprint.md) 0.26 第六（6.1 第 1、6 条，6.5，6.7）、八、九、十一节，以及 [M2 实现计划](m2-plan.md)第十三节挪到 M3 的内容；第三节的决定由创始人 2026-11-09 确认。技术栈和开发约定见 [AGENTS.md](../../AGENTS.md)。
 
 ## 一、范围与验收
 
@@ -95,7 +95,7 @@ flowchart LR
 - **迁移**：5 加 `devices`（名称、公钥、APNs 设备令牌、是否推送、配对时间、最近连接时间）；6 加 `schedules`（第九节的字段与上次运行结果）和 `letters.schedule_id`；做费用上限时再加 `usage_daily`（每个会话每天的 token 和费用）。会话选项加每日费用上限；设置加中继地址、「允许手机访问」、全局每日费用上限。电脑的长期私钥存系统钥匙串。
 - **接口**：`POST /api/devices/pairing`（只限本机，生成二维码内容）、`GET /api/devices`、`PATCH /api/devices/:id`、`DELETE /api/devices/:id`（只限本机）；`GET|POST /api/schedules`、`PATCH|DELETE /api/schedules/:id`、`POST /api/schedules/:id/run`。事件流加设备和定时任务的变化。
 - **命令行**：`jig remote on|off|status`、`jig schedule list|run`、`jig service install|uninstall|status`，都有 `--help`，供程序读取的有 `--json`。
-- [数据清单](data-inventory.md)和隐私说明补上：设备与推送令牌、定时任务、每日用量；中继看得到的元数据（连接时间、流量、推送令牌）和看不到的内容。
+- [数据清单](../data-inventory.md)和隐私说明补上：设备与推送令牌、定时任务、每日用量；中继看得到的元数据（连接时间、流量、推送令牌）和看不到的内容。
 
 ## 十二、开发顺序
 
