@@ -184,12 +184,12 @@ export function deviceLimits(): MiddlewareHandler<AppEnv> {
 		if (!c.env?.device) return next();
 		const { method, path } = c.req;
 		const write = method !== "GET" && method !== "HEAD";
-		// A phone may remove itself when it unpairs, but no other phone.
 		const self = path === `/api/devices/${c.env.device}`;
 		if (
 			(path.startsWith("/api/providers") && write) ||
 			path === "/api/devices/pairing" ||
-			(path.startsWith("/api/devices/") && method === "DELETE" && !self) ||
+			// A phone changes or removes only itself, never another phone.
+			(path.startsWith("/api/devices/") && write && !self) ||
 			path.startsWith("/api/auth/")
 		) {
 			return problemResponse(

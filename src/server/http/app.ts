@@ -15,6 +15,7 @@ import { api } from "./api.ts";
 import { deviceRoutes } from "./devices.ts";
 import { DraftCache, eventRoutes } from "./events.ts";
 import { mailRoutes } from "./mail.ts";
+import { type NoteStreams, noteRoutes } from "./notes.ts";
 import { type AppEnv, errorHandler, problemResponse, requestId, titleFor } from "./problem.ts";
 import { providerRoutes } from "./providers.ts";
 import { scheduleRoutes } from "./schedules.ts";
@@ -46,6 +47,8 @@ export interface AppOptions {
 	scheduler?: Scheduler;
 	/** Told when Jig's page on the Mac is in front and in use, so notifications wait (section 8). */
 	onPresence?: () => void;
+	/** Notifications for phones that keep their own connection (the Android app). */
+	notes?: NoteStreams;
 }
 
 const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Jig</title>
@@ -96,6 +99,7 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 	app.route("/api", mailRoutes(agents?.post ?? new PostOffice(store, log)));
 	if (bus) app.route("/api", eventRoutes(store, bus, new DraftCache(bus)));
 	if (options.scheduler) app.route("/api", scheduleRoutes(store, options.scheduler));
+	if (options.notes) app.route("/api", noteRoutes(options.notes));
 
 	const root = options.webRoot;
 	if (root && existsSync(join(root, "index.html"))) {

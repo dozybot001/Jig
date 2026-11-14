@@ -131,12 +131,15 @@ export function serveCommand(): Command {
 			});
 			// Notifications to paired phones, sealed for each; the relay passes them to Apple's service.
 			const { Notifier } = await import("../server/push.ts");
+			const { NoteStreams } = await import("../server/http/notes.ts");
+			const notes = new NoteStreams(store);
 			const notifier = new Notifier({
 				store,
 				mail: agents.post.mail,
 				bus,
 				schedules: () => agents.schedules.list(),
-				send: (note, mode, id) => remote.push(note, mode, id),
+				// iPhones through Apple's service; phones that keep their own connection directly.
+				send: (note, mode, id) => remote.push(note, mode, id) + notes.send(note),
 			});
 			// Scheduled tasks run from the service, whether or not a page is open (blueprint 6.5).
 			const scheduler = new Scheduler(store, agents.post, agents.schedules, log);
@@ -152,6 +155,7 @@ export function serveCommand(): Command {
 				remote,
 				scheduler,
 				onPresence: () => notifier.seen(),
+				notes,
 			});
 			handle = async (request, device) => app.fetch(request, { device });
 

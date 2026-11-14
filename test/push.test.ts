@@ -9,6 +9,7 @@ import { publicKeyOf } from "../src/remote/noise.ts";
 import { parsePairingLink } from "../src/remote/protocol.ts";
 import { openPush, type PushJob, type PushResult, pushKey, sealPush } from "../src/remote/push.ts";
 import { createApp } from "../src/server/http/app.ts";
+import { NoteStreams } from "../src/server/http/notes.ts";
 import { MemoryKeyStore } from "../src/server/keys.ts";
 import { MailStore } from "../src/server/mail/store.ts";
 import { type Clear, type Note, Notifier } from "../src/server/push.ts";
@@ -174,7 +175,8 @@ describe("notifications through the relay", () => {
 			handle: async (request, device) =>
 				(app as ReturnType<typeof createApp>).fetch(request, { device: device.id }),
 		});
-		app = createApp({ store, bus, remote, security: { port: 4777 }, log: () => {} });
+		const notes = new NoteStreams(store);
+		app = createApp({ store, bus, remote, notes, log: () => {} });
 		await remote.sync();
 		await until(() => remote.status().connected);
 		const link = parsePairingLink((await remote.pairing()).link);
@@ -188,6 +190,8 @@ describe("notifications through the relay", () => {
 			link,
 			device: welcome.device,
 			logs,
+			app,
+			notes,
 			async close() {
 				phone.close();
 				remote.stop();
@@ -223,6 +227,43 @@ describe("notifications through the relay", () => {
 			// A phone with notifications turned off on the Mac gets none.
 			store.updateDevice(device, { push: false });
 			assert.equal(remote.push(note, "alert"), 0);
+		} finally {
+			await close();
+		}
+	});
+
+	test("a phone that keeps its own connection gets notifications over the channel", async () => {
+		const { store, phone, device, app, notes, close } = await setup();
+		try {
+			assert.equal(notes.send({ v: 1, clear: [], badge: 0 }), 0);
+			const note = {
+				v: 1 as const,
+				id: "n1",
+				kind: "card" as const,
+				title: "#3",
+				body: "",
+				badge: 1,
+			};
+			const stream = phone.stream("/api/notes", (text) => text.includes('"n1"'));
+			await until(() => notes.send({ v: 1, clear: [], badge: 0 }) === 1);
+			assert.equal(notes.send(note), 1);
+			const text = await stream;
+			assert.match(text, /event: hello/);
+			assert.match(text, /event: note\ndata: \{"v":1,"id":"n1"/);
+			// Turned off on the Mac, the phone is not written to; the Mac's own page cannot listen.
+			store.updateDevice(device, { push: false });
+			assert.equal(notes.send(note), 0);
+			assert.equal((await app.request("/api/notes")).status, 400);
+			// A phone turns its own notifications on and off, and touches no other phone.
+			assert.equal(
+				(await phone.request("PATCH", `/api/devices/${device}`, { push: true })).status,
+				200,
+			);
+			const other = store.addDevice("another", "k".repeat(43));
+			assert.equal(
+				(await phone.request("PATCH", `/api/devices/${other.id}`, { push: false })).status,
+				403,
+			);
 		} finally {
 			await close();
 		}
