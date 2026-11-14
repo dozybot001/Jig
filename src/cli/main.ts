@@ -19,9 +19,21 @@ const commands = [
 	keyCommand(async () => {
 		const { openRuntime } = await import("../server/runtime.ts");
 		const runtime = openRuntime();
+		const { SEARCH_SERVICES } = await import("../server/tools/web-search.ts");
 		return {
 			keys: runtime.keys,
-			providers: runtime.gateway.providers(),
+			// Search services keep their keys the same way: jig key set search-bocha.
+			providers: [
+				...runtime.gateway.providers(),
+				...SEARCH_SERVICES.map((service) => ({
+					id: service.id,
+					name: service.name,
+					region: service.region,
+					baseUrl: service.origin,
+					keyRequired: true,
+					custom: false,
+				})),
+			],
 			close: runtime.close,
 		};
 	}),

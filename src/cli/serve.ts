@@ -109,6 +109,11 @@ export function serveCommand(): Command {
 			// Answers handed to a waiting call whose result was never stored come back as letters.
 			new MailStore(store).requeueHandedOff();
 			const log = (line: string) => io.stderr.write(`${line}\n`);
+			// Tools beyond the built-in ones: web search when a search service has a key (M4 plan).
+			const { ALL_TOOLS } = await import("../server/tools/registry.ts");
+			const { SearchAccess, webSearchTool } = await import("../server/tools/web-search.ts");
+			const search = new SearchAccess(runtime.keys);
+			const extraTools = [webSearchTool(search, { version: VERSION })];
 			const agents = new Agents({
 				store,
 				gateway,
@@ -116,6 +121,7 @@ export function serveCommand(): Command {
 				home,
 				version: VERSION,
 				log,
+				tools: () => [...ALL_TOOLS, ...extraTools],
 			});
 			const { RemoteAccess } = await import("../remote/access.ts");
 			const { KeychainStore } = await import("../server/keys.ts");
@@ -182,8 +188,11 @@ export function serveCommand(): Command {
 			scheduler.start();
 			notifier.start();
 			// Phone access follows the settings, which `jig remote` may change while Jig runs.
-			const syncRemote = () =>
+			const syncRemote = () => {
 				void remote.sync().catch((error: Error) => log(`remote access: ${error.message}`));
+				// A search key saved with `jig key set` while Jig runs is picked up here.
+				void search.refresh().catch(() => {});
+			};
 			syncRemote();
 			const remoteSweep = setInterval(syncRemote, REMOTE_SYNC_MS);
 			const info: ServeFile = { port, pid: process.pid, startedAt: Date.now() };

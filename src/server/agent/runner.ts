@@ -156,7 +156,8 @@ export interface AgentsOptions {
 	permissions: PermissionEngine;
 	home: string;
 	version: string;
-	tools?: ToolDefinition[];
+	/** The tools sessions may be offered; a function is asked every time, for tools that come and go. */
+	tools?: ToolDefinition[] | (() => ToolDefinition[]);
 	log?: (line: string) => void;
 	/** How often streaming drafts go to the interface. */
 	draftIntervalMs?: number;
@@ -238,7 +239,7 @@ export class Agents {
 	readonly #permissions: PermissionEngine;
 	readonly #home: string;
 	readonly #version: string;
-	readonly #tools: ToolDefinition[];
+	readonly #allTools: () => ToolDefinition[];
 	readonly #log: (line: string) => void;
 	readonly #draftInterval: number;
 	readonly #live = new Map<string, Live>();
@@ -289,7 +290,8 @@ export class Agents {
 		this.#permissions = options.permissions;
 		this.#home = options.home;
 		this.#version = options.version;
-		this.#tools = options.tools ?? ALL_TOOLS;
+		const tools = options.tools ?? ALL_TOOLS;
+		this.#allTools = typeof tools === "function" ? tools : () => tools;
 		this.#log = options.log ?? ((line) => process.stderr.write(`${line}\n`));
 		this.#draftInterval = options.draftIntervalMs ?? 50;
 		this.post = options.post ?? new PostOffice(options.store, this.#log);
@@ -694,7 +696,7 @@ export class Agents {
 		snapshot: ContextSnapshot,
 		signal: AbortSignal,
 	): Promise<AssistantMessage> {
-		const tools = toolsFor(session, this.#tools, this.#roles(session));
+		const tools = toolsFor(session, this.#allTools(), this.#roles(session));
 		let last = 0;
 		let pending: ReturnType<typeof setTimeout> | null = null;
 		let latest: AssistantMessage | null = null;
@@ -738,7 +740,7 @@ export class Agents {
 		const signal = live.controller.signal;
 		const current = this.#store.getSession(sessionId);
 		const byName = new Map(
-			toolsFor(current, this.#tools, this.#roles(current)).map((tool) => [tool.name, tool]),
+			toolsFor(current, this.#allTools(), this.#roles(current)).map((tool) => [tool.name, tool]),
 		);
 		const results = new Map<
 			string,
