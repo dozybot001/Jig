@@ -13,7 +13,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (savedInstanceState == null) handle(intent)
+        handle(intent)
         setContent { Root(model) }
     }
 
@@ -35,7 +35,9 @@ class MainActivity : ComponentActivity() {
 
     private fun handle(intent: Intent) {
         // A tapped notification: its session, or the approval center.
+        // Each extra is taken off once it is acted on, so a redrawn screen does not act on it again.
         if (intent.getBooleanExtra(OPEN, false)) model.open(intent.getStringExtra(SESSION))
+        intent.removeExtra(OPEN)
         if (BuildConfig.DEBUG) {
             // Debug builds only, for emulator runs: `--es jig.pair <jig://pair?…>` pairs as scanning
             // would, `--ez jig.demo true` opens the demo, `--es jig.tab approvals|letters` picks a tab.
@@ -45,6 +47,7 @@ class MainActivity : ComponentActivity() {
                 "approvals" -> model.tab = Tab.Approvals
                 "letters" -> model.tab = Tab.Letters
             }
+            for (extra in listOf("jig.pair", "jig.demo", "jig.tab")) intent.removeExtra(extra)
         }
     }
 

@@ -9,6 +9,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -43,9 +45,9 @@ import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
 import cn.tenonai.apps.jig.AppModel
 import cn.tenonai.apps.jig.BuildConfig
 import cn.tenonai.apps.jig.Link
@@ -63,7 +65,7 @@ private fun Context.open(intent: Intent) {
 /** Counts up each time the app comes back to the front, so what system settings changed is read again. */
 @Composable
 private fun resumes(): Int {
-    val owner = LocalContext.current as LifecycleOwner
+    val owner = LocalActivity.current as ComponentActivity
     var count by remember { mutableIntStateOf(0) }
     DisposableEffect(owner) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) count += 1 }
@@ -237,7 +239,7 @@ fun AboutScreen(model: AppModel, close: () -> Unit) {
                 })
                 GroupDivider()
                 GroupRow(stringResource(R.string.website), stringResource(R.string.website_host), onClick = {
-                    context.open(Intent(Intent.ACTION_VIEW, Uri.parse("https://tenon.asia/")))
+                    context.open(Intent(Intent.ACTION_VIEW, "https://tenon.asia/".toUri()))
                 })
             }
             Spacer(Modifier.height(16.dp))
@@ -247,7 +249,7 @@ fun AboutScreen(model: AppModel, close: () -> Unit) {
                 GroupRow(stringResource(R.string.terms), onClick = { model.pages.add(Page.Policy(privacy = false)) })
                 GroupDivider()
                 GroupRow(stringResource(R.string.feedback), stringResource(R.string.feedback_address), onClick = {
-                    context.open(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:support@tenonai.cn")))
+                    context.open(Intent(Intent.ACTION_SENDTO, "mailto:support@tenonai.cn".toUri()))
                 })
             }
         }

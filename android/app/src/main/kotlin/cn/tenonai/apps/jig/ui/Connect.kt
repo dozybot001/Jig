@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import cn.tenonai.apps.jig.AppModel
 import cn.tenonai.apps.jig.Page
 import cn.tenonai.apps.jig.R
@@ -162,7 +164,7 @@ fun ScannerScreen(model: AppModel, close: () -> Unit) {
 
 @Composable
 private fun CameraPreview(onCode: (String) -> Unit) {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as ComponentActivity
     val executor = remember { Executors.newSingleThreadExecutor() }
     val view = remember { PreviewView(activity) }
     DisposableEffect(Unit) {
@@ -187,7 +189,7 @@ private fun CameraPreview(onCode: (String) -> Unit) {
                 provider.unbindAll()
                 provider.bindToLifecycle(activity, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
             }
-        }, activity.mainExecutor)
+        }, ContextCompat.getMainExecutor(activity))
         onDispose {
             runCatching { providers.get().unbindAll() }
             executor.shutdown()

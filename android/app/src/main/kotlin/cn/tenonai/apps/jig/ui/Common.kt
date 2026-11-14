@@ -237,7 +237,7 @@ fun GroupRow(label: String, value: String? = null, onClick: (() -> Unit)? = null
             .heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = color, modifier = Modifier.weight(1f, fill = value == null))
+        Text(label, color = color, modifier = if (value == null && leading == null) Modifier.weight(1f) else Modifier)
         if (value != null || leading != null) {
             Spacer(Modifier.width(12.dp))
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
@@ -245,7 +245,7 @@ fun GroupRow(label: String, value: String? = null, onClick: (() -> Unit)? = null
                 if (value != null) Text(value, color = colors.soft, textAlign = TextAlign.End)
             }
         }
-        if (onClick != null && value == null && leading == null) Icon(Icons.Forward, null, Modifier.size(18.dp), tint = colors.soft)
+        if (onClick != null && value == null && leading == null && color == colors.ink) Icon(Icons.Forward, null, Modifier.size(18.dp), tint = colors.soft)
     }
 }
 

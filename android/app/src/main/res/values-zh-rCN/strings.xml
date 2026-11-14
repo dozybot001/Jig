@@ -89,7 +89,6 @@
     <string name="something_else">其他回答…</string>
     <string name="pick_any">可多选</string>
     <string name="recommended">建议</string>
-    <string name="selected">已选</string>
     <string name="options">选项</string>
     <string name="add_note">写一句备注（可选）</string>
     <string name="decision">决定</string>
@@ -148,8 +147,8 @@
     <string name="channel_needs">等你处理的事</string>
     <string name="channel_link">和电脑的连接</string>
     <string name="service_title">Jig 正在接收通知</string>
-    <string name="service_online">已连接到%s。</string>
-    <string name="service_waiting">现在连不上%s，Jig 会一直重试。</string>
+    <string name="service_online">已连接到「%s」。</string>
+    <string name="service_waiting">现在连不上「%s」，Jig 会一直重试。</string>
 
     <string name="push_permission">要你授权</string>
     <string name="push_question">问你</string>
@@ -164,7 +163,9 @@
     <string name="push_schedule_error">定时任务出错了</string>
     <string name="push_budget_reached">今天的费用到了每日上限，已停下</string>
     <string name="push_budget_warning" formatted="false">今天的费用超过了每日上限的 80%</string>
-    <string name="push_many">有 %d 件事等你</string>
+    <plurals name="push_many">
+        <item quantity="other">有 %d 件事等你</item>
+    </plurals>
     <string name="push_fallback">Jig 里有事等你。</string>
     <string name="push_separator">：</string>
 

@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import androidx.core.content.edit
 import cn.tenonai.apps.jig.MainActivity
 import cn.tenonai.apps.jig.R
 import cn.tenonai.apps.jig.api.Center
@@ -74,7 +75,7 @@ class NoteText(note: Note, text: (Int) -> String, count: (Int, Int) -> String) {
             }
             "schedule" -> text(if (note.code == "error") R.string.push_schedule_error else R.string.push_schedule_done)
             "budget" -> text(if (note.code == "budget-reached") R.string.push_budget_reached else R.string.push_budget_warning)
-            "many" -> count(R.string.push_many, note.n ?: 0)
+            "many" -> count(R.plurals.push_many, note.n ?: 0)
             else -> text(R.string.push_fallback)
         }
         val detail = note.body.orEmpty()
@@ -114,7 +115,7 @@ class Notifier(private val context: Context) {
     }
 
     private fun show(note: Note, tag: String) {
-        val text = NoteText(note, { context.getString(it) }) { id, n -> context.getString(id, n) }
+        val text = NoteText(note, { context.getString(it) }) { id, n -> context.resources.getQuantityString(id, n, n) }
         val open = Intent(context, MainActivity::class.java)
             .setAction("jig.open.$tag")
             .putExtra(MainActivity.OPEN, true)
@@ -145,7 +146,7 @@ class Notifier(private val context: Context) {
         val keys = center.keys
         val seen = prefs.getStringSet(SEEN, null)
         val fresh = if (seen == null) emptySet() else keys - seen
-        prefs.edit().putStringSet(SEEN, keys).apply()
+        prefs.edit { putStringSet(SEEN, keys) }
         if (keys.isEmpty()) {
             // Nothing is waiting, so no notification stays.
             for (shown in manager.activeNotifications) if (shown.id == NOTE) manager.cancel(shown.tag, NOTE)
@@ -162,7 +163,7 @@ class Notifier(private val context: Context) {
     /** Unpaired: nothing of the old pairing stays on the screen or in the list of seen items. */
     fun forget() {
         for (shown in manager.activeNotifications) if (shown.id == NOTE) manager.cancel(shown.tag, NOTE)
-        prefs.edit().remove(SEEN).apply()
+        prefs.edit { remove(SEEN) }
     }
 
     /** The system lets this app show notifications (the permission on Android 13 and later, and the app's switch). */
@@ -171,12 +172,12 @@ class Notifier(private val context: Context) {
     /** The person's own switch in Jig's settings; on until they turn it off. */
     var wanted: Boolean
         get() = prefs.getBoolean(WANTED, true)
-        set(value) = prefs.edit().putBoolean(WANTED, value).apply()
+        set(value) = prefs.edit { putBoolean(WANTED, value) }
 
     /** Android has been asked for the permission once; after a refusal only system settings can change it. */
     var asked: Boolean
         get() = prefs.getBoolean(ASKED, false)
-        set(value) = prefs.edit().putBoolean(ASKED, value).apply()
+        set(value) = prefs.edit { putBoolean(ASKED, value) }
 
     companion object {
         const val NEEDS = "needs"

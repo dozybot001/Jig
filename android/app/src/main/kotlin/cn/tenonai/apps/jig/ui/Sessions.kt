@@ -35,7 +35,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -315,9 +314,8 @@ private fun AnswerText(text: String) {
 /** "Read 1 file, ran 2 commands": the tools a stretch of work used, by kind, in the computer's wording. */
 @Composable
 private fun toolSummary(names: List<String>): String {
-    val resources = LocalContext.current.resources
     return ToolKinds.count(names).mapIndexed { index, (kind, n) ->
-        val part = resources.getQuantityString(
+        val part = pluralStringResource(
             when (kind) {
                 "read" -> R.plurals.tools_read
                 "edit" -> R.plurals.tools_edit

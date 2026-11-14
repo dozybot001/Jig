@@ -35,6 +35,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -485,28 +486,32 @@ class AppModel(private val context: Context) {
         if (notesJob?.isActive == true) return
         notesJob = scope.launch {
             var wait = 3_000L
+            var refusals = 0
             while (isActive) {
                 val client = client ?: return@launch
                 try {
-                    client.sse("/api/notes").collect { event ->
-                        when (event.event) {
-                            "hello" -> {
-                                listening = true
-                                link = Link.Online
-                                wait = 3_000L
-                                // Back after being away: what came to the approval center meanwhile gets one notification.
-                                runCatching { Center.from(client.get("/api/center")) }.getOrNull()?.let {
-                                    center = it
-                                    notifier.waiting(it, back = true)
-                                }
-                            }
-                            "note" -> {
-                                notifier.handle(event.data)
-                                if (!visible) {
-                                    runCatching { Center.from(client.get("/api/center")) }.getOrNull()?.let {
-                                        center = it
-                                        notifier.waiting(it)
+                    coroutineScope {
+                        var told = false
+                        client.sse("/api/notes").collect { event ->
+                            when (event.event) {
+                                "hello" -> {
+                                    listening = true
+                                    link = Link.Online
+                                    wait = 3_000L
+                                    refusals = 0
+                                    told = false
+                                    // Back after being away. The computer sends again what it could not
+                                    // deliver in the last ten minutes; what is older and still waiting
+                                    // gets one notification that sums it up, unless Jig is on screen.
+                                    launch {
+                                        delay(8_000)
+                                        readCenter(client)?.let { notifier.waiting(it, back = !told && !visible) }
                                     }
+                                }
+                                "note" -> {
+                                    told = true
+                                    notifier.handle(event.data)
+                                    if (!visible) readCenter(client)?.let(notifier::waiting)
                                 }
                             }
                         }
@@ -518,13 +523,21 @@ class AppModel(private val context: Context) {
                     wait = 60_000L
                 } catch (error: Exception) {
                     note(error)
+                    if (error is RelayException.Refused) refusals += 1
                 }
                 listening = false
-                // Removed on the computer: there is nothing to listen to until the phone is paired again.
-                if (link == Link.Refused) return@launch
+                // Removed on the computer: after a few refusals in a row there is nothing to listen
+                // to until the phone is paired again, and the service stops.
+                if (refusals >= 3) {
+                    context.stopService(Intent(context, LinkService::class.java))
+                    return@launch
+                }
                 pause(wait)
                 wait = (wait * 2).coerceAtMost(60_000L)
             }
         }
     }
+
+    private suspend fun readCenter(client: JigClient): Center? =
+        runCatching { Center.from(client.get("/api/center")) }.getOrNull()?.also { center = it }
 }

@@ -58,6 +58,11 @@ android {
         buildConfig = true
     }
 
+    lint {
+        // The adaptive icon stays in mipmap-anydpi-v26, where the build tools look for it.
+        disable += "ObsoleteSdkInt"
+    }
+
     testOptions {
         unitTests.all {
             // The policy text is read where it is, so the test fails when the app's copy falls behind.

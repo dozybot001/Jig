@@ -106,7 +106,6 @@
     <string name="something_else">Something else…</string>
     <string name="pick_any">Pick any</string>
     <string name="recommended">Recommended</string>
-    <string name="selected">Selected</string>
     <string name="options">Options</string>
     <string name="add_note">Add a note (optional)</string>
     <string name="decision">Decision</string>
@@ -186,7 +185,10 @@
     <string name="push_schedule_error">Scheduled task stopped with an error</string>
     <string name="push_budget_reached">Stopped: today\'s spending reached the daily limit</string>
     <string name="push_budget_warning" formatted="false">Today\'s spending passed 80% of the daily limit</string>
-    <string name="push_many">%d things need you</string>
+    <plurals name="push_many">
+        <item quantity="one">%d thing needs you</item>
+        <item quantity="other">%d things need you</item>
+    </plurals>
     <string name="push_fallback">Something in Jig needs you.</string>
     <string name="push_separator">": "</string>
 

@@ -7,5 +7,4 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
     <color name="paper">#FFFFFF</color>
-    <color name="ink">#0D0D0D</color>
 </resources>

@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,16 +57,18 @@ fun Root(model: AppModel) {
         }
         val close = { if (model.pages.isNotEmpty()) model.pages.removeAt(model.pages.lastIndex) }
         BackHandler(enabled = model.pages.isNotEmpty()) { close() }
-        when (val page = model.pages.lastOrNull()) {
-            null -> if (model.connected) Tabs(model) else ConnectScreen(model)
-            is Page.Session -> SessionScreen(model, page.session, close)
-            is Page.Question -> QuestionScreen(model, page.approval, close)
-            is Page.Decision -> DecisionScreen(model, page.card, close)
-            is Page.Letter -> LetterScreen(model, page.letter, close)
-            Page.Settings -> SettingsScreen(model, close)
-            Page.About -> AboutScreen(model, close)
-            is Page.Policy -> PolicyScreen(page.privacy, close)
-            Page.Scanner -> ScannerScreen(model, close)
+        Surface(Modifier.fillMaxSize(), color = colors.paper, contentColor = colors.ink) {
+            when (val page = model.pages.lastOrNull()) {
+                null -> if (model.connected) Tabs(model) else ConnectScreen(model)
+                is Page.Session -> SessionScreen(model, page.session, close)
+                is Page.Question -> QuestionScreen(model, page.approval, close)
+                is Page.Decision -> DecisionScreen(model, page.card, close)
+                is Page.Letter -> LetterScreen(model, page.letter, close)
+                Page.Settings -> SettingsScreen(model, close)
+                Page.About -> AboutScreen(model, close)
+                is Page.Policy -> PolicyScreen(page.privacy, close)
+                Page.Scanner -> ScannerScreen(model, close)
+            }
         }
         // What the computer said when it refused a request. The first screen shows its problem in place.
         val problem = model.problem
