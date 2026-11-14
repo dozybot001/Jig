@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
 	type Group,
 	letterQuotaOf,
@@ -9,9 +9,9 @@ import {
 	type SessionKind,
 	type ThinkingLevel,
 } from "../../../src/shared/types.ts";
-import { createGroup, createSession, renameGroup, updateSession } from "../actions.ts";
+import { createGroup, createSession, renameGroup, spentToday, updateSession } from "../actions.ts";
 import { ApiError } from "../api.ts";
-import { t, useLang } from "../i18n.ts";
+import { formatCost, t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
 import { CloseIcon } from "./icons.tsx";
 import { ModelPicker } from "./session.tsx";
@@ -229,6 +229,15 @@ export function SessionSettingsDialog({
 	const [receive, setReceive] = useState<ReceivePolicy>(session.options.receive ?? "accept");
 	const savedQuota = session.options.letterQuota ? String(session.options.letterQuota) : "";
 	const [quota, setQuota] = useState(savedQuota);
+	const savedBudget = session.options.dailyBudget ? String(session.options.dailyBudget) : "";
+	const [budget, setBudget] = useState(savedBudget);
+	const [spent, setSpent] = useState<number | null>(null);
+	useEffect(() => {
+		spentToday()
+			.then((today) => setSpent(today.sessions[session.id] ?? 0))
+			.catch(() => {});
+	}, [session.id]);
+	const budgetId = useId();
 	const [canPost, setCanPost] = useState(session.options.canPostCards === true);
 	const [canOrganize, setCanOrganize] = useState(session.options.canOrganize === true);
 	const roleId = useId();
@@ -246,6 +255,7 @@ export function SessionSettingsDialog({
 				compactAt: compactAt.trim() ? Number(compactAt) : null,
 				receive,
 				letterQuota: quota.trim() ? Number(quota) : null,
+				...(budget !== savedBudget ? { dailyBudget: Number(budget) || null } : {}),
 				canPostCards: canPost,
 				canOrganize,
 			},
@@ -259,6 +269,7 @@ export function SessionSettingsDialog({
 		JSON.stringify(rules) !== JSON.stringify(session.rules) ||
 		receive !== (session.options.receive ?? "accept") ||
 		quota !== savedQuota ||
+		budget !== savedBudget ||
 		canPost !== (session.options.canPostCards === true) ||
 		canOrganize !== (session.options.canOrganize === true);
 	return (
@@ -332,6 +343,23 @@ export function SessionSettingsDialog({
 					</>
 				)}
 			</SettingGroup>
+			<SettingGroup title={t("budgetSection")}>
+				<SettingRow
+					label={t("dailyBudget")}
+					htmlFor={budgetId}
+					info={t("dailyBudgetHelp")}
+					{...(spent === null ? {} : { hint: t("spentToday", { n: formatCost(spent) }) })}
+				>
+					<input
+						id={budgetId}
+						className="input input-number"
+						inputMode="decimal"
+						placeholder={t("budgetNone")}
+						value={budget}
+						onChange={(event) => setBudget(cleanAmount(event.target.value))}
+					/>
+				</SettingRow>
+			</SettingGroup>
 			<SettingGroup title={t("contextSection")}>
 				<SettingRow
 					label={t("compactAt")}
@@ -356,6 +384,13 @@ export function SessionSettingsDialog({
 			<ErrorBox error={generalError(save.error, ["options"])} />
 		</Dialog>
 	);
+}
+
+/** Keeps what was typed to an amount: digits with at most one point and two decimals. */
+export function cleanAmount(value: string): string {
+	const [whole = "", ...rest] = value.replace(/[^\d.]/g, "").split(".");
+	const head = whole.slice(0, 6);
+	return rest.length > 0 ? `${head}.${rest.join("").slice(0, 2)}` : head;
 }
 
 export function GroupDialog({

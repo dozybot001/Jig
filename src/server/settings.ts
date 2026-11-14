@@ -34,6 +34,8 @@ export const SETTING_DEFAULTS = {
 	decisionLog: null as string | null,
 	/** Phones reach this Mac through the relay (blueprint 6.7, M3 plan section 6). */
 	remote: { enabled: false, relayUrl: "wss://relay.tenonai.cn" } as RemoteSettings,
+	/** The most all sessions together may spend in a day, in US dollars (M3 plan, section 10). */
+	dailyBudget: null as number | null,
 };
 
 export interface RemoteSettings {
@@ -52,6 +54,7 @@ export function readSettings(store: Store): Settings {
 		mainSessionId: store.getSetting("mainSessionId", SETTING_DEFAULTS.mainSessionId),
 		decisionLog: store.getSetting("decisionLog", SETTING_DEFAULTS.decisionLog),
 		remote: { ...SETTING_DEFAULTS.remote, ...store.getSetting("remote", SETTING_DEFAULTS.remote) },
+		dailyBudget: store.getSetting("dailyBudget", SETTING_DEFAULTS.dailyBudget),
 	};
 }
 

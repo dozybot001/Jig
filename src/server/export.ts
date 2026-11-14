@@ -8,6 +8,7 @@ import type {
 } from "../shared/messages.ts";
 import { askedQuestion } from "../shared/messages.ts";
 import type { Entry, Session, ToolCallStatus, ToolCallView } from "../shared/types.ts";
+import { dollars } from "./budget.ts";
 
 export type ExportLanguage = "zh" | "en";
 
@@ -44,6 +45,10 @@ interface ExportStrings {
 	compacted: string;
 	modelError: string;
 	compactFailed: string;
+	budgetReached: string;
+	budgetWarning: string;
+	budgetSession: string;
+	budgetAll: string;
 	missingKey: string;
 	error: string;
 	jobFinished: string;
@@ -86,6 +91,10 @@ const ZH: ExportStrings = {
 	compacted: "较早的记录已压成摘要",
 	modelError: "模型请求失败",
 	compactFailed: "压缩上下文失败",
+	budgetReached: "今天的费用到了{scope}每日上限（{spent} / {limit}），已停下",
+	budgetWarning: "今天的费用超过了{scope}每日上限的 80%（{spent} / {limit}）",
+	budgetSession: "这个会话的",
+	budgetAll: "全部会话的",
 	missingKey: "没有 {provider} 的 API Key",
 	error: "出错",
 	jobFinished: "后台任务 {job}（{command}）结束了{exit}。",
@@ -147,6 +156,10 @@ const EN: ExportStrings = {
 	compacted: "Earlier messages were summarized",
 	modelError: "The model request failed",
 	compactFailed: "Could not compact the context",
+	budgetReached: "Stopped: today's spending reached {scope} daily limit ({spent} of {limit})",
+	budgetWarning: "Today's spending passed 80% of {scope} daily limit ({spent} of {limit})",
+	budgetSession: "this session's",
+	budgetAll: "the shared",
 	missingKey: "There is no API key for {provider}",
 	error: "Error",
 	jobFinished: "Background job {job} ({command}) ended{exit}.",
@@ -350,6 +363,14 @@ function noticeLine(notice: Notice, strings: ExportStrings): string {
 		case "changed": {
 			const by = typeof notice.data?.by === "string" ? notice.data.by : "";
 			return strings.changed.replace("{by}", () => by);
+		}
+		case "budget": {
+			const data = notice.data ?? {};
+			const amount = (value: unknown) => (typeof value === "number" ? dollars(value) : "");
+			return (data.code === "budget-reached" ? strings.budgetReached : strings.budgetWarning)
+				.replace("{scope}", data.scope === "session" ? strings.budgetSession : strings.budgetAll)
+				.replace("{spent}", () => amount(data.spent))
+				.replace("{limit}", () => amount(data.limit));
 		}
 		case "error": {
 			const code = typeof notice.data?.code === "string" ? notice.data.code : "";

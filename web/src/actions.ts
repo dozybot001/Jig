@@ -484,6 +484,7 @@ export type SessionPatch = Partial<{
 		permissionMode?: PermissionMode;
 		receive?: ReceivePolicy;
 		letterQuota?: number | null;
+		dailyBudget?: number | null;
 		canPostCards?: boolean;
 		canOrganize?: boolean;
 	};
@@ -798,6 +799,10 @@ export async function revokeDevice(id: string): Promise<void> {
 	await api("DELETE", `/api/devices/${id}`);
 	await loadPhones();
 }
+
+/** What was spent today, in US dollars: in all and by session. */
+export const spentToday = () =>
+	api<{ day: string; total: number; sessions: Record<string, number> }>("GET", "/api/usage/today");
 
 export async function saveSettings(patch: Partial<Settings>): Promise<void> {
 	const settings = await api<Settings>("PATCH", "/api/settings", patch);

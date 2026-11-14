@@ -161,6 +161,7 @@ export const listSessionsTool: ToolDefinition = {
 		const jig = [
 			`- default model: ${settings.defaultModel.provider}/${settings.defaultModel.model} (${settings.defaultModel.thinking})`,
 			`- decision log: ${settings.decisionLog ?? "none"}`,
+			`- daily budget for all sessions: ${settings.dailyBudget ? `$${settings.dailyBudget}` : "none"}`,
 			`- workspaces: ${workspaces || "none"}`,
 			`- theme: ${settings.theme}; language: ${settings.language}`,
 		];
@@ -385,6 +386,11 @@ export const manageJigTool: ToolDefinition = {
 							maximum: 100,
 							description: "Letters it may send between the person's messages; 0 for the default.",
 						},
+						daily_budget: {
+							type: "number",
+							minimum: 0,
+							description: "The most it may spend in a day, in US dollars; 0 for no limit.",
+						},
 						can_post_cards: { type: "boolean" },
 						can_manage: { type: "boolean", description: "May use manage_jig." },
 						pinned: { type: "boolean" },
@@ -433,6 +439,11 @@ export const manageJigTool: ToolDefinition = {
 					decision_log: {
 						type: "string",
 						description: 'A Markdown file every decision is added to, or "none".',
+					},
+					daily_budget: {
+						type: "number",
+						minimum: 0,
+						description: "The most all sessions may spend in a day, in US dollars; 0 for no limit.",
 					},
 					add_workspace: { type: "string", description: "A folder to add to the workspaces." },
 					remove_workspace: { type: "string", description: "A workspace, by folder or name." },

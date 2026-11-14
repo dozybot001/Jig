@@ -24,6 +24,7 @@ import type {
 	ToolCallView,
 	UsageTotals,
 } from "../shared/types.ts";
+import { localDay } from "./budget.ts";
 import { type Db, json, transaction } from "./db/database.ts";
 import { conflict, invalid, notFound } from "./errors.ts";
 import type { BusEvent, EventBus } from "./events.ts";
@@ -793,7 +794,7 @@ export class Store {
 	}
 
 	/** Adds one model request's usage; `contextTokens` is what that request put in the context window. */
-	addUsage(id: string, usage: UsageTotals, contextTokens: number): Session {
+	addUsage(id: string, usage: UsageTotals, contextTokens: number, now = Date.now()): Session {
 		return this.tx(() => {
 			this.#q(
 				`UPDATE sessions SET usage_input = usage_input + ?, usage_output = usage_output + ?,
@@ -806,11 +807,47 @@ export class Store {
 				usage.cacheWrite,
 				usage.cost,
 				contextTokens,
-				Date.now(),
+				now,
 				id,
+			);
+			this.#q(
+				`INSERT INTO usage_daily (session_id, day, input, output, cache_read, cache_write, cost)
+					VALUES (?, ?, ?, ?, ?, ?, ?)
+					ON CONFLICT (session_id, day) DO UPDATE SET input = input + excluded.input,
+						output = output + excluded.output, cache_read = cache_read + excluded.cache_read,
+						cache_write = cache_write + excluded.cache_write, cost = cost + excluded.cost`,
+			).run(
+				id,
+				localDay(now),
+				usage.input,
+				usage.output,
+				usage.cacheRead,
+				usage.cacheWrite,
+				usage.cost,
 			);
 			return this.#emitSession(id);
 		});
+	}
+
+	/** Dollars spent on a local calendar day, by one session or by all of them. */
+	spentOn(day: string, sessionId?: string): number {
+		const row = (
+			sessionId
+				? this.#q(
+						"SELECT COALESCE(SUM(cost), 0) AS cost FROM usage_daily WHERE day = ? AND session_id = ?",
+					).get(day, sessionId)
+				: this.#q("SELECT COALESCE(SUM(cost), 0) AS cost FROM usage_daily WHERE day = ?").get(day)
+		) as { cost: number };
+		return row.cost;
+	}
+
+	/** What each session spent on a day, for the sessions that used a model then. */
+	spentBySession(day: string): Record<string, number> {
+		const rows = this.#q("SELECT session_id, cost FROM usage_daily WHERE day = ?").all(day) as {
+			session_id: string;
+			cost: number;
+		}[];
+		return Object.fromEntries(rows.map((row) => [row.session_id, row.cost]));
 	}
 
 	setContextTokens(id: string, contextTokens: number): Session {

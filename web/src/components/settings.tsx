@@ -14,10 +14,11 @@ import {
 	saveKey,
 	saveSettings,
 	setPhoneAccess,
+	spentToday,
 } from "../actions.ts";
-import { formatAgo, t, useLang } from "../i18n.ts";
+import { formatAgo, formatCost, t, useLang } from "../i18n.ts";
 import { type ProviderSummary, setState, useAppState } from "../state.ts";
-import { ConfirmDialog } from "./dialogs.tsx";
+import { ConfirmDialog, cleanAmount } from "./dialogs.tsx";
 import {
 	ChevronIcon,
 	DataIcon,
@@ -271,16 +272,27 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 	const [model, setModel] = useState(settings?.defaultModel);
 	const [log, setLog] = useState(settings?.decisionLog ?? "");
 	const logId = useId();
+	const savedBudget = settings?.dailyBudget ? String(settings.dailyBudget) : "";
+	const [budget, setBudget] = useState(savedBudget);
+	const [spent, setSpent] = useState<number | null>(null);
+	useEffect(() => {
+		spentToday()
+			.then((today) => setSpent(today.total))
+			.catch(() => {});
+	}, []);
+	const budgetId = useId();
 	const save = useAction(async () => {
 		await saveSettings({
 			...(model ? { defaultModel: model } : {}),
 			decisionLog: log.trim() || null,
+			...(budget !== savedBudget ? { dailyBudget: Number(budget) || null } : {}),
 		});
 		onClose();
 	});
 	const dirty =
 		JSON.stringify(model) !== JSON.stringify(settings?.defaultModel) ||
-		log.trim() !== (settings?.decisionLog ?? "");
+		log.trim() !== (settings?.decisionLog ?? "") ||
+		budget !== savedBudget;
 	return (
 		<Dialog
 			title={t("defaultsTitle")}
@@ -323,6 +335,19 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 					value={log}
 					onChange={(event) => setLog(event.target.value)}
 				/>
+			</Field>
+			<Field label={t("dailyBudgetAll")} htmlFor={budgetId} info={t("dailyBudgetAllHelp")}>
+				<input
+					id={budgetId}
+					className="input input-number"
+					inputMode="decimal"
+					placeholder={t("budgetNone")}
+					value={budget}
+					onChange={(event) => setBudget(cleanAmount(event.target.value))}
+				/>
+				{spent !== null && (
+					<span className="hint">{t("spentToday", { n: formatCost(spent) })}</span>
+				)}
 			</Field>
 			<ErrorBox error={save.error} />
 		</Dialog>

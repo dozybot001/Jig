@@ -155,6 +155,7 @@ export function directoryLine(
 	const options = session.options;
 	if (options.receive && options.receive !== "accept") parts.push(`receives: ${options.receive}`);
 	if (options.letterQuota) parts.push(`letter quota: ${options.letterQuota}`);
+	if (options.dailyBudget) parts.push(`daily budget: $${options.dailyBudget}`);
 	if (options.canPostCards) parts.push("can post cards");
 	if (options.canOrganize) parts.push("can manage Jig");
 	if (session.pinned) parts.push("pinned");

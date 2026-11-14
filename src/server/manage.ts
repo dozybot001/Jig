@@ -15,6 +15,7 @@ import {
 	THINKING_LEVELS,
 	type ThinkingLevel,
 } from "../shared/types.ts";
+import { dollars, isBudget } from "./budget.ts";
 import { invalid } from "./errors.ts";
 import { resolveWorkingFolder } from "./paths.ts";
 import { isInside } from "./permissions/paths.ts";
@@ -90,6 +91,18 @@ function list(value: unknown, key: string): Fields[] {
 }
 
 const none = (value: string | undefined) => value === "none" || value === "";
+
+/** A daily spending limit from a call: dollars, 0 for none; undefined when not given. */
+function budgetOf(value: unknown): number | null | undefined {
+	if (value === undefined) return undefined;
+	if (value !== 0 && (value === null || !isBudget(value))) {
+		throw invalid(
+			"daily_budget must be an amount in US dollars, or 0 for no limit.",
+			"daily_budget",
+		);
+	}
+	return value === 0 ? null : (value as number);
+}
 
 /**
  * manage_jig: everything the settings interface can do, for the main conversation and the sessions the
@@ -396,6 +409,22 @@ export class Manager {
 					);
 				}
 			}
+			const budgetValue = budgetOf(change.daily_budget);
+			if (budgetValue !== undefined && budgetValue !== (target.options.dailyBudget ?? null)) {
+				const from = target.options.dailyBudget ?? null;
+				// More room to spend, or no limit at all, is for the person to allow.
+				if (budgetValue === null || (from !== null && budgetValue > from)) {
+					widen("raise-budget", target);
+				} else reach("configure");
+				options.dailyBudget = budgetValue;
+				options.budgetExtra = null;
+				note(
+					{ action: "set_daily_budget", session: target.name, from, to: budgetValue },
+					budgetValue === null
+						? `Removed the daily spending limit of "${target.name}".`
+						: `Set the daily spending limit of "${target.name}" to ${dollars(budgetValue)}.`,
+				);
+			}
 			for (const [key, right] of [
 				["can_post_cards", "cards"],
 				["can_manage", "manage"],
@@ -573,6 +602,23 @@ export class Manager {
 					if (commit) store.setSetting("defaultModel", next);
 					add({ action: "set_default_model", from, to }, `New sessions now use ${to}.`);
 				}
+			}
+			const budgetValue = budgetOf(fields.daily_budget);
+			if (budgetValue !== undefined && budgetValue !== current.dailyBudget) {
+				const from = current.dailyBudget;
+				if (budgetValue === null || (from !== null && budgetValue > from)) {
+					widen("raise-budget", null);
+				} else reach("configure");
+				if (commit) {
+					store.setSetting("dailyBudget", budgetValue);
+					store.setSetting("budgetExtra", null);
+				}
+				add(
+					{ action: "set_daily_budget", session: null, from, to: budgetValue },
+					budgetValue === null
+						? "Removed the daily spending limit for all sessions together."
+						: `Set the daily spending limit for all sessions together to ${dollars(budgetValue)}.`,
+				);
 			}
 			const log = text(fields, "decision_log", 4096);
 			if (log !== undefined) {

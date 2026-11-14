@@ -43,6 +43,10 @@ export interface SessionOptions {
 	canPostCards?: boolean;
 	/** May rename sessions and teams and move sessions between teams, as the main conversation can. */
 	canOrganize?: boolean;
+	/** The most this session may spend in a day, in US dollars; null or absent: no limit of its own. */
+	dailyBudget?: number | null;
+	/** More room for one day, given when the person continued the session after it reached a limit. */
+	budgetExtra?: { day: string; amount: number } | null;
 	/** Named after its first message; after its first turn Jig gives it a short name of its own. */
 	autoName?: boolean;
 }
@@ -270,6 +274,7 @@ export type ConfirmReason =
 	| "change-folder"
 	| "open-letters"
 	| "raise-quota"
+	| "raise-budget"
 	| "grant-rights"
 	| "change-main"
 	| "decision-log";
@@ -317,6 +322,8 @@ export type ChangeStep =
 	| { action: "set_permission"; session: string; from: PermissionMode; to: PermissionMode }
 	| { action: "set_receive"; session: string; from: ReceivePolicy; to: ReceivePolicy }
 	| { action: "set_letter_quota"; session: string; from: number; to: number }
+	/** A daily spending limit, of one session or of all together (no session); null is no limit. */
+	| { action: "set_daily_budget"; session: string | null; from: number | null; to: number | null }
 	| { action: "set_right"; session: string; right: "cards" | "manage"; on: boolean }
 	| { action: "pin"; session: string; on: boolean }
 	| { action: "archive"; session: string; on: boolean }

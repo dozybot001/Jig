@@ -7,6 +7,7 @@ import {
 	SESSION_KINDS,
 	THINKING_LEVELS,
 } from "../../shared/types.ts";
+import { isBudget, localDay } from "../budget.ts";
 import { invalid } from "../errors.ts";
 import { type ExportLanguage, exportFileName, sessionMarkdown } from "../export.ts";
 import { pickFolder } from "../folder-picker.ts";
@@ -252,6 +253,10 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			}
 			const canPostCards = optBoolean(options, "canPostCards");
 			const canOrganize = optBoolean(options, "canOrganize");
+			const dailyBudget = options.dailyBudget;
+			if (dailyBudget !== undefined && !isBudget(dailyBudget)) {
+				throw invalid("dailyBudget must be an amount in US dollars above 0, or null.", "options");
+			}
 			const next: SessionOptions = {};
 			if (compactAt !== undefined) next.compactAt = compactAt as number | null;
 			if (permissionMode !== undefined) next.permissionMode = permissionMode;
@@ -259,6 +264,11 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			if (letterQuota !== undefined) next.letterQuota = letterQuota as number | null;
 			if (canPostCards !== undefined) next.canPostCards = canPostCards;
 			if (canOrganize !== undefined) next.canOrganize = canOrganize;
+			// A new limit starts without the room given by continuing under the old one.
+			if (dailyBudget !== undefined) {
+				next.dailyBudget = dailyBudget;
+				next.budgetExtra = null;
+			}
 			patch.options = next;
 		}
 		// A name the person chose is not replaced by Jig's automatic one.
@@ -411,7 +421,23 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			});
 			deps.onRemoteChanged?.();
 		}
+		if (fields.dailyBudget !== undefined) {
+			if (!isBudget(fields.dailyBudget)) {
+				throw invalid(
+					"dailyBudget must be an amount in US dollars above 0, or null.",
+					"dailyBudget",
+				);
+			}
+			store.setSetting("dailyBudget", fields.dailyBudget);
+			store.setSetting("budgetExtra", null);
+		}
 		return c.json(readSettings(store));
+	});
+
+	// What was spent today (this computer's calendar day), in all and by session, for the limits.
+	app.get("/usage/today", (c) => {
+		const day = localDay(Date.now());
+		return c.json({ day, total: store.spentOn(day), sessions: store.spentBySession(day) });
 	});
 
 	return app;

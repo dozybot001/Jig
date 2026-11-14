@@ -5,6 +5,7 @@ import { run } from "./run.ts";
 import { scheduleCommand } from "./schedule.ts";
 import { sendCommand } from "./send.ts";
 import { openCommand, serveCommand } from "./serve.ts";
+import { serviceCommand } from "./service.ts";
 
 const commands = [
 	serveCommand(),
@@ -12,6 +13,7 @@ const commands = [
 	sendCommand(),
 	scheduleCommand(),
 	remoteCommand(),
+	serviceCommand(),
 	keyCommand(async () => {
 		const { openRuntime } = await import("../server/runtime.ts");
 		const runtime = openRuntime();

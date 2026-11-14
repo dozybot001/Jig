@@ -23,6 +23,8 @@ export interface Settings {
 	decisionLog: string | null;
 	/** Phones reach this Mac through the relay (M3 plan, section 6). */
 	remote: { enabled: boolean; relayUrl: string };
+	/** The most all sessions together may spend in a day, in US dollars. */
+	dailyBudget: number | null;
 }
 
 /** Paired phones and the relay connection, for the phone access dialog. */

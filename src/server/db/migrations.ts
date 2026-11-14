@@ -246,4 +246,18 @@ CREATE TABLE schedules (
 CREATE UNIQUE INDEX schedules_name ON schedules (name COLLATE NOCASE);
 ALTER TABLE letters ADD COLUMN schedule_id TEXT REFERENCES schedules (id) ON DELETE SET NULL;
 `,
+	// What each session used on each local calendar day, for the daily spending limits (M3 plan, section 10).
+	`
+CREATE TABLE usage_daily (
+	session_id TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+	day TEXT NOT NULL,
+	input INTEGER NOT NULL DEFAULT 0,
+	output INTEGER NOT NULL DEFAULT 0,
+	cache_read INTEGER NOT NULL DEFAULT 0,
+	cache_write INTEGER NOT NULL DEFAULT 0,
+	cost REAL NOT NULL DEFAULT 0,
+	PRIMARY KEY (session_id, day)
+) STRICT, WITHOUT ROWID;
+CREATE INDEX usage_daily_day ON usage_daily (day);
+`,
 ];

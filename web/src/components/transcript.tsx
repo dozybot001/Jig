@@ -29,7 +29,7 @@ import {
 	type ToolCallView,
 } from "../../../src/shared/types.ts";
 import { answerApproval, loadEarlier, markRead, selectSession, toolCallFor } from "../actions.ts";
-import { formatAgo, hasMessage, type MessageKey, t, useLang } from "../i18n.ts";
+import { formatAgo, formatCost, hasMessage, type MessageKey, t, useLang } from "../i18n.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
 import { Capped, Diff, Markdown, ScrollBlock, useStickToBottom } from "./content.tsx";
 import {
@@ -218,6 +218,17 @@ export function changeText(step: ChangeStep): string {
 				from: step.from,
 				to: step.to,
 			});
+		case "set_daily_budget": {
+			const amount = (value: number | null) =>
+				value === null ? t("budgetNone") : t("cost", { n: formatCost(value) });
+			return step.session === null
+				? t("change_set_daily_budget_all", { from: amount(step.from), to: amount(step.to) })
+				: t("change_set_daily_budget", {
+						session: quoted(step.session),
+						from: amount(step.from),
+						to: amount(step.to),
+					});
+		}
 		case "set_right":
 			return t(step.on ? "change_right_on" : "change_right_off", {
 				session: quoted(step.session),
@@ -1075,6 +1086,15 @@ function EntryView({ entry }: { entry: Entry }) {
 							? ""
 							: t("jobExit", { code: data.exitCode }),
 				});
+			} else if (notice.kind === "budget") {
+				text = t(
+					data.code === "budget-reached" ? "notice_budget_reached" : "notice_budget_warning",
+					{
+						scope: t(data.scope === "session" ? "budgetScope_session" : "budgetScope_all"),
+						spent: formatCost(Number(data.spent ?? 0)),
+						limit: formatCost(Number(data.limit ?? 0)),
+					},
+				);
 			} else if (notice.kind === "changed") {
 				const steps = (notice.data?.steps ?? []) as unknown as ChangeStep[];
 				text = t("notice_changed", {

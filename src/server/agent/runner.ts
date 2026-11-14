@@ -25,6 +25,14 @@ import {
 	type ToolCallView,
 	type UsageTotals,
 } from "../../shared/types.ts";
+import {
+	type BudgetMark,
+	crossedWarning,
+	dollars,
+	grantMore,
+	localDay,
+	reached,
+} from "../budget.ts";
 import { conflict, invalid, JigError } from "../errors.ts";
 import { decisionRef, letterRef, letterText, type ScheduleRef } from "../mail/envelope.ts";
 import { BODY_MAX, PostOffice, reasonText, SUMMARY_MAX } from "../mail/post.ts";
@@ -259,6 +267,8 @@ export class Agents {
 	readonly #turns = new Map<string, Turn>();
 	/** Sessions the person stopped: letters wait until the person writes to them or continues them. */
 	readonly #paused = new Set<string>();
+	/** Sessions that stopped at a daily spending limit, with the day: raising the limit that day continues them. */
+	readonly #capped = new Map<string, string>();
 	readonly #manager: Manager;
 	/** A session's or team's name by id, for what the person reads on permission cards. */
 	readonly #names = (id: string): string | null => {
@@ -342,6 +352,8 @@ export class Agents {
 			throw conflict("There is nothing to continue yet.", undefined, "nothing-to-continue");
 		this.#dropReplyQuestions(sessionId);
 		this.#paused.delete(sessionId);
+		// Continuing a session that stopped at a spending limit gives it as much room again for today.
+		grantMore(this.#store, session, Date.now());
 		this.#start(sessionId, { resume: true, byPerson: true });
 	}
 
@@ -350,6 +362,7 @@ export class Agents {
 		const live = this.#live.get(sessionId);
 		if (!live) return;
 		this.#paused.add(sessionId);
+		this.#capped.delete(sessionId);
 		live.controller.abort();
 	}
 
@@ -501,6 +514,7 @@ export class Agents {
 		this.#store.setStatus(sessionId, "working");
 		let endStatus: SessionStatus = "idle";
 		let detail: string | null = null;
+		let capped: string | null = null;
 		try {
 			let retriedOverflow = false;
 			if (resume) await this.#resumeCalls(sessionId, live);
@@ -508,6 +522,11 @@ export class Agents {
 			for (let step = 0; step < MAX_STEPS; step++) {
 				if (signal.aborted) break;
 				const session = this.#store.getSession(sessionId);
+				const over = reached(this.#store, session, Date.now());
+				if (over) {
+					capped = this.#budgetNotice(sessionId, "budget-reached", over);
+					break;
+				}
 				const model = this.#requireModel(session);
 				const snapshot = this.#refreshContext(session);
 				await this.#compactIfNeeded(session, model, signal);
@@ -525,6 +544,9 @@ export class Agents {
 					.trim();
 				if (said) this.#lastText.set(sessionId, said);
 				this.#store.addUsage(sessionId, totals(final), contextSize(final));
+				for (const mark of crossedWarning(this.#store, session, totals(final).cost, Date.now())) {
+					this.#budgetNotice(sessionId, "budget-warning", mark);
+				}
 
 				if (final.stopReason === "aborted" || signal.aborted) {
 					this.#notice(sessionId, "interrupted", "Stopped by the person.");
@@ -588,8 +610,12 @@ export class Agents {
 			if (signal.aborted) endStatus = "idle";
 			this.#store.setStatus(sessionId, endStatus, detail);
 			this.#store.bumpUnread(sessionId);
-			this.#endTurn(sessionId, endStatus, detail, signal.aborted);
-			if (endStatus === "idle" && !signal.aborted) {
+			if (capped && !signal.aborted) this.#capped.set(sessionId, localDay(Date.now()));
+			else this.#capped.delete(sessionId);
+			// To the sessions that wait for this one, a stop at a spending limit is a turn that failed.
+			if (capped && !signal.aborted) this.#endTurn(sessionId, "error", capped, false);
+			else this.#endTurn(sessionId, endStatus, detail, signal.aborted);
+			if (endStatus === "idle" && !signal.aborted && !capped) {
 				this.#nameAfterFirstTurn(sessionId).catch((error: unknown) =>
 					this.#log(`session ${sessionId}: naming failed: ${(error as Error).message}`),
 				);
@@ -1034,6 +1060,8 @@ export class Agents {
 		}
 		if (session.archivedAt !== null) return;
 		if (session.status !== "idle" && session.status !== "error") return;
+		// At a spending limit letters wait: for the next day, a higher limit, or the person.
+		if (reached(this.#store, session, Date.now())) return;
 		if (this.post.mail.queuedFor(sessionId).length === 0) return;
 		this.#dropLeftovers(sessionId, "Not run: a letter arrived and the conversation moved on.");
 		this.#start(sessionId);
@@ -1041,7 +1069,50 @@ export class Agents {
 
 	/** Starts every free session with letters waiting: after a restart, and for letters from `jig send`. */
 	wakeQueued(): void {
+		this.#continueCapped();
 		for (const id of this.post.mail.sessionsWithQueued()) this.#wake(id);
+	}
+
+	/** Sessions that stopped at a spending limit today go on once the limit was raised or removed. */
+	#continueCapped(): void {
+		const now = Date.now();
+		for (const [id, day] of [...this.#capped]) {
+			let session: Session;
+			try {
+				session = this.#store.getSession(id);
+			} catch {
+				this.#capped.delete(id);
+				continue;
+			}
+			if (day !== localDay(now) || session.archivedAt !== null || this.#paused.has(id)) {
+				this.#capped.delete(id);
+				continue;
+			}
+			if (this.isRunning(id) || reached(this.#store, session, now)) continue;
+			this.#capped.delete(id);
+			this.#start(id, { resume: true });
+		}
+	}
+
+	/** A line for the person about a daily spending limit; returns the text. */
+	#budgetNotice(
+		sessionId: string,
+		code: "budget-warning" | "budget-reached",
+		mark: BudgetMark,
+	): string {
+		const whose = mark.scope === "session" ? "this session's" : "the shared";
+		const amounts = `${dollars(mark.spent)} of ${dollars(mark.limit)}`;
+		const text =
+			code === "budget-reached"
+				? `Stopped: today's spending reached ${whose} daily limit (${amounts}).`
+				: `Today's spending passed 80% of ${whose} daily limit (${amounts}).`;
+		this.#notice(sessionId, "budget", text, {
+			code,
+			scope: mark.scope,
+			spent: mark.spent,
+			limit: mark.limit,
+		});
+		return text;
 	}
 
 	/**

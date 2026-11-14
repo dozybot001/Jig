@@ -121,7 +121,9 @@ export interface Notice {
 		| "compacted"
 		| "job_finished"
 		/** Another session changed this one with manage_jig; data has who and the changes. */
-		| "changed";
+		| "changed"
+		/** A daily spending limit: data has the code (budget-warning or budget-reached), scope, spent and limit. */
+		| "budget";
 	text?: string;
 	data?: JsonObject;
 	timestamp: number;
