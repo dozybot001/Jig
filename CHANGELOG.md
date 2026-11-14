@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+### 新增
+
+- Jig 图标（macOS）：`jig app install` 在「应用程序」里放一个 Jig 图标。点它时，Jig 没在运行就先在后台启动，然后打开界面并登录好。`jig app uninstall` 移除，`jig app status` 查看。它是这份 Jig 的启动器，移动或更新 Node.js、Jig 之后重新运行一次 install。
+
 ## [0.4.0] - 2026-11-15
 
 ### 新增

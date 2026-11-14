@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { appCommand } from "./app.ts";
 import { exportCommand } from "./export.ts";
 import { keyCommand } from "./key.ts";
 import { mcpCommand } from "./mcp.ts";
@@ -16,6 +17,7 @@ const commands = [
 	scheduleCommand(),
 	remoteCommand(),
 	serviceCommand(),
+	appCommand(),
 	exportCommand(),
 	mcpCommand(),
 	keyCommand(async () => {
