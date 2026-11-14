@@ -23,7 +23,7 @@ Jig 以 MIT 许可证开源，当前版本 1.0.1（npm 上的电脑端是 1.0.0�
 
 手机上的 Jig 只连接你自己电脑上的 Jig：在电脑上显示二维码，手机扫码配对，之后在手机上看会话、处理审批中心里的事。两端经中继通信，内容端到端加密；默认用 Tenon AI 运行的中继，也可以自己部署（见 `relay/`）。
 
-- 安卓：安装包（apk）在 [GitHub](https://github.com/dozybot001/Jig/releases) 和 [Gitee](https://gitee.com/dozybot/jig/releases) 的 Releases 里，由长沙榫卯人工智能科技有限公司签名。签名证书的 SHA-256 指纹是 `67:37:32:56:56:15:6A:54:F9:A8:BE:17:35:D8:7F:4B:30:16:06:53:EC:AE:B9:FD:51:3B:05:96:9F:6A:43:61`；每个版本的说明里有安装包的 SHA-256。更新时系统如果提示签名不一致，不要安装。
+- 安卓：安装包（apk）在 [GitHub](https://github.com/dozybot001/Jig/releases) 和 [Gitee](https://gitee.com/dozybot/jig/releases) 的 Releases 里，由长沙榫卯人工智能科技有限公司签名。签名证书的 SHA-256 指纹是 `67:37:32:56:56:15:6A:54:F9:A8:BE:17:35:D8:7F:4B:30:16:06:53:EC:AE:B9:FD:51:3B:05:96:9F:6A:43:61`；这个指纹也公布在[官网的 Jig 页面](https://tenonai.cn/zh/products/jig/#android)上，可以对照；每个版本的说明里有安装包的 SHA-256。更新时系统如果提示签名不一致，不要安装。
 - iPhone：还没有上架，之后经 TestFlight 和 App Store 发布。
 
 ## 隐私
