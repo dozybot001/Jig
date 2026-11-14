@@ -6,7 +6,7 @@ AI 原生的多 Agent 工作台。
 
 每个会话有名字、职责、工作区、模型和权限，按团队组织：常设会话长期负责一块事，任务会话为一件事开设，做完回报，之后可以归档。会话之间用信件分派和回报。会话跑在你电脑上的 Jig 服务里，网页关了也照常干活。
 
-Jig 以 MIT 许可证开源，当前版本 1.0.0。能做什么见[更新记录](CHANGELOG.md)，为什么这样做见[产品蓝图](docs/blueprint.md)。iPhone 应用的源码在 `ios/`，还没有上架；安卓版在 `android/`，在开发中。
+Jig 以 MIT 许可证开源，当前版本 1.0.1（npm 上的电脑端是 1.0.0，两者代码相同）。能做什么见[更新记录](CHANGELOG.md)，为什么这样做见[产品蓝图](docs/blueprint.md)。iPhone 应用的源码在 `ios/`，还没有上架；安卓版的源码在 `android/`，安装包见下面的「手机端」。
 
 ## 安装与快速开始
 
@@ -18,6 +18,13 @@ Jig 以 MIT 许可证开源，当前版本 1.0.0。能做什么见[更新记录]
 4. 可选：`jig service install` 让 Jig 登录后自动启动；macOS 上 `jig app install` 在「应用程序」里放一个 Jig 图标。
 
 从源码运行：克隆仓库后 `npm install`、`npm run build:web`、`npm link`。
+
+## 手机端
+
+手机上的 Jig 只连接你自己电脑上的 Jig：在电脑上显示二维码，手机扫码配对，之后在手机上看会话、处理审批中心里的事。两端经中继通信，内容端到端加密；默认用 Tenon AI 运行的中继，也可以自己部署（见 `relay/`）。
+
+- 安卓：安装包（apk）在 [GitHub](https://github.com/dozybot001/Jig/releases) 和 [Gitee](https://gitee.com/dozybot/jig/releases) 的 Releases 里，由长沙榫卯人工智能科技有限公司签名。签名证书的 SHA-256 指纹是 `67:37:32:56:56:15:6A:54:F9:A8:BE:17:35:D8:7F:4B:30:16:06:53:EC:AE:B9:FD:51:3B:05:96:9F:6A:43:61`；每个版本的说明里有安装包的 SHA-256。更新时系统如果提示签名不一致，不要安装。
+- iPhone：还没有上架，之后经 TestFlight 和 App Store 发布。
 
 ## 隐私
 
