@@ -220,6 +220,16 @@ struct LetterItem: Decodable, Identifiable, Sendable {
 }
 
 /// An RFC 9457 problem from Jig, shown to the person as it came.
+/// Something a session saved for the person to look at (src/shared/types.ts).
+struct ArtifactItem: Decodable, Identifiable, Hashable, Sendable {
+	let id: String
+	let sessionId: String
+	let name: String
+	let kind: String
+	let version: Int
+	let updatedAt: Double
+}
+
 struct JigProblem: Error, Decodable, LocalizedError {
 	let title: String
 	let detail: String?

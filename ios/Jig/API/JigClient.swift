@@ -97,6 +97,11 @@ struct JigClient: Sendable {
 		return try JSONDecoder().decode(Value.self, from: data)
 	}
 
+	/// A response that is plain text, such as an artifact's content.
+	func text(_ path: String) async throws -> String {
+		String(decoding: try await call("GET", path, body: nil), as: UTF8.self)
+	}
+
 	@discardableResult
 	func post(_ path: String, _ payload: some Encodable & Sendable) async throws -> Data {
 		try await call("POST", path, body: JSONEncoder().encode(payload))

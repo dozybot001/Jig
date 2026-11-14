@@ -22,6 +22,7 @@ final class AppModel {
 	private(set) var sessions: [SessionSummary] = []
 	private(set) var center: Center?
 	private(set) var letters: [LetterItem] = []
+	private(set) var artifacts: [ArtifactItem] = []
 	/// The Mac this phone is paired with, as the Mac names itself.
 	private(set) var desktopName: String?
 	private(set) var link: Link = .connecting
@@ -31,7 +32,7 @@ final class AppModel {
 	var problem: String?
 	var showingSettings = false
 
-	enum Tab: Hashable { case sessions, approvals, letters }
+	enum Tab: Hashable { case sessions, approvals, letters, artifacts }
 	/// The tab in front, and the session open in the sessions tab: where a screen can send the person.
 	var tab: Tab = .sessions
 	var sessionPath: [SessionSummary] = []
@@ -78,6 +79,7 @@ final class AppModel {
 		switch UserDefaults.standard.string(forKey: "JigTab") {
 		case "approvals": tab = .approvals
 		case "letters": tab = .letters
+		case "artifacts": tab = .artifacts
 		default: break
 		}
 		if settingsAtLaunch != nil { showingSettings = true }
@@ -187,6 +189,7 @@ final class AppModel {
 		sessions = []
 		center = nil
 		letters = []
+		artifacts = []
 		tokenOnMac = nil
 		sessionToOpen = nil
 		problem = nil
@@ -199,6 +202,18 @@ final class AppModel {
 		await refreshSessions()
 		await refreshCenter()
 		await refreshLetters()
+		await refreshArtifacts()
+	}
+
+	func refreshArtifacts() async {
+		await attempt { artifacts = try await $0.get("/api/artifacts?limit=200", as: Page<ArtifactItem>.self).items }
+	}
+
+	/// The latest version's text, as the session saved it.
+	func artifactText(_ artifact: ArtifactItem) async -> String? {
+		var result: String?
+		await attempt { result = try await $0.text("/api/artifacts/\(artifact.id)/versions/\(artifact.version)") }
+		return result
 	}
 
 	func refreshSessions() async {
@@ -387,6 +402,8 @@ final class AppModel {
 		case "letter":
 			await refreshCenter()
 			await refreshLetters()
+		case "artifact", "artifactDeleted":
+			await refreshArtifacts()
 		default:
 			break
 		}

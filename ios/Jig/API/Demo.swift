@@ -22,6 +22,8 @@ private actor DemoServer {
 	private var approvals: [[String: Any]] = []
 	private var cards: [[String: Any]] = []
 	private var letters: [[String: Any]] = []
+	private var artifacts: [[String: Any]] = []
+	private var artifactTexts: [String: String] = [:]
 	private var make = DemoBuilder()
 
 	init() {
@@ -139,6 +141,15 @@ private actor DemoServer {
 				summary: String(localized: "Write this week's report from the merged changes."), minutes: 6
 			),
 		]
+		let now = Date().timeIntervalSince1970 * 1000
+		let reportTitle = String(localized: "This week's report")
+		let chartTitle = String(localized: "Merged changes per day")
+		artifacts = [
+			["id": "a1", "sessionId": "report", "name": reportTitle, "kind": "markdown", "version": 2, "updatedAt": now - 300_000],
+			["id": "a2", "sessionId": "report", "name": chartTitle, "kind": "chart", "version": 1, "updatedAt": now - 600_000],
+		]
+		artifactTexts["a1"] = String(localized: "**This week**\n\n- The checkout page loads in under a second.\n- Two color options for the home page are drafted.\n- The weekly report now writes itself every Friday.")
+		artifactTexts["a2"] = "{\"type\":\"bar\",\"title\":\"\(chartTitle)\",\"labels\":[\"1\",\"2\",\"3\",\"4\",\"5\"],\"series\":[{\"name\":\"\(store)\",\"values\":[3,5,2,6,4]}]}"
 		self.make = make
 	}
 
@@ -155,6 +166,11 @@ private actor DemoServer {
 				"session": session, "entries": entries[parts[2]] ?? [], "toolCalls": [], "approvals": [],
 				"queue": [], "olderCursor": NSNull(),
 			])
+		case ("GET", 2) where parts[1] == "artifacts":
+			return json(["items": artifacts, "nextCursor": NSNull()])
+		case ("GET", 5) where parts[1] == "artifacts" && parts[3] == "versions":
+			guard let text = artifactTexts[parts[2]] else { return missing() }
+			return (Data(text.utf8), 200)
 		case ("GET", 2) where parts[1] == "center":
 			return json([
 				"approvals": approvals, "cards": cards,

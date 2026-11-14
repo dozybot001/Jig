@@ -34,6 +34,9 @@ struct RootView: View {
 					LettersView()
 						.tabItem { Label("Letters", systemImage: "envelope") }
 						.tag(AppModel.Tab.letters)
+					ArtifactsView()
+						.tabItem { Label("Artifacts", systemImage: "doc.text") }
+						.tag(AppModel.Tab.artifacts)
 				}
 				.task(id: model.isDemo) {
 					await model.refreshAll()

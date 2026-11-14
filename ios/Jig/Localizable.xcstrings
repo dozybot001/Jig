@@ -1766,6 +1766,116 @@
           }
         }
       }
+    },
+    "Artifacts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "产物"
+          }
+        }
+      }
+    },
+    "No artifacts yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有产物"
+          }
+        }
+      }
+    },
+    "Page": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "页面"
+          }
+        }
+      }
+    },
+    "Data": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数据"
+          }
+        }
+      }
+    },
+    "Chart": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图表"
+          }
+        }
+      }
+    },
+    "Document": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文档"
+          }
+        }
+      }
+    },
+    "Version %lld": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 版"
+          }
+        }
+      }
+    },
+    "This artifact cannot be shown": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个产物显示不出来"
+          }
+        }
+      }
+    },
+    "This week's report": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本周周报"
+          }
+        }
+      }
+    },
+    "Merged changes per day": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每天合并的改动"
+          }
+        }
+      }
+    },
+    "**This week**\n\n- The checkout page loads in under a second.\n- Two color options for the home page are drafted.\n- The weekly report now writes itself every Friday.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "**本周**\n\n- 结账页一秒内打开。\n- 首页的两套配色已起草。\n- 周报现在每周五自动写好。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
