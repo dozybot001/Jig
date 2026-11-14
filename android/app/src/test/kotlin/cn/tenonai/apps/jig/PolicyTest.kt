@@ -33,6 +33,18 @@ class PolicyTest {
         return Regex("""^\s*"(.*)",$""", RegexOption.MULTILINE).findAll(block).map { it.groupValues[1] }.toList()
     }
 
+    /** After a dependency changes, `node android/scripts/dependencies.ts` writes the page again. */
+    @Test
+    fun theLicensesPageNamesEveryLibraryInTheReleasedApp() {
+        val page = File(root, "android/app/src/main/assets/licenses.txt").readText()
+        val libraries = File(root, "android/app/gradle.lockfile").readLines()
+            .filter { "releaseRuntimeClasspath" in it }
+            .map { it.substringBefore("=").split(":").let { (group, name, version) -> "$group:$name $version" } }
+        assertTrue(libraries.size > 100)
+        assertEquals(emptyList<String>(), libraries.filterNot { "\n$it\n" in page || "built into $it\n" in page })
+        assertTrue("Apache License" in page && "Bouncy Castle" in page && "LibYuv" in page)
+    }
+
     @Test
     fun theTextIsTheComputersInBothLanguages() {
         val version = checkNotNull(Regex("""POLICY_VERSION = "([^"]+)"""").find(source)).groupValues[1]

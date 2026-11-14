@@ -72,6 +72,7 @@ sealed interface Page {
     data object Settings : Page
     data object About : Page
     data class Policy(val privacy: Boolean) : Page
+    data object Licenses : Page
     data object Scanner : Page
 }
 

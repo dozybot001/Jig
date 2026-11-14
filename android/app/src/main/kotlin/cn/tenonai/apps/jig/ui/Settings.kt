@@ -16,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -248,6 +251,8 @@ fun AboutScreen(model: AppModel, close: () -> Unit) {
                 GroupDivider()
                 GroupRow(stringResource(R.string.terms), onClick = { model.pages.add(Page.Policy(privacy = false)) })
                 GroupDivider()
+                GroupRow(stringResource(R.string.licenses), onClick = { model.pages.add(Page.Licenses) })
+                GroupDivider()
                 GroupRow(stringResource(R.string.feedback), stringResource(R.string.feedback_address), onClick = {
                     context.open(Intent(Intent.ACTION_SENDTO, "mailto:support@tenonai.cn".toUri()))
                 })
@@ -272,6 +277,29 @@ fun PolicyScreen(privacy: Boolean, close: () -> Unit) {
                 for (paragraph in stringArrayResource(if (privacy) R.array.policy_privacy else R.array.policy_terms)) {
                     Text(paragraph)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * The open source libraries in the app, each license's text and the notices their packages carry.
+ * The text is written by android/scripts/dependencies.ts from the libraries themselves.
+ */
+@Composable
+fun LicensesScreen(close: () -> Unit) {
+    val context = LocalContext.current
+    val parts = remember {
+        context.assets.open("licenses.txt").bufferedReader().use { it.readText() }.split("\n\n────────\n\n")
+    }
+    Screen(stringResource(R.string.licenses), onBack = close) { padding ->
+        SelectionContainer {
+            LazyColumn(
+                Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                items(parts) { Text(it.trim(), style = MaterialTheme.typography.bodySmall) }
             }
         }
     }

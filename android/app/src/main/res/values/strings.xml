@@ -212,6 +212,7 @@
     <string name="website_host" translatable="false">tenon.asia</string>
     <string name="privacy_policy">Privacy Policy</string>
     <string name="terms">Terms of Service</string>
+    <string name="licenses">Open source licenses</string>
     <string name="feedback">Feedback</string>
     <string name="feedback_address" translatable="false">support@tenonai.cn</string>
     <string name="policy_effective">Version %1$s · effective %2$s</string>

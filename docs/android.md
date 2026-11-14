@@ -10,7 +10,7 @@
 
 - 未配对时：说明、扫电脑上的二维码配对、粘贴配对链接、「看演示」（内置演示数据，不连电脑）。
 - 底部四个入口：会话（列表、会话记录、回复、停下）、审批（授权、提问、决定卡、待放行的信）、信件、产物（文档、数据、图表、页面，看最新一版）。
-- 右上角设置：配对的电脑和连接状态、通知、后台运行、断开配对、关于（版本和构建号、出品方、官网、隐私政策、用户协议、反馈）。
+- 右上角设置：配对的电脑和连接状态、通知、后台运行、断开配对、关于（版本和构建号、出品方、官网、隐私政策、用户协议、开源许可、反馈）。
 - 通知：有事要你处理、会话出错、任务做完时通知，点开进对应的会话或审批；电脑上处理掉的，通知跟着撤下。
 - 中英双语（跟随系统，Android 13 起可以在系统设置里单独给 Jig 选语言），深浅色跟随系统。
 
@@ -39,9 +39,9 @@
 | `noise-vectors.ts` | 用电脑端的 `src/remote/noise.ts` 和固定的测试密钥生成 `app/src/test/resources/noise-vectors.json` |
 | `sync-policy.ts` | 从 `src/shared/policy.ts` 生成两种语言的 `res/values*/policy.xml`。隐私政策改了以后跑一次，不跑的话 `PolicyTest` 会失败 |
 | `test-computer.ts` | 一台测试用的电脑：本机中继加内存里的 Jig 接口、四个产物和通知，不碰 `~/.jig` 和系统钥匙串。用法见文件开头 |
-| `dependencies.ts` | 从锁文件和 Gradle 缓存里的 POM 生成 `android/DEPENDENCIES.md`：进安装包的每个库的名称、版本和许可证 |
+| `dependencies.ts` | 从锁文件和 Gradle 缓存里各库的 POM 和包，生成 `android/DEPENDENCIES.md`（进安装包的每个库的名称、版本和许可证）和应用里「开源许可」页的内容 `app/src/main/assets/licenses.txt`。升级依赖后跑一次，不跑的话 `PolicyTest` 会失败 |
 
-依赖（都来自 Google Maven 和 Maven Central，版本锁在 `app/gradle.lockfile`）：Compose 和 AndroidX、CameraX（扫码的相机）、ZXing core（识别二维码）、OkHttp（到中继的 WebSocket）、Bouncy Castle（X25519 和 ChaCha20-Poly1305：系统自带的要到 API 31 和 28 才有）、kotlinx.coroutines、kotlinx.serialization-json。没有统计、崩溃上报、推送和 Google 服务的库。全部 145 个库（多数是 AndroidX 和 Kotlin 的传递依赖）列在 [android/DEPENDENCIES.md](../android/DEPENDENCIES.md)：143 个 Apache-2.0，1 个 MIT（checker-qual），1 个 Bouncy Castle 许可证（MIT 式）；发安装包之前由法务组核。
+依赖（都来自 Google Maven 和 Maven Central，版本锁在 `app/gradle.lockfile`）：Compose 和 AndroidX、CameraX（扫码的相机）、ZXing core（识别二维码）、OkHttp（到中继的 WebSocket）、Bouncy Castle（X25519 和 ChaCha20-Poly1305：系统自带的要到 API 31 和 28 才有）、kotlinx.coroutines、kotlinx.serialization-json。没有统计、崩溃上报、推送和 Google 服务的库。全部 145 个库（多数是 AndroidX 和 Kotlin 的传递依赖）列在 [android/DEPENDENCIES.md](../android/DEPENDENCIES.md)：143 个 Apache-2.0，1 个 MIT（checker-qual），1 个 Bouncy Castle 许可证（MIT 式）；法务组 11-15 核过，可以。
 
 ## 3. 构建和运行
 
@@ -94,7 +94,21 @@ echo settle > /tmp/jig-android/cmd                          # 电脑端处理掉
 - 列表读 `GET /api/artifacts`，内容读 `GET /api/artifacts/:id/versions/:n`（纯文本），只看最新一版。文档按行内 Markdown 显示，数据排版成缩进的 JSON，图表（柱状或折线）自己画，黑白灰，系列之间用深浅区分。
 - HTML 产物放在封闭的网页视图里（蓝图 6.6 第 19 条）：没有自己的地址，不加载网络和文件，页面发出的每个请求都得到空的回应，链接点了不跳转，页面里另加一条内容安全策略；不开本地存储。页面自己的脚本能跑，但碰不到 Jig、电脑和网络。
 
-### 4.4 权限
+### 4.4 开源许可页
+
+关于页里的「开源许可」随安装包走，内容由 `dependencies.ts` 生成，不手写（法务组 11-15 的要求）：
+
+- 143 个 Apache-2.0 的库的名称和版本，后面附一份 Apache-2.0 全文（取自 AndroidX 包里的 `LICENSE.txt`）。
+- Bouncy Castle 和 checker-qual 各自包里的许可原文，带版权行。
+- `androidx.camera:camera-core` 的 POM 另写了 BSD-3-Clause。它的包里没有这部分的声明文字；按我对 AndroidX 源码的了解，这是它本地图像处理库里编进去的 libyuv，所以页面上放的是 libyuv 自己的许可（`scripts/notices/libyuv.txt`，全仓库只有这一份是手放的）。**这一条的归属没有在包里找到依据，请法务组确认。**
+- 各库包里带的 NOTICE 文件：只有 `jakarta.inject:jakarta.inject-api` 有一份，照原文放。
+- 脚本遇到不认识的许可证，或者 MIT 一类的库包里找不到许可原文，就报错，不会悄悄漏掉。
+
+### 4.5 加密
+
+安卓版自带 Bouncy Castle 做 X25519 和 ChaCha20-Poly1305，不是系统加密（系统自带的要到 API 31 和 28 才有，应用从 26 起）；SHA-256、HMAC 和存储用的 AES-GCM 是系统的。法务组 11-15：直接发安装包没有申报手续；以后上应用商店，出口合规按「用了非系统的标准加密算法」填。iPhone 版只用系统的 CryptoKit，两端的填法不同。
+
+### 4.6 权限
 
 合并后的清单里只有这些（`aapt2 dump badging` 核对过）：`INTERNET`、`ACCESS_NETWORK_STATE`、`CAMERA`（只在扫码时用，没有相机的手机可以粘贴链接）、`POST_NOTIFICATIONS`、`FOREGROUND_SERVICE`、`FOREGROUND_SERVICE_REMOTE_MESSAGING`、`RECEIVE_BOOT_COMPLETED`、`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`，以及 `androidx.core` 给应用自己声明的 `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`。
 
@@ -116,16 +130,16 @@ echo settle > /tmp/jig-android/cmd                          # 电脑端处理掉
 
 ### 6.1 单元测试
 
-14 个全部通过。
+15 个全部通过。
 
 - `NoiseTest`（9 个）：公钥、握手的两条消息、握手哈希、请求和回应的帧、三块的长消息，和电脑端代码生成的向量逐字节一致；改过一个字节的帧和握手回应被拒绝，计数器不动；全零的公钥被拒绝；配对链接按电脑端写的样子读出来；`test/push.test.ts` 的固定向量（通知密钥和密文）解得开，改过的、换了密钥的解不开。
 - `ApiTest`（4 个）：事件流按任意分片切成事件；会话记录变成消息、信件和一行工具摘要；审批中心的两种提问格式；通知的文字。
-- `PolicyTest`（1 个）：应用里的隐私政策和用户协议与 `src/shared/policy.ts` 两种语言逐段相同。
+- `PolicyTest`（2 个）：应用里的隐私政策和用户协议与 `src/shared/policy.ts` 两种语言逐段相同；「开源许可」页写到了锁文件里进安装包的每一个库。
 
 ### 6.2 构建产物
 
 - 调试包 19.9 MB；正式构建（R8，未签名）2.4 MB。lint 没有问题。构建产物不留：验证完跑 `./gradlew clean`。
-- `aapt2 dump badging`（正式构建）：包名 `cn.tenonai.apps.jig`，版本 1.0.0（10000），目标 API 37，语言是英文和简体中文，不可调试，权限如 4.4。
+- `aapt2 dump badging`（正式构建）：包名 `cn.tenonai.apps.jig`，版本 1.0.0（10000），目标 API 37，语言是英文和简体中文，不可调试，权限如 4.6。
 
 ### 6.3 模拟器走查
 
@@ -145,6 +159,7 @@ Android 17（API 37），调试包，连 `test-computer.ts`：
 | 断开配对（电脑连不上时） | 确认后约 5 秒回到首页，配对和私钥已删 |
 | 电脑端主动断开通道后 | 手机自己重连，之后的通知照常收到，没有重复 |
 | 接口拒绝请求 | 弹出「没有办成」和电脑端给的原因 |
+| 关于页的「开源许可」 | 打开后能从库的清单一直滚到最后的 NOTICE |
 | 产物：文档、数据、折线图、页面各一个 | 都显示出来。页面里的脚本去取外网地址，结果是取不到；外网图片不加载 |
 
 Android 8.0（API 26）：调试包的演示、配对、会话列表、后台收通知都通过。正式构建用调试密钥签了装上：能启动，演示能走；粘贴 `ws://` 的配对链接按预期配对不成（正式构建只连 `wss://`），生成密钥和握手的第一条消息都跑过，没有崩溃。
@@ -162,13 +177,20 @@ Android 8.0（API 26）：调试包的演示、配对、会话列表、后台收
 
 ## 7. 签名和发布
 
-都还没做，也不该由我自己做：
+都还没做。**拿到 App 备案号之前，安卓安装包不公开放出，官网和 Releases 都不放**（法务组 11-15）。
 
-- 签名密钥按产品规范 15.6 生成和保管（RSA 4096，`~/.tenon-keys/android/jig/jig-release.p12`，口令进登录钥匙串，脚本先给安全组看）。**密钥还没生成，所以还没有证书指纹可登记。**生成要创始人在本会话确认。
-- 发布按 17.10：可以先在 Gitee 和 GitHub 的 Releases 发安装包，第一次对外放出之前请创始人在本会话确认。Jig 的安卓版联网，国内分发前按法务组的核实办 App 备案（`~/Tenon-AI/docs/setup/china-app-store.md`）。
-- Gradle 只出未签名的正式构建；签名、核对证书指纹和权限的发布脚本到生成密钥时再写。
+发安装包之前要齐的：
+
+| 事 | 状态 |
+| --- | --- |
+| 应用里的「开源许可」页 | 做了（4.4），libyuv 那一条等法务组确认 |
+| 隐私政策里安卓的内容 | 安卓那几句的中英文草稿 11-15 发给了主开发会话，由它并进 `src/shared/policy.ts`、发法务组看；定稿后跑 `sync-policy.ts`。现在应用里还是 iPhone 的写法，不能带着发 |
+| App 备案 | Jig 手机端联网、默认连我们的中继，要先用公司主体办备案，iPhone 和安卓一起报，由创始人在腾讯云提交（法务组已发总办排期）。备案要填包名 `cn.tenonai.apps.jig`、签名证书的 MD5 指纹和公钥 |
+| 签名密钥 | 没生成。按产品规范 15.6（RSA 4096，`~/.tenon-keys/android/jig/jig-release.p12`，口令进登录钥匙串，脚本先给安全组看），生成要创始人在本会话确认。生成后把包名、证书的 MD5 指纹和公钥发主开发会话转法务组，三个指纹登记在这里 |
+| 发布脚本 | 没写。Gradle 只出未签名的正式构建；签名、核对证书指纹和权限的脚本到生成密钥时写 |
+| 首次放出 | 请创始人在本会话确认（规范 17.10） |
 
 ## 8. 交给别的会话的事
 
-- 主开发会话：隐私政策和用户协议补上安卓的内容（密钥存在 Android Keystore 加密的文件里；通知不经推送服务，经加密通道）；电脑端「添加 iPhone」的按钮和 `jig remote` 的帮助文字要不要改成不分手机系统的说法；`npm run check` 要不要带上安卓的单元测试。
+- 主开发会话：把安卓那几句隐私政策并进 `src/shared/policy.ts`（草稿已发）；电脑端「添加 iPhone」的按钮和 `jig remote` 的帮助文字要不要改成不分手机系统的说法；`npm run check` 要不要带上安卓的单元测试。
 - 官网地址：应用里和 iPhone、电脑端一样写的是 tenon.asia；产品规范 1.1 说官网已迁到 tenonai.cn。三端要一起改，由主开发会话定。

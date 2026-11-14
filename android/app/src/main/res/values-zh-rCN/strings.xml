@@ -186,6 +186,7 @@
     <string name="website">官网</string>
     <string name="privacy_policy">隐私政策</string>
     <string name="terms">用户协议</string>
+    <string name="licenses">开源许可</string>
     <string name="feedback">反馈</string>
     <string name="policy_effective">版本 %1$s · %2$s生效</string>
 

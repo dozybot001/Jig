@@ -68,6 +68,7 @@ fun Root(model: AppModel) {
                 Page.Settings -> SettingsScreen(model, close)
                 Page.About -> AboutScreen(model, close)
                 is Page.Policy -> PolicyScreen(page.privacy, close)
+                Page.Licenses -> LicensesScreen(close)
                 Page.Scanner -> ScannerScreen(model, close)
             }
         }
