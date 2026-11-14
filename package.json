@@ -24,7 +24,7 @@
 		"node": ">=24"
 	},
 	"bin": {
-		"jig": "./bin/jig.js"
+		"jig": "bin/jig.js"
 	},
 	"files": [
 		"bin",
