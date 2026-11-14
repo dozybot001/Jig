@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The official Tenon mark (ios/Jig/Assets.xcassets/TenonMark.imageset/tenon-mark.svg): orange #F06B32, white T. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp" android:height="64dp" android:viewportWidth="64" android:viewportHeight="64">
+    <path android:fillColor="#F06B32" android:pathData="M17,0H47A17,17 0,0 1,64 17V47A17,17 0,0 1,47 64H17A17,17 0,0 1,0 47V17A17,17 0,0 1,17 0Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M13,16H51V28H38V48H26V28H13Z" />
+</vector>

@@ -1,0 +1,395 @@
+package cn.tenonai.apps.jig.ui
+
+import android.text.format.DateUtils
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import cn.tenonai.apps.jig.R
+import cn.tenonai.apps.jig.api.Choice
+
+/** A screen with a title bar: Back at the left when it was opened over another, actions at the right. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun Screen(
+    title: String,
+    onBack: (() -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {},
+    bottomBar: @Composable () -> Unit = {},
+    content: @Composable (PaddingValues) -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                },
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) { Icon(Icons.Back, stringResource(R.string.back)) }
+                    }
+                },
+                actions = actions,
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.paper, scrolledContainerColor = colors.paper),
+            )
+        },
+        bottomBar = bottomBar,
+        containerColor = colors.paper,
+        content = content,
+    )
+}
+
+/** Jig's mark: three parallel lines that form a J (web/public/icons/jig-mark.svg), in the text colour. */
+@Composable
+fun JigMark(size: Dp, modifier: Modifier = Modifier) {
+    val ink = colors.ink
+    Canvas(modifier.size(size)) {
+        val scale = this.size.minDimension / 64f
+        for ((x, radius) in listOf(54f to 22f, 45f to 13f, 36f to 4f)) {
+            val path = Path().apply {
+                moveTo(x * scale, 8f * scale)
+                lineTo(x * scale, 34f * scale)
+                arcTo(
+                    rect = androidx.compose.ui.geometry.Rect(
+                        Offset((32f - radius) * scale, (34f - radius) * scale), Size(2 * radius * scale, 2 * radius * scale),
+                    ),
+                    startAngleDegrees = 0f, sweepAngleDegrees = 180f, forceMoveTo = false,
+                )
+            }
+            drawPath(path, SolidColor(ink), style = Stroke(width = 5f * scale, cap = StrokeCap.Round))
+        }
+    }
+}
+
+/** Jig's full lockup for the About page (spec 1.4–1.6, 2.2): the mark, the wordmark and the Tenon mark at its upper right. */
+@Composable
+fun Lockup() {
+    val label = stringResource(R.string.lockup_label)
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = Modifier.clearAndSetSemantics { contentDescription = label },
+    ) {
+        JigMark(44.dp)
+        Spacer(Modifier.width(12.dp))
+        Text("Jig", fontSize = 40.sp, lineHeight = 44.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.width(7.dp))
+        Image(painterResource(R.drawable.tenon_mark), null, Modifier.padding(top = 4.dp).size(23.dp))
+    }
+}
+
+/** A small label with a border, such as "Recommended" or "Can't be undone". */
+@Composable
+fun Tag(text: String, warning: Boolean = false) {
+    val color = if (warning) colors.danger else colors.soft
+    Text(
+        text, color = color, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium,
+        modifier = Modifier
+            .border(1.dp, if (warning) colors.danger else colors.control, RoundedCornerShape(5.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
+}
+
+enum class ButtonKind { Primary, Secondary, Destructive }
+
+/**
+ * Jig's buttons, as on the computer: the main one on a soft grey fill, the others outlined. At least
+ * 48dp high (spec 5.8); while [busy] it shows that and takes no second tap (spec 4.7–4.8).
+ */
+@Composable
+fun CapsuleButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    kind: ButtonKind = ButtonKind.Primary,
+    icon: ImageVector? = null,
+    enabled: Boolean = true,
+    busy: Boolean = false,
+) {
+    val foreground = when (kind) {
+        ButtonKind.Primary -> colors.onPrimary
+        ButtonKind.Secondary -> colors.ink
+        ButtonKind.Destructive -> colors.danger
+    }
+    Surface(
+        onClick = onClick,
+        enabled = enabled && !busy,
+        shape = CircleShape,
+        color = if (kind == ButtonKind.Primary) colors.primary else Color.Transparent,
+        contentColor = foreground.copy(alpha = if (enabled && !busy) 1f else 0.45f),
+        border = if (kind == ButtonKind.Primary) null else BorderStroke(1.dp, colors.control),
+        modifier = modifier.defaultMinSize(minHeight = 48.dp),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            if (icon != null) {
+                Icon(icon, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+            }
+            Text(if (busy) "$text…" else text, fontWeight = FontWeight.Medium, maxLines = 1)
+        }
+    }
+}
+
+/** A section's heading in a list. */
+@Composable
+fun SectionTitle(text: String) {
+    Text(
+        text, color = colors.soft, style = MaterialTheme.typography.labelLarge,
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 6.dp).semantics { heading() },
+    )
+}
+
+/** A note under a group of rows, in smaller grey text. */
+@Composable
+fun Footnote(text: String) {
+    Text(
+        text, color = colors.soft, style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+    )
+}
+
+/** A group of rows inside one outline, as the settings and About pages use. */
+@Composable
+fun Group(content: @Composable () -> Unit) {
+    Column(
+        Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp))
+            .border(1.dp, colors.control, RoundedCornerShape(14.dp)),
+    ) { content() }
+}
+
+/** One row of a group: a label and its value, and where a tap leads when it leads somewhere. */
+@Composable
+fun GroupRow(label: String, value: String? = null, onClick: (() -> Unit)? = null, leading: (@Composable () -> Unit)? = null, color: Color = colors.ink) {
+    Row(
+        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = color, modifier = Modifier.weight(1f, fill = value == null))
+        if (value != null || leading != null) {
+            Spacer(Modifier.width(12.dp))
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                leading?.invoke()
+                if (value != null) Text(value, color = colors.soft, textAlign = TextAlign.End)
+            }
+        }
+        if (onClick != null && value == null && leading == null) Icon(Icons.Forward, null, Modifier.size(18.dp), tint = colors.soft)
+    }
+}
+
+@Composable
+fun GroupDivider() {
+    Box(Modifier.fillMaxWidth().padding(start = 16.dp).background(colors.control).heightIn(min = 1.dp, max = 1.dp))
+}
+
+/** What a list shows when it is loaded and has nothing. */
+@Composable
+fun Empty(icon: ImageVector, text: String) {
+    Column(
+        Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(icon, null, Modifier.size(40.dp), tint = colors.soft)
+        Spacer(Modifier.size(12.dp))
+        Text(text, color = colors.soft, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+    }
+}
+
+/** A card's top line and its one sentence: who waits, since when, and on what. */
+@Composable
+fun CardHead(session: String, date: Double, text: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        val since = DateUtils.getRelativeTimeSpanString(
+            date.toLong(), System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE,
+        ).toString()
+        Text(
+            if (session.isEmpty()) since else "$session · $since",
+            color = colors.soft, style = MaterialTheme.typography.bodySmall,
+        )
+        Text(text, maxLines = 4, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/**
+ * One option to pick: a round mark (or a square one when several may be picked), the label, what it
+ * leads to, and the recommended tag.
+ */
+@Composable
+fun OptionRow(option: Choice, recommended: Boolean, selected: Boolean, multiple: Boolean, pick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .selectable(selected = selected, role = if (multiple) Role.Checkbox else Role.RadioButton, onClick = pick)
+            .heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            when {
+                multiple && selected -> Icons.BoxOn
+                multiple -> Icons.BoxOff
+                selected -> Icons.RadioOn
+                else -> Icons.RadioOff
+            },
+            null, Modifier.padding(top = 1.dp).size(22.dp), tint = if (selected) colors.ink else colors.soft,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(option.label, modifier = Modifier.weight(1f, fill = false))
+                if (recommended) Tag(stringResource(R.string.recommended))
+            }
+            if (option.detail != null) Text(option.detail, color = colors.soft, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+/** A text field that grows with its text (spec section 8), on Jig's grey fill. */
+@Composable
+fun GrowingField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    hint: String,
+    modifier: Modifier = Modifier,
+    maxLines: Int = 6,
+    plain: Boolean = false,
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        maxLines = maxLines,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.ink),
+        cursorBrush = SolidColor(colors.ink),
+        keyboardOptions = if (plain) {
+            KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false)
+        } else {
+            KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+        },
+        modifier = modifier.defaultMinSize(minHeight = 48.dp).background(colors.bubble, RoundedCornerShape(20.dp)),
+        decorationBox = { field ->
+            Box(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) Text(hint, color = colors.soft, style = MaterialTheme.typography.bodyLarge)
+                field()
+            }
+        },
+    )
+}
+
+/**
+ * Text with its inline Markdown shown as such: `code`, **bold** and [links](https://…). Anything
+ * else stays as written.
+ */
+@Composable
+fun inlineMarkdown(text: String): AnnotatedString {
+    val code = SpanStyle(fontFamily = FontFamily.Monospace, background = colors.bubble)
+    val link = SpanStyle(textDecoration = TextDecoration.Underline)
+    return buildAnnotatedString {
+        var i = 0
+        while (i < text.length) {
+            val rest = text.substring(i)
+            when {
+                rest.startsWith("`") && rest.indexOf('`', 1) > 1 -> {
+                    val end = rest.indexOf('`', 1)
+                    withStyle(code) { append(rest.substring(1, end)) }
+                    i += end + 1
+                }
+                rest.startsWith("**") && rest.indexOf("**", 2) > 2 -> {
+                    val end = rest.indexOf("**", 2)
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(rest.substring(2, end)) }
+                    i += end + 2
+                }
+                rest.startsWith("[") -> {
+                    val match = LINK.find(rest)
+                    if (match != null && match.range.first == 0) {
+                        withLink(LinkAnnotation.Url(match.groupValues[2], androidx.compose.ui.text.TextLinkStyles(link))) {
+                            append(match.groupValues[1])
+                        }
+                        i += match.value.length
+                    } else {
+                        append('[')
+                        i += 1
+                    }
+                }
+                else -> {
+                    append(text[i])
+                    i += 1
+                }
+            }
+        }
+    }
+}
+
+private val LINK = Regex("""^\[([^\]\n]+)]\((https?://[^)\s]+)\)""")
+
+/** The default text style of the content colour, for places that need one as a value. */
+@Composable
+fun bodyStyle(): TextStyle = MaterialTheme.typography.bodyLarge.copy(color = LocalContentColor.current)

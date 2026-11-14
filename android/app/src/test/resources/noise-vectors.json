@@ -1,0 +1,28 @@
+{
+	"computerPrivate": "0101010101010101010101010101010101010101010101010101010101010101",
+	"computerPublic": "a4e09292b651c278b9772c569f5fa9bb13d906b46ab68c9df9dc2b4409f8a209",
+	"phonePrivate": "0202020202020202020202020202020202020202020202020202020202020202",
+	"phonePublic": "ce8d3ad1ccb633ec7b70c17814a5c76ecd029685050d344745ba05870e587d59",
+	"phoneEphemeral": "0303030303030303030303030303030303030303030303030303030303030303",
+	"desktop": "AAECAwQFBgcICQoLDA0ODw",
+	"hello": "{\"pair\":\"c2VjcmV0\",\"name\":\"Pixel\",\"app\":\"0.2.0\"}",
+	"welcome": "{\"desktop\":\"书房的电脑\",\"version\":\"0.2.0\",\"device\":\"d1\"}",
+	"message1": "5dfedd3b6bd47f6fa28ee15d969d5bb0ea53774d488bdaf9df1c6e0124b3ef22c4c6c043f282005bdd0615108bbf19828ce9f779b97c30af866d86d4d6ce5298348fbd6c66d864deb92ad4c9d6dc2982b917797b6730ffec75dc19f7da2ee313c5c2efbbc78f0430d9f3721071a9132fa3f9b46a7af8b4be5f9b1fe37771690c6fdc38303824ac61229d662d00144e22",
+	"message2": "ac01b2209e86354fb853237b5de0f4fab13c7fcbf433a61c019369617fecf10be13ffade461ffeb30a6a1e6eb6776c3c9c6c0a1d093907092b3cede864a28084198d1486c5a1ef1bab1c6f407fd9c51bb9fe6784b2895ea97899eb87ea14a157d6729370c09454dd2cba631517",
+	"handshakeHash": "e94879e55c57804f1950f4babb8c0e5df4d5944a3e7ef0f15c5ffbdb9b641fa0",
+	"request": "{\"t\":\"req\",\"id\":1,\"method\":\"GET\",\"path\":\"/api/sessions?limit=200\"}",
+	"requestSealed": [
+		"007ad132cf92e12d3ab790d1a5f50d14e6d1e99f1ac228891238ca1124b6d9e5ba5e208614ce24bbf869e00e011c103f91c5a2d9aa4d32bae4af64db724053181a181e37bd5f3d73db831f724c17ec36f0331e"
+	],
+	"longLength": 140000,
+	"longSealedSha256": [
+		"52a4aaeb6d64d72814fa9faa3091e83577b655d606a351d29bb7871d25e723a6",
+		"69b732a1e1262349a95e03b6f1646d5159b7006b39c43144c2aab3ce36854f7f",
+		"532bc5958f5aeba6960ed699f20e8fb7fd7fbc456256d2fd1048e8e234c16dee"
+	],
+	"response": "{\"t\":\"res\",\"id\":1,\"status\":200,\"type\":\"application/json\",\"body\":\"{\\\"items\\\":[]}\"}",
+	"responseSealed": [
+		"7c74e3369016f10d224efd0f6d7f32927eb0b2b1d84927daa7accbb9a693d6f17f2d9333ad568218ae5ee5528761ae6a862ccaf13a9690b9f190f93f603330ed4b63319a05d60dbac65b7e58ac1b36af8b4f4bf07d918228ffe0c098bddd9d17f401"
+	],
+	"link": "jig://pair?r=wss%3A%2F%2Frelay.tenonai.cn&d=AAECAwQFBgcICQoLDA0ODw&k=pOCSkrZRwni5dyxWn1-puxPZBrRqtoyd-dwrRAn4ogk&s=c2VjcmV0&n=%E4%B9%A6%E6%88%BF%E7%9A%84%E7%94%B5%E8%84%91+%26+Mac"
+}

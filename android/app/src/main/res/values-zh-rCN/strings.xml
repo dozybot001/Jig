@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tagline">AI 原生的多 Agent 工作台</string>
+    <string name="lockup_label">Jig，榫卯 Tenon AI 出品</string>
+
+    <string name="tab_sessions">会话</string>
+    <string name="tab_approvals">审批</string>
+    <string name="tab_letters">信件</string>
+    <string name="settings">设置</string>
+    <string name="about">关于 Jig</string>
+    <string name="back">返回</string>
+    <string name="ok">好</string>
+    <string name="cancel">取消</string>
+    <string name="retry">重试</string>
+    <string name="problem_title">没有办成</string>
+
+    <string name="connect_scan">扫描电脑上的二维码</string>
+    <string name="connect_scan_help">在电脑上的 Jig 里打开 设置 → 手机访问，点「添加 iPhone」（安卓手机也用这个按钮），再扫描出现的二维码。</string>
+    <string name="connect_paste_title">或者粘贴配对链接</string>
+    <string name="pair">配对</string>
+    <string name="demo_try">看演示</string>
+    <string name="demo_help">用示例数据看看，不需要电脑。</string>
+    <string name="scan_title">扫描二维码</string>
+    <string name="scan_hint">把相机对准电脑上 Jig 显示的二维码。</string>
+    <string name="camera_denied">Jig 只用相机扫描配对二维码。请在系统设置里允许使用相机，或者改用粘贴配对链接。</string>
+    <string name="open_system_settings">去系统设置打开</string>
+    <string name="not_pairing_link">这不是 Jig 的配对链接。</string>
+    <string name="pair_offline">电脑不在线。请让电脑上的 Jig 保持运行并打开手机访问，再扫一次。</string>
+    <string name="pair_failed">配对没有成功。请在电脑上重新显示二维码，再扫一次。</string>
+
+    <string name="sessions_empty">还没有会话</string>
+    <string name="pinned">已置顶</string>
+    <string name="status_waiting">在等你</string>
+    <string name="status_working">在干活</string>
+    <string name="status_attention">出错或待核对</string>
+    <plurals name="unread">
+        <item quantity="other">%d 条未读</item>
+    </plurals>
+    <string name="messages_empty">还没有消息</string>
+    <string name="message_hint">消息</string>
+    <string name="send">发送</string>
+    <string name="stop">停下</string>
+    <string name="working">正在工作…</string>
+    <string name="tools_separator">，</string>
+    <plurals name="tools_read">
+        <item quantity="other">读取 %d 个文件</item>
+    </plurals>
+    <plurals name="tools_edit">
+        <item quantity="other">编辑 %d 处</item>
+    </plurals>
+    <plurals name="tools_write">
+        <item quantity="other">写入 %d 个文件</item>
+    </plurals>
+    <plurals name="tools_search">
+        <item quantity="other">搜索 %d 次</item>
+    </plurals>
+    <plurals name="tools_shell">
+        <item quantity="other">运行 %d 条命令</item>
+    </plurals>
+    <plurals name="tools_web">
+        <item quantity="other">抓取 %d 个网页</item>
+    </plurals>
+    <plurals name="tools_letter">
+        <item quantity="other">发信 %d 封</item>
+    </plurals>
+    <plurals name="tools_session">
+        <item quantity="other">开会话 %d 个</item>
+    </plurals>
+    <plurals name="tools_card">
+        <item quantity="other">改审批中心 %d 次</item>
+    </plurals>
+    <plurals name="tools_other">
+        <item quantity="other">另有 %d 步</item>
+    </plurals>
+
+    <string name="center_empty">没有等你处理的事</string>
+    <string name="center_permissions">等你授权的操作</string>
+    <string name="center_questions">等你回答的问题</string>
+    <string name="center_cards">待你审批的事</string>
+    <string name="center_held">待放行的信</string>
+    <string name="allow">允许</string>
+    <string name="always">总是允许</string>
+    <string name="decline">拒绝</string>
+    <string name="asks_every_time">每次确认</string>
+    <string name="release">放行</string>
+    <string name="refuse">拒收</string>
+    <string name="answer">回答</string>
+    <string name="your_answer">写下你的回答</string>
+    <string name="something_else">其他回答…</string>
+    <string name="pick_any">可多选</string>
+    <string name="recommended">建议</string>
+    <string name="selected">已选</string>
+    <string name="options">选项</string>
+    <string name="add_note">写一句备注（可选）</string>
+    <string name="decision">决定</string>
+    <string name="due">期限 %s</string>
+    <string name="undoable">可撤回</string>
+    <string name="not_undoable">不可撤回</string>
+
+    <string name="letters_empty">还没有信件</string>
+    <string name="letter_held">等你放行</string>
+    <string name="letter_refused">已拒收</string>
+    <string name="letter_dropped">已丢弃</string>
+    <string name="letter_request">请求</string>
+    <string name="letter_report">回报</string>
+    <string name="letter_decision">决定</string>
+    <string name="letter_notice">通知</string>
+    <string name="letter_to">寄给 %1$s · %2$s</string>
+    <string name="sender_you">你</string>
+    <string name="sender_cli">命令行</string>
+    <string name="sender_schedule">定时任务「%s」</string>
+
+    <string name="banner_demo">示例数据，不会发到电脑。</string>
+    <string name="banner_offline">电脑不在线。请让电脑上的 Jig 保持运行，并打开手机访问。</string>
+    <string name="banner_refused">电脑已经不认这台手机，重新配对后才能继续用。</string>
+    <string name="banner_unreachable">连不上。请检查网络，Jig 会一直重试。</string>
+    <string name="leave">退出</string>
+    <string name="pair_again">重新配对</string>
+
+    <string name="computer">电脑</string>
+    <string name="connection">连接</string>
+    <string name="link_demo">演示</string>
+    <string name="link_connecting">正在连接…</string>
+    <string name="link_online">已连接</string>
+    <string name="link_offline">电脑不在线</string>
+    <string name="link_refused">已在电脑上移除</string>
+    <string name="link_unreachable">连不上</string>
+    <string name="settings_paired_note">手机和电脑之间端到端加密，中继只转发密文。</string>
+    <string name="settings_demo_note">这是示例数据，你在这里的操作不会发到电脑。</string>
+    <string name="demo_computer">演示用的电脑</string>
+    <string name="leave_demo">退出演示</string>
+    <string name="unpair">断开配对</string>
+    <string name="unpair_title">断开这台手机的配对？</string>
+    <string name="unpair_message">电脑会把这台手机从列表里移除。之后要在这里用 Jig，需要在电脑上重新显示二维码再扫描。</string>
+
+    <string name="notifications">通知</string>
+    <string name="notifications_on">已打开</string>
+    <string name="notifications_blocked">在系统设置里关着</string>
+    <string name="notifications_off">还没打开</string>
+    <string name="notifications_turn_on">打开通知</string>
+    <string name="notifications_turn_off">关闭通知</string>
+    <string name="background">后台运行</string>
+    <string name="background_allowed">已允许</string>
+    <string name="background_limited">受电池优化限制</string>
+    <string name="background_allow">允许 Jig 在后台运行</string>
+    <string name="notifications_note">有事要你处理（授权、提问、决定、待放行的信）、会话出错停下、任务做完时，Jig 通知这台手机。通知经加密通道送到，中继读不到内容。</string>
+    <string name="background_note">Jig 不用推送服务。打开通知后，应用在后台保持一条到中继的连接，系统会为它显示一条常驻通知。系统为了省电停掉 Jig，或者你在最近任务里划掉 Jig（部分手机）时，通知收不到，再次打开 Jig 后恢复，那时还在等你的事在「审批」里看得到。要减少这种情况，请允许 Jig 不受电池优化限制；部分手机还要在系统设置里允许 Jig 自启动和后台运行。</string>
+    <string name="channel_needs">等你处理的事</string>
+    <string name="channel_link">和电脑的连接</string>
+    <string name="service_title">Jig 正在接收通知</string>
+    <string name="service_online">已连接到%s。</string>
+    <string name="service_waiting">现在连不上%s，Jig 会一直重试。</string>
+
+    <string name="push_permission">要你授权</string>
+    <string name="push_question">问你</string>
+    <string name="push_card">等你决定</string>
+    <string name="push_letter">有一封信等你放行</string>
+    <string name="push_error">出错停下了</string>
+    <string name="push_review">Jig 重启时它在干活，等你核对</string>
+    <string name="push_task_done">任务做完了</string>
+    <string name="push_task_failed">任务失败了</string>
+    <string name="push_task_given_up">任务放弃了</string>
+    <string name="push_schedule_done">定时任务做完了</string>
+    <string name="push_schedule_error">定时任务出错了</string>
+    <string name="push_budget_reached">今天的费用到了每日上限，已停下</string>
+    <string name="push_budget_warning" formatted="false">今天的费用超过了每日上限的 80%</string>
+    <string name="push_many">有 %d 件事等你</string>
+    <string name="push_fallback">Jig 里有事等你。</string>
+    <string name="push_separator">：</string>
+
+    <string name="about_version">版本 %1$s · 构建 %2$s</string>
+    <string name="about_what">AI 原生的多 Agent 工作台。Jig 按 Session Engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。会话跑在你电脑上的 Jig 里。</string>
+    <string name="about_phone">安卓上的 Jig 经中继连接你的电脑，两端之间端到端加密。离开电脑时，你在这里处理要你做的事：授权操作、回答会话的提问、处理决定卡，也能看会话的进展并回复。</string>
+    <string name="publisher">出品方</string>
+    <string name="tenon">榫卯 Tenon AI</string>
+    <string name="website">官网</string>
+    <string name="privacy_policy">隐私政策</string>
+    <string name="terms">用户协议</string>
+    <string name="feedback">反馈</string>
+    <string name="policy_effective">版本 %1$s · %2$s生效</string>
+
+    <string name="demo_main">主对话</string>
+    <string name="demo_store">商城</string>
+    <string name="demo_design">设计</string>
+    <string name="demo_report">周报</string>
+    <string name="demo_main_ask">今天有什么要我处理的？</string>
+    <string name="demo_main_answer">三件事：商城要推送登录的修复，设计问首页用哪种强调色，发布日期等你决定（决定卡 #12）。</string>
+    <string name="demo_store_ask">把登录有效期改成 30 分钟，跑一遍测试，然后推送。</string>
+    <string name="demo_store_answer">登录有效期改成了 30 分钟（`auth/session.ts`），48 个测试全部通过。推送要你授权。</string>
+    <string name="demo_design_request">给首页做两个配色方案。</string>
+    <string name="demo_design_answer">两个方案都做好了，已经问你选哪个。</string>
+    <string name="demo_report_request">根据本周合并的改动写周报。</string>
+    <string name="demo_push_description">推送登录有效期的修复</string>
+    <string name="demo_color_header">强调色</string>
+    <string name="demo_color_question">首页用哪种颜色？</string>
+    <string name="demo_color_grey">黑白灰</string>
+    <string name="demo_color_grey_detail">和电脑端一致。</string>
+    <string name="demo_color_accent">加一个强调色</string>
+    <string name="demo_color_accent_detail">按钮和链接更醒目。</string>
+    <string name="demo_card_title">周五发布，还是下周一？</string>
+    <string name="demo_card_context">还有两个修复在审。周五能早点发布；下周一多留一天测试。</string>
+    <string name="demo_card_friday">周五</string>
+    <string name="demo_card_friday_detail">先发审过的修复，其余的下周发。</string>
+    <string name="demo_card_monday">下周一</string>
+    <string name="demo_card_monday_detail">所有修复一起发布。</string>
+    <string name="demo_letter_held">请把发布日期写进更新记录。</string>
+    <string name="demo_letter_report">两个配色方案都做好了，等你挑选。</string>
+    <string name="demo_pushed">已推送到 origin/main。</string>
+    <string name="demo_not_pushed">没有推送。</string>
+    <string name="demo_reply">这是演示，消息没有发给真实的会话。</string>
+</resources>

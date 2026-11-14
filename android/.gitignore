@@ -1,0 +1,14 @@
+build/
+.gradle/
+.kotlin/
+local.properties
+.idea/
+*.iml
+*.apk
+*.aab
+
+# The signing key stays outside the repository (product standard 15.6.2).
+*.jks
+*.keystore
+*.p12
+keystore.properties
