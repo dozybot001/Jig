@@ -143,8 +143,8 @@ struct AboutView: View {
 						Text("Tenon AI").bold()
 					}
 				}
-				Link(destination: URL(string: "https://tenon.asia/")!) {
-					LabeledContent("Website", value: "tenon.asia")
+				Link(destination: URL(string: "https://tenonai.cn/")!) {
+					LabeledContent("Website", value: "tenonai.cn")
 				}
 			}
 			Section {

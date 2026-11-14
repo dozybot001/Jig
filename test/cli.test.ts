@@ -13,7 +13,7 @@ describe("jig cli", () => {
 	test("--version prints version, publisher and website to stdout", async () => {
 		const { io, stdout, stderr } = fakeIo();
 		assert.equal(await run(["--version"], io), 0);
-		assert.equal(stdout.text(), `jig ${VERSION}\nTenon AI · https://tenon.asia/\n`);
+		assert.equal(stdout.text(), `jig ${VERSION}\nTenon AI · https://tenonai.cn/\n`);
 		assert.equal(stderr.text(), "");
 	});
 
@@ -24,7 +24,7 @@ describe("jig cli", () => {
 			name: "jig",
 			version: VERSION,
 			publisher: "Tenon AI",
-			website: "https://tenon.asia/",
+			website: "https://tenonai.cn/",
 		});
 	});
 

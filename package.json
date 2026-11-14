@@ -1,11 +1,11 @@
 {
 	"name": "jig",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"private": true,
 	"description": "An AI-native multi-agent workbench",
 	"license": "UNLICENSED",
-	"author": "Tenon AI (https://tenon.asia/)",
-	"homepage": "https://tenon.asia/",
+	"author": "Tenon AI (https://tenonai.cn/)",
+	"homepage": "https://tenonai.cn/",
 	"type": "module",
 	"engines": {
 		"node": ">=24"

@@ -398,8 +398,8 @@ function About() {
 				</div>
 				<div className="about-row">
 					<span className="about-label">{t("website")}</span>
-					<a href="https://tenon.asia/" target="_blank" rel="noopener noreferrer">
-						tenon.asia
+					<a href="https://tenonai.cn/" target="_blank" rel="noopener noreferrer">
+						tenonai.cn
 					</a>
 				</div>
 				<button type="button" className="about-row" onClick={() => setDoc("privacy")}>
