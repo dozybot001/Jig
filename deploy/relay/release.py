@@ -63,7 +63,7 @@ def container(container_name, publish):
     args = [
         "docker", "run", "-d", "--name", container_name,
         "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-        "--user", f"{UID}:{UID}", "--memory", "256m", "--cpus", "0.5", "--pids-limit", "128",
+        "--user", f"{UID}:{UID}", "--memory", "512m", "--cpus", "0.5", "--pids-limit", "128",
         "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
         "--mount", f"type=bind,src={release}/app,dst=/app,readonly",
         "--workdir", "/app", "--env-file", str(env_file),
