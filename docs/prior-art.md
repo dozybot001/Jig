@@ -4,7 +4,7 @@
 
 ## 一、结论
 
-- **不 fork，也不在现成项目上构建。** 按 [M1 实现计划](m1-plan.md)自己写服务、Agent 循环、工具、权限和界面，部分文件带声明复制。
+- **不 fork，也不在现成项目上构建。** 按 [M1 实现计划](m1-plan.md)自己写服务、Agent 循环、工具、权限和界面，参照下面这些项目的设计，没有复制代码。
   - 产品形态最接近的 Paseo、T3 Code 只包装 Claude Code、Codex 等外部命令行，没有自己的 Agent 循环。
   - 技术形态最接近的 OpenCode 自带循环、模型可换，但新版绑定 Effect 和 Bun，界面用 SolidJS，约 1.1 万个文件；fork 等于接手它的循环。
   - OpenClaw 是多渠道的个人助理网关，体量过大。pi 的 `apps/p2` 技术栈和 Jig 最像（Node、React 19、pi），但 README 写明是原型，很快删除。
@@ -15,7 +15,7 @@
   4. Jig 的审批可能挂几个小时、跨重启，循环要在每个工具调用上落库和恢复，这一层要自己掌握。
 
   它的循环文件 959 行，连同 Agent 类和类型约 2100 行，照着改写的成本不高。
-- **代码主要从这几处复制**：pi（MIT）、OpenCode（MIT）、Gemini CLI（Apache-2.0）、Kimi Code（MIT）、OpenClaw（MIT）、T3 Code（MIT）。
+- **设计主要参照这几处**：pi（MIT）、OpenCode（MIT）、Gemini CLI（Apache-2.0）、Kimi Code（MIT）、OpenClaw（MIT）、T3 Code（MIT）。都是参照设计自己写，没有复制代码；2026-11-14 法务组把只读命令名单、「允许并记住」的前缀和剥包装命令三处和原文比过，不构成复制。
 
 ## 二、复制规则
 
@@ -47,7 +47,7 @@
 
 ### 4.1 Agent 循环
 
-- **pi `packages/agent/src/agent-loop.ts`、`types.ts`**（MIT，复制后改写）：
+- **pi `packages/agent/src/agent-loop.ts`、`types.ts`**（MIT，参照设计自己写）：
   - 事件按 agent、turn、message、tool_execution 分 start、update、end 三种，可以直接转成 SSE。
   - 一批工具调用先逐个预检（参数校验和 `beforeToolCall`，审批在这一步逐个问完），再执行。批里有一个工具要求顺序执行，整批就顺序执行。结果按原顺序写回。
   - `beforeToolCall` 返回 `{block, reason}` 时，生成一条出错的工具结果，拒绝理由由此交给模型。
@@ -73,7 +73,7 @@
 | web_fetch | OpenCode `tool/plugin/webfetch.ts`、`tool/html-markdown.ts`；Gemini CLI `tools/web-fetch.ts` | 用 htmlparser2 转 Markdown；手动跟随重定向，每一跳重新过权限，最多 10 跳；超时 30 秒；拒绝 localhost 和私网地址 |
 | 输出截断 | pi `core/tools/truncate.ts` | 截断规则，以及截断后给模型的提示 |
 
-复制工具代码时，参数定义改成普通 JSON Schema；pi-ai 1.5 的 `Tool.parameters` 就是 JSON Schema。
+工具的参数定义用普通 JSON Schema；pi-ai 1.5 的 `Tool.parameters` 就是 JSON Schema。
 
 ### 4.3 权限
 

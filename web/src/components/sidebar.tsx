@@ -819,7 +819,7 @@ function Search() {
 }
 
 /**
- * The folded sidebar on wide screens, as in ChatGPT and Yew: Jig's graphic on top (it turns into the
+ * The folded sidebar on wide screens, as in ChatGPT: Jig's graphic on top (it turns into the
  * open button under the pointer), then the main actions as icons, settings at the bottom (spec 1.6:
  * a collapsed navigation shows the product graphic only).
  */

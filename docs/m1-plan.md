@@ -16,7 +16,7 @@
 | 模型接入 | `@earendil-works/pi-ai` 1.5（MIT） | 见第三节 |
 | 本地服务 | Hono + `@hono/node-server` | 体积小，用标准 Request/Response，自带 SSE |
 | 实时推送 | SSE；界面的操作走普通 HTTP 请求 | 断线后按 `Last-Event-ID` 补发，M2 的手机网络切换也用得上；不需要 WebSocket |
-| 网页界面 | React 19 + Vite 8 | 与 Yew、WeSaid 一致 |
+| 网页界面 | React 19 + Vite 8 | 与 WeSaid 一致 |
 | 密钥 | `@napi-rs/keyring` | 读写 macOS 钥匙串；开源后同样支持 Windows 和 Linux |
 | 文件搜索 | 系统里的 ripgrep（`rg`） | 速度快，自动遵守 `.gitignore`；M1 先要求本机装好，开源前再定是否内置 |
 | Markdown 渲染 | react-markdown | 默认不渲染原始 HTML，链接另做过滤 |

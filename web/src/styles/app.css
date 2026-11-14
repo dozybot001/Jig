@@ -682,7 +682,7 @@ body.scroll-locked {
 	grid-template-columns: 56px minmax(0, 1fr);
 }
 /*
- * The folded sidebar (as in ChatGPT and Yew): Jig's graphic, then the main actions as icons. Folding and
+ * The folded sidebar (as in ChatGPT): Jig's graphic, then the main actions as icons. Folding and
  * unfolding keeps the graphic and the icons where they were: centred 28 px from the left, the graphic
  * 32 px from the top and the rows 42 px apart, as in the open sidebar. The edge is a shadow, not a
  * border, so it does not shift the centre.
