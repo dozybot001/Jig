@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import type { AssistantMessage } from "../../src/shared/messages.ts";
 import type {
 	Approval,
+	Artifact,
 	Card,
 	Device,
 	Entry,
@@ -129,10 +130,13 @@ export interface AppState {
 	 * The approval center is a page of its own: you go there to clear what waits across sessions, and
 	 * into a session to work on one thing (founder, 2026-11-09). Null shows the session or home.
 	 */
-	page: "center" | "schedules" | null;
+	page: "center" | "schedules" | "artifacts" | null;
 	centerTab: CenterTab;
 	/** Scheduled tasks, read when their page first opens; null until then. */
 	schedules: Schedule[] | null;
+	/** Artifacts, read when their page first opens; null until then. The open one's id. */
+	artifacts: Artifact[] | null;
+	artifactId: string | null;
 	/** The sessions list shows one team's sessions; null shows all (blueprint section 8). */
 	teamFilter: string | null;
 }
@@ -193,6 +197,8 @@ let state: AppState = {
 	page: null,
 	centerTab: "pending",
 	schedules: null,
+	artifacts: null,
+	artifactId: null,
 	teamFilter: null,
 };
 

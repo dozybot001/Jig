@@ -4,6 +4,7 @@ import {
 	deleteGroup,
 	duplicateSession,
 	exportSession,
+	openArtifacts,
 	openCenter,
 	openSchedules,
 	renameGroup,
@@ -26,6 +27,7 @@ import { Snippet } from "./content.tsx";
 import { ConfirmDialog, GroupDialog, NewSessionDialog, SessionSettingsDialog } from "./dialogs.tsx";
 import {
 	ArchiveIcon,
+	ArtifactIcon,
 	CenterIcon,
 	ChatIcon,
 	CloseIcon,
@@ -644,6 +646,7 @@ function FixedEntries() {
 	const count = useAppState((state) => centerCount(state.center));
 	const open = useAppState((state) => state.page === "center");
 	const onSchedules = useAppState((state) => state.page === "schedules");
+	const onArtifacts = useAppState((state) => state.page === "artifacts");
 	return (
 		<>
 			{mainId && mainName && (
@@ -686,6 +689,15 @@ function FixedEntries() {
 			>
 				<ScheduleIcon />
 				<span className="nav-label">{t("schedules")}</span>
+			</button>
+			<button
+				type="button"
+				className="nav-row"
+				aria-current={onArtifacts ? "page" : undefined}
+				onClick={() => openArtifacts()}
+			>
+				<ArtifactIcon />
+				<span className="nav-label">{t("artifacts")}</span>
 			</button>
 		</>
 	);
@@ -830,6 +842,7 @@ export function SidebarRail() {
 	const count = useAppState((state) => centerCount(state.center));
 	const onCenter = useAppState((state) => state.page === "center");
 	const onSchedules = useAppState((state) => state.page === "schedules");
+	const onArtifacts = useAppState((state) => state.page === "artifacts");
 	const [dialog, setDialog] = useState<"team" | "workspace" | null>(null);
 	return (
 		<nav className="rail" aria-label={t("sessions")}>
@@ -884,6 +897,15 @@ export function SidebarRail() {
 				onClick={() => openSchedules()}
 			>
 				<ScheduleIcon />
+			</Button>
+			<Button
+				variant="icon"
+				aria-label={t("artifacts")}
+				title={t("artifacts")}
+				aria-current={onArtifacts ? "page" : undefined}
+				onClick={() => openArtifacts()}
+			>
+				<ArtifactIcon />
 			</Button>
 			<Button
 				variant="icon"

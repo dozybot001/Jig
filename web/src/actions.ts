@@ -2,6 +2,7 @@ import type { AssistantMessage } from "../../src/shared/messages.ts";
 import type {
 	Approval,
 	ApprovalDecision,
+	Artifact,
 	Card,
 	Device,
 	Entry,
@@ -143,6 +144,9 @@ export async function boot(): Promise<void> {
 		} else if (view === "schedules") {
 			connect(null, null);
 			openSchedules();
+		} else if (view === "artifacts") {
+			connect(null, null);
+			openArtifacts();
 		} else if (viewed && getState().sessions[viewed]) await selectSession(viewed);
 		else if (view === "home") connect(null, null);
 		else if (main && getState().sessions[main]) await selectSession(main);
@@ -179,6 +183,7 @@ function connect(sessionId: string | null, after: number | null): void {
 			void reloadSessions();
 			void loadCenter();
 			if (getState().schedules) void loadSchedules();
+			if (getState().artifacts) void loadArtifacts();
 		}
 		connectedOnce = true;
 	});
@@ -232,7 +237,9 @@ type GlobalEvent =
 	| { type: "card"; card: Card }
 	| { type: "sessionsDeleted"; ids: string[] }
 	| { type: "devices"; devices: Device[] }
-	| { type: "schedules"; schedules: Schedule[] };
+	| { type: "schedules"; schedules: Schedule[] }
+	| { type: "artifact"; artifact: Artifact }
+	| { type: "artifactDeleted"; id: string };
 
 /** Drops deleted sessions from every list; a deleted session that is open closes. */
 function dropSessions(ids: string[]): void {
@@ -269,6 +276,19 @@ function applyGlobalEvent(event: GlobalEvent): void {
 			return;
 		case "schedules":
 			setState({ schedules: event.schedules });
+			return;
+		case "artifact":
+			setState((current) => ({
+				artifacts: current.artifacts
+					? [...current.artifacts.filter((a) => a.id !== event.artifact.id), event.artifact]
+					: current.artifacts,
+			}));
+			return;
+		case "artifactDeleted":
+			setState((current) => ({
+				artifacts: current.artifacts?.filter((a) => a.id !== event.id) ?? null,
+				artifactId: current.artifactId === event.id ? null : current.artifactId,
+			}));
 			return;
 		case "sessionSummary":
 			setState((current) => ({
@@ -611,6 +631,50 @@ export function openSchedules(): void {
 	setState({ page: "schedules", drawerOpen: false });
 	rememberView("schedules");
 	if (!getState().schedules) void loadSchedules();
+}
+
+export function openArtifacts(): void {
+	setState({ page: "artifacts", drawerOpen: false });
+	rememberView("artifacts");
+	if (!getState().artifacts) void loadArtifacts();
+}
+
+/** Opens the artifacts page with one artifact showing. */
+export function openArtifact(id: string): void {
+	setState({ artifactId: id });
+	openArtifacts();
+}
+
+export async function loadArtifacts(): Promise<void> {
+	const page = await api<Page<Artifact>>("GET", "/api/artifacts?limit=500");
+	setState({ artifacts: page.items });
+}
+
+export async function artifactVersions(
+	id: string,
+): Promise<{ version: number; size: number; createdAt: number }[]> {
+	const result = await api<{ versions: { version: number; size: number; createdAt: number }[] }>(
+		"GET",
+		`/api/artifacts/${id}`,
+	);
+	return result.versions;
+}
+
+/** A version's text as it was saved. */
+export async function artifactText(id: string, version: number): Promise<string> {
+	const response = await fetch(`/api/artifacts/${id}/versions/${version}`, {
+		credentials: "same-origin",
+	});
+	if (!response.ok) throw new Error(`HTTP ${response.status}`);
+	return response.text();
+}
+
+export async function deleteArtifact(id: string): Promise<void> {
+	await api("DELETE", `/api/artifacts/${id}`);
+	setState((current) => ({
+		artifacts: current.artifacts?.filter((a) => a.id !== id) ?? null,
+		artifactId: current.artifactId === id ? null : current.artifactId,
+	}));
 }
 
 export async function loadSchedules(): Promise<void> {

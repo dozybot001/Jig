@@ -31,6 +31,7 @@ import {
 import { answerApproval, loadEarlier, markRead, selectSession, toolCallFor } from "../actions.ts";
 import { formatAgo, formatCost, hasMessage, type MessageKey, t, useLang } from "../i18n.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
+import { ArtifactChip } from "./artifacts.tsx";
 import { Capped, Diff, Markdown, ScrollBlock, useStickToBottom } from "./content.tsx";
 import {
 	CheckAllIcon,
@@ -885,6 +886,17 @@ function StepView({
 	const approvals = view
 		? Object.values(transcript.approvals).filter((a) => a.toolCallId === view.id)
 		: [];
+	const saved = step.block.name === "save_artifact" ? view?.detail : null;
+	if (saved && typeof saved.artifactId === "string") {
+		return (
+			<ArtifactChip
+				id={saved.artifactId}
+				name={String(saved.name ?? "")}
+				kind={String(saved.kind ?? "markdown")}
+				version={Number(saved.version ?? 1)}
+			/>
+		);
+	}
 	return (
 		<ToolCard
 			call={step.block}

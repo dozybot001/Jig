@@ -84,6 +84,8 @@ export const MailIcon = () => <Mail {...props} />;
 export const CenterIcon = () => <Inbox {...props} />;
 /** Scheduled tasks: letters Jig sends at set times. */
 export const ScheduleIcon = () => <Clock {...props} />;
+/** What sessions saved for the person to look at. */
+export const ArtifactIcon = () => <FileText {...props} />;
 /** The main conversation, where the person usually works. */
 export const MainIcon = () => <MessagesSquare {...props} />;
 /** A team in the person's organization. */

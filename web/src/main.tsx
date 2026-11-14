@@ -1,6 +1,7 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { boot } from "./actions.ts";
+import { ArtifactsPage } from "./components/artifacts.tsx";
 import { CenterPage } from "./components/center.tsx";
 import { SchedulesPage } from "./components/schedules.tsx";
 import { SessionView } from "./components/session.tsx";
@@ -87,6 +88,8 @@ function App() {
 					<CenterPage />
 				) : page === "schedules" ? (
 					<SchedulesPage />
+				) : page === "artifacts" ? (
+					<ArtifactsPage />
 				) : (
 					<SessionView />
 				)}
