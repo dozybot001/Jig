@@ -133,6 +133,50 @@ describe("the relay under bad input", () => {
 		}
 	});
 
+	test("many connections that do not read stay under one total, and the relay stays up", async () => {
+		const total = 8 * 1024 * 1024;
+		const { relay, url, healthy } = await start({ maxBufferedTotal: total });
+		try {
+			const desktops = await Promise.all([1, 2, 3].map(() => fakeDesktop(url)));
+			const phones: WebSocket[] = [];
+			for (const desktop of desktops) {
+				for (let i = 0; i < 8; i++) {
+					const phone = new WebSocket(`${url}/phone/${desktop.identity.desktopId}`);
+					phone.on("error", () => {});
+					await new Promise((resolve) => phone.once("open", resolve));
+					(phone as unknown as { _socket: Socket })._socket.pause();
+					phones.push(phone);
+				}
+			}
+			await until(() => desktops.every((desktop) => desktop.channels.length === 8));
+			let most = 0;
+			const watch = setInterval(() => {
+				most = Math.max(most, relay.waiting);
+			}, 5);
+			// Each stays under its own limit of 4 MB; together they would be far over the total.
+			for (let round = 0; round < 6; round++) {
+				for (const desktop of desktops) {
+					for (const channel of desktop.channels) {
+						const frame = Buffer.alloc(4 + 512 * 1024);
+						frame.writeUInt32BE(channel, 0);
+						desktop.socket.send(frame);
+					}
+				}
+				await new Promise((resolve) => setTimeout(resolve, 50));
+			}
+			await new Promise((resolve) => setTimeout(resolve, 300));
+			clearInterval(watch);
+			most = Math.max(most, relay.waiting);
+			// One frame may be on its way in when the total is reached.
+			assert.ok(most <= total + 1024 * 1024, `waiting reached ${most}`);
+			assert.ok(relay.counts.phones < phones.length);
+			assert.ok(await healthy());
+			for (const desktop of desktops) desktop.socket.close();
+		} finally {
+			await relay.close();
+		}
+	});
+
 	test("one address holds only so many connections", async () => {
 		const { relay, url } = await start({ maxPerAddress: 2 });
 		try {

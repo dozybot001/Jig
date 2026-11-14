@@ -40,6 +40,8 @@ export interface RelayOptions {
 	helloMs?: number;
 	/** Bytes that may wait to be sent to one connection that is not reading; past it, it is closed. */
 	maxBuffered?: number;
+	/** Bytes that may wait to be sent over all connections together, well under the memory limit. */
+	maxBufferedTotal?: number;
 	/** Connections one address may hold at once. */
 	maxPerAddress?: number;
 	/** The address a connection comes from; behind the reverse proxy, the one it reports. */
@@ -103,6 +105,9 @@ export class Relay {
 	readonly #addressOf: (request: IncomingMessage) => string;
 	/** Open connections by the address they come from. */
 	readonly #perAddress = new Map<string, number>();
+	/** An upper estimate of the bytes waiting to be sent: counted again every 100 ms, added to in between. */
+	#waiting = 0;
+	#countedAt = 0;
 	readonly #push: RelayOptions["push"];
 	/** Notifications handed on since the last count, for the health log: a number, no tokens. */
 	pushes = 0;
@@ -122,7 +127,8 @@ export class Relay {
 			log: options.log ?? ((line) => process.stderr.write(`${line}\n`)),
 			pushPerMinute: options.pushPerMinute ?? 60,
 			maxConnections: options.maxConnections ?? 4000,
-			maxBuffered: options.maxBuffered ?? 8 * 1024 * 1024,
+			maxBuffered: options.maxBuffered ?? 4 * 1024 * 1024,
+			maxBufferedTotal: options.maxBufferedTotal ?? 96 * 1024 * 1024,
 			maxPerAddress: options.maxPerAddress ?? 50,
 			helloMs: options.helloMs ?? 10_000,
 		};
@@ -216,13 +222,44 @@ export class Relay {
 	 */
 	#forward(to: WebSocket | undefined, data: Buffer): void {
 		if (!to || to.readyState !== to.OPEN) return;
+		const now = Date.now();
+		if (now - this.#countedAt >= 100) this.#count(now);
+		// Many connections that each stay under their own limit must not add up to the memory limit:
+		// once everything waiting would pass the total, the connections with the most waiting are
+		// dropped until there is room. Those are the ones not reading; one that reads keeps working.
+		if (this.#waiting + data.length > this.#options.maxBufferedTotal) {
+			this.#count(now);
+			const slow = [...this.#wss.clients]
+				.filter((socket) => socket.bufferedAmount > 0)
+				.sort((a, b) => b.bufferedAmount - a.bufferedAmount);
+			for (const socket of slow) {
+				if (this.#waiting + data.length <= this.#options.maxBufferedTotal) break;
+				this.#waiting -= socket.bufferedAmount;
+				socket.terminate();
+			}
+			if (to.readyState !== to.OPEN) return;
+		}
 		if (to.bufferedAmount > this.#options.maxBuffered) {
 			to.close(TOO_SLOW, "not reading");
 			// Closing waits for the other end; what is queued is dropped at once.
 			setTimeout(() => to.terminate(), 1000).unref();
 			return;
 		}
+		this.#waiting += data.length;
 		to.send(data, { binary: true });
+	}
+
+	#count(now: number): void {
+		let total = 0;
+		for (const socket of this.#wss.clients) total += socket.bufferedAmount;
+		this.#waiting = total;
+		this.#countedAt = now;
+	}
+
+	/** Bytes waiting to be sent over all connections right now. */
+	get waiting(): number {
+		this.#count(Date.now());
+		return this.#waiting;
 	}
 
 	#desktop(socket: WebSocket): void {
