@@ -111,7 +111,13 @@ for (const [group, name, version] of rows) {
 	}
 	if (kinds.has("bsd")) {
 		// camera-core names BSD-3-Clause in its POM for the libyuv code built into its native image
-		// library, and ships no text for it; the text kept in scripts/notices is libyuv's own.
+		// library, and ships no text for it; the text kept in scripts/notices/libyuv.txt is libyuv's own.
+		// Where this comes from (confirmed by the legal group, 2026-11-15); check both again when the
+		// camera version changes:
+		//   - AndroidX source, camera/camera-core/build.gradle: the library's description says "This
+		//     library includes code from libyuv, which is licensed under the BSD-3-Clause license",
+		//     and an extraLicense entry declares BSD-3-Clause.
+		//   - the LICENSE file at the root of the libyuv repository, which libyuv.txt reproduces.
 		if (`${group}:${name}` !== "androidx.camera:camera-core") throw new Error(`${id}: an unexpected BSD license`);
 		others.push(`libyuv, built into ${id}\n\n${readFileSync(join(here, "scripts/notices/libyuv.txt"), "utf8").trim()}`);
 	}

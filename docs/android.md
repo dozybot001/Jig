@@ -100,7 +100,7 @@ echo settle > /tmp/jig-android/cmd                          # 电脑端处理掉
 
 - 143 个 Apache-2.0 的库的名称和版本，后面附一份 Apache-2.0 全文（取自 AndroidX 包里的 `LICENSE.txt`）。
 - Bouncy Castle 和 checker-qual 各自包里的许可原文，带版权行。
-- `androidx.camera:camera-core` 的 POM 另写了 BSD-3-Clause。它的包里没有这部分的声明文字；按我对 AndroidX 源码的了解，这是它本地图像处理库里编进去的 libyuv，所以页面上放的是 libyuv 自己的许可（`scripts/notices/libyuv.txt`，全仓库只有这一份是手放的）。**这一条的归属没有在包里找到依据，请法务组确认。**
+- `androidx.camera:camera-core` 的 POM 另写了 BSD-3-Clause。它的包里没有这部分的声明文字。这是它本地图像处理库里编进去的 libyuv，页面上放的是 libyuv 自己的许可（`scripts/notices/libyuv.txt`，全仓库只有这一份是手放的）。法务组 11-15 确认了归属，依据有两处：AndroidX 源码 `camera/camera-core/build.gradle` 的库说明写着「This library includes code from libyuv, which is licensed under the BSD-3-Clause license」，并用 `extraLicense` 声明了 BSD-3-Clause；libyuv 仓库根目录的 `LICENSE`。升级 camera 版本时对着这两处复核，出处也写在 `dependencies.ts` 的注释里。
 - 各库包里带的 NOTICE 文件：只有 `jakarta.inject:jakarta.inject-api` 有一份，照原文放。
 - 脚本遇到不认识的许可证，或者 MIT 一类的库包里找不到许可原文，就报错，不会悄悄漏掉。
 
@@ -183,14 +183,26 @@ Android 8.0（API 26）：调试包的演示、配对、会话列表、后台收
 
 | 事 | 状态 |
 | --- | --- |
-| 应用里的「开源许可」页 | 做了（4.4），libyuv 那一条等法务组确认 |
-| 隐私政策里安卓的内容 | 安卓那几句的中英文草稿 11-15 发给了主开发会话，由它并进 `src/shared/policy.ts`、发法务组看；定稿后跑 `sync-policy.ts`。现在应用里还是 iPhone 的写法，不能带着发 |
+| 应用里的「开源许可」页 | 做了（4.4），法务组 11-15 核过 |
+| 隐私政策里安卓的内容 | 草稿见 7.1，法务组 11-15 对照代码核过，措辞不用改。现在不并进 `src/shared/policy.ts`：等发安卓安装包那一次，由主开发会话并入并升版本，再跑 `sync-policy.ts`。**安装包里的 `policy.xml` 必须是带安卓段落的那一版**，现在这份只写了 iPhone，不能带着发 |
 | App 备案 | Jig 手机端联网、默认连我们的中继，要先用公司主体办备案，iPhone 和安卓一起报，由创始人在腾讯云提交（法务组已发总办排期）。备案要填包名 `cn.tenonai.apps.jig`、签名证书的 MD5 指纹和公钥 |
 | 签名密钥 | 没生成。按产品规范 15.6（RSA 4096，`~/.tenon-keys/android/jig/jig-release.p12`，口令进登录钥匙串，脚本先给安全组看），生成要创始人在本会话确认。生成后把包名、证书的 MD5 指纹和公钥发主开发会话转法务组，三个指纹登记在这里 |
 | 发布脚本 | 没写。Gradle 只出未签名的正式构建；签名、核对证书指纹和权限的脚本到生成密钥时写 |
 | 首次放出 | 请创始人在本会话确认（规范 17.10） |
 
+### 7.1 隐私政策里安卓的段落（草稿，法务组 2026-11-15 核过）
+
+放在「手机访问」那段里 iPhone 的句子后面。并入时主开发会话同时把两个平台都适用的「iPhone」改成「手机」，只有 iPhone 才有的仍写 iPhone。
+
+中文：
+
+> 安卓上的 Jig 把配对信息和自己的密钥存在应用的私有文件里，用 Android 密钥库里的密钥加密，只存在这台设备上，不进系统备份和换机传输。安卓上的 Jig 不使用推送服务，也没有推送令牌：打开通知后，它用一个前台服务在后台保持到中继的连接，电脑经端到端加密的通道把通知的内容发给手机，中继只转发密文；系统会为这条连接显示一条常驻通知，系统停掉 Jig 时收不到通知。扫描配对二维码时用到相机，画面只在手机上识别，不保存也不发出。手机上另记着通知的开关和已经看到的待办的编号，不含内容。
+
+English:
+
+> Jig on Android keeps the pairing and its own key in a private file of the app, encrypted with a key in the Android Keystore, on that device only; it is left out of system backups and device transfers. Jig on Android uses no push service and has no push token: with notifications on, a foreground service keeps a connection to the relay open in the background, and the computer sends what a notification says to the phone over the end-to-end encrypted channel; the relay only passes ciphertext along. Android shows a standing notification for this connection, and notifications do not arrive while the system has stopped Jig. Scanning the pairing QR code uses the camera; the picture is read on the phone and is neither kept nor sent. The phone also remembers whether notifications are on and the ids of the items it has already seen, without their content.
+
 ## 8. 交给别的会话的事
 
-- 主开发会话：把安卓那几句隐私政策并进 `src/shared/policy.ts`（草稿已发）；电脑端「添加 iPhone」的按钮和 `jig remote` 的帮助文字要不要改成不分手机系统的说法；`npm run check` 要不要带上安卓的单元测试。
+- 主开发会话：发安卓安装包那一次把 7.1 的段落并进 `src/shared/policy.ts` 并升版本；电脑端「添加 iPhone」的按钮和 `jig remote` 的帮助文字要不要改成不分手机系统的说法；`npm run check` 要不要带上安卓的单元测试。
 - 官网地址：应用里和 iPhone、电脑端一样写的是 tenon.asia；产品规范 1.1 说官网已迁到 tenonai.cn。三端要一起改，由主开发会话定。
