@@ -50,7 +50,7 @@ describe("artifacts", () => {
 			"v1.md",
 			"v2.md",
 		]);
-		assert.throws(() => artifacts.content(first.id, 3), /not found|No /i);
+		assert.throws(() => artifacts.content(first.id, 3), /does not exist/);
 		// The interface hears about each version.
 		assert.equal(
 			events.filter((e) => e.scope === "global" && e.event.type === "artifact").length,
