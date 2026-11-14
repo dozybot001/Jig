@@ -307,7 +307,7 @@ function QueuedItem({ sessionId, id, text }: { sessionId: string; id: string; te
 	);
 }
 
-/** The box at the bottom: your message, the model choice and a round send or stop button (as in Codex). */
+/** The box at the bottom: your message, the model choice and a round send or stop button. */
 function Composer({ session, transcript }: { session: Session; transcript: TranscriptState }) {
 	useLang();
 	const [text, setText] = useState("");
@@ -514,7 +514,7 @@ function nameFrom(text: string): string {
 }
 
 /**
- * No session open: one composer in the middle of the page (as in Codex, spec 12.3). You pick a folder
+ * No session open: one composer in the middle of the page (spec 12.3). You pick a folder
  * and a model in its bar and start by sending; the three templates under it add a role.
  */
 function HomeView() {

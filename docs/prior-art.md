@@ -25,23 +25,11 @@
 - 第三节排除的仓库，代码和文档都不读。
 - 包装 Claude Code 的项目里，面向 Claude Code 的适配层和分析文档不读，例如 Happy 的 `docs/competition/claude/`、OpenCode 的 `packages/core/src/plugin/provider/claude-agent/`。
 
-## 三、排除清单
+## 三、不读、不用的材料
 
-| 仓库 | 原因 |
-| --- | --- |
-| QwenLM/qwen-code | 源码注释引用了 Claude Code 未公开源码的文件名和行号（`chatCompressionService.ts`、`fileReadCache.ts`）。同类实现改看它的上游 Gemini CLI |
-| letta-ai/letta-code | `src/agent/prompts/source_claude.md` 转载了 Claude Code 的系统提示词。Letta 只看公开文档 |
-| ultraworkers/claw-code | README 声明不主张对原 Claude Code 源码材料的所有权 |
-| Piebald-AI/claude-code-system-prompts | 收录 Claude Code 的系统提示词和工具说明 |
-| Yuyz0112/claude-code-reverse | 逆向 Claude Code 的模型交互 |
-| dnakov/anon-kode | 已被 DMCA 屏蔽 |
-| Twigpine/openclaude、shareAI-lab/Kode-CLI | 来源存疑，没有核实 |
-| Dicklesworthstone/mcp_agent_mail（含 Rust 版） | 在 MIT 之上加了附加条款：不给 OpenAI、Anthropic 及代表它们行事的人任何权利，也不许把衍生作品提供给它们。开发 Jig 用的是 Claude，所以代码不读，只用 README 里的通用思路 |
-
-另外两条：
-
-- pi-ai、OpenClaw、Hermes 的 Anthropic 适配层，在使用订阅 OAuth 令牌时会冒充 Claude Code，发送 `claude-cli/…` 的 User-Agent 和身份句。Jig 接 Anthropic 只用 API Key，不做 Anthropic 账号登录。
-- pi 文档里有个示例把 MCP OAuth 的 `clientName` 设成 Claude Code，Jig 不照做。
+- 不读、不用泄露、逆向或转载的 Claude Code 源码和提示词。
+- 许可证带附加条款的项目不读代码，只看公开的说明文档。
+- Jig 接 Anthropic 只用 API Key，不做账号登录，不发送其他客户端的标识。
 
 ## 四、M1：Agent 循环与工具
 

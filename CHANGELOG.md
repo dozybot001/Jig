@@ -4,9 +4,17 @@
 
 ## [未发布]
 
+## [1.0.0] - 2026-11-15
+
 ### 新增
 
+- Jig 以 MIT 许可证开源，npm 包是 `@tenonai/jig`：`npm install -g @tenonai/jig`。支持 macOS 和 Linux。
+
 - Jig 图标（macOS）：`jig app install` 在「应用程序」里放一个 Jig 图标。点它时，Jig 没在运行就先在后台启动，然后打开界面并登录好。`jig app uninstall` 移除，`jig app status` 查看。它是这份 Jig 的启动器，移动或更新 Node.js、Jig 之后重新运行一次 install。
+
+### 变更
+
+- 用户协议换成开源后的版本（2.0）：MIT 许可证、你选的模型服务商适用它自己的条款、默认中继的提供方式、名称和标志不在授权范围内。隐私政策写明选境外的搜索服务时查询词会发往境外。
 
 ## [0.4.0] - 2026-11-15
 

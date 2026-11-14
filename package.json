@@ -1,11 +1,24 @@
 {
 	"name": "@tenonai/jig",
-	"version": "0.4.0",
-	"private": true,
+	"version": "1.0.0",
 	"description": "An AI-native multi-agent workbench",
-	"license": "UNLICENSED",
+	"keywords": [
+		"agent",
+		"ai",
+		"multi-agent",
+		"workbench",
+		"cli"
+	],
+	"license": "MIT",
 	"author": "Tenon AI (https://tenonai.cn/)",
-	"homepage": "https://tenonai.cn/",
+	"homepage": "https://tenonai.cn/products/jig/",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/dozybot001/Jig.git"
+	},
+	"bugs": {
+		"url": "https://github.com/dozybot001/Jig/issues"
+	},
 	"type": "module",
 	"engines": {
 		"node": ">=24"
@@ -20,6 +33,9 @@
 		"THIRD-PARTY-NOTICES.md",
 		"CHANGELOG.md"
 	],
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
 		"check": "biome check . && tsc --noEmit -p . && tsc --noEmit -p web && npm test",
 		"test": "node --test \"test/**/*.test.ts\"",

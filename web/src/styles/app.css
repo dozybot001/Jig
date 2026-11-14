@@ -1,5 +1,5 @@
 /*
- * Jig's design tokens: a black, white and grey interface after the Codex app. Jig's colour is ink:
+ * Jig's design tokens: a black, white and grey interface. Jig's colour is ink:
  * the mark, primary buttons, focus rings, switches and unread counts are near-black on light themes
  * and near-white on dark ones; links are underlined. Text contrast is at least 4.5:1. Borders are
  * deliberately faint (founder's call, 2026-11-08); fields are told apart by their fill, icon and
@@ -994,7 +994,7 @@ body.scroll-locked {
 	width: 28px;
 	min-height: 28px;
 }
-/* With a mouse, a row's menu shows on hover or focus, in place of its time (as in Codex). */
+/* With a mouse, a row's menu shows on hover or focus, in place of its time. */
 @media (hover: hover) {
 	.session-item:not(:hover, :focus-within) .session-row-menu,
 	.group-heading:not(:hover, :focus-within) .btn-icon:not(.heading-add) {
@@ -1135,7 +1135,7 @@ body.scroll-locked {
 	background: var(--bg);
 }
 
-/* Home: one composer in the middle of the page, as in Codex (spec 12.3: one primary action). */
+/* Home: one composer in the middle of the page (spec 12.3: one primary action). */
 .main-home {
 	position: relative;
 	grid-template-rows: minmax(0, 1fr);
@@ -1361,7 +1361,7 @@ body.scroll-locked {
 	padding: 4px 8px;
 }
 
-/* Tool calls, thinking and notes read as quiet activity lines; a click opens the detail (as in Codex). */
+/* Tool calls, thinking and notes read as quiet activity lines; a click opens the detail. */
 .activity > summary {
 	display: flex;
 	align-items: center;
@@ -1436,7 +1436,7 @@ body.scroll-locked {
 .tool-state-needs_review {
 	color: var(--review);
 }
-/* Work in progress shimmers, like Codex's running steps; reduced motion leaves it still. */
+/* Work in progress shimmers; reduced motion leaves it still. */
 .shimmer {
 	background:
 		linear-gradient(90deg, var(--text-3) 25%, var(--text) 50%, var(--text-3) 75%) 0 0 / 200% 100%;
@@ -1627,7 +1627,7 @@ body.scroll-locked {
 	color: var(--danger);
 }
 
-/* The composer: a rounded box with the model choice and a round send button inside (as in Codex). */
+/* The composer: a rounded box with the model choice and a round send button inside. */
 .composer {
 	padding: 0 20px 18px;
 	background: var(--bg);
@@ -1810,7 +1810,7 @@ body.scroll-locked {
 }
 /*
  * Settings dialogs: groups under a small title, each a rounded box of rows; a row has the name and a
- * short explanation on the left and a control sized to its value on the right (as in Codex's settings).
+ * short explanation on the left and a control sized to its value on the right.
  */
 .setting-group {
 	display: grid;
