@@ -22,6 +22,9 @@ VERSION="$(sed -n 's/^.*"version": *"\([0-9][0-9.]*\)".*$/\1/p' ../package.json 
 grep -q '安卓' app/src/main/res/values-zh-rCN/policy.xml && grep -q 'Android' app/src/main/res/values/policy.xml ||
     fail "应用里的隐私政策还没有安卓的内容。等它并进 src/shared/policy.ts 后跑 sync-policy.ts，再出包。"
 
+# No library in the package has a known vulnerability (OSV); only names and versions are sent.
+node scripts/check-vulnerabilities.ts || fail "进安装包的库里有已知漏洞，或者查不了 OSV。先处理再出包。"
+
 ./gradlew --console=plain clean :app:testDebugUnitTest :app:lintRelease :app:assembleRelease
 UNSIGNED="app/build/outputs/apk/release/app-release-unsigned.apk"
 [ -f "$UNSIGNED" ] || fail "没有生成未签名的正式包：${UNSIGNED}"

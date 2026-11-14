@@ -90,5 +90,9 @@ dependencies {
     implementation(libs.bouncycastle)
     implementation(libs.zxing.core)
 
+    constraints {
+        implementation(libs.guava) { because("the version CameraX asks for has GHSA-xxph-c9ww-hj94") }
+    }
+
     testImplementation(libs.junit)
 }

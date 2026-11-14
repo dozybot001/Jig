@@ -38,10 +38,11 @@
 | --- | --- |
 | `noise-vectors.ts` | 用电脑端的 `src/remote/noise.ts` 和固定的测试密钥生成 `app/src/test/resources/noise-vectors.json` |
 | `sync-policy.ts` | 从 `src/shared/policy.ts` 生成两种语言的 `res/values*/policy.xml`。隐私政策改了以后跑一次，不跑的话 `PolicyTest` 会失败 |
+| `check-vulnerabilities.ts` | 拿进安装包的库去查 OSV 漏洞库，只发库名和版本；有结果就以 1 退出。`release.sh` 每次出包都跑 |
 | `test-computer.ts` | 一台测试用的电脑：本机中继加内存里的 Jig 接口、四个产物和通知，不碰 `~/.jig` 和系统钥匙串。用法见文件开头 |
 | `dependencies.ts` | 从锁文件和 Gradle 缓存里各库的 POM 和包，生成 `android/DEPENDENCIES.md`（进安装包的每个库的名称、版本和许可证）和应用里「开源许可」页的内容 `app/src/main/assets/licenses.txt`。升级依赖后跑一次，不跑的话 `PolicyTest` 会失败 |
 
-依赖（都来自 Google Maven 和 Maven Central，版本锁在 `app/gradle.lockfile`）：Compose 和 AndroidX、CameraX（扫码的相机）、ZXing core（识别二维码）、OkHttp（到中继的 WebSocket）、Bouncy Castle（X25519 和 ChaCha20-Poly1305：系统自带的要到 API 31 和 28 才有）、kotlinx.coroutines、kotlinx.serialization-json。没有统计、崩溃上报、推送和 Google 服务的库。全部 145 个库（多数是 AndroidX 和 Kotlin 的传递依赖）列在 [android/DEPENDENCIES.md](../android/DEPENDENCIES.md)：143 个 Apache-2.0，1 个 MIT（checker-qual），1 个 Bouncy Castle 许可证（MIT 式）；法务组 11-15 核过，可以。
+依赖（都来自 Google Maven 和 Maven Central，版本锁在 `app/gradle.lockfile`）：Compose 和 AndroidX、CameraX（扫码的相机）、ZXing core（识别二维码）、OkHttp（到中继的 WebSocket）、Bouncy Castle（X25519 和 ChaCha20-Poly1305：系统自带的要到 API 31 和 28 才有）、kotlinx.coroutines、kotlinx.serialization-json。没有统计、崩溃上报、推送和 Google 服务的库。全部 143 个库（多数是 AndroidX 和 Kotlin 的传递依赖）列在 [android/DEPENDENCIES.md](../android/DEPENDENCIES.md)：142 个 Apache-2.0，1 个 Bouncy Castle 许可证（MIT 式）。法务组 11-15 核过当时的 145 个，可以；之后 guava 升了版本（见 4.7），带走了 checker-qual（MIT）和另一个注解库，没有新增许可证。
 
 ## 3. 构建和运行
 
@@ -54,7 +55,9 @@
 | `./gradlew :app:assembleDebug` | 调试包 `app/build/outputs/apk/debug/app-debug.apk`，用调试密钥签，只用于测试 |
 | `./gradlew :app:assembleRelease` | 正式构建 `app/build/outputs/apk/release/app-release-unsigned.apk`，开了 R8，没有签名 |
 
-升级依赖：改 `gradle/libs.versions.toml`，跑 `./gradlew --write-locks :app:assembleDebug :app:assembleRelease :app:testDebugUnitTest :app:lintDebug`，把锁文件的改动一起提交。
+依赖的版本锁在 `app/gradle.lockfile` 和 `settings-gradle.lockfile`；每个依赖文件的 SHA-256 记在 `gradle/verification-metadata.xml`，下载到的文件对不上，构建就失败。
+
+升级依赖：改 `gradle/libs.versions.toml`，跑 `./gradlew --write-locks --write-verification-metadata sha256 :app:assembleDebug :app:assembleRelease :app:testDebugUnitTest :app:lintDebug`，再跑 `dependencies.ts` 和 `check-vulnerabilities.ts`，把这几个文件的改动一起提交。
 
 调试版才有的启动参数（模拟器上用，正式构建里没有）：`--es jig.pair '<配对链接>'` 像扫码一样配对，`--ez jig.demo true` 打开演示，`--es jig.tab approvals|letters|artifacts` 选入口。调试版允许连本网络里 `ws://` 的测试中继，正式构建只连 `wss://`。
 
@@ -98,8 +101,8 @@ echo settle > /tmp/jig-android/cmd                          # 电脑端处理掉
 
 关于页里的「开源许可」随安装包走，内容由 `dependencies.ts` 生成，不手写（法务组 11-15 的要求）：
 
-- 143 个 Apache-2.0 的库的名称和版本，后面附一份 Apache-2.0 全文（取自 AndroidX 包里的 `LICENSE.txt`）。
-- Bouncy Castle 和 checker-qual 各自包里的许可原文，带版权行。
+- 142 个 Apache-2.0 的库的名称和版本，后面附一份 Apache-2.0 全文（取自 AndroidX 包里的 `LICENSE.txt`）。
+- Bouncy Castle 包里的许可原文，带版权行。（checker-qual 在 guava 升版本后不再进安装包。）
 - `androidx.camera:camera-core` 的 POM 另写了 BSD-3-Clause。它的包里没有这部分的声明文字。这是它本地图像处理库里编进去的 libyuv，页面上放的是 libyuv 自己的许可（`scripts/notices/libyuv.txt`，全仓库只有这一份是手放的）。法务组 11-15 确认了归属，依据有两处：AndroidX 源码 `camera/camera-core/build.gradle` 的库说明写着「This library includes code from libyuv, which is licensed under the BSD-3-Clause license」，并用 `extraLicense` 声明了 BSD-3-Clause；libyuv 仓库根目录的 `LICENSE`。升级 camera 版本时对着这两处复核，出处也写在 `dependencies.ts` 的注释里。
 - 各库包里带的 NOTICE 文件：只有 `jakarta.inject:jakarta.inject-api` 有一份，照原文放。
 - 脚本遇到不认识的许可证，或者 MIT 一类的库包里找不到许可原文，就报错，不会悄悄漏掉。
@@ -108,7 +111,14 @@ echo settle > /tmp/jig-android/cmd                          # 电脑端处理掉
 
 安卓版自带 Bouncy Castle 做 X25519 和 ChaCha20-Poly1305，不是系统加密（系统自带的要到 API 31 和 28 才有，应用从 26 起）；SHA-256、HMAC 和存储用的 AES-GCM 是系统的。法务组 11-15：直接发安装包没有申报手续；以后上应用商店，出口合规按「用了非系统的标准加密算法」填。iPhone 版只用系统的 CryptoKit，两端的填法不同。
 
-### 4.6 权限
+### 4.6 依赖的校验和漏洞检查
+
+安全组 11-15 要求在第一次对外发包前补上，已做：
+
+- 校验值：`gradle/verification-metadata.xml`，见第 3 节。生成后清掉构建产物重新构建过，能过。
+- OSV：2026-11-15 第一次查出 1 条，`com.google.guava:guava 33.3.1-android` 的 GHSA-xxph-c9ww-hj94（CVE-2026-102554，反序列化时可以被撑爆内存，33.7.2 修复）。guava 不是 Jig 自己用的，是 CameraX 经 `androidx.media3` 带进来的，Jig 也不反序列化 Java 对象；仍用依赖约束把它提到 33.8.0-android。复查：143 个库，0 条。
+
+### 4.7 权限
 
 合并后的清单里只有这些（`aapt2 dump badging` 核对过）：`INTERNET`、`ACCESS_NETWORK_STATE`、`CAMERA`（只在扫码时用，没有相机的手机可以粘贴链接）、`POST_NOTIFICATIONS`、`FOREGROUND_SERVICE`、`FOREGROUND_SERVICE_REMOTE_MESSAGING`、`RECEIVE_BOOT_COMPLETED`、`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`，以及 `androidx.core` 给应用自己声明的 `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`。
 
@@ -139,7 +149,7 @@ echo settle > /tmp/jig-android/cmd                          # 电脑端处理掉
 ### 6.2 构建产物
 
 - 调试包 19.9 MB；正式构建（R8，未签名）2.4 MB。lint 没有问题。构建产物不留：验证完跑 `./gradlew clean`。
-- `aapt2 dump badging`（正式构建）：包名 `cn.tenonai.apps.jig`，版本 1.0.0（10000），目标 API 37，语言是英文和简体中文，不可调试，权限如 4.6。
+- `aapt2 dump badging`（正式构建）：包名 `cn.tenonai.apps.jig`，版本 1.0.1（10001），目标 API 37，语言是英文和简体中文，不可调试，权限如 4.7。
 
 ### 6.3 模拟器走查
 
@@ -167,13 +177,13 @@ Android 8.0（API 26）：调试包的演示、配对、会话列表、后台收
 ### 6.4 还没验证的
 
 - 真机，尤其是国产系统：前台服务能活多久、自启动和后台限制、通知在各家系统上的表现。
-- 扫码：相机预览和二维码识别的代码写了，模拟器上没有能对准二维码的相机，没实测；配对都是用链接做的。
+- 扫码：模拟器上扫码页能打开，相机预览正常（guava 升版本后看的）；二维码识别没实测，模拟器的相机对不准二维码，配对都是用链接做的。
 - 正式构建经 `wss://` 的完整握手：`relay.tenonai.cn` 今天刚上线，没有配对着的电脑可连。
 - 离开超过 10 分钟后重连时的汇总通知：模拟器上没能造出这种情况，只验证了短暂断线后不重复通知。
 - 开机后服务自己恢复、Doze 下的表现、长时间挂着的耗电。
 - 读屏（TalkBack）和大字体下的逐页检查。
 - 产物在 Android 8.0 上没看（只在 Android 17 上看过）；旧版本系统自带的网页视图对内容安全策略的支持没核对，联网是靠网页视图自己的设置挡住的。
-- 依赖文件的校验值（`gradle/verification-metadata.xml`）还没生成，现在只锁了版本。
+- guava 升到 33.8.0 以后只在模拟器上看了启动、扫码页和隐私政策页，没有重走全部页面。
 
 ## 7. 签名和发布
 
@@ -184,13 +194,15 @@ Android 8.0（API 26）：调试包的演示、配对、会话列表、后台收
 | 事 | 状态 |
 | --- | --- |
 | 应用里的「开源许可」页 | 做了（4.4），法务组 11-15 核过 |
-| 隐私政策里安卓的内容 | 草稿见 7.1，法务组 11-15 对照代码核过，措辞不用改。现在不并进 `src/shared/policy.ts`：等发安卓安装包那一次，由主开发会话并入并升版本，再跑 `sync-policy.ts`。**安装包里的 `policy.xml` 必须是带安卓段落的那一版**，现在这份只写了 iPhone，不能带着发 |
+| 隐私政策里安卓的内容 | 做了：主开发会话在 1.0.1 把安卓的内容并进了 `src/shared/policy.ts`（隐私政策 2.1，82d050b），应用里的已同步，模拟器上看过。当初的草稿留在 7.1 |
 | App 备案 | 包名、证书 MD5 指纹和公钥 11-15 发给了主开发会话，它已请法务组提交。Jig 手机端联网、默认连我们的中继，要先用公司主体办备案，iPhone 和安卓一起报，由创始人在腾讯云提交（法务组已发总办排期）。备案要填包名 `cn.tenonai.apps.jig`、签名证书的 MD5 指纹和公钥 |
 | 签名密钥 | 2026-11-15 生成，见 7.2。安全组补看了生成脚本，可以，不用重来。**还没备份** |
-| 备份脚本和发布脚本 | 写了，用测试密钥演练过（7.3），11-15 发安全组审；它看过之前不对着正式密钥运行 |
+| 备份脚本和发布脚本 | 安全组 11-15 审过（4e950bd），都可以；按它的意见改了备份脚本的检查顺序，发布脚本加了 OSV 检查（7.3） |
+| 依赖的校验值和 OSV 检查 | 做了（4.6） |
+| 安全组验候选包 | 没做。第一次对外发包前把候选包发安全组，它按清单验 |
 | 首次放出 | 请创始人在本会话确认（规范 17.10） |
 
-### 7.1 隐私政策里安卓的段落（草稿，法务组 2026-11-15 核过）
+### 7.1 隐私政策里安卓的段落（草稿，法务组 2026-11-15 核过；已在隐私政策 2.1 并入）
 
 放在「手机访问」那段里 iPhone 的句子后面。并入时主开发会话同时把两个平台都适用的「iPhone」改成「手机」，只有 iPhone 才有的仍写 iPhone。
 
@@ -227,29 +239,31 @@ English:
 
 ### 7.3 备份和出正式包
 
-两个脚本都在 `android/scripts/`，共用 `signing-common.sh`。**安全组看过之前，不对着正式密钥运行。**
+两个脚本都在 `android/scripts/`，共用 `signing-common.sh`。安全组 11-15 审过，备份脚本可以对着正式密钥运行。
 
 备份：`backup-signing-key.sh <放备份的文件夹> [<另一处> ...]`
 
 - 要创始人在能直接打字的终端里跑：映像口令从键盘读（不回显，输两次，不少于 20 个字符），不经管道和参数，也不出现在任何会话里；不是终端就拒绝运行。口令由他在密码管理器里生成，另抄一份纸质的。
 - 备份是一个 AES-256 加密的磁盘映像，里面有密钥库、密钥库的口令和写着三个指纹的说明。密钥库的口令直接写进挂载的映像，不经过普通磁盘。
 - 当场做恢复演练：重新只读打开映像，用里面的口令打开密钥库，核对证书 SHA-256 和登记的一致；再用里面的私钥签一份证书请求，看到 `verify OK` 才算验签通过（系统的 LibreSSL 验签失败也返回 0），并核对请求里的公钥就是证书里的公钥。演练没过的映像会删掉。
-- 演练通过后把同一个映像复制到给出的每个文件夹，逐字节比对。放哪由创始人定，这台 Mac 之外至少一份（15.6.3）；不能放在密钥目录里。
+- 演练通过后把同一个映像复制到给出的每个文件夹，逐字节比对。放哪由创始人定，这台 Mac 之外至少一份（15.6.3）；不能放在密钥目录里。哪个文件夹里已有同名文件，一开始就停，什么都不建（安全组的意见）。给出的文件夹都和主目录在同一块盘上、又不在 iCloud 云盘里时，提醒一句，不拦。
+- 跑之前和创始人确认：映像口令在会同步到手机的密码管理器里存一份，另抄纸质的。做完告诉安全组，它核对映像和记录。
 
 出正式包：`release.sh`，这一步不发布任何东西。
 
 1. `android/`、`package.json` 或 `src/shared/policy.ts` 有没提交的改动就停；应用里的隐私政策没有安卓的内容也停（7.1）。
-2. 跑单元测试、lint 和正式构建。
+2. 查 OSV，有已知漏洞或查不了就停；再跑单元测试、lint 和正式构建。
 3. 用 `apksigner` 签名，只用 v2 和 v3。口令从钥匙串读进环境变量，不经过 Gradle。找不到正式密钥就停，不会改用别的密钥。
-4. 核对，全部通过才得到正式的文件名，中途退出就删掉没核对完的文件：签名验证通过、证书 SHA-256 和登记的一致、签名者只有一个、没有 v1 签名；包名和版本号对、不可调试、关掉了明文连接和系统备份；申请和声明的权限恰好是 4.6 的名单。
+4. 核对，全部通过才得到正式的文件名，中途退出就删掉没核对完的文件：签名验证通过、证书 SHA-256 和登记的一致、签名者只有一个、没有 v1 签名；包名和版本号对、不可调试、关掉了明文连接和系统备份；申请和声明的权限恰好是 4.7 的名单。
 5. 产物在 `android/build/release/`：`Jig-<版本>.apk` 和 `SHA256SUMS`。
 
 2026-11-15 用一次性的测试密钥在临时目录里演练过，测试密钥、它的钥匙串条目和签出来的包都已删：
 
 - 备份：正常流程走通（两处的副本和原件一致，恢复演练通过）；同一天重复运行、口令太短、登记的指纹对不上、不在终端里运行，都被拦下，没有留下映像。
-- 出包：原样运行被「有没提交的改动」拦下；去掉这一条和隐私政策那一条后，测试密钥签的 1.0.0 走完全部核对；登记的指纹不对时被拦下，没有留下包。隐私政策那一条本身现在就会拦（应用里还没有安卓段落）。
+- 出包：原样运行被「有没提交的改动」拦下；去掉这一条和隐私政策那一条后，测试密钥签的 1.0.0 走完全部核对；登记的指纹不对时被拦下，没有留下包。
+- 按安全组意见改过以后又演练了备份脚本：第二处已有同名文件时一开始就停，第一处和密钥目录里什么都没留；两处都在本机盘上时出提醒，流程照常走完。发布脚本加的 OSV 那一步没有另外演练整个流程，只单独跑过检查脚本。
 
 ## 8. 交给别的会话的事
 
-- 主开发会话：发安卓安装包那一次把 7.1 的段落并进 `src/shared/policy.ts` 并升版本；电脑端「添加 iPhone」的按钮和 `jig remote` 的帮助文字要不要改成不分手机系统的说法；`npm run check` 要不要带上安卓的单元测试。
+- 主开发会话：电脑端「添加 iPhone」的按钮和 `jig remote` 的帮助文字要不要改成不分手机系统的说法；`npm run check` 要不要带上安卓的单元测试。
 - 官网地址：应用里和 iPhone、电脑端一样写的是 tenon.asia；产品规范 1.1 说官网已迁到 tenonai.cn。三端要一起改，由主开发会话定。

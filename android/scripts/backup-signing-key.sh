@@ -28,12 +28,21 @@ for place in "$@"; do
     done
     PLACES+=("$real")
 done
+IMAGE_NAME="jig-android-signing-key-$(date +%Y%m%d).dmg"
+# Checked before anything is made, so a run never stops with one place written and another refused.
+OFF_THIS_DISK=""
+for place in "${PLACES[@]}"; do
+    [ ! -e "${place}/${IMAGE_NAME}" ] || fail "那里已经有同名的文件，不覆盖：${place}/${IMAGE_NAME}"
+    case "$place" in */Mobile\ Documents/*) OFF_THIS_DISK=1 ;; esac
+    [ "$(stat -f %d "$place")" = "$(stat -f %d "$HOME")" ] || OFF_THIS_DISK=1
+done
+[ -n "$OFF_THIS_DISK" ] || echo "提醒：给出的文件夹都和主目录在同一块盘上，也不在 iCloud 云盘里。这台 Mac 之外至少要有一份备份。"
 [ -t 0 ] || fail "要在能直接打字的终端里运行：备份口令从键盘读，不经管道。"
 [ -f "$KEYSTORE" ] || fail "找不到密钥库：${KEYSTORE}"
 [ -f "$FINGERPRINT_FILE" ] || fail "找不到登记的证书指纹：${FINGERPRINT_FILE}"
 EXPECTED="$(tr -d '[:space:]' <"$FINGERPRINT_FILE")"
 
-IMAGE="$KEY_DIR/jig-android-signing-key-$(date +%Y%m%d).dmg"
+IMAGE="$KEY_DIR/$IMAGE_NAME"
 [ ! -e "$IMAGE" ] || fail "今天的备份映像已经存在，不覆盖：${IMAGE}"
 
 echo "请在密码管理器里生成一个备份口令（不少于 20 个字符），存好，再抄一份到纸上。"
@@ -117,13 +126,12 @@ echo "恢复演练通过：从备份打开密钥库，用里面的私钥签名�
 
 # 3. The same image to every place, each copy compared with the original byte for byte.
 for place in "${PLACES[@]}"; do
-    copy="${place}/$(basename "$IMAGE")"
-    [ ! -e "$copy" ] || fail "那里已经有同名的文件，不覆盖：${copy}"
+    copy="${place}/${IMAGE_NAME}"
     cp "$IMAGE" "$copy"
     cmp -s "$IMAGE" "$copy" || fail "复制出去的映像和原件不一样：${copy}"
     echo "已复制到：${copy}"
 done
 DONE=1
-echo "备份映像：$(basename "$IMAGE")，SHA-256 $(shasum -a 256 "$IMAGE" | cut -d' ' -f1)"
+echo "备份映像：${IMAGE_NAME}，SHA-256 $(shasum -a 256 "$IMAGE" | cut -d' ' -f1)"
 echo "这台 Mac 上的原件留在 ${IMAGE}；它和密钥在同一块盘上，只防误删。"
 echo "备份口令在密码管理器里，另有一份纸质的，和 U 盘分开放。用了 iCloud 云盘的话，那个文件夹不要设成共享，并等它上传完。"
