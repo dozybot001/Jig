@@ -4,6 +4,10 @@ coverage/
 *.log
 .env
 *.p8
+*.p12
+*.jks
+*.keystore
+keystore.properties
 .env.*
 !.env.example
 .DS_Store
