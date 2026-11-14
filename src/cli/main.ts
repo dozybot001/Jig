@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { exportCommand } from "./export.ts";
 import { keyCommand } from "./key.ts";
 import { remoteCommand } from "./remote.ts";
 import { run } from "./run.ts";
@@ -14,6 +15,7 @@ const commands = [
 	scheduleCommand(),
 	remoteCommand(),
 	serviceCommand(),
+	exportCommand(),
 	keyCommand(async () => {
 		const { openRuntime } = await import("../server/runtime.ts");
 		const runtime = openRuntime();

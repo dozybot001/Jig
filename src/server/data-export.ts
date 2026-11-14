@@ -1,0 +1,113 @@
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import type { Card, Letter, Session } from "../shared/types.ts";
+import { invalid } from "./errors.ts";
+import { type ExportLanguage, sessionMarkdown } from "./export.ts";
+import { MailStore } from "./mail/store.ts";
+import { ScheduleBook } from "./schedules.ts";
+import { readSettings } from "./settings.ts";
+import type { Store } from "./store.ts";
+
+/**
+ * Everything Jig keeps, as files a person can read without Jig (blueprint, principle 5; M4 plan,
+ * section 2): each session as Markdown, and letters, cards, scheduled tasks and settings as JSON.
+ * Left out: API keys (they are in the keychain), paired phones and their tokens, sign-in tokens.
+ */
+export interface ExportCounts {
+	sessions: number;
+	letters: number;
+	cards: number;
+	schedules: number;
+	files: number;
+}
+
+const PAGE = 200;
+
+function all<T, C>(page: (cursor: C | null) => { items: T[]; nextCursor: C | null }): T[] {
+	const items: T[] = [];
+	let cursor: C | null = null;
+	do {
+		const next = page(cursor);
+		items.push(...next.items);
+		cursor = next.nextCursor;
+	} while (cursor !== null);
+	return items;
+}
+
+/** A file name from a session's name: readable, and safe on every file system. */
+function fileNameOf(name: string, taken: Set<string>): string {
+	const base =
+		name
+			.replace(/[\\/:*?"<>|\p{Cc}]/gu, " ")
+			.replace(/\s+/g, " ")
+			.trim()
+			.slice(0, 80) || "session";
+	let candidate = base;
+	for (let n = 2; taken.has(candidate.toLowerCase()); n++) candidate = `${base} ${n}`;
+	taken.add(candidate.toLowerCase());
+	return `${candidate}.md`;
+}
+
+export function exportAll(store: Store, folder: string, now = Date.now()): ExportCounts {
+	if (existsSync(folder) && readdirSync(folder).length > 0) {
+		throw invalid(`${folder} is not empty. Export into a new or empty folder.`, "folder");
+	}
+	const settings = readSettings(store);
+	const language: ExportLanguage = settings.language === "en" ? "en" : "zh";
+	const mail = new MailStore(store);
+	let files = 0;
+	const write = (path: string, content: string) => {
+		writeFileSync(join(folder, path), content, { mode: 0o600 });
+		files += 1;
+	};
+	const json = (value: unknown) => `${JSON.stringify(value, null, "\t")}\n`;
+	mkdirSync(join(folder, "sessions"), { recursive: true, mode: 0o700 });
+
+	const sessions: Session[] = [
+		...all<Session, string>((cursor) => store.listSessions({ cursor, limit: PAGE })),
+		...all<Session, string>((cursor) =>
+			store.listSessions({ archived: true, cursor, limit: PAGE }),
+		),
+	];
+	const groups = new Map(store.listGroups().map((group) => [group.id, group.name]));
+	const taken = new Set<string>();
+	const index = sessions.map((session) => {
+		const file = fileNameOf(session.name, taken);
+		write(
+			join("sessions", file),
+			sessionMarkdown({
+				session,
+				groupName: session.groupId ? (groups.get(session.groupId) ?? null) : null,
+				entries: store.allEntries(session.id),
+				toolCalls: store.toolCallsForSession(session.id),
+				language,
+				now,
+			}),
+		);
+		// The record is in the Markdown file; this lists what the session is.
+		const { rules, options, todos, ...summary } = session;
+		return {
+			...summary,
+			team: session.groupId ? (groups.get(session.groupId) ?? null) : null,
+			file,
+		};
+	});
+	write("sessions.json", json(index));
+
+	const letters = all<Letter, string>((cursor) => mail.listLetters({ cursor, limit: PAGE }));
+	write("letters.json", json(letters));
+	const cards = all<Card, string>((cursor) =>
+		mail.listCards({ cursor: cursor === null ? null : Number(cursor), limit: PAGE }),
+	);
+	write("cards.json", json(cards));
+	const schedules = new ScheduleBook(store).list();
+	write("schedules.json", json(schedules));
+	write("settings.json", json({ exportedAt: new Date(now).toISOString(), ...settings }));
+	return {
+		sessions: sessions.length,
+		letters: letters.length,
+		cards: cards.length,
+		schedules: schedules.length,
+		files,
+	};
+}
