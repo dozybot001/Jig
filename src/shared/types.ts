@@ -396,6 +396,23 @@ export interface Schedule {
 	updatedAt: number;
 }
 
+export const ARTIFACT_KINDS = ["markdown", "html", "json", "chart"] as const;
+export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];
+
+/** Something a session made for the person to keep: a document, a page, data or a chart (blueprint 6.6). */
+export interface Artifact {
+	id: string;
+	sessionId: string;
+	name: string;
+	kind: ArtifactKind;
+	/** The latest version; versions count from 1. */
+	version: number;
+	/** Bytes of the latest version. */
+	size: number;
+	createdAt: number;
+	updatedAt: number;
+}
+
 /** A phone paired with this Mac through the relay (M3 plan, section 4). */
 export interface Device {
 	id: string;

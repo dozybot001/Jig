@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import type { RemoteAccess } from "../../remote/access.ts";
 import { VERSION } from "../../shared/version.ts";
 import type { Agents } from "../agent/runner.ts";
+import type { ArtifactStore } from "../artifacts.ts";
 import type { EventBus } from "../events.ts";
 import { PostOffice } from "../mail/post.ts";
 import type { ModelGateway } from "../model/gateway.ts";
@@ -12,6 +13,7 @@ import type { Scheduler } from "../schedules.ts";
 import type { Store } from "../store.ts";
 import { agentRoutes } from "./agents.ts";
 import { api } from "./api.ts";
+import { artifactRoutes } from "./artifacts.ts";
 import { deviceRoutes } from "./devices.ts";
 import { DraftCache, eventRoutes } from "./events.ts";
 import { mailRoutes } from "./mail.ts";
@@ -49,6 +51,8 @@ export interface AppOptions {
 	onPresence?: () => void;
 	/** Notifications for phones that keep their own connection (the Android app). */
 	notes?: NoteStreams;
+	/** What sessions saved for the person to look at (M4 plan, section 6). */
+	artifacts?: ArtifactStore;
 }
 
 const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Jig</title>
@@ -100,6 +104,7 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 	if (bus) app.route("/api", eventRoutes(store, bus, new DraftCache(bus)));
 	if (options.scheduler) app.route("/api", scheduleRoutes(store, options.scheduler));
 	if (options.notes) app.route("/api", noteRoutes(options.notes));
+	if (options.artifacts) app.route("/", artifactRoutes(options.artifacts));
 
 	const root = options.webRoot;
 	if (root && existsSync(join(root, "index.html"))) {

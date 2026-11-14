@@ -6,8 +6,9 @@ import type { Command } from "./run.ts";
 const HELP = `Usage: jig export <folder> [options]
 
 Write everything Jig keeps into a folder, as files you can read without Jig:
-each session as Markdown, and letters, decision cards, scheduled tasks and
-settings as JSON. The folder must be new or empty.
+each session as Markdown; letters, decision cards, scheduled tasks and
+settings as JSON; and every version of every artifact. The folder must be new
+or empty.
 
 API keys stay in the system keychain and are not exported; neither are paired
 phones or sign-in tokens.
@@ -39,13 +40,14 @@ export function exportCommand(): Command {
 			const { EventBus } = await import("../server/events.ts");
 			const { Store } = await import("../server/store.ts");
 			const { exportAll } = await import("../server/data-export.ts");
-			const db = openDatabase(dbPath(jigHome(io.env)));
+			const home = jigHome(io.env);
+			const db = openDatabase(dbPath(home));
 			try {
-				const counts = exportAll(new Store(db, new EventBus()), folder);
+				const counts = exportAll(new Store(db, new EventBus()), folder, Date.now(), home);
 				if (values.json) io.stdout.write(`${JSON.stringify({ folder, ...counts })}\n`);
 				else {
 					io.stdout.write(
-						`Exported ${counts.sessions} sessions, ${counts.letters} letters, ${counts.cards} decision cards and ${counts.schedules} scheduled tasks to ${folder} (${counts.files} files).\n`,
+						`Exported ${counts.sessions} sessions, ${counts.letters} letters, ${counts.cards} decision cards, ${counts.schedules} scheduled tasks and ${counts.artifacts} artifacts to ${folder} (${counts.files} files).\n`,
 					);
 				}
 				return EXIT_OK;

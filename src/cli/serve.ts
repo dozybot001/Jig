@@ -118,7 +118,13 @@ export function serveCommand(): Command {
 			const mcp = new McpHub({ jigHome: home, version: VERSION, log });
 			const { skillTool } = await import("../server/skills.ts");
 			const { homedir } = await import("node:os");
-			const extraTools = [webSearchTool(search, { version: VERSION }), skillTool(home, homedir())];
+			const { ArtifactStore, saveArtifactTool } = await import("../server/artifacts.ts");
+			const artifacts = new ArtifactStore(store, home);
+			const extraTools = [
+				webSearchTool(search, { version: VERSION }),
+				skillTool(home, homedir()),
+				saveArtifactTool(artifacts),
+			];
 			const agents = new Agents({
 				store,
 				gateway,
@@ -168,6 +174,7 @@ export function serveCommand(): Command {
 				scheduler,
 				onPresence: () => notifier.seen(),
 				notes,
+				artifacts,
 			});
 			handle = async (request, device) => app.fetch(request, { device });
 

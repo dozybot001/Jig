@@ -260,4 +260,26 @@ CREATE TABLE usage_daily (
 ) STRICT, WITHOUT ROWID;
 CREATE INDEX usage_daily_day ON usage_daily (day);
 `,
+	// Artifacts (M4 plan, section 6): the list here, each version's file in the data folder.
+	`
+CREATE TABLE artifacts (
+	id TEXT PRIMARY KEY,
+	session_id TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+	name TEXT NOT NULL,
+	kind TEXT NOT NULL CHECK (kind IN ('markdown', 'html', 'json', 'chart')),
+	version INTEGER NOT NULL,
+	size INTEGER NOT NULL,
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL,
+	UNIQUE (session_id, name)
+) STRICT;
+CREATE INDEX artifacts_updated ON artifacts (updated_at);
+CREATE TABLE artifact_versions (
+	artifact_id TEXT NOT NULL REFERENCES artifacts (id) ON DELETE CASCADE,
+	version INTEGER NOT NULL,
+	size INTEGER NOT NULL,
+	created_at INTEGER NOT NULL,
+	PRIMARY KEY (artifact_id, version)
+) STRICT, WITHOUT ROWID;
+`,
 ];

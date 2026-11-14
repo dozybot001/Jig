@@ -99,6 +99,13 @@ export function localOnly(port: number): MiddlewareHandler<AppEnv> {
 export const securityHeaders = (): MiddlewareHandler<AppEnv> => async (c, next) => {
 	await next();
 	const headers = c.res.headers;
+	// An HTML artifact brings its own, stricter policy, and is framed by Jig's own page only.
+	if (c.req.path.startsWith("/artifact-view/") && headers.has("Content-Security-Policy")) {
+		headers.set("X-Content-Type-Options", "nosniff");
+		headers.set("Referrer-Policy", "no-referrer");
+		headers.set("X-Frame-Options", "SAMEORIGIN");
+		return;
+	}
 	headers.set(
 		"Content-Security-Policy",
 		"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
@@ -190,6 +197,8 @@ export function deviceLimits(): MiddlewareHandler<AppEnv> {
 			path === "/api/devices/pairing" ||
 			// A phone changes or removes only itself, never another phone.
 			(path.startsWith("/api/devices/") && write && !self) ||
+			// Artifacts are looked at on the phone and managed on the Mac.
+			(path.startsWith("/api/artifacts/") && write) ||
 			path.startsWith("/api/auth/")
 		) {
 			return problemResponse(

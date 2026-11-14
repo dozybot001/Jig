@@ -454,6 +454,8 @@ export class Agents {
 		const ids = this.#store.deleteArchivedSessions((id) => this.isRunning(id));
 		for (const id of ids) {
 			rmSync(join(this.#home, "tmp", id), { recursive: true, force: true });
+			// Its artifacts' rows went with the session; their files go too.
+			rmSync(join(this.#home, "artifacts", id), { recursive: true, force: true });
 			this.#readStates.delete(id);
 			this.#jobs.get(id)?.stopAll();
 			this.#jobs.delete(id);

@@ -1,6 +1,7 @@
 import type { AssistantMessage } from "../shared/messages.ts";
 import type {
 	Approval,
+	Artifact,
 	Card,
 	Device,
 	Group,
@@ -31,7 +32,10 @@ export type GlobalEvent =
 	/** Paired phones changed, or the relay connection did. */
 	| { type: "devices"; devices: Device[] }
 	/** A scheduled task was added, changed, run or removed. */
-	| { type: "schedules"; schedules: Schedule[] };
+	| { type: "schedules"; schedules: Schedule[] }
+	/** A session saved an artifact or a new version of one. */
+	| { type: "artifact"; artifact: Artifact }
+	| { type: "artifactDeleted"; id: string };
 
 export type BusEvent =
 	| { scope: "session"; sessionId: string; seq: number; event: SessionEvent }

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Card, Letter, Session } from "../shared/types.ts";
+import { ArtifactStore } from "./artifacts.ts";
 import { invalid } from "./errors.ts";
 import { type ExportLanguage, sessionMarkdown } from "./export.ts";
 import { MailStore } from "./mail/store.ts";
@@ -18,6 +19,7 @@ export interface ExportCounts {
 	letters: number;
 	cards: number;
 	schedules: number;
+	artifacts: number;
 	files: number;
 }
 
@@ -48,7 +50,12 @@ function fileNameOf(name: string, taken: Set<string>): string {
 	return `${candidate}.md`;
 }
 
-export function exportAll(store: Store, folder: string, now = Date.now()): ExportCounts {
+export function exportAll(
+	store: Store,
+	folder: string,
+	now = Date.now(),
+	jigHome: string | null = null,
+): ExportCounts {
 	if (existsSync(folder) && readdirSync(folder).length > 0) {
 		throw invalid(`${folder} is not empty. Export into a new or empty folder.`, "folder");
 	}
@@ -103,7 +110,32 @@ export function exportAll(store: Store, folder: string, now = Date.now()): Expor
 	const schedules = new ScheduleBook(store).list();
 	write("schedules.json", json(schedules));
 	write("settings.json", json({ exportedAt: new Date(now).toISOString(), ...settings }));
+	// Artifacts: every version's file under the session's and the artifact's name, with a list.
+	let artifacts = 0;
+	if (jigHome) {
+		const kept = new ArtifactStore(store, jigHome);
+		const names = new Map(index.map((entry) => [entry.id, entry.file.replace(/\.md$/, "")]));
+		const used = new Set<string>();
+		for (const artifact of kept.list({ limit: 100_000 })) {
+			const dir = join(
+				"artifacts",
+				names.get(artifact.sessionId) ?? artifact.sessionId,
+				fileNameOf(artifact.name, used).replace(/\.md$/, ""),
+			);
+			mkdirSync(join(folder, dir), { recursive: true, mode: 0o700 });
+			const versions = kept.versions(artifact.id);
+			for (const { version } of versions) {
+				const extension = { markdown: "md", html: "html", json: "json", chart: "json" }[
+					artifact.kind
+				];
+				write(join(dir, `v${version}.${extension}`), kept.content(artifact.id, version).content);
+			}
+			write(join(dir, "artifact.json"), json({ ...artifact, versions }));
+			artifacts += 1;
+		}
+	}
 	return {
+		artifacts,
 		sessions: sessions.length,
 		letters: letters.length,
 		cards: cards.length,
