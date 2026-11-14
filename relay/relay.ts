@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { type RawData, type WebSocket, WebSocketServer } from "ws";
 import { CHALLENGE_PREFIX, desktopIdOf, OFFLINE } from "../src/remote/protocol.ts";
+import { MAX_PUSH_DATA, PUSH_TOKEN, type PushJob, type PushResult } from "../src/remote/push.ts";
 
 /**
  * Jig's relay (M3 plan, section 5): joins a phone's connection to the Mac it names and forwards their
@@ -11,7 +12,9 @@ import { CHALLENGE_PREFIX, desktopIdOf, OFFLINE } from "../src/remote/protocol.t
  *
  * Mac:   GET /desktop  → {type:"challenge", nonce} → {type:"hello", key, sig} → {type:"ready", desktop}
  *        then {type:"open"|"close", channel} as phones come and go, and binary frames
- *        [channel: uint32 big-endian][payload] both ways.
+ *        [channel: uint32 big-endian][payload] both ways. {type:"push", token, data, mode, id?} asks
+ *        for a notification to a phone; the relay hands the sealed data to Apple's push service and
+ *        answers {type:"pushResult", token, ok, gone, reason?}.
  * Phone: GET /phone/<desktop id> → binary frames with the payload only; closed with 4404 when the Mac
  *        is not connected.
  */
@@ -27,6 +30,10 @@ export interface RelayOptions {
 	frameRate?: number;
 	heartbeatMs?: number;
 	log?: (line: string) => void;
+	/** Hands a notification to the push service; without it the relay answers that push is not set up. */
+	push?: (job: PushJob) => Promise<PushResult>;
+	/** Notifications one Mac may ask for per minute, on average, with bursts up to that many. */
+	pushPerMinute?: number;
 }
 
 const TOO_MANY = 4429;
@@ -54,13 +61,25 @@ interface Desktop {
 	next: number;
 }
 
+/** Reads a push request; null when it is not one the relay passes on. */
+function pushJob(message: Record<string, unknown>): PushJob | null {
+	const { token, data, mode, id } = message;
+	if (typeof token !== "string" || !PUSH_TOKEN.test(token)) return null;
+	if (typeof data !== "string" || data.length > MAX_PUSH_DATA || !/^[A-Za-z0-9+/=]+$/.test(data)) {
+		return null;
+	}
+	if (mode !== "alert" && mode !== "background") return null;
+	if (id !== undefined && (typeof id !== "string" || !/^[\w-]{1,64}$/.test(id))) return null;
+	return { token, data, mode, ...(id ? { id } : {}) };
+}
+
 /** A token bucket per connection: refuses floods without slowing normal use. */
-function limiter(rate: number) {
-	let tokens = rate * 2;
+function limiter(rate: number, burst = rate * 2) {
+	let tokens = burst;
 	let last = Date.now();
 	return () => {
 		const now = Date.now();
-		tokens = Math.min(rate * 2, tokens + ((now - last) / 1000) * rate);
+		tokens = Math.min(burst, tokens + ((now - last) / 1000) * rate);
 		last = now;
 		if (tokens < 1) return false;
 		tokens -= 1;
@@ -69,7 +88,10 @@ function limiter(rate: number) {
 }
 
 export class Relay {
-	readonly #options: Required<Omit<RelayOptions, "host">> & { host: string };
+	readonly #options: Required<Omit<RelayOptions, "host" | "push">> & { host: string };
+	readonly #push: RelayOptions["push"];
+	/** Notifications handed on since the last count, for the health log: a number, no tokens. */
+	pushes = 0;
 	readonly #desktops = new Map<string, Desktop>();
 	readonly #http: Server;
 	readonly #wss: WebSocketServer;
@@ -84,7 +106,9 @@ export class Relay {
 			frameRate: options.frameRate ?? 200,
 			heartbeatMs: options.heartbeatMs ?? 30_000,
 			log: options.log ?? ((line) => process.stderr.write(`${line}\n`)),
+			pushPerMinute: options.pushPerMinute ?? 60,
 		};
+		this.#push = options.push;
 		this.#http = createServer((request, response) => {
 			if (request.url === "/health") {
 				response.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
@@ -139,6 +163,7 @@ export class Relay {
 		socket.send(JSON.stringify({ type: "challenge", nonce }));
 		let id: string | null = null;
 		const allowed = limiter(this.#options.frameRate);
+		const pushAllowed = limiter(this.#options.pushPerMinute / 60, this.#options.pushPerMinute);
 		socket.on("message", (data, binary) => {
 			if (!allowed()) {
 				socket.close(TOO_MANY, "too many frames");
@@ -176,6 +201,22 @@ export class Relay {
 			const message = parse(data, binary);
 			if (message?.type === "close" && typeof message.channel === "number") {
 				desktop.phones.get(message.channel)?.close(1000, "closed by the Mac");
+			} else if (message?.type === "push") {
+				const job = pushJob(message);
+				if (!job) return;
+				const answer = (result: PushResult) => {
+					if (socket.readyState === socket.OPEN) {
+						socket.send(JSON.stringify({ type: "pushResult", ...result }));
+					}
+				};
+				const refuse = (reason: string) =>
+					answer({ token: job.token, ok: false, gone: false, reason });
+				if (!this.#push) refuse("push is not set up on this relay");
+				else if (!pushAllowed()) refuse("too many notifications");
+				else {
+					this.pushes += 1;
+					void this.#push(job).then(answer, (error: Error) => refuse(error.message));
+				}
 			}
 		});
 		socket.on("close", () => {

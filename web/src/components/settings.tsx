@@ -13,6 +13,7 @@ import {
 	saveCustomProvider,
 	saveKey,
 	saveSettings,
+	setDevicePush,
 	setPhoneAccess,
 	spentToday,
 } from "../actions.ts";
@@ -672,12 +673,20 @@ function PhonesDialog({ onClose }: { onClose: () => void }) {
 					<SettingRow
 						key={device.id}
 						label={device.name}
-						hint={
+						hint={[
 							device.lastSeenAt
 								? t("lastConnected", { ago: formatAgo(device.lastSeenAt, now) })
-								: t("neverConnected")
-						}
+								: t("neverConnected"),
+							device.canPush ? null : t("phoneNoPush"),
+						]
+							.filter(Boolean)
+							.join(t("hintSeparator"))}
 					>
+						<Switch
+							label={t("phoneNotify")}
+							checked={device.push}
+							onChange={(push) => void setDevicePush(device.id, push)}
+						/>
 						<Button
 							variant="danger"
 							onClick={() => setRemoving({ id: device.id, name: device.name })}

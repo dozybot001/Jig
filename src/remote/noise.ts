@@ -58,7 +58,7 @@ function rawPrivate(key: KeyObject): Buffer {
 	return key.export({ format: "der", type: "pkcs8" }).subarray(PKCS8.length);
 }
 
-function dh(pair: KeyPair, publicKey: Buffer): Buffer {
+export function dh(pair: KeyPair, publicKey: Buffer): Buffer {
 	if (publicKey.length !== KEY_LENGTH) throw new NoiseError("A public key has the wrong length.");
 	const shared = diffieHellman({
 		privateKey: privateKeyObject(pair.privateKey),

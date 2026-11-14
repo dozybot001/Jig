@@ -5,6 +5,7 @@ import type { Store } from "../server/store.ts";
 import type { Device } from "../shared/types.ts";
 import { Connector } from "./connector.ts";
 import { createPairing, type Identity, loadIdentity } from "./identity.ts";
+import { MAX_PUSH_DATA, pushKey, sealPush } from "./push.ts";
 
 /** Where remote access stands, for the settings page and `jig remote status`. */
 export interface RemoteStatus {
@@ -32,6 +33,8 @@ export class RemoteAccess {
 	};
 	#identity: Identity | null = null;
 	#connector: Connector | null = null;
+	/** Each phone's notification key, by its public key. */
+	readonly #pushKeys = new Map<string, Buffer>();
 
 	constructor(
 		store: Store,
@@ -68,6 +71,11 @@ export class RemoteAccess {
 			desktopName: desktopName(),
 			version: this.#options.version,
 			handle: this.#options.handle,
+			onPushResult: (result) => {
+				// Apple no longer knows the token (the app was removed, or restored elsewhere): forget it.
+				if (result.gone) this.#store.dropPushToken(result.token);
+				else if (!result.ok) this.#options.log?.(`notifications: ${result.reason ?? "not sent"}`);
+			},
 			...(this.#options.log ? { log: this.#options.log } : {}),
 			...(this.#options.WebSocketImpl ? { WebSocketImpl: this.#options.WebSocketImpl } : {}),
 		});
@@ -91,6 +99,29 @@ export class RemoteAccess {
 			relay: relayUrl,
 			name: desktopName(),
 		});
+	}
+
+	/**
+	 * Sends one notification to every paired phone that takes them, each sealed with that phone's key.
+	 * Returns how many the relay was asked to deliver.
+	 */
+	push(note: object, mode: "alert" | "background", id?: string): number {
+		const connector = this.#connector;
+		const identity = this.#identity;
+		if (!connector?.connected || !identity) return 0;
+		const plaintext = Buffer.from(JSON.stringify(note));
+		let sent = 0;
+		for (const target of this.#store.pushTargets()) {
+			let key = this.#pushKeys.get(target.publicKey);
+			if (!key) {
+				key = pushKey(identity.noise, Buffer.from(target.publicKey, "base64url"));
+				this.#pushKeys.set(target.publicKey, key);
+			}
+			const data = sealPush(key, plaintext).toString("base64");
+			if (data.length > MAX_PUSH_DATA) continue;
+			if (connector.push({ token: target.token, data, mode, ...(id ? { id } : {}) })) sent += 1;
+		}
+		return sent;
 	}
 
 	/** A revoked device loses its open connections at once. */

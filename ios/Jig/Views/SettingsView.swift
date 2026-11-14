@@ -8,6 +8,7 @@ struct SettingsView: View {
 	@State private var confirming = false
 	@State private var leaving = false
 	@State private var path: [String] = []
+	@State private var notifications: PushCenter.State?
 
 	var body: some View {
 		NavigationStack(path: $path) {
@@ -20,6 +21,32 @@ struct SettingsView: View {
 						Text("This is sample data. Nothing you do here reaches a Mac.")
 					} else {
 						Text("Your iPhone and the Mac are encrypted end to end; the relay only passes ciphertext along.")
+					}
+				}
+				if !model.isDemo, let notifications {
+					Section {
+						LabeledContent("Notifications", value: notificationText(notifications))
+						switch notifications {
+						case .on:
+							EmptyView()
+						case .notAsked:
+							Button("Turn on notifications") {
+								Task {
+									await model.notifications()
+									self.notifications = await PushCenter.state()
+								}
+							}
+						case .off:
+							Button("Open iOS Settings") {
+								if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+									UIApplication.shared.open(url)
+								}
+							}
+						}
+					} footer: {
+						Text(
+							"Jig notifies this iPhone when something needs you (a permission, a question, a decision or a held letter), when a session stops with an error, and when a task finishes. What a notification says is encrypted for this iPhone; the relay and Apple cannot read it."
+						)
 					}
 				}
 				Section {
@@ -35,6 +62,7 @@ struct SettingsView: View {
 				}
 			}
 			.navigationDestination(for: String.self) { _ in AboutView() }
+			.task { notifications = await PushCenter.state() }
 			.navigationTitle("Settings")
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbar {
@@ -54,6 +82,14 @@ struct SettingsView: View {
 		#if DEBUG
 		.onAppear { if model.settingsAtLaunch == "about" { path = ["about"] } }
 		#endif
+	}
+}
+
+private func notificationText(_ state: PushCenter.State) -> String {
+	switch state {
+	case .on: String(localized: "On")
+	case .off: String(localized: "Off in iOS Settings")
+	case .notAsked: String(localized: "Not turned on")
 	}
 }
 

@@ -129,6 +129,15 @@ export function serveCommand(): Command {
 					return handle(request, device.id);
 				},
 			});
+			// Notifications to paired phones, sealed for each; the relay passes them to Apple's service.
+			const { Notifier } = await import("../server/push.ts");
+			const notifier = new Notifier({
+				store,
+				mail: agents.post.mail,
+				bus,
+				schedules: () => agents.schedules.list(),
+				send: (note, mode, id) => remote.push(note, mode, id),
+			});
 			// Scheduled tasks run from the service, whether or not a page is open (blueprint 6.5).
 			const scheduler = new Scheduler(store, agents.post, agents.schedules, log);
 			const app = createApp({
@@ -142,6 +151,7 @@ export function serveCommand(): Command {
 				build: shortCommit(),
 				remote,
 				scheduler,
+				onPresence: () => notifier.seen(),
 			});
 			handle = async (request, device) => app.fetch(request, { device });
 
@@ -166,6 +176,7 @@ export function serveCommand(): Command {
 			const sweep = setInterval(() => agents.wakeQueued(), LETTER_SWEEP_MS);
 			// Runs missed while Jig was not running are run or skipped now, as each task says.
 			scheduler.start();
+			notifier.start();
 			// Phone access follows the settings, which `jig remote` may change while Jig runs.
 			const syncRemote = () =>
 				void remote.sync().catch((error: Error) => log(`remote access: ${error.message}`));
@@ -186,6 +197,7 @@ export function serveCommand(): Command {
 					clearInterval(sweep);
 					clearInterval(remoteSweep);
 					scheduler.stop();
+					notifier.stop();
 					remote.stop();
 					agents.shutdown();
 					server.close();

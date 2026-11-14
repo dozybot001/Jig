@@ -471,12 +471,22 @@ export class Store {
 		});
 	}
 
-	/** The APNs token of a device that takes notifications, for the push step. */
-	pushTokenOf(id: string): string | null {
-		const row = this.#q("SELECT push_token, push FROM devices WHERE id = ?").get(id) as
-			| { push_token: string | null; push: number }
-			| undefined;
-		return row && row.push === 1 ? row.push_token : null;
+	/** Paired phones that take notifications and have given a token. */
+	pushTargets(): { id: string; publicKey: string; token: string }[] {
+		const rows = this.#q(
+			"SELECT id, public_key, push_token FROM devices WHERE push = 1 AND push_token IS NOT NULL",
+		).all() as { id: string; public_key: string; push_token: string }[];
+		return rows.map((row) => ({ id: row.id, publicKey: row.public_key, token: row.push_token }));
+	}
+
+	/** Forgets a token Apple no longer knows. */
+	dropPushToken(token: string): void {
+		this.tx(() => {
+			const changed = this.#q("UPDATE devices SET push_token = NULL WHERE push_token = ?").run(
+				token,
+			);
+			if (changed.changes > 0) this.#devicesChanged();
+		});
 	}
 
 	#device(id: string): Device {

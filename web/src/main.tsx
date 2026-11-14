@@ -8,6 +8,7 @@ import { SettingsDialogs } from "./components/settings.tsx";
 import { Sidebar, SidebarRail, useNarrow } from "./components/sidebar.tsx";
 import { Button } from "./components/ui.tsx";
 import { t, useLang } from "./i18n.ts";
+import { watchPresence } from "./presence.ts";
 import { centerCount, setState, useAppState } from "./state.ts";
 import "./styles/app.css";
 
@@ -103,4 +104,5 @@ if (root) {
 		</StrictMode>,
 	);
 	void boot();
+	watchPresence();
 }

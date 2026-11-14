@@ -102,6 +102,11 @@ struct JigClient: Sendable {
 		try await call("POST", path, body: JSONEncoder().encode(payload))
 	}
 
+	@discardableResult
+	func patch(_ path: String, _ payload: some Encodable & Sendable) async throws -> Data {
+		try await call("PATCH", path, body: JSONEncoder().encode(payload))
+	}
+
 	func delete(_ path: String) async throws {
 		_ = try await call("DELETE", path, body: nil)
 	}

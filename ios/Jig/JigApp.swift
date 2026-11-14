@@ -2,12 +2,14 @@ import SwiftUI
 
 @main
 struct JigApp: App {
+	@UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 	@State private var model = AppModel()
 
 	var body: some Scene {
 		WindowGroup {
 			RootView()
 				.environment(model)
+				.task { PushCenter.shared.model = model }
 		}
 	}
 }

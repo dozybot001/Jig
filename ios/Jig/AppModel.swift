@@ -35,9 +35,12 @@ final class AppModel {
 	/// The tab in front, and the session open in the sessions tab: where a screen can send the person.
 	var tab: Tab = .sessions
 	var sessionPath: [SessionSummary] = []
+	/// The session to open once the list has it: from a tapped notification, or `-JigSession <id>` in Debug.
+	private var sessionToOpen: String?
+	/// This phone's APNs token, and the one the Mac was last given.
+	private var apnsToken: String?
+	private var tokenOnMac: String?
 	#if DEBUG
-	/// `-JigSession <id>`: the session to open once the list has loaded.
-	private var openAtLaunch = UserDefaults.standard.string(forKey: "JigSession")
 	/// `-JigSettings YES` or `-JigSettings about`: what the settings sheet opens at.
 	let settingsAtLaunch = UserDefaults.standard.string(forKey: "JigSettings")
 	#endif
@@ -78,6 +81,7 @@ final class AppModel {
 		default: break
 		}
 		if settingsAtLaunch != nil { showingSettings = true }
+		sessionToOpen = UserDefaults.standard.string(forKey: "JigSession")
 		#endif
 	}
 
@@ -132,6 +136,7 @@ final class AppModel {
 			self.link = .online
 			problem = nil
 			await refreshAll()
+			await notifications()
 		} catch RelayError.macOffline {
 			problem = String(localized: "The Mac is not online. Keep Jig running on the Mac with phone access on, then scan again.")
 		} catch {
@@ -182,6 +187,8 @@ final class AppModel {
 		sessions = []
 		center = nil
 		letters = []
+		tokenOnMac = nil
+		sessionToOpen = nil
 		problem = nil
 		showingSettings = false
 		tab = .sessions
@@ -196,17 +203,66 @@ final class AppModel {
 
 	func refreshSessions() async {
 		await attempt { sessions = try await $0.get("/api/sessions?limit=200", as: Page<SessionSummary>.self).items }
-		#if DEBUG
-		if let id = openAtLaunch, let session = sessions.first(where: { $0.id == id }) {
-			openAtLaunch = nil
+		if let id = sessionToOpen, let session = sessions.first(where: { $0.id == id }) {
+			sessionToOpen = nil
+			showingSettings = false
 			tab = .sessions
 			sessionPath = [session]
 		}
-		#endif
 	}
 
 	func refreshCenter() async {
 		await attempt { center = try await $0.get("/api/center", as: Center.self) }
+		if paired, let center { await PushCenter.show(waiting: center.count) }
+	}
+
+	// MARK: Notifications (M3 plan, section 8)
+
+	/// Paired with a Mac through the relay: not the demo, and not Debug's direct connection.
+	private var paired: Bool { !isDemo && channel != nil }
+
+	/// Once paired: asks to send notifications the first time, and gives the Mac this phone's token.
+	func notifications() async {
+		guard paired else { return }
+		await PushCenter.turnOn()
+		await sendPushToken()
+	}
+
+	/// Apple gave this phone a token (again): the Mac gets it.
+	func pushToken(_ token: String) {
+		guard token != apnsToken else { return }
+		apnsToken = token
+		Task { await sendPushToken() }
+	}
+
+	private struct TokenPatch: Encodable, Sendable {
+		let pushToken: String
+	}
+
+	private func sendPushToken() async {
+		guard paired, let client, let token = apnsToken, let id = Vault.pairing?.deviceId else { return }
+		// Apple has two services: builds run from Xcode get tokens for the sandbox one.
+		#if DEBUG
+		let value = "sandbox:\(token)"
+		#else
+		let value = "production:\(token)"
+		#endif
+		guard value != tokenOnMac else { return }
+		// Quietly: a Mac that is offline now gets it the next time the phone connects.
+		if (try? await client.patch("/api/devices/\(id)", TokenPatch(pushToken: value))) != nil {
+			tokenOnMac = value
+		}
+	}
+
+	/// A notification was tapped: its session, or the approval center.
+	func open(session: String?) {
+		showingSettings = false
+		guard let session else {
+			tab = .approvals
+			return
+		}
+		sessionToOpen = session
+		Task { await refreshSessions() }
 	}
 
 	func refreshLetters() async {
@@ -301,6 +357,7 @@ final class AppModel {
 						link = .online
 						if reconnecting { await refreshAll() }
 						reconnecting = true
+						await notifications()
 					case "reset":
 						await refreshAll()
 					case "global":

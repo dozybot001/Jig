@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { renderSVG } from "uqr";
 import type { RemoteAccess } from "../../remote/access.ts";
+import { PUSH_TOKEN } from "../../remote/push.ts";
 import { conflict, invalid } from "../errors.ts";
 import type { Store } from "../store.ts";
 import { optBoolean, optNullableString, optString, readJson } from "./input.ts";
@@ -24,6 +25,9 @@ export function deviceRoutes(store: Store, remote: RemoteAccess | undefined): Ho
 		const pushToken = optNullableString(fields, "pushToken", 200);
 		if (pushToken !== undefined && c.env?.device !== id) {
 			throw invalid("Only the device itself can set its notification token.", "pushToken");
+		}
+		if (pushToken && !PUSH_TOKEN.test(pushToken)) {
+			throw invalid("The notification token is not one Apple gives out.", "pushToken");
 		}
 		return c.json(
 			store.updateDevice(id, {

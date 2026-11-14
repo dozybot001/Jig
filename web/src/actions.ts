@@ -795,6 +795,12 @@ export async function createPairing(): Promise<{ link: string; svg: string; expi
 	return api("POST", "/api/devices/pairing");
 }
 
+/** Whether Jig sends this phone notifications. */
+export async function setDevicePush(id: string, push: boolean): Promise<void> {
+	await api("PATCH", `/api/devices/${id}`, { push });
+	await loadPhones();
+}
+
 export async function revokeDevice(id: string): Promise<void> {
 	await api("DELETE", `/api/devices/${id}`);
 	await loadPhones();

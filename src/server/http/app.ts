@@ -44,6 +44,8 @@ export interface AppOptions {
 	remote?: RemoteAccess;
 	/** Scheduled tasks (M3 plan, section 9). */
 	scheduler?: Scheduler;
+	/** Told when Jig's page on the Mac is in front and in use, so notifications wait (section 8). */
+	onPresence?: () => void;
 }
 
 const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Jig</title>
@@ -83,6 +85,11 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 		}),
 	);
 	app.route("/api", deviceRoutes(store, options.remote));
+	// The page on the Mac says it is in front and in use; a phone's use does not count.
+	app.post("/api/presence", (c) => {
+		if (!c.env?.device) options.onPresence?.();
+		return c.body(null, 204);
+	});
 	if (gateway) app.route("/api", providerRoutes(store, gateway));
 	if (agents) app.route("/api", agentRoutes(store, agents, log));
 	// The runner's post office, so a released letter or a decision wakes its recipient.

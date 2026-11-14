@@ -3,6 +3,7 @@ import type { Device } from "../shared/types.ts";
 import { consumePairing, type Identity, signChallenge } from "./identity.ts";
 import { Opener, Responder, type Session, seal } from "./noise.ts";
 import { type ChannelMessage, type Hello, prologueFor, type Welcome } from "./protocol.ts";
+import type { PushJob, PushResult } from "./push.ts";
 
 /**
  * The Mac's side of remote access (M3 plan, section 6): keeps a connection to the relay, answers each
@@ -23,6 +24,8 @@ export interface ConnectorOptions {
 	WebSocketImpl?: typeof WebSocket;
 	/** Longest wait between reconnects. */
 	maxRetryMs?: number;
+	/** The relay's answer to a notification it was asked to send. */
+	onPushResult?: (result: PushResult) => void;
 }
 
 const FIRST_RETRY_MS = 1000;
@@ -92,7 +95,7 @@ export class Connector {
 	}
 
 	#control(text: string): void {
-		let message: { type?: string; nonce?: string; channel?: number };
+		let message: { type?: string; nonce?: string; channel?: number } & Partial<PushResult>;
 		try {
 			message = JSON.parse(text);
 		} catch {
@@ -116,7 +119,21 @@ export class Connector {
 		} else if (message.type === "close" && typeof message.channel === "number") {
 			this.#channels.get(message.channel)?.end();
 			this.#channels.delete(message.channel);
+		} else if (message.type === "pushResult" && typeof message.token === "string") {
+			this.#options.onPushResult?.({
+				token: message.token,
+				ok: message.ok === true,
+				gone: message.gone === true,
+				...(typeof message.reason === "string" ? { reason: message.reason } : {}),
+			});
 		}
+	}
+
+	/** Asks the relay to notify a phone; false when the relay is not connected. */
+	push(job: PushJob): boolean {
+		if (!this.connected || !this.#socket) return false;
+		this.#socket.send(JSON.stringify({ type: "push", ...job }));
+		return true;
 	}
 
 	#frame(frame: Buffer): void {
