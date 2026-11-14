@@ -27,6 +27,7 @@ object Icons {
     val Sessions = icon("sessions", "M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-8l-4 3.5V17a2 2 0 0 1-2-2Z")
     val Approvals = icon("approvals", CIRCLE, "M8 12.5l2.8 2.8L16 9.5")
     val Letters = icon("letters", "M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z", "M3.5 7.5L12 13l8.5-5.5")
+    val Artifacts = icon("artifacts", "M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z", "M14 3v4h4", "M9 12h6", "M9 16h6")
     val Settings = icon(
         "settings", "M12 9a3 3 0 1 0 0 6a3 3 0 0 0 0-6Z", "M12 5.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 0 0 0-13Z",
         "M18.5 12H21", "M16.6 16.6l1.76 1.76", "M12 18.5V21", "M7.4 16.6l-1.76 1.76", "M5.5 12H3",

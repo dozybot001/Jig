@@ -6,6 +6,7 @@
     <string name="tab_sessions">会话</string>
     <string name="tab_approvals">审批</string>
     <string name="tab_letters">信件</string>
+    <string name="tab_artifacts">产物</string>
     <string name="settings">设置</string>
     <string name="about">关于 Jig</string>
     <string name="back">返回</string>
@@ -109,6 +110,14 @@
     <string name="sender_cli">命令行</string>
     <string name="sender_schedule">定时任务「%s」</string>
 
+    <string name="artifacts_empty">还没有产物</string>
+    <string name="artifact_page">页面</string>
+    <string name="artifact_data">数据</string>
+    <string name="artifact_chart">图表</string>
+    <string name="artifact_document">文档</string>
+    <string name="artifact_version">第 %d 版</string>
+    <string name="artifact_unreadable">这个产物显示不出来</string>
+
     <string name="banner_demo">示例数据，不会发到电脑。</string>
     <string name="banner_offline">电脑不在线。请让电脑上的 Jig 保持运行，并打开手机访问。</string>
     <string name="banner_refused">电脑已经不认这台手机，重新配对后才能继续用。</string>
@@ -206,6 +215,9 @@
     <string name="demo_card_monday_detail">所有修复一起发布。</string>
     <string name="demo_letter_held">请把发布日期写进更新记录。</string>
     <string name="demo_letter_report">两个配色方案都做好了，等你挑选。</string>
+    <string name="demo_report_title">本周周报</string>
+    <string name="demo_chart_title">每天合并的改动</string>
+    <string name="demo_report_text">**本周**\n\n- 结账页一秒内打开。\n- 首页的两套配色已起草。\n- 周报现在每周五自动写好。</string>
     <string name="demo_pushed">已推送到 origin/main。</string>
     <string name="demo_not_pushed">没有推送。</string>
     <string name="demo_reply">这是演示，消息没有发给真实的会话。</string>

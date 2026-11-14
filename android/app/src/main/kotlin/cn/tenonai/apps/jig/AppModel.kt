@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cn.tenonai.apps.jig.api.ApprovalItem
+import cn.tenonai.apps.jig.api.ArtifactItem
 import cn.tenonai.apps.jig.api.CardItem
 import cn.tenonai.apps.jig.api.Center
 import cn.tenonai.apps.jig.api.DemoTransport
@@ -59,7 +60,7 @@ enum class Link {
     Unreachable,
 }
 
-enum class Tab { Sessions, Approvals, Letters }
+enum class Tab { Sessions, Approvals, Letters, Artifacts }
 
 /** A screen opened over the tabs (or over the first screen); Back closes the last one. */
 sealed interface Page {
@@ -67,6 +68,7 @@ sealed interface Page {
     class Question(val approval: ApprovalItem) : Page
     class Decision(val card: CardItem) : Page
     class Letter(val letter: LetterItem) : Page
+    data class Artifact(val artifact: ArtifactItem) : Page
     data object Settings : Page
     data object About : Page
     data class Policy(val privacy: Boolean) : Page
@@ -94,6 +96,8 @@ class AppModel(private val context: Context) {
     var center by mutableStateOf<Center?>(null)
         private set
     var letters by mutableStateOf(listOf<LetterItem>())
+        private set
+    var artifacts by mutableStateOf(listOf<ArtifactItem>())
         private set
     /** The computer this phone is paired with, as the computer names itself. */
     var desktopName by mutableStateOf<String?>(null)
@@ -253,6 +257,7 @@ class AppModel(private val context: Context) {
         sessions = emptyList()
         center = null
         letters = emptyList()
+        artifacts = emptyList()
         sessionToOpen = null
         problem = null
         tab = Tab.Sessions
@@ -282,6 +287,18 @@ class AppModel(private val context: Context) {
         refreshSessions()
         refreshCenter()
         refreshLetters()
+        refreshArtifacts()
+    }
+
+    suspend fun refreshArtifacts() {
+        attempt { artifacts = it.get("/api/artifacts?limit=200").objects("items").mapNotNull(ArtifactItem::from) }
+    }
+
+    /** The text of an artifact's latest version, as the session saved it. */
+    suspend fun artifactText(artifact: ArtifactItem): String? {
+        var result: String? = null
+        attempt { result = it.text("/api/artifacts/${artifact.id}/versions/${artifact.version}") }
+        return result
     }
 
     suspend fun refreshSessions() {
@@ -419,6 +436,7 @@ class AppModel(private val context: Context) {
                 refreshCenter()
                 refreshLetters()
             }
+            "artifact", "artifactDeleted" -> refreshArtifacts()
         }
     }
 

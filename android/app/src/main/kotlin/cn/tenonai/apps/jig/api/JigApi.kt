@@ -249,6 +249,40 @@ class LetterItem(
     }
 }
 
+/** Something a session saved for the person to look at (src/shared/types.ts). */
+data class ArtifactItem(val id: String, val sessionId: String, val name: String, val kind: String, val version: Int) {
+    companion object {
+        fun from(json: JsonObject): ArtifactItem? {
+            return ArtifactItem(
+                id = json.str("id") ?: return null,
+                sessionId = json.str("sessionId").orEmpty(),
+                name = json.str("name").orEmpty(),
+                kind = json.str("kind").orEmpty(),
+                version = json.int("version") ?: 1,
+            )
+        }
+    }
+}
+
+/** A chart artifact's data: bars or lines over labels (src/server/artifacts.ts). */
+class ChartData(val line: Boolean, val title: String?, val labels: List<String>, val series: List<Pair<String, List<Double>>>) {
+    companion object {
+        fun from(json: JsonObject): ChartData? {
+            val series = json.objects("series").map { one ->
+                one.str("name").orEmpty() to one.list("values").mapNotNull { (it as? JsonPrimitive)?.doubleOrNull }
+            }
+            if (series.isEmpty() || series.all { it.second.isEmpty() }) return null
+            return ChartData(
+                line = json.str("type") == "line",
+                title = json.str("title"),
+                // A label is text or a number.
+                labels = json.list("labels").map { (it as? JsonPrimitive)?.content.orEmpty() },
+                series = series,
+            )
+        }
+    }
+}
+
 /** What the approval center waits on: permission requests and questions, decision cards, held letters. */
 class Center(val approvals: List<ApprovalItem>, val cards: List<CardItem>, val held: List<LetterItem>) {
     val count: Int get() = approvals.size + cards.size + held.size

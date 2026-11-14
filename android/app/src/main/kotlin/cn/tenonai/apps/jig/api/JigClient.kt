@@ -81,6 +81,9 @@ class JigClient(val transport: Transport) {
 
     suspend fun get(path: String): JsonObject = parse(call("GET", path, null))
 
+    /** An answer that is plain text, such as one version of an artifact. */
+    suspend fun text(path: String): String = call("GET", path, null)
+
     suspend fun post(path: String, payload: JsonElement = JsonObject(emptyMap())): String =
         call("POST", path, payload.toString())
 

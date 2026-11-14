@@ -40,12 +40,13 @@ class MainActivity : ComponentActivity() {
         intent.removeExtra(OPEN)
         if (BuildConfig.DEBUG) {
             // Debug builds only, for emulator runs: `--es jig.pair <jig://pair?…>` pairs as scanning
-            // would, `--ez jig.demo true` opens the demo, `--es jig.tab approvals|letters` picks a tab.
+            // would, `--ez jig.demo true` opens the demo, `--es jig.tab approvals|letters|artifacts` picks a tab.
             intent.getStringExtra("jig.pair")?.let(model::startPairing)
             if (intent.getBooleanExtra("jig.demo", false)) model.startDemo()
             when (intent.getStringExtra("jig.tab")) {
                 "approvals" -> model.tab = Tab.Approvals
                 "letters" -> model.tab = Tab.Letters
+                "artifacts" -> model.tab = Tab.Artifacts
             }
             for (extra in listOf("jig.pair", "jig.demo", "jig.tab")) intent.removeExtra(extra)
         }

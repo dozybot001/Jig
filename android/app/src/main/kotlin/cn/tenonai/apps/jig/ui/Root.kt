@@ -64,6 +64,7 @@ fun Root(model: AppModel) {
                 is Page.Question -> QuestionScreen(model, page.approval, close)
                 is Page.Decision -> DecisionScreen(model, page.card, close)
                 is Page.Letter -> LetterScreen(model, page.letter, close)
+                is Page.Artifact -> ArtifactScreen(model, page.artifact, close)
                 Page.Settings -> SettingsScreen(model, close)
                 Page.About -> AboutScreen(model, close)
                 is Page.Policy -> PolicyScreen(page.privacy, close)
@@ -89,6 +90,7 @@ private fun Tabs(model: AppModel) {
         Tab.Sessions -> R.string.tab_sessions
         Tab.Approvals -> R.string.tab_approvals
         Tab.Letters -> R.string.tab_letters
+        Tab.Artifacts -> R.string.tab_artifacts
     }
     Screen(
         title = stringResource(title),
@@ -106,6 +108,7 @@ private fun Tabs(model: AppModel) {
                         Triple(Tab.Sessions, Icons.Sessions, R.string.tab_sessions),
                         Triple(Tab.Approvals, Icons.Approvals, R.string.tab_approvals),
                         Triple(Tab.Letters, Icons.Letters, R.string.tab_letters),
+                        Triple(Tab.Artifacts, Icons.Artifacts, R.string.tab_artifacts),
                     )) {
                         NavigationBarItem(
                             selected = model.tab == tab,
@@ -135,6 +138,7 @@ private fun Tabs(model: AppModel) {
                 Tab.Sessions -> SessionsList(model)
                 Tab.Approvals -> CenterList(model)
                 Tab.Letters -> LettersList(model)
+                Tab.Artifacts -> ArtifactsList(model)
             }
         }
     }

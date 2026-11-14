@@ -1,6 +1,6 @@
 # Jig 安卓版
 
-状态（2026-11-15）：功能写完，能构建，单元测试通过，在 Android 17 和 Android 8.0 两台模拟器上走查过（第 6 节）。还没做：真机、扫码的实测、签名密钥、发布。安卓版不卡 v1 的验收（蓝图第十三节）。
+状态（2026-11-15）：功能写完（含 1.0.0 加的「产物」入口），能构建，单元测试通过，在 Android 17 和 Android 8.0 两台模拟器上走查过（第 6 节）。还没做：真机、扫码的实测、签名密钥、发布。安卓版不卡 v1 的验收（蓝图第十三节）。
 
 由「Jig 安卓 · 开发」会话负责，只动 `android/` 和本文件；电脑端、中继和协议归 Jig 的主开发会话。
 
@@ -9,7 +9,7 @@
 功能和 iPhone 应用一样（M3 计划第七节），只做离开电脑时要你做的事：
 
 - 未配对时：说明、扫电脑上的二维码配对、粘贴配对链接、「看演示」（内置演示数据，不连电脑）。
-- 底部三个入口：会话（列表、会话记录、回复、停下）、审批（授权、提问、决定卡、待放行的信）、信件。
+- 底部四个入口：会话（列表、会话记录、回复、停下）、审批（授权、提问、决定卡、待放行的信）、信件、产物（文档、数据、图表、页面，看最新一版）。
 - 右上角设置：配对的电脑和连接状态、通知、后台运行、断开配对、关于（版本和构建号、出品方、官网、隐私政策、用户协议、反馈）。
 - 通知：有事要你处理、会话出错、任务做完时通知，点开进对应的会话或审批；电脑上处理掉的，通知跟着撤下。
 - 中英双语（跟随系统，Android 13 起可以在系统设置里单独给 Jig 选语言），深浅色跟随系统。
@@ -30,7 +30,7 @@
 | `data/Vault.kt` | 手机私钥和配对信息的存放 |
 | `notify/` | 通知的文字和显示（`Notifier.kt`）、保持连接的前台服务和开机后恢复（`LinkService.kt`） |
 | `AppModel.kt` | 应用的状态和操作，界面和前台服务共用一份 |
-| `ui/` | 界面。图标是自己画的线条图标，不带图标库 |
+| `ui/` | 界面。图标是自己画的线条图标，不带图标库；图表也是自己画的 |
 
 `android/scripts/`（都在仓库根目录用 Node 运行）：
 
@@ -38,9 +38,10 @@
 | --- | --- |
 | `noise-vectors.ts` | 用电脑端的 `src/remote/noise.ts` 和固定的测试密钥生成 `app/src/test/resources/noise-vectors.json` |
 | `sync-policy.ts` | 从 `src/shared/policy.ts` 生成两种语言的 `res/values*/policy.xml`。隐私政策改了以后跑一次，不跑的话 `PolicyTest` 会失败 |
-| `test-computer.ts` | 一台测试用的电脑：本机中继加内存里的 Jig 接口和通知，不碰 `~/.jig` 和系统钥匙串。用法见文件开头 |
+| `test-computer.ts` | 一台测试用的电脑：本机中继加内存里的 Jig 接口、四个产物和通知，不碰 `~/.jig` 和系统钥匙串。用法见文件开头 |
+| `dependencies.ts` | 从锁文件和 Gradle 缓存里的 POM 生成 `android/DEPENDENCIES.md`：进安装包的每个库的名称、版本和许可证 |
 
-依赖（都来自 Google Maven 和 Maven Central，版本锁在 `app/gradle.lockfile`）：Compose 和 AndroidX、CameraX（扫码的相机）、ZXing core（识别二维码）、OkHttp（到中继的 WebSocket）、Bouncy Castle（X25519 和 ChaCha20-Poly1305：系统自带的要到 API 31 和 28 才有）、kotlinx.coroutines、kotlinx.serialization-json。没有统计、崩溃上报、推送和 Google 服务的库。
+依赖（都来自 Google Maven 和 Maven Central，版本锁在 `app/gradle.lockfile`）：Compose 和 AndroidX、CameraX（扫码的相机）、ZXing core（识别二维码）、OkHttp（到中继的 WebSocket）、Bouncy Castle（X25519 和 ChaCha20-Poly1305：系统自带的要到 API 31 和 28 才有）、kotlinx.coroutines、kotlinx.serialization-json。没有统计、崩溃上报、推送和 Google 服务的库。全部 145 个库（多数是 AndroidX 和 Kotlin 的传递依赖）列在 [android/DEPENDENCIES.md](../android/DEPENDENCIES.md)：143 个 Apache-2.0，1 个 MIT（checker-qual），1 个 Bouncy Castle 许可证（MIT 式）；发安装包之前由法务组核。
 
 ## 3. 构建和运行
 
@@ -55,7 +56,7 @@
 
 升级依赖：改 `gradle/libs.versions.toml`，跑 `./gradlew --write-locks :app:assembleDebug :app:assembleRelease :app:testDebugUnitTest :app:lintDebug`，把锁文件的改动一起提交。
 
-调试版才有的启动参数（模拟器上用，正式构建里没有）：`--es jig.pair '<配对链接>'` 像扫码一样配对，`--ez jig.demo true` 打开演示，`--es jig.tab approvals|letters` 选入口。调试版允许连本网络里 `ws://` 的测试中继，正式构建只连 `wss://`。
+调试版才有的启动参数（模拟器上用，正式构建里没有）：`--es jig.pair '<配对链接>'` 像扫码一样配对，`--ez jig.demo true` 打开演示，`--es jig.tab approvals|letters|artifacts` 选入口。调试版允许连本网络里 `ws://` 的测试中继，正式构建只连 `wss://`。
 
 连本机的测试电脑：
 
@@ -88,7 +89,12 @@ echo settle > /tmp/jig-android/cmd                          # 电脑端处理掉
 - 开机后和应用更新后，服务自己恢复，不用打开应用。
 - 收不到通知的情况，设置页上照实写了：系统为了省电停掉 Jig，或者在最近任务里划掉它（部分手机）时，通知收不到，再打开 Jig 后恢复。设置页显示 Jig 是否受电池优化限制，有按钮调出系统的「不受电池优化限制」对话框；国产系统上还要在系统设置里允许自启动和后台运行，这一步应用代办不了，写了提示。
 
-### 4.3 权限
+### 4.3 产物
+
+- 列表读 `GET /api/artifacts`，内容读 `GET /api/artifacts/:id/versions/:n`（纯文本），只看最新一版。文档按行内 Markdown 显示，数据排版成缩进的 JSON，图表（柱状或折线）自己画，黑白灰，系列之间用深浅区分。
+- HTML 产物放在封闭的网页视图里（蓝图 6.6 第 19 条）：没有自己的地址，不加载网络和文件，页面发出的每个请求都得到空的回应，链接点了不跳转，页面里另加一条内容安全策略；不开本地存储。页面自己的脚本能跑，但碰不到 Jig、电脑和网络。
+
+### 4.4 权限
 
 合并后的清单里只有这些（`aapt2 dump badging` 核对过）：`INTERNET`、`ACCESS_NETWORK_STATE`、`CAMERA`（只在扫码时用，没有相机的手机可以粘贴链接）、`POST_NOTIFICATIONS`、`FOREGROUND_SERVICE`、`FOREGROUND_SERVICE_REMOTE_MESSAGING`、`RECEIVE_BOOT_COMPLETED`、`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`，以及 `androidx.core` 给应用自己声明的 `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`。
 
@@ -101,7 +107,7 @@ echo settle > /tmp/jig-android/cmd                          # 电脑端处理掉
 | 称呼 | Mac、iPhone | 电脑、手机（Jig 也能跑在 Linux 上） |
 | 配对说明 | 「添加 iPhone」 | 电脑端的按钮现在叫「添加 iPhone」，说明里照实写了这个名字，加了一句安卓也用它 |
 | 调试版的直连本机 | 有（粘贴 `jig open` 的链接） | 没有，用 `test-computer.ts` 的本机中继 |
-| 隐私政策和用户协议 | 同一份文字 | 同一份文字（`src/shared/policy.ts`）。里面写的还是 iPhone、iOS 钥匙串和 Apple 的推送，没有安卓的内容 |
+| 隐私政策和用户协议 | 同一份文字 | 同一份文字（`src/shared/policy.ts`，现在是 2.0）。里面写的还是 iPhone、iOS 钥匙串和 Apple 的推送，没有安卓的内容 |
 | 密钥存放 | iOS 钥匙串，应用和通知扩展共用 | Keystore 加密的文件，见 4.1 |
 
 ## 6. 验证记录
@@ -118,8 +124,8 @@ echo settle > /tmp/jig-android/cmd                          # 电脑端处理掉
 
 ### 6.2 构建产物
 
-- 调试包 19.9 MB；正式构建（R8，未签名）2.4 MB。lint 没有问题。
-- `aapt2 dump badging`（正式构建）：包名 `cn.tenonai.apps.jig`，版本 0.3.0（300），目标 API 37，语言是英文和简体中文，不可调试，权限如 4.3。
+- 调试包 19.9 MB；正式构建（R8，未签名）2.4 MB。lint 没有问题。构建产物不留：验证完跑 `./gradlew clean`。
+- `aapt2 dump badging`（正式构建）：包名 `cn.tenonai.apps.jig`，版本 1.0.0（10000），目标 API 37，语言是英文和简体中文，不可调试，权限如 4.4。
 
 ### 6.3 模拟器走查
 
@@ -139,6 +145,7 @@ Android 17（API 37），调试包，连 `test-computer.ts`：
 | 断开配对（电脑连不上时） | 确认后约 5 秒回到首页，配对和私钥已删 |
 | 电脑端主动断开通道后 | 手机自己重连，之后的通知照常收到，没有重复 |
 | 接口拒绝请求 | 弹出「没有办成」和电脑端给的原因 |
+| 产物：文档、数据、折线图、页面各一个 | 都显示出来。页面里的脚本去取外网地址，结果是取不到；外网图片不加载 |
 
 Android 8.0（API 26）：调试包的演示、配对、会话列表、后台收通知都通过。正式构建用调试密钥签了装上：能启动，演示能走；粘贴 `ws://` 的配对链接按预期配对不成（正式构建只连 `wss://`），生成密钥和握手的第一条消息都跑过，没有崩溃。
 
@@ -150,6 +157,7 @@ Android 8.0（API 26）：调试包的演示、配对、会话列表、后台收
 - 离开超过 10 分钟后重连时的汇总通知：模拟器上没能造出这种情况，只验证了短暂断线后不重复通知。
 - 开机后服务自己恢复、Doze 下的表现、长时间挂着的耗电。
 - 读屏（TalkBack）和大字体下的逐页检查。
+- 产物在 Android 8.0 上没看（只在 Android 17 上看过）；旧版本系统自带的网页视图对内容安全策略的支持没核对，联网是靠网页视图自己的设置挡住的。
 - 依赖文件的校验值（`gradle/verification-metadata.xml`）还没生成，现在只锁了版本。
 
 ## 7. 签名和发布

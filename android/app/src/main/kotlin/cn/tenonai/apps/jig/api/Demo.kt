@@ -45,6 +45,8 @@ private class DemoServer(private val text: (Int) -> String) {
     private val approvals = mutableListOf<JsonObject>()
     private val cards = mutableListOf<JsonObject>()
     private val letters = mutableListOf<JsonObject>()
+    private val artifacts = mutableListOf<JsonObject>()
+    private val artifactTexts = mutableMapOf<String, String>()
 
     private fun ago(minutes: Int): Double = (System.currentTimeMillis() - minutes * 60_000L).toDouble()
 
@@ -160,6 +162,26 @@ private class DemoServer(private val text: (Int) -> String) {
         letters += letter("l3", design, "main", "report", "delivered", text(R.string.demo_letter_report), 10)
         letters += letter("l2", main, "design", "request", "delivered", text(R.string.demo_design_request), 15)
         letters += letter("l1", main, "report", "request", "delivered", text(R.string.demo_report_request), 6)
+        val chartTitle = text(R.string.demo_chart_title)
+        artifacts += buildJsonObject {
+            put("id", "a1"); put("sessionId", "report"); put("name", text(R.string.demo_report_title))
+            put("kind", "markdown"); put("version", 2); put("updatedAt", ago(5))
+        }
+        artifacts += buildJsonObject {
+            put("id", "a2"); put("sessionId", "report"); put("name", chartTitle)
+            put("kind", "chart"); put("version", 1); put("updatedAt", ago(10))
+        }
+        artifactTexts["a1"] = text(R.string.demo_report_text)
+        artifactTexts["a2"] = buildJsonObject {
+            put("type", "bar"); put("title", chartTitle)
+            putJsonArray("labels") { for (day in 1..5) add(JsonPrimitive("$day")) }
+            putJsonArray("series") {
+                add(buildJsonObject {
+                    put("name", store)
+                    putJsonArray("values") { for (n in listOf(3, 5, 2, 6, 4)) add(JsonPrimitive(n)) }
+                })
+            }
+        }.toString()
     }
 
     fun handle(method: String, path: String, body: String?): Pair<String, Int> {
@@ -181,6 +203,9 @@ private class DemoServer(private val text: (Int) -> String) {
                 put("held", JsonArray(letters.filter { it.str("status") == "held" }))
             })
             method == "GET" && parts.size == 2 && at(1) == "letters" -> page(letters)
+            method == "GET" && parts.size == 2 && at(1) == "artifacts" -> page(artifacts)
+            method == "GET" && parts.size == 5 && at(1) == "artifacts" && at(3) == "versions" ->
+                artifactTexts[at(2)]?.let { it to 200 } ?: missing()
             method == "POST" && parts.size == 3 && at(1) == "approvals" -> {
                 val approval = approvals.find { it.str("id") == at(2) } ?: return missing()
                 approvals.remove(approval)
