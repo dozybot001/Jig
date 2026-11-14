@@ -25,6 +25,8 @@ export interface Settings {
 	remote: { enabled: boolean; relayUrl: string };
 	/** The most all sessions together may spend in a day, in US dollars. */
 	dailyBudget: number | null;
+	/** Folders of notes sessions may read, such as ~/memory. */
+	memoryDirs: string[];
 }
 
 /** Paired phones and the relay connection, for the phone access dialog. */

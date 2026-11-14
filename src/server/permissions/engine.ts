@@ -60,6 +60,8 @@ function strongest(effects: RuleEffect[]): RuleEffect | null {
  */
 export class PermissionEngine {
 	readonly #secrets: string[];
+	/** Folders outside the working folder that may be read without asking: memory and skill folders. */
+	readRoots: () => string[] = () => [];
 
 	constructor(jigHome: string) {
 		this.#secrets = secretLocations(jigHome);
@@ -147,8 +149,12 @@ export class PermissionEngine {
 		}
 
 		if (effects.includes("ask")) return this.#ask(subject.tool, subject.summary);
+		const roots = this.readRoots();
 		const needed = subject.paths.filter(
-			(path, index) => effects[index] !== "allow" && (!cwd || !isInside(path, cwd)),
+			(path, index) =>
+				effects[index] !== "allow" &&
+				(!cwd || !isInside(path, cwd)) &&
+				!roots.some((root) => isInside(path, root)),
 		);
 		if (needed.length === 0) return { effect: "allow" };
 		// Remember the folder: allowing ~/memory/a.md once usually means the person trusts ~/memory.

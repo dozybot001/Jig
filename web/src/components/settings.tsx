@@ -282,9 +282,20 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 			.catch(() => {});
 	}, []);
 	const budgetId = useId();
+	const savedMemory = (settings?.memoryDirs ?? []).join("\n");
+	const [memory, setMemory] = useState(savedMemory);
+	const memoryId = useId();
 	const save = useAction(async () => {
 		await saveSettings({
 			...(model ? { defaultModel: model } : {}),
+			...(memory !== savedMemory
+				? {
+						memoryDirs: memory
+							.split("\n")
+							.map((line) => line.trim())
+							.filter(Boolean),
+					}
+				: {}),
 			decisionLog: log.trim() || null,
 			...(budget !== savedBudget ? { dailyBudget: Number(budget) || null } : {}),
 		});
@@ -293,7 +304,8 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 	const dirty =
 		JSON.stringify(model) !== JSON.stringify(settings?.defaultModel) ||
 		log.trim() !== (settings?.decisionLog ?? "") ||
-		budget !== savedBudget;
+		budget !== savedBudget ||
+		memory !== savedMemory;
 	return (
 		<Dialog
 			title={t("defaultsTitle")}
@@ -335,6 +347,17 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 					placeholder={t("decisionLogPlaceholder")}
 					value={log}
 					onChange={(event) => setLog(event.target.value)}
+				/>
+			</Field>
+			<Field label={t("memoryDirs")} htmlFor={memoryId} info={t("memoryDirsHelp")}>
+				<textarea
+					id={memoryId}
+					className="textarea"
+					spellCheck={false}
+					rows={2}
+					placeholder={t("memoryDirsPlaceholder")}
+					value={memory}
+					onChange={(event) => setMemory(event.target.value)}
 				/>
 			</Field>
 			<Field label={t("dailyBudgetAll")} htmlFor={budgetId} info={t("dailyBudgetAllHelp")}>

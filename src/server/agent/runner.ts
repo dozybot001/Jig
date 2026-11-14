@@ -42,6 +42,7 @@ import { resolveWorkingFolder } from "../paths.ts";
 import type { PermissionEngine } from "../permissions/engine.ts";
 import { isInside } from "../permissions/paths.ts";
 import { ScheduleBook } from "../schedules.ts";
+import { skillFolders } from "../skills.ts";
 import { type Store, validateSessionName } from "../store.ts";
 import { Jobs } from "../tools/jobs.ts";
 import { settleAnswer } from "../tools/misc.ts";
@@ -66,6 +67,7 @@ import {
 } from "./context.ts";
 import {
 	type ContextSnapshot,
+	type InstructionExtras,
 	loadInstructions,
 	MAIN_ROLE,
 	NAMING_PROMPT,
@@ -167,6 +169,8 @@ export interface AgentsOptions {
 	waitMs?: number;
 	/** Scheduled tasks; one is made when not given. */
 	schedules?: ScheduleBook;
+	/** The person's home folder, for `~/.claude` skills and instructions; absent, they are not read. */
+	userHome?: string | null;
 }
 
 const KEEP_RECENT_TOKENS = 20_000;
@@ -267,6 +271,7 @@ export class Agents {
 	 */
 	readonly #turns = new Map<string, Turn>();
 	/** Sessions the person stopped: letters wait until the person writes to them or continues them. */
+	readonly #userHome: string | null;
 	readonly #paused = new Set<string>();
 	/** Sessions that stopped at a daily spending limit, with the day: raising the limit that day continues them. */
 	readonly #capped = new Map<string, string>();
@@ -297,6 +302,12 @@ export class Agents {
 		this.post = options.post ?? new PostOffice(options.store, this.#log);
 		this.schedules = options.schedules ?? new ScheduleBook(options.store);
 		this.#waitMs = options.waitMs ?? WAIT_MS;
+		this.#userHome = options.userHome ?? null;
+		// Memory folders and the person's skill folders are read without asking, like the working folder.
+		this.#permissions.readRoots = () => [
+			...this.#store.getSetting<string[]>("memoryDirs", []),
+			...skillFolders(null, this.#home, this.#userHome),
+		];
 		this.post.setHooks({ queued: (letter) => this.#onQueued(letter) });
 		this.#manager = new Manager({
 			store: this.#store,
@@ -503,6 +514,14 @@ export class Agents {
 				this.#finishCall(call, failure(text), "error", Date.now());
 			}
 		});
+	}
+
+	/** Memory folders from the settings, and where the person's own skills and instructions are. */
+	#extras(): InstructionExtras {
+		return {
+			memoryDirs: this.#store.getSetting<string[]>("memoryDirs", []),
+			userHome: this.#userHome,
+		};
 	}
 
 	#requireModel(session: Session): ModelInfo {
@@ -1668,13 +1687,13 @@ export class Agents {
 		const placement = this.#placement(session);
 		const saved = this.#store.getContextSnapshot<ContextSnapshot>(session.id);
 		if (!saved) {
-			const snapshot = takeSnapshot(session, this.#home, placement);
+			const snapshot = takeSnapshot(session, this.#home, placement, this.#extras());
 			this.#store.setContextSnapshot(session.id, snapshot);
 			return snapshot;
 		}
 		// A session switched between chat and code gets a fresh environment: folder, git status and files.
 		if (saved.cwd !== session.cwd) {
-			const snapshot = takeSnapshot(session, this.#home, placement);
+			const snapshot = takeSnapshot(session, this.#home, placement, this.#extras());
 			this.#store.setContextSnapshot(session.id, snapshot);
 			this.#store.appendEntry(session.id, {
 				role: "system",
@@ -1710,7 +1729,7 @@ export class Agents {
 		const updates: string[] = [];
 		const date = today();
 		if (date !== told.date) updates.push(`Today's date is now ${date}.`);
-		const current = loadInstructions(session.cwd, this.#home);
+		const current = loadInstructions(session.cwd, this.#home, this.#extras());
 		if (JSON.stringify(current) !== JSON.stringify(told.instructions)) {
 			updates.push(
 				current.length > 0
@@ -1825,7 +1844,7 @@ export class Agents {
 			);
 			this.#store.setContextSnapshot(
 				session.id,
-				takeSnapshot(session, this.#home, this.#placement(session)),
+				takeSnapshot(session, this.#home, this.#placement(session), this.#extras()),
 			);
 			this.#store.setContextTokens(
 				session.id,

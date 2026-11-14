@@ -4,6 +4,7 @@ import { release } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { type PermissionMode, permissionModeOf, type Session } from "../../shared/types.ts";
 import { isInside } from "../permissions/paths.ts";
+import { findSkills, memoryIndex, memoryNote, skillsNote } from "../skills.ts";
 
 /** Inputs of the system prompt, saved per session so the prompt stays the same between turns (prompt caching). */
 export interface ContextSnapshot {
@@ -107,7 +108,11 @@ function withoutCode(text: string): string {
  * `@path` lines import other files: up to 5 levels, never outside the project root (or Jig's folder
  * for the global file), each file once. The total is capped at 32 KiB.
  */
-export function loadInstructions(cwd: string | null, jigHome: string): InstructionFile[] {
+export function loadInstructions(
+	cwd: string | null,
+	jigHome: string,
+	extras: InstructionExtras = {},
+): InstructionFile[] {
 	const files: InstructionFile[] = [];
 	const seen = new Set<string>();
 	let budget = MAX_INSTRUCTIONS;
@@ -139,7 +144,11 @@ export function loadInstructions(cwd: string | null, jigHome: string): Instructi
 		}
 	};
 
-	add(join(jigHome, "AGENTS.md"), jigHome, 0);
+	const userHome = extras.userHome ?? null;
+	const own = join(jigHome, "AGENTS.md");
+	// A person who has set nothing up for Jig keeps the global file they already have.
+	if (existsSync(own) || !userHome) add(own, jigHome, 0);
+	else add(join(userHome, ".claude", "CLAUDE.md"), join(userHome, ".claude"), 0);
 	if (cwd) {
 		const root = findProjectRoot(cwd);
 		const chain: string[] = [];
@@ -152,13 +161,33 @@ export function loadInstructions(cwd: string | null, jigHome: string): Instructi
 			add(existsSync(agents) ? agents : join(dir, "CLAUDE.md"), root, 0);
 		}
 	}
+	// Memory folders: where they are, and each one's index. Skills: their names and descriptions.
+	const memory = (extras.memoryDirs ?? []).filter((dir) => existsSync(dir));
+	if (memory.length > 0) {
+		files.push({ path: "memory folders", content: memoryNote(memory) });
+		for (const dir of memory) {
+			const index = memoryIndex(dir);
+			if (index && !seen.has(index.path)) files.push(index);
+		}
+	}
+	const skills = findSkills(cwd, jigHome, userHome);
+	if (skills.length > 0) files.push({ path: "skills", content: skillsNote(skills) });
 	return files;
+}
+
+/** What is read besides Jig's own and the project's files (M4 plan, section 4). */
+export interface InstructionExtras {
+	/** Folders of notes the person keeps across sessions. */
+	memoryDirs?: string[];
+	/** The person's home folder, for `~/.claude`; absent, nothing outside Jig's folder is read. */
+	userHome?: string | null;
 }
 
 export function takeSnapshot(
 	session: Session,
 	jigHome: string,
 	placement: Placement = { main: null, parent: null },
+	extras: InstructionExtras = {},
 ): ContextSnapshot {
 	return {
 		date: today(),
@@ -166,7 +195,7 @@ export function takeSnapshot(
 		shell: process.env.SHELL ?? "/bin/sh",
 		cwd: session.cwd,
 		git: session.cwd ? gitStatus(session.cwd) : null,
-		instructions: loadInstructions(session.cwd, jigHome),
+		instructions: loadInstructions(session.cwd, jigHome, extras),
 		permissionMode: permissionModeOf(session.options),
 		main: placement.main,
 		parent: placement.parent,

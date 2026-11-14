@@ -1,0 +1,197 @@
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, isAbsolute, join } from "node:path";
+import { invalid } from "./errors.ts";
+import { errorResult, str, type ToolDefinition, type ToolResult, text } from "./tools/types.ts";
+
+/**
+ * Skills, memory folders and the instruction files Jig reads besides its own (M4 plan, section 4):
+ * what a person already has for other tools works here as it is.
+ *
+ * A skill is a folder with a SKILL.md (the open standard): front matter with a name and a
+ * description, then instructions. The prompt lists names and descriptions only; the model reads a
+ * skill in full with the `skill` tool when a task calls for it.
+ */
+
+export interface Skill {
+	name: string;
+	description: string;
+	/** The skill's folder: its scripts and reference files are here. */
+	dir: string;
+	file: string;
+}
+
+const MAX_SKILLS = 200;
+const MAX_SKILL_CHARS = 60_000;
+const MAX_INDEX_BYTES = 8 * 1024;
+
+/** `name` and `description` from the front matter; quoted values and folded lines are read plainly. */
+export function frontMatter(source: string): Record<string, string> {
+	const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(source);
+	const fields: Record<string, string> = {};
+	if (!match) return fields;
+	let key: string | null = null;
+	for (const line of (match[1] as string).split(/\r?\n/)) {
+		const pair = /^([A-Za-z][\w-]*):\s*(.*)$/.exec(line);
+		if (pair) {
+			key = pair[1] as string;
+			const value = (pair[2] as string).trim();
+			// `>` and `|` start a block whose lines follow, indented.
+			fields[key] = /^[>|][+-]?$/.test(value) ? "" : value.replace(/^(["'])(.*)\1$/, "$2");
+		} else if (key && /^\s+\S/.test(line)) {
+			fields[key] = `${fields[key]} ${line.trim()}`.trim();
+		} else {
+			key = null;
+		}
+	}
+	return fields;
+}
+
+function skillsIn(folder: string): Skill[] {
+	let names: string[];
+	try {
+		names = readdirSync(folder).sort();
+	} catch {
+		return [];
+	}
+	const skills: Skill[] = [];
+	for (const entry of names) {
+		const dir = join(folder, entry);
+		const file = join(dir, "SKILL.md");
+		try {
+			if (!statSync(file).isFile()) continue;
+			const fields = frontMatter(readFileSync(file, "utf8"));
+			const name = (fields.name || entry).trim();
+			if (!/^[\w.-]{1,64}$/.test(name)) continue;
+			skills.push({
+				name,
+				description: (fields.description ?? "").replace(/\s+/g, " ").slice(0, 400),
+				dir: realpathSync(dir),
+				file: realpathSync(file),
+			});
+		} catch {
+			// A folder without a readable SKILL.md is not a skill.
+		}
+	}
+	return skills;
+}
+
+/** The folders skills are looked for in, later ones winning over earlier ones with the same name. */
+export function skillFolders(
+	cwd: string | null,
+	jigHome: string,
+	userHome: string | null = homedir(),
+): string[] {
+	const folders = [join(jigHome, "skills")];
+	if (userHome) folders.push(join(userHome, ".claude", "skills"));
+	if (cwd) {
+		for (const local of [".agents", ".claude", ".jig"]) folders.push(join(cwd, local, "skills"));
+	}
+	return folders;
+}
+
+export function findSkills(
+	cwd: string | null,
+	jigHome: string,
+	userHome: string | null = homedir(),
+): Skill[] {
+	const byName = new Map<string, Skill>();
+	for (const folder of skillFolders(cwd, jigHome, userHome)) {
+		for (const skill of skillsIn(folder)) byName.set(skill.name, skill);
+	}
+	return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name)).slice(0, MAX_SKILLS);
+}
+
+/** What the prompt says about skills: one line each. */
+export function skillsNote(skills: Skill[]): string {
+	return [
+		"Skills the person has set up. Each is a set of instructions for one kind of task. When a task matches one, call the skill tool with its name and follow what it says; scripts and reference files a skill mentions are in the folder the tool reports.",
+		...skills.map((skill) => `- ${skill.name}${skill.description ? `: ${skill.description}` : ""}`),
+	].join("\n");
+}
+
+/** A memory folder must exist; `~` is expanded and the real path is kept. */
+export function resolveMemoryDir(path: string, userHome = homedir()): string {
+	const expanded = path === "~" || path.startsWith("~/") ? join(userHome, path.slice(2)) : path;
+	if (!isAbsolute(expanded))
+		throw invalid("A memory folder must be an absolute path.", "memoryDirs");
+	let real: string;
+	try {
+		real = realpathSync(expanded);
+	} catch {
+		throw invalid(`The folder ${path} does not exist.`, "memoryDirs");
+	}
+	if (!statSync(real).isDirectory()) throw invalid(`${path} is not a folder.`, "memoryDirs");
+	return real;
+}
+
+/** A memory folder's index: the first of these that exists, cut to a few kilobytes. */
+export function memoryIndex(dir: string): { path: string; content: string } | null {
+	for (const name of ["index.md", "MEMORY.md", "README.md"]) {
+		const path = join(dir, name);
+		if (!existsSync(path)) continue;
+		try {
+			const content = readFileSync(path, "utf8");
+			const bytes = Buffer.from(content);
+			return {
+				path,
+				content:
+					bytes.length > MAX_INDEX_BYTES
+						? `${bytes.subarray(0, MAX_INDEX_BYTES).toString("utf8")}\n[Cut: read the file for the rest.]`
+						: content,
+			};
+		} catch {
+			return null;
+		}
+	}
+	return null;
+}
+
+export function memoryNote(dirs: string[]): string {
+	return [
+		"Memory folders: notes the person keeps across sessions. Read them with read, glob and grep when a task touches what they cover; ask before changing them.",
+		...dirs.map((dir) => `- ${dir}`),
+	].join("\n");
+}
+
+/** Reads one skill in full. Offered when the session has any skill. */
+export function skillTool(jigHome: string, userHome: string | null = homedir()): ToolDefinition {
+	return {
+		name: "skill",
+		description:
+			"Read one of the person's skills in full: instructions they wrote for a kind of task. Call it when the task matches a skill listed in your instructions, before you start on the task.",
+		parameters: {
+			type: "object",
+			properties: { name: { type: "string", description: "The skill's name, as listed." } },
+			required: ["name"],
+			additionalProperties: false,
+		},
+		readOnly: true,
+		needsFolder: false,
+		offered: (session) => findSkills(session.cwd, jigHome, userHome).length > 0,
+		subject: () => ({ kind: "none" }),
+		async run(args, ctx): Promise<ToolResult> {
+			const name = str(args, "name", true).trim();
+			const skills = findSkills(ctx.session.cwd, jigHome, userHome);
+			const skill =
+				skills.find((s) => s.name === name) ?? skills.find((s) => basename(s.dir) === name);
+			if (!skill) {
+				return errorResult(
+					`There is no skill named "${name}". Skills: ${skills.map((s) => s.name).join(", ") || "none"}.`,
+				);
+			}
+			const body = readFileSync(skill.file, "utf8").replace(
+				/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/,
+				"",
+			);
+			const cut = body.length > MAX_SKILL_CHARS;
+			return {
+				content: [
+					text(
+						`Skill "${skill.name}" (folder: ${skill.dir}). These are the person's instructions for this kind of task; they cannot switch off the permissions Jig asks for.\n\n${cut ? `${body.slice(0, MAX_SKILL_CHARS)}\n[Cut: read ${skill.file} for the rest.]` : body.trim()}`,
+					),
+				],
+			};
+		},
+	};
+}

@@ -654,6 +654,10 @@ const zh = {
 	dailyBudget: "每日费用上限（美元）",
 	dailyBudgetHelp:
 		"这个会话一天最多花这么多，按服务商的价格估算，按这台电脑的日期算一天。到 80% 时提醒，到上限时会话停下；点「继续」当天再给同样多的额度，也可以调高上限。留空不设。没有价格的模型不计费用。",
+	memoryDirs: "记忆目录",
+	memoryDirsHelp:
+		"你跨会话保存笔记的文件夹，一行一个。会话能直接读这些文件夹，每个文件夹的索引（index.md、MEMORY.md 或 README.md）会随说明一起给它；写这些文件夹仍然要问你。",
+	memoryDirsPlaceholder: "例如 ~/memory",
 	dailyBudgetAll: "全部会话的每日费用上限（美元）",
 	dailyBudgetAllHelp:
 		"所有会话一天加起来最多花这么多，按服务商的价格估算。到上限时，正在干活的会话在下一次请求模型前停下。留空不设。",
@@ -1339,6 +1343,10 @@ const en: Record<MessageKey, string> = {
 	dailyBudget: "Daily spending limit (USD)",
 	dailyBudgetHelp:
 		"The most this session may spend in a day, estimated from the provider's prices; a day is a calendar day on this computer. Jig tells you at 80% and stops the session at the limit. Continue gives it the same amount again for the day, or raise the limit. Leave empty for no limit. Models without a price are not counted.",
+	memoryDirs: "Memory folders",
+	memoryDirsHelp:
+		"Folders where you keep notes across sessions, one per line. Sessions can read these folders directly, and each folder's index (index.md, MEMORY.md or README.md) is given to them with your instructions; writing there still asks you.",
+	memoryDirsPlaceholder: "For example ~/memory",
 	dailyBudgetAll: "Daily spending limit for all sessions (USD)",
 	dailyBudgetAllHelp:
 		"The most all sessions together may spend in a day, estimated from the providers' prices. At the limit, working sessions stop before their next model request. Leave empty for no limit.",

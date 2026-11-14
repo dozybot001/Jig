@@ -13,6 +13,7 @@ import { type ExportLanguage, exportFileName, sessionMarkdown } from "../export.
 import { pickFolder } from "../folder-picker.ts";
 import { resolveWorkingFolder } from "../paths.ts";
 import { type DefaultModel, readSettings, resolveLogFile, type Workspace } from "../settings.ts";
+import { resolveMemoryDir } from "../skills.ts";
 import type { SessionPatch, Store } from "../store.ts";
 import { idempotent } from "./idempotency.ts";
 import {
@@ -420,6 +421,15 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 				relayUrl: relayUrl ?? current.relayUrl,
 			});
 			deps.onRemoteChanged?.();
+		}
+		const memoryDirs = optArray(fields, "memoryDirs");
+		if (memoryDirs) {
+			if (memoryDirs.length > 10 || memoryDirs.some((dir) => typeof dir !== "string")) {
+				throw invalid("memoryDirs is a list of up to 10 folders.", "memoryDirs");
+			}
+			store.setSetting("memoryDirs", [
+				...new Set((memoryDirs as string[]).map((dir) => resolveMemoryDir(dir))),
+			]);
 		}
 		if (fields.dailyBudget !== undefined) {
 			if (!isBudget(fields.dailyBudget)) {

@@ -36,6 +36,8 @@ export const SETTING_DEFAULTS = {
 	remote: { enabled: false, relayUrl: "wss://relay.tenonai.cn" } as RemoteSettings,
 	/** The most all sessions together may spend in a day, in US dollars (M3 plan, section 10). */
 	dailyBudget: null as number | null,
+	/** Folders of notes sessions may read, such as ~/memory (M4 plan, section 4). */
+	memoryDirs: [] as string[],
 };
 
 export interface RemoteSettings {
@@ -55,6 +57,7 @@ export function readSettings(store: Store): Settings {
 		decisionLog: store.getSetting("decisionLog", SETTING_DEFAULTS.decisionLog),
 		remote: { ...SETTING_DEFAULTS.remote, ...store.getSetting("remote", SETTING_DEFAULTS.remote) },
 		dailyBudget: store.getSetting("dailyBudget", SETTING_DEFAULTS.dailyBudget),
+		memoryDirs: store.getSetting("memoryDirs", SETTING_DEFAULTS.memoryDirs),
 	};
 }
 

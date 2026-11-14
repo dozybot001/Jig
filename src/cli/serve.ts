@@ -113,7 +113,9 @@ export function serveCommand(): Command {
 			const { ALL_TOOLS } = await import("../server/tools/registry.ts");
 			const { SearchAccess, webSearchTool } = await import("../server/tools/web-search.ts");
 			const search = new SearchAccess(runtime.keys);
-			const extraTools = [webSearchTool(search, { version: VERSION })];
+			const { skillTool } = await import("../server/skills.ts");
+			const { homedir } = await import("node:os");
+			const extraTools = [webSearchTool(search, { version: VERSION }), skillTool(home, homedir())];
 			const agents = new Agents({
 				store,
 				gateway,
@@ -122,6 +124,7 @@ export function serveCommand(): Command {
 				version: VERSION,
 				log,
 				tools: () => [...ALL_TOOLS, ...extraTools],
+				userHome: homedir(),
 			});
 			const { RemoteAccess } = await import("../remote/access.ts");
 			const { KeychainStore } = await import("../server/keys.ts");
