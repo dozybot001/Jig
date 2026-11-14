@@ -16,7 +16,7 @@ import tarfile
 import time
 import urllib.request
 
-sha, image = sys.argv[1], sys.argv[2]
+sha, image, bundle_path = sys.argv[1], sys.argv[2], sys.argv[3]
 assert re.fullmatch("[0-9a-f]{40}", sha)
 
 PORT = 7290
@@ -67,7 +67,7 @@ def container(container_name, publish):
         "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
         "--mount", f"type=bind,src={release}/app,dst=/app,readonly",
         "--workdir", "/app", "--env-file", str(env_file),
-        "--env", "HOST=0.0.0.0", "--env", f"PORT={PORT}",
+        "--env", "HOST=0.0.0.0", "--env", f"PORT={PORT}", "--env", "TRUST_PROXY=1",
     ]
     if key_file.exists():
         args += ["--mount", f"type=bind,src={key_file},dst=/run/secrets/apns.p8,readonly"]
@@ -101,7 +101,7 @@ try:
 
     if not release.exists():
         release.mkdir(parents=True)
-        with tarfile.open(f"/tmp/jig-relay-{sha}.tar.gz") as bundle:
+        with tarfile.open(bundle_path) as bundle:
             bundle.extractall(release, filter="data")
     manifest = json.loads((release / "manifest.json").read_text())
     assert manifest["commit"] == sha
@@ -185,6 +185,9 @@ except BaseException:
         run(["systemctl", "reload", "caddy"])
     raise
 finally:
+    # The copies made for validation hold other products' site files; they do not stay.
+    shutil.rmtree(base / "candidate-sites", ignore_errors=True)
+    (base / "candidate-Caddyfile").unlink(missing_ok=True)
     lock.rmdir()
 
 # Housekeeping after an accepted release never fails it (product standard 15.2.3): keep the

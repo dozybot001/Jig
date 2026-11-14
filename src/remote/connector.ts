@@ -24,6 +24,8 @@ export interface ConnectorOptions {
 	WebSocketImpl?: typeof WebSocket;
 	/** Longest wait between reconnects. */
 	maxRetryMs?: number;
+	/** How long a phone has to finish the handshake. */
+	handshakeMs?: number;
 	/** The relay's answer to a notification it was asked to send. */
 	onPushResult?: (result: PushResult) => void;
 }
@@ -173,6 +175,7 @@ class Channel {
 	#opener: Opener | null = null;
 	#requests = new Map<number, AbortController>();
 	#ended = false;
+	readonly #handshakeTimer: NodeJS.Timeout;
 	device: Device | null = null;
 
 	constructor(connector: Connector, number: number, options: ConnectorOptions) {
@@ -183,6 +186,12 @@ class Channel {
 			static: options.identity.noise,
 			prologue: prologueFor(options.identity.desktopId),
 		});
+		// A connection that does not finish the handshake soon is closed, so someone who only knows
+		// this Mac's id cannot hold the places of its phones.
+		this.#handshakeTimer = setTimeout(() => {
+			if (!this.#session && !this.#ended) connector.closeChannel(number);
+		}, options.handshakeMs ?? 10_000);
+		this.#handshakeTimer.unref();
 	}
 
 	async receive(payload: Buffer): Promise<void> {
@@ -285,6 +294,7 @@ class Channel {
 
 	end(): void {
 		this.#ended = true;
+		clearTimeout(this.#handshakeTimer);
 		for (const controller of this.#requests.values()) controller.abort();
 		this.#requests.clear();
 	}

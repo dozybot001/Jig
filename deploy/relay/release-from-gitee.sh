@@ -61,8 +61,8 @@ for p in root.rglob('*'):
     if p.is_file(): files[str(p.relative_to(root))] = hashlib.sha256(p.read_bytes()).hexdigest()
 (root / 'manifest.json').write_text(json.dumps({'commit': sys.argv[2], 'files': files}))
 PY
-	tar --no-xattrs -czf "/tmp/jig-relay-$release.tar.gz" -C "$bundle" app jig-relay.caddy manifest.json
-	python3 "$stage/deploy/relay/release.py" "$release" "$node_image"
-	rm -f "/tmp/jig-relay-$release.tar.gz"
+	# The bundle stays in the private staging folder, which is removed when this script ends.
+	tar --no-xattrs -czf "$stage/bundle.tar.gz" -C "$bundle" app jig-relay.caddy manifest.json
+	python3 "$stage/deploy/relay/release.py" "$release" "$node_image" "$stage/bundle.tar.gz"
 }
 main "$@" </dev/null

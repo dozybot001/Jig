@@ -11,6 +11,17 @@ const apns = config ? new Apns(config) : null;
 const relay = new Relay({
 	port,
 	...(process.env.MAX_CONNECTIONS ? { maxConnections: Number(process.env.MAX_CONNECTIONS) } : {}),
+	// Behind the reverse proxy every connection comes from the proxy; it appends the address it saw
+	// as the last value of X-Forwarded-For, which a client cannot forge.
+	...(process.env.TRUST_PROXY === "1"
+		? {
+				addressOf: (request) => {
+					const forwarded = request.headers["x-forwarded-for"];
+					const last = (Array.isArray(forwarded) ? forwarded.at(-1) : forwarded)?.split(",").at(-1);
+					return last?.trim() || request.socket.remoteAddress || "";
+				},
+			}
+		: {}),
 	host: process.env.HOST ?? "0.0.0.0",
 	...(apns ? { push: (job) => apns.send(job) } : {}),
 });

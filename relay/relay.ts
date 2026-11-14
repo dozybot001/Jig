@@ -38,9 +38,16 @@ export interface RelayOptions {
 	maxConnections?: number;
 	/** How long a Mac has to prove which Mac it is before its connection is closed. */
 	helloMs?: number;
+	/** Bytes that may wait to be sent to one connection that is not reading; past it, it is closed. */
+	maxBuffered?: number;
+	/** Connections one address may hold at once. */
+	maxPerAddress?: number;
+	/** The address a connection comes from; behind the reverse proxy, the one it reports. */
+	addressOf?: (request: IncomingMessage) => string;
 }
 
 const TOO_MANY = 4429;
+const TOO_SLOW = 4408;
 const REPLACED = 4409;
 
 const SPKI_ED25519 = Buffer.from("302a300506032b6570032100", "hex");
@@ -92,7 +99,10 @@ function limiter(rate: number, burst = rate * 2) {
 }
 
 export class Relay {
-	readonly #options: Required<Omit<RelayOptions, "host" | "push">> & { host: string };
+	readonly #options: Required<Omit<RelayOptions, "host" | "push" | "addressOf">> & { host: string };
+	readonly #addressOf: (request: IncomingMessage) => string;
+	/** Open connections by the address they come from. */
+	readonly #perAddress = new Map<string, number>();
 	readonly #push: RelayOptions["push"];
 	/** Notifications handed on since the last count, for the health log: a number, no tokens. */
 	pushes = 0;
@@ -112,9 +122,12 @@ export class Relay {
 			log: options.log ?? ((line) => process.stderr.write(`${line}\n`)),
 			pushPerMinute: options.pushPerMinute ?? 60,
 			maxConnections: options.maxConnections ?? 4000,
+			maxBuffered: options.maxBuffered ?? 8 * 1024 * 1024,
+			maxPerAddress: options.maxPerAddress ?? 50,
 			helloMs: options.helloMs ?? 10_000,
 		};
 		this.#push = options.push;
+		this.#addressOf = options.addressOf ?? ((request) => request.socket.remoteAddress ?? "");
 		this.#http = createServer((request, response) => {
 			// Nothing here is a page: no content to sniff, frame or cache.
 			const headers = {
@@ -132,6 +145,8 @@ export class Relay {
 			maxPayload: this.#options.maxFrame,
 		});
 		this.#wss.on("connection", (socket, request) => this.#connected(socket, request));
+		// A failing listener or socket never takes the process, and every other connection, down.
+		this.#wss.on("error", () => {});
 	}
 
 	/** Starts listening; resolves with the port (useful with port 0 in tests). */
@@ -163,14 +178,51 @@ export class Relay {
 		socket.on("pong", () => {
 			alive.alive = true;
 		});
+		// A frame that is too large or not valid ends that connection only; nothing of it is logged.
+		socket.on("error", () => socket.terminate());
 		if (this.#wss.clients.size > this.#options.maxConnections) {
 			socket.close(TOO_MANY, "the relay is full");
 			return;
 		}
-		const path = new URL(request.url ?? "/", "http://relay").pathname;
+		const address = this.#addressOf(request);
+		const held = this.#perAddress.get(address) ?? 0;
+		if (held >= this.#options.maxPerAddress) {
+			socket.close(TOO_MANY, "too many connections from this address");
+			return;
+		}
+		this.#perAddress.set(address, held + 1);
+		socket.once("close", () => {
+			const left = (this.#perAddress.get(address) ?? 1) - 1;
+			if (left > 0) this.#perAddress.set(address, left);
+			else this.#perAddress.delete(address);
+		});
+		let path: string;
+		let desktopId = "";
+		try {
+			path = new URL(request.url ?? "/", "http://relay").pathname;
+			if (path.startsWith("/phone/")) desktopId = decodeURIComponent(path.slice(7));
+		} catch {
+			socket.close(1008, "bad path");
+			return;
+		}
 		if (path === "/desktop") this.#desktop(socket);
-		else if (path.startsWith("/phone/")) this.#phone(socket, decodeURIComponent(path.slice(7)));
+		else if (path.startsWith("/phone/")) this.#phone(socket, desktopId);
 		else socket.close(1008, "unknown path");
+	}
+
+	/**
+	 * Passes a frame on, unless the receiving end is not reading and too much already waits for it:
+	 * then that end is closed, so a connection that never reads cannot fill the relay's memory.
+	 */
+	#forward(to: WebSocket | undefined, data: Buffer): void {
+		if (!to || to.readyState !== to.OPEN) return;
+		if (to.bufferedAmount > this.#options.maxBuffered) {
+			to.close(TOO_SLOW, "not reading");
+			// Closing waits for the other end; what is queued is dropped at once.
+			setTimeout(() => to.terminate(), 1000).unref();
+			return;
+		}
+		to.send(data, { binary: true });
 	}
 
 	#desktop(socket: WebSocket): void {
@@ -216,7 +268,7 @@ export class Relay {
 			if (binary) {
 				const frame = toBuffer(data);
 				if (frame.length < 4) return;
-				desktop.phones.get(frame.readUInt32BE(0))?.send(frame.subarray(4), { binary: true });
+				this.#forward(desktop.phones.get(frame.readUInt32BE(0)), frame.subarray(4));
 				return;
 			}
 			const message = parse(data, binary);
@@ -270,7 +322,7 @@ export class Relay {
 			const payload = toBuffer(data);
 			const header = Buffer.alloc(4);
 			header.writeUInt32BE(channel, 0);
-			desktop.socket.send(Buffer.concat([header, payload]), { binary: true });
+			this.#forward(desktop.socket, Buffer.concat([header, payload]));
 		});
 		socket.on("close", () => {
 			if (desktop.phones.get(channel) !== socket) return;
