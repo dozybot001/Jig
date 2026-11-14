@@ -34,6 +34,10 @@ export interface RelayOptions {
 	push?: (job: PushJob) => Promise<PushResult>;
 	/** Notifications one Mac may ask for per minute, on average, with bursts up to that many. */
 	pushPerMinute?: number;
+	/** Connections the relay holds at once; more are turned away. */
+	maxConnections?: number;
+	/** How long a Mac has to prove which Mac it is before its connection is closed. */
+	helloMs?: number;
 }
 
 const TOO_MANY = 4429;
@@ -107,14 +111,21 @@ export class Relay {
 			heartbeatMs: options.heartbeatMs ?? 30_000,
 			log: options.log ?? ((line) => process.stderr.write(`${line}\n`)),
 			pushPerMinute: options.pushPerMinute ?? 60,
+			maxConnections: options.maxConnections ?? 4000,
+			helloMs: options.helloMs ?? 10_000,
 		};
 		this.#push = options.push;
 		this.#http = createServer((request, response) => {
-			if (request.url === "/health") {
-				response.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
-				return;
-			}
-			response.writeHead(404).end();
+			// Nothing here is a page: no content to sniff, frame or cache.
+			const headers = {
+				"Content-Type": "text/plain; charset=utf-8",
+				"X-Content-Type-Options": "nosniff",
+				"Cache-Control": "no-store",
+				"Referrer-Policy": "no-referrer",
+				"Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+			};
+			if (request.url === "/health") response.writeHead(200, headers).end("ok");
+			else response.writeHead(404, headers).end();
 		});
 		this.#wss = new WebSocketServer({
 			server: this.#http,
@@ -152,6 +163,10 @@ export class Relay {
 		socket.on("pong", () => {
 			alive.alive = true;
 		});
+		if (this.#wss.clients.size > this.#options.maxConnections) {
+			socket.close(TOO_MANY, "the relay is full");
+			return;
+		}
 		const path = new URL(request.url ?? "/", "http://relay").pathname;
 		if (path === "/desktop") this.#desktop(socket);
 		else if (path.startsWith("/phone/")) this.#phone(socket, decodeURIComponent(path.slice(7)));
@@ -162,6 +177,12 @@ export class Relay {
 		const nonce = randomBytes(32).toString("base64url");
 		socket.send(JSON.stringify({ type: "challenge", nonce }));
 		let id: string | null = null;
+		// A connection that does not say which Mac it is holds no place for long.
+		const hello = setTimeout(() => {
+			if (id === null) socket.close(1008, "no hello");
+		}, this.#options.helloMs);
+		hello.unref();
+		socket.once("close", () => clearTimeout(hello));
 		const allowed = limiter(this.#options.frameRate);
 		const pushAllowed = limiter(this.#options.pushPerMinute / 60, this.#options.pushPerMinute);
 		socket.on("message", (data, binary) => {

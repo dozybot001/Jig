@@ -1,0 +1,11 @@
+{
+	"name": "jig-relay",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"node": ">=24"
+	},
+	"dependencies": {
+		"ws": "8.22.0"
+	}
+}

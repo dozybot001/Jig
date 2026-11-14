@@ -1,0 +1,206 @@
+"""Verifies the immutable relay bundle, tests a candidate, then replaces the running relay.
+
+Run as root on the server by release-from-gitee.sh. The relay keeps no data, so there is nothing
+to back up or migrate; a release swaps the container and, the first time, installs the Caddy site.
+A failure at any step puts the previous container and ingress back.
+"""
+import hashlib
+import json
+import os
+import pathlib
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+import time
+import urllib.request
+
+sha, image = sys.argv[1], sys.argv[2]
+assert re.fullmatch("[0-9a-f]{40}", sha)
+
+PORT = 7290
+UID = 70980  # registered in the product standard, appendix A.3
+HOST = "relay.tenonai.cn"
+base = pathlib.Path("/opt/jig-relay")
+config = base / "config"
+env_file = config / "relay.env"
+key_file = config / "apns.p8"
+release = base / "releases" / sha
+active = base / "active.json"
+site = pathlib.Path("/etc/caddy/sites-enabled/jig-relay.caddy")
+name = f"jig-relay-{sha[:12]}"
+candidate = f"{name}-candidate"
+
+
+def run(args, **kw):
+    return subprocess.run(args, check=True, **kw)
+
+
+def quiet(args):
+    return subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
+
+
+def health(url, hsts=False):
+    with urllib.request.urlopen(url, timeout=5) as response:
+        assert response.status == 200 and response.read() == b"ok", "The relay is not healthy"
+        assert response.headers.get("X-Content-Type-Options") == "nosniff", "Security headers missing"
+        if hsts:
+            assert "max-age=31536000" in (response.headers.get("Strict-Transport-Security") or ""), "HSTS missing"
+
+
+def retry(check, attempts, pause):
+    for attempt in range(attempts):
+        try:
+            return check()
+        except Exception:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(pause)
+
+
+def container(container_name, publish):
+    args = [
+        "docker", "run", "-d", "--name", container_name,
+        "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+        "--user", f"{UID}:{UID}", "--memory", "256m", "--cpus", "0.5", "--pids-limit", "128",
+        "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
+        "--mount", f"type=bind,src={release}/app,dst=/app,readonly",
+        "--workdir", "/app", "--env-file", str(env_file),
+        "--env", "HOST=0.0.0.0", "--env", f"PORT={PORT}",
+    ]
+    if key_file.exists():
+        args += ["--mount", f"type=bind,src={key_file},dst=/run/secrets/apns.p8,readonly"]
+    if publish:
+        # Its own bridge network keeps it away from other containers; the port is on 127.0.0.1 only.
+        args += [
+            "--restart", "unless-stopped", "--network", "jig-relay",
+            "--publish", f"127.0.0.1:{PORT}:{PORT}",
+            "--log-driver", "journald", "--log-opt", "tag=jig-relay",
+        ]
+    else:
+        args += ["--network", "none"]
+    run(args + [image, "node", "relay/main.ts"], stdout=subprocess.DEVNULL)
+
+
+lock = base / ".publish-lock"
+lock.mkdir()
+previous = json.loads(active.read_text()) if active.exists() else {}
+site_before = site.read_bytes() if site.exists() else None
+started = previous_stopped = site_changed = False
+try:
+    # Private configuration: the environment file is root's, the signing key is readable by the
+    # relay's user alone. Neither is in the repository or the release.
+    config.mkdir(mode=0o700, exist_ok=True)
+    if not env_file.exists():
+        env_file.touch(mode=0o600)
+    assert env_file.stat().st_mode & 0o777 == 0o600, "relay.env must be 0600"
+    if key_file.exists():
+        meta = key_file.stat()
+        assert meta.st_uid == UID and meta.st_mode & 0o777 == 0o400, "apns.p8 must be 0400 and owned by the relay's user"
+
+    if not release.exists():
+        release.mkdir(parents=True)
+        with tarfile.open(f"/tmp/jig-relay-{sha}.tar.gz") as bundle:
+            bundle.extractall(release, filter="data")
+    manifest = json.loads((release / "manifest.json").read_text())
+    assert manifest["commit"] == sha
+    actual = {
+        str(p.relative_to(release)): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in release.rglob("*")
+        if p.is_file() and p != release / "manifest.json"
+    }
+    assert actual == manifest["files"], "Release checksum mismatch"
+    for p in release.rglob("*"):
+        p.chmod(0o555 if p.is_dir() else 0o444)
+    release.chmod(0o555)
+
+    if previous.get("commit") == sha and site.exists():
+        health(f"https://{HOST}/health", hsts=True)
+        print("This relay release is already active.")
+        sys.exit()
+
+    # The candidate runs without a network: it must start and answer on its own loopback.
+    quiet(["docker", "rm", "-f", candidate])
+    container(candidate, publish=False)
+    probe = f"fetch('http://127.0.0.1:{PORT}/health').then(r=>r.text()).then(t=>process.exit(t==='ok'?0:1),()=>process.exit(1))"
+    try:
+        retry(lambda: run(["docker", "exec", candidate, "node", "-e", probe]), 20, 0.5)
+        logs = subprocess.run(["docker", "logs", candidate], capture_output=True, text=True)
+        wanted = "notifications on" if key_file.exists() else "notifications off"
+        assert wanted in logs.stderr + logs.stdout, f"The candidate did not start with {wanted}"
+    finally:
+        quiet(["docker", "rm", "-f", candidate])
+
+    # The new site file is checked through the root config, which defines the shared snippets.
+    site_text = (release / "jig-relay.caddy").read_text()
+    sites = base / "candidate-sites"
+    shutil.rmtree(sites, ignore_errors=True)
+    shutil.copytree("/etc/caddy/sites-enabled", sites)
+    (sites / "jig-relay.caddy").write_text(site_text)
+    line = "import /etc/caddy/sites-enabled/*.caddy"
+    root = pathlib.Path("/etc/caddy/Caddyfile").read_text()
+    assert root.count(line) == 1, "Unexpected Caddy root config"
+    check = base / "candidate-Caddyfile"
+    check.write_text(root.replace(line, f"import {sites}/*.caddy"))
+    run(["caddy", "validate", "--config", str(check), "--adapter", "caddyfile"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # The relay holds only connections: the old one stops and the new one takes the port. Macs and
+    # phones reconnect by themselves within seconds.
+    if quiet(["docker", "network", "inspect", "jig-relay"]):
+        run(["docker", "network", "create", "jig-relay"], stdout=subprocess.DEVNULL)
+    if previous.get("container"):
+        run(["docker", "stop", previous["container"]], stdout=subprocess.DEVNULL)
+        previous_stopped = True
+    quiet(["docker", "rm", "-f", name])
+    container(name, publish=True)
+    started = True
+    retry(lambda: health(f"http://127.0.0.1:{PORT}/health"), 20, 0.5)
+
+    if site_before != site_text.encode():
+        temp = site.with_suffix(".candidate")
+        temp.write_text(site_text)
+        os.replace(temp, site)
+        site_changed = True
+        run(["systemctl", "reload", "caddy"])
+    # The first time, Caddy gets the certificate before the public check can pass.
+    retry(lambda: health(f"https://{HOST}/health", hsts=True), 30, 3)
+
+    state = {"commit": sha, "previous": previous.get("commit"), "port": PORT, "container": name, "image": image}
+    temp = active.with_suffix(".candidate")
+    temp.write_text(json.dumps(state))
+    os.replace(temp, active)
+    print(f"Jig relay deployed and the public health check passed: {sha}")
+except BaseException:
+    if started:
+        quiet(["docker", "rm", "-f", name])
+    if previous_stopped:
+        run(["docker", "start", previous["container"]], stdout=subprocess.DEVNULL)
+    if site_changed:
+        if site_before is None:
+            site.unlink(missing_ok=True)
+        else:
+            site.write_bytes(site_before)
+        run(["systemctl", "reload", "caddy"])
+    raise
+finally:
+    lock.rmdir()
+
+# Housekeeping after an accepted release never fails it (product standard 15.2.3): keep the
+# current release, the previous one and the three newest; remove the containers of the rest.
+try:
+    keep = {sha, previous.get("commit")}
+    releases = sorted((base / "releases").iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+    keep |= {p.name for p in releases[:3]}
+    for old in releases:
+        if old.name in keep:
+            continue
+        quiet(["docker", "rm", "-f", f"jig-relay-{old.name[:12]}"])
+        run(["chmod", "-R", "u+w", str(old)])
+        shutil.rmtree(old)
+    for line in subprocess.run(["docker", "ps", "-a", "--format", "{{.Names}}"], capture_output=True, text=True).stdout.split():
+        if line.startswith("jig-relay-") and not any(line == f"jig-relay-{commit[:12]}" for commit in keep if commit):
+            quiet(["docker", "rm", "-f", line])
+except Exception as error:  # noqa: BLE001
+    print(f"Release retention skipped: {error}", file=sys.stderr)

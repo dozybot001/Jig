@@ -10,6 +10,7 @@ const config = apnsConfigFromEnv(process.env);
 const apns = config ? new Apns(config) : null;
 const relay = new Relay({
 	port,
+	...(process.env.MAX_CONNECTIONS ? { maxConnections: Number(process.env.MAX_CONNECTIONS) } : {}),
 	host: process.env.HOST ?? "0.0.0.0",
 	...(apns ? { push: (job) => apns.send(job) } : {}),
 });
