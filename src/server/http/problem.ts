@@ -11,7 +11,7 @@ import { JigError } from "../errors.ts";
 export type AppEnv = { Variables: { requestId: string }; Bindings: { device?: string } };
 
 /** Problem types are tag URIs (RFC 4151): stable identifiers that are not meant to be fetched. */
-export const problemType = (code: string) => `tag:tenon.asia,2026:jig/problem/${code}`;
+export const problemType = (code: string) => `tag:tenonai.cn,2026:jig/problem/${code}`;
 
 export function problemResponse(
 	c: Context<AppEnv>,
