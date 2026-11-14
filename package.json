@@ -1,5 +1,5 @@
 {
-	"name": "jig",
+	"name": "@tenonai/jig",
 	"version": "0.4.0",
 	"private": true,
 	"description": "An AI-native multi-agent workbench",
@@ -11,15 +11,24 @@
 		"node": ">=24"
 	},
 	"bin": {
-		"jig": "./src/cli/main.ts"
+		"jig": "./bin/jig.js"
 	},
+	"files": [
+		"bin",
+		"dist",
+		"web/dist",
+		"THIRD-PARTY-NOTICES.md",
+		"CHANGELOG.md"
+	],
 	"scripts": {
 		"check": "biome check . && tsc --noEmit -p . && tsc --noEmit -p web && npm test",
 		"test": "node --test \"test/**/*.test.ts\"",
 		"format": "biome check --write .",
 		"build:web": "vite build --config web/vite.config.ts",
 		"watch:web": "vite build --config web/vite.config.ts --watch",
-		"relay:publish": "bash deploy/relay/publish.sh"
+		"relay:publish": "bash deploy/relay/publish.sh",
+		"build": "tsc -p tsconfig.build.json && npm run build:web && node scripts/notices.mjs",
+		"prepack": "npm run build"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.6.6",

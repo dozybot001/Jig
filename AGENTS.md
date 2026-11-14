@@ -7,7 +7,7 @@
 
 ## 技术栈
 
-- Node.js 24 及以上，TypeScript，ESM。服务端用 Node 自带的类型擦除直接运行 `.ts`，开发时不另设构建步骤；对外发布前再用 `tsc` 编译。只用可擦除的语法，不用 `enum`、`namespace` 和参数属性。
+- Node.js 24 及以上，TypeScript，ESM。服务端用 Node 自带的类型擦除直接运行 `.ts`，开发时不另设构建步骤；对外发布的 npm 包（`@tenonai/jig`）用 `npm run build` 编译到 `dist/`，`bin/jig.js` 在源码目录里跑源码、在装好的包里跑编译结果。只用可擦除的语法，不用 `enum`、`namespace` 和参数属性。
 - 存储：Node 自带的 `node:sqlite`。数据目录默认 `~/.jig`，可用 `JIG_HOME` 指定；表结构变更写成按序号执行的迁移。
 - 模型接入：`@earendil-works/pi-ai`，锁定精确版本，只在 `src/server/model/` 里引用；其他模块通过这一层调用模型，换库时只改这一层。Agent 循环、工具和权限自己写，这是产品本身（蓝图第九节）。
 - 本地服务：Hono；服务端向界面推送用 SSE。网页界面：React + Vite。

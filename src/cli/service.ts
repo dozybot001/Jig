@@ -47,7 +47,10 @@ function realHost(): ServiceHost {
 		homeDir: homedir(),
 		uid: userInfo().uid,
 		node: process.execPath,
-		entry: fileURLToPath(new URL("./main.ts", import.meta.url)),
+		// The sources in a checkout, the compiled file in the published package.
+		entry: fileURLToPath(
+			new URL(import.meta.url.endsWith(".ts") ? "./main.ts" : "./main.js", import.meta.url),
+		),
 		run: (command, args) => spawnSync(command, args, { stdio: "ignore" }).status,
 	};
 }
