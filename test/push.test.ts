@@ -29,7 +29,8 @@ const VECTOR = {
 	phone: Buffer.alloc(32, 2),
 	nonce: Buffer.alloc(12, 3),
 	note: '{"v":1,"id":"n1","kind":"permission","title":"官网","body":"git push","badge":2}',
-	key: "6b8f194238cae3afb991545fc73bc9ef0f4ac1fb92e6bd67ad924d580e318f4d",
+	// Derived from the two fixed test keys above; not a secret.
+	key: "6b8f194238cae3afb991545fc73bc9ef0f4ac1fb92e6bd67ad924d580e318f4d", // gitleaks:allow
 	sealed:
 		"AwMDAwMDAwMDAwMDB+tpFSbM9MdgSEpAPCVHoBuxkomSUYkChVi7sCkBKDLTEV3tKqnLNqbBb+DxF7V53Z3Jw99sz29PXii88JgcsCZI4s3k5pJzmPg6raQATNjwu19EyTotKOZeuygs5lVF1Kc=",
 };
