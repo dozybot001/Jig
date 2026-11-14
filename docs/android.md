@@ -1,6 +1,6 @@
 # Jig 安卓版
 
-状态（2026-11-15）：功能写完（含 1.0.0 加的「产物」入口），能构建，单元测试通过，在 Android 17 和 Android 8.0 两台模拟器上走查过（第 6 节）。还没做：真机、扫码的实测、签名密钥、发布。安卓版不卡 v1 的验收（蓝图第十三节）。
+状态（2026-11-15）：功能写完（含 1.0.0 加的「产物」入口），能构建，单元测试通过，在 Android 17 和 Android 8.0 两台模拟器上走查过（第 6 节）。签名密钥 11-15 02:07 已生成，还没备份（7.2）。还没做：真机、扫码的实测、发布。安卓版不卡 v1 的验收（蓝图第十三节）。
 
 由「Jig 安卓 · 开发」会话负责，只动 `android/` 和本文件；电脑端、中继和协议归 Jig 的主开发会话。
 
@@ -185,8 +185,8 @@ Android 8.0（API 26）：调试包的演示、配对、会话列表、后台收
 | --- | --- |
 | 应用里的「开源许可」页 | 做了（4.4），法务组 11-15 核过 |
 | 隐私政策里安卓的内容 | 草稿见 7.1，法务组 11-15 对照代码核过，措辞不用改。现在不并进 `src/shared/policy.ts`：等发安卓安装包那一次，由主开发会话并入并升版本，再跑 `sync-policy.ts`。**安装包里的 `policy.xml` 必须是带安卓段落的那一版**，现在这份只写了 iPhone，不能带着发 |
-| App 备案 | Jig 手机端联网、默认连我们的中继，要先用公司主体办备案，iPhone 和安卓一起报，由创始人在腾讯云提交（法务组已发总办排期）。备案要填包名 `cn.tenonai.apps.jig`、签名证书的 MD5 指纹和公钥 |
-| 签名密钥 | 没生成。按产品规范 15.6（RSA 4096，`~/.tenon-keys/android/jig/jig-release.p12`，口令进登录钥匙串，脚本先给安全组看），生成要创始人在本会话确认。生成后把包名、证书的 MD5 指纹和公钥发主开发会话转法务组，三个指纹登记在这里 |
+| App 备案 | 包名、证书 MD5 指纹和公钥 11-15 发给了主开发会话转法务组。Jig 手机端联网、默认连我们的中继，要先用公司主体办备案，iPhone 和安卓一起报，由创始人在腾讯云提交（法务组已发总办排期）。备案要填包名 `cn.tenonai.apps.jig`、签名证书的 MD5 指纹和公钥 |
+| 签名密钥 | 2026-11-15 生成，见 7.2。还没备份；生成脚本还没给安全组看 |
 | 发布脚本 | 没写。Gradle 只出未签名的正式构建；签名、核对证书指纹和权限的脚本到生成密钥时写 |
 | 首次放出 | 请创始人在本会话确认（规范 17.10） |
 
@@ -201,6 +201,29 @@ Android 8.0（API 26）：调试包的演示、配对、会话列表、后台收
 English:
 
 > Jig on Android keeps the pairing and its own key in a private file of the app, encrypted with a key in the Android Keystore, on that device only; it is left out of system backups and device transfers. Jig on Android uses no push service and has no push token: with notifications on, a foreground service keeps a connection to the relay open in the background, and the computer sends what a notification says to the phone over the end-to-end encrypted channel; the relay only passes ciphertext along. Android shows a standing notification for this connection, and notifications do not arrive while the system has stopped Jig. Scanning the pairing QR code uses the camera; the picture is read on the phone and is neither kept nor sent. The phone also remembers whether notifications are on and the ids of the items it has already seen, without their content.
+
+### 7.2 签名密钥
+
+创始人 2026-11-15 在本会话确认（「确认」）后，02:07 用 `android/scripts/create-signing-key.sh` 生成，照产品规范 15.6。
+
+| | |
+| --- | --- |
+| 包名 | `cn.tenonai.apps.jig` |
+| 证书主体 | `CN=Jig, O="Changsha Tenon Artificial Intelligence Technology Co., Ltd.", L=Changsha, C=CN` |
+| 密钥 | RSA 4096，有效期 30 年，PKCS12，别名 `jig` |
+| SHA-256 | `6737325656156A54F9A8BE1735D87F4B30160653ECAEB9FD513B05969F6A4361` |
+| SHA-1 | `B3E8C4CCF1F6383CBA73BE5A82A5F420314743D1` |
+| MD5 | `C525CD6F71F5A1E1B23FB02C33D1A05A` |
+| 公钥 | `android/release/signing-public-key.txt`（模数的十六进制，指数 65537） |
+
+指纹和公钥不是秘密。SHA-256 另存在 `android/release/signing-certificate.sha256`，发布脚本拿它核对。
+
+- 密钥库在仓库外的 `~/.tenon-keys/android/jig/jig-release.p12`，目录 0700、文件 0600。
+- 口令由脚本随机生成，直接存进登录钥匙串（服务 `tenon-android-signing`，账户 `jig`），没有显示过，不在任何文件、命令参数、日志和会话里。
+- 正式运行之前，脚本用一次性的测试密钥在临时目录里演练过一遍，测试密钥和它的钥匙串条目已删。
+- **还没备份**（15.6.3）：用这把密钥签的包第一次对外发布或交给别人安装之前，要在这台 Mac 之外做好至少一份加密备份并做恢复演练，映像口令由创始人在终端里输入。在那之前这台 Mac 坏了，密钥就没了；因为还没发过包，重新生成一把、改掉这里和备案登记的指纹就行。备份脚本还没写。
+- **脚本还没给安全组看**（15.6.4 要求先看）：做法和安全组 11-14 审过的 PassBy 那份相同（口令经标准输入进钥匙串、`-storepass:env`、生成后核对证书主体）。安全组有意见要重来的话，同上，重新生成并改登记。
+- 怀疑泄露：停止用它发布，告诉安全组（15.6.6）。
 
 ## 8. 交给别的会话的事
 
