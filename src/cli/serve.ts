@@ -113,6 +113,9 @@ export function serveCommand(): Command {
 			const { ALL_TOOLS } = await import("../server/tools/registry.ts");
 			const { SearchAccess, webSearchTool } = await import("../server/tools/web-search.ts");
 			const search = new SearchAccess(runtime.keys);
+			// MCP servers from mcp.json in the data folder; their tools ask before the first use.
+			const { McpHub } = await import("../server/mcp.ts");
+			const mcp = new McpHub({ jigHome: home, version: VERSION, log });
 			const { skillTool } = await import("../server/skills.ts");
 			const { homedir } = await import("node:os");
 			const extraTools = [webSearchTool(search, { version: VERSION }), skillTool(home, homedir())];
@@ -123,7 +126,7 @@ export function serveCommand(): Command {
 				home,
 				version: VERSION,
 				log,
-				tools: () => [...ALL_TOOLS, ...extraTools],
+				tools: () => [...ALL_TOOLS, ...extraTools, ...mcp.tools()],
 				userHome: homedir(),
 			});
 			const { RemoteAccess } = await import("../remote/access.ts");
@@ -195,6 +198,8 @@ export function serveCommand(): Command {
 				void remote.sync().catch((error: Error) => log(`remote access: ${error.message}`));
 				// A search key saved with `jig key set` while Jig runs is picked up here.
 				void search.refresh().catch(() => {});
+				// A changed mcp.json is read again: new servers start, removed ones stop.
+				void mcp.refresh().catch((error: Error) => log(`mcp: ${error.message}`));
 			};
 			syncRemote();
 			const remoteSweep = setInterval(syncRemote, REMOTE_SYNC_MS);
@@ -214,6 +219,7 @@ export function serveCommand(): Command {
 					clearInterval(remoteSweep);
 					scheduler.stop();
 					notifier.stop();
+					mcp.stop();
 					remote.stop();
 					agents.shutdown();
 					server.close();
