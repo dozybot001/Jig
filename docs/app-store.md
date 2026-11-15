@@ -11,7 +11,7 @@
 | 出口合规：`ITSAppUsesNonExemptEncryption = NO` | 已写进工程（cef51bb） |
 | App Store Connect 里建应用记录 | 没做，要创始人登录 |
 | 商店文案、截图、隐私标签、审核说明 | 文案见第二节；截图没拍（要 6.9 英寸，1320×2868） |
-| 隐私政策网址、技术支持网址 | 等平台组给官网上的地址 |
+| 隐私政策网址、技术支持网址 | 平台组已给：隐私政策 https://tenonai.cn/products/jig/privacy/ （中文 https://tenonai.cn/zh/products/jig/privacy/ ），技术支持和营销 https://tenonai.cn/products/jig/ （中文 https://tenonai.cn/zh/products/jig/ ）。官网的政策文字从 `src/shared/policy.ts` 导出，改了政策要把提交号告诉平台组 |
 | 上传到 TestFlight | 没做 |
 | 提交审核 | 没做，要创始人确认 |
 
