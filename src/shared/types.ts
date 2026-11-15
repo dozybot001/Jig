@@ -87,6 +87,32 @@ export interface UsageTotals {
 	cost: number;
 }
 
+/** What all sessions together used on one local calendar day (YYYY-MM-DD). */
+export interface UsageDay extends UsageTotals {
+	day: string;
+}
+
+/** What one session used on one day. */
+export interface SessionUsage extends UsageTotals {
+	sessionId: string;
+	name: string;
+	archived: boolean;
+}
+
+/** The usage page: the last days oldest first, every day present; `budget` is the daily limit for all sessions. */
+export interface UsageOverview {
+	today: string;
+	budget: number | null;
+	days: UsageDay[];
+}
+
+/** One day on the usage page: the sessions that used a model then, the one that cost most first. */
+export interface UsageDetail {
+	day: string;
+	total: number;
+	sessions: SessionUsage[];
+}
+
 export interface Group {
 	id: string;
 	name: string;

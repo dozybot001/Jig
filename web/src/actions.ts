@@ -21,6 +21,8 @@ import type {
 	ThinkingLevel,
 	ToolCallView,
 	Transcript,
+	UsageDetail,
+	UsageOverview,
 } from "../../src/shared/types.ts";
 import { ApiError, all, api, downloadFile } from "./api.ts";
 import { getLang, setLang, systemLang } from "./i18n.ts";
@@ -147,6 +149,9 @@ export async function boot(): Promise<void> {
 		} else if (view === "artifacts") {
 			connect(null, null);
 			openArtifacts();
+		} else if (view === "usage") {
+			connect(null, null);
+			openUsage();
 		} else if (viewed && getState().sessions[viewed]) await selectSession(viewed);
 		else if (view === "home") connect(null, null);
 		else if (main && getState().sessions[main]) await selectSession(main);
@@ -638,6 +643,18 @@ export function openArtifacts(): void {
 	rememberView("artifacts");
 	if (!getState().artifacts) void loadArtifacts();
 }
+
+/** The usage page; it reads its own numbers each time it opens. */
+export function openUsage(): void {
+	setState({ page: "usage", drawerOpen: false });
+	rememberView("usage");
+}
+
+/** What all sessions together cost on each of the last days, oldest first, with the daily limit. */
+export const loadUsage = (days = 30) => api<UsageOverview>("GET", `/api/usage?days=${days}`);
+
+/** What each session used on one day (YYYY-MM-DD), the one that cost most first. */
+export const loadUsageDay = (day: string) => api<UsageDetail>("GET", `/api/usage/${day}`);
 
 /** Opens the artifacts page with one artifact showing. */
 export function openArtifact(id: string): void {

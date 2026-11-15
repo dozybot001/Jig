@@ -2,6 +2,7 @@ import {
 	Archive,
 	ArrowUp,
 	Ban,
+	ChartColumn,
 	Check,
 	CheckCheck,
 	ChevronRight,
@@ -86,6 +87,8 @@ export const CenterIcon = () => <Inbox {...props} />;
 export const ScheduleIcon = () => <Clock {...props} />;
 /** What sessions saved for the person to look at. */
 export const ArtifactIcon = () => <FileText {...props} />;
+/** What sessions cost, day by day. */
+export const UsageIcon = () => <ChartColumn {...props} />;
 /** The main conversation, where the person usually works. */
 export const MainIcon = () => <MessagesSquare {...props} />;
 /** A team in the person's organization. */

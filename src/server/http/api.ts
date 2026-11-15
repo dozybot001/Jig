@@ -1,13 +1,20 @@
 import { Hono } from "hono";
 import { RELAY_URL } from "../../remote/protocol.ts";
-import type { PermissionRule, Session, SessionOptions, Transcript } from "../../shared/types.ts";
+import type {
+	PermissionRule,
+	Session,
+	SessionOptions,
+	Transcript,
+	UsageDetail,
+	UsageOverview,
+} from "../../shared/types.ts";
 import {
 	PERMISSION_MODES,
 	RECEIVE_POLICIES,
 	SESSION_KINDS,
 	THINKING_LEVELS,
 } from "../../shared/types.ts";
-import { isBudget, localDay } from "../budget.ts";
+import { isBudget, isDay, lastDays, localDay } from "../budget.ts";
 import { invalid } from "../errors.ts";
 import { type ExportLanguage, exportFileName, sessionMarkdown } from "../export.ts";
 import { pickFolder } from "../folder-picker.ts";
@@ -63,6 +70,8 @@ export function parseRules(value: unknown[]): PermissionRule[] {
 }
 
 const MAX_WORKSPACES = 50;
+/** How far back the usage page can look. */
+const MAX_USAGE_DAYS = 90;
 
 /**
  * Checks the saved workspaces. A new or moved one must point at an existing folder; one already saved
@@ -448,6 +457,38 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 	app.get("/usage/today", (c) => {
 		const day = localDay(Date.now());
 		return c.json({ day, total: store.spentOn(day), sessions: store.spentBySession(day) });
+	});
+
+	// The usage page: each of the last days with what all sessions used, days without use as zeros.
+	app.get("/usage", (c) => {
+		const count = optIntQuery(c, "days") ?? 30;
+		if (count < 1 || count > MAX_USAGE_DAYS) {
+			throw invalid(`days must be a whole number from 1 to ${MAX_USAGE_DAYS}.`, "days");
+		}
+		const days = lastDays(Date.now(), count);
+		const today = days[days.length - 1] as string;
+		const used = new Map(store.usageByDay(days[0] as string, today).map((row) => [row.day, row]));
+		const overview: UsageOverview = {
+			today,
+			budget: store.getSetting<number | null>("dailyBudget", null),
+			days: days.map(
+				(day) =>
+					used.get(day) ?? { day, cost: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			),
+		};
+		return c.json(overview);
+	});
+
+	// One day on the usage page: what each session used, the one that cost most first.
+	app.get("/usage/:day", (c) => {
+		const day = c.req.param("day");
+		if (!isDay(day)) throw invalid("day must be a calendar day written as YYYY-MM-DD.", "day");
+		const detail: UsageDetail = {
+			day,
+			total: store.spentOn(day),
+			sessions: store.usageBySession(day),
+		};
+		return c.json(detail);
 	});
 
 	return app;

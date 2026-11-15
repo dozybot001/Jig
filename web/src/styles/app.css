@@ -2919,3 +2919,146 @@ button.about-row {
 	text-align: left;
 	font-weight: 400;
 }
+
+/* --- usage: today against the limit, a bar per day, the sessions of one day (blueprint 6.9) --- */
+
+.usage-today {
+	display: grid;
+	gap: 6px;
+}
+.usage-today p {
+	margin: 0;
+}
+.usage-figure {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px 10px;
+}
+.usage-figure strong {
+	font-size: var(--fs-xl);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+.usage-meter {
+	height: 4px;
+	border-radius: 2px;
+	background: var(--selected);
+	overflow: hidden;
+}
+.usage-meter span {
+	display: block;
+	height: 100%;
+	border-radius: 2px;
+	background: var(--text);
+}
+.usage-section {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 8px;
+}
+.usage-section > p {
+	margin: 0;
+}
+.usage-chart {
+	position: relative;
+	min-width: 0;
+}
+/* The picture lies over the buttons and lets the pointer through to them. */
+.usage-svg {
+	position: absolute;
+	inset: 0;
+	display: block;
+	pointer-events: none;
+}
+.usage-hits {
+	position: absolute;
+	display: flex;
+}
+.usage-hit {
+	flex: 1 1 0;
+	min-width: 0;
+	padding: 0;
+	border: none;
+	border-radius: 3px;
+	background: none;
+	cursor: pointer;
+}
+.usage-hit:focus-visible {
+	outline-offset: 0;
+}
+@media (hover: hover) {
+	.usage-hit:hover {
+		background: var(--hover);
+	}
+}
+.usage-bar {
+	fill: var(--text);
+	opacity: 0.35;
+}
+.usage-bar-on {
+	fill: var(--text);
+	opacity: 1;
+}
+.usage-base {
+	stroke: var(--control-strong);
+	stroke-width: 1;
+}
+.usage-limit {
+	stroke: var(--text-2);
+	stroke-width: 1;
+	stroke-dasharray: 4 3;
+}
+.usage-day {
+	margin: 0;
+	font-size: var(--fs-m);
+	font-weight: 600;
+}
+.usage-note {
+	font-weight: 400;
+}
+.usage-table-wrap {
+	overflow-x: auto;
+}
+.usage-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--fs-s);
+	font-variant-numeric: tabular-nums;
+}
+.usage-table tr th,
+.usage-table tr td {
+	padding: 7px 0 7px 14px;
+	border-bottom: 1px solid var(--divider);
+	text-align: right;
+	white-space: nowrap;
+}
+.usage-table tr th:first-child {
+	padding-left: 0;
+	text-align: left;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+.usage-name {
+	text-align: left;
+}
+.usage-table thead th {
+	color: var(--text-2);
+	font-weight: 400;
+}
+.usage-table tbody th {
+	min-width: 120px;
+	font-weight: 400;
+}
+.usage-table tfoot th,
+.usage-table tfoot td {
+	border-bottom: none;
+	font-weight: 600;
+}
+/* The label keeps a margin of page colour, so a bar behind it does not run into the words. */
+.usage-limit-label {
+	paint-order: stroke;
+	stroke: var(--bg);
+	stroke-width: 4px;
+	stroke-linejoin: round;
+}

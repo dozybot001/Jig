@@ -7,6 +7,7 @@ import {
 	openArtifacts,
 	openCenter,
 	openSchedules,
+	openUsage,
 	renameGroup,
 	saveSettings,
 	selectSession,
@@ -49,6 +50,7 @@ import {
 	SearchIcon,
 	SlidersIcon,
 	TeamIcon,
+	UsageIcon,
 } from "./icons.tsx";
 import { SettingsMenu } from "./settings.tsx";
 import { Button, describeError, ErrorBox, Menu, type MenuEntry, useAction, useNow } from "./ui.tsx";
@@ -647,6 +649,7 @@ function FixedEntries() {
 	const open = useAppState((state) => state.page === "center");
 	const onSchedules = useAppState((state) => state.page === "schedules");
 	const onArtifacts = useAppState((state) => state.page === "artifacts");
+	const onUsage = useAppState((state) => state.page === "usage");
 	return (
 		<>
 			{mainId && mainName && (
@@ -698,6 +701,15 @@ function FixedEntries() {
 			>
 				<ArtifactIcon />
 				<span className="nav-label">{t("artifacts")}</span>
+			</button>
+			<button
+				type="button"
+				className="nav-row"
+				aria-current={onUsage ? "page" : undefined}
+				onClick={() => openUsage()}
+			>
+				<UsageIcon />
+				<span className="nav-label">{t("usage")}</span>
 			</button>
 		</>
 	);
@@ -843,6 +855,7 @@ export function SidebarRail() {
 	const onCenter = useAppState((state) => state.page === "center");
 	const onSchedules = useAppState((state) => state.page === "schedules");
 	const onArtifacts = useAppState((state) => state.page === "artifacts");
+	const onUsage = useAppState((state) => state.page === "usage");
 	const [dialog, setDialog] = useState<"team" | "workspace" | null>(null);
 	return (
 		<nav className="rail" aria-label={t("sessions")}>
@@ -906,6 +919,15 @@ export function SidebarRail() {
 				onClick={() => openArtifacts()}
 			>
 				<ArtifactIcon />
+			</Button>
+			<Button
+				variant="icon"
+				aria-label={t("usage")}
+				title={t("usage")}
+				aria-current={onUsage ? "page" : undefined}
+				onClick={() => openUsage()}
+			>
+				<UsageIcon />
 			</Button>
 			<Button
 				variant="icon"

@@ -17,11 +17,13 @@ import type {
 	SessionKind,
 	SessionOptions,
 	SessionStatus,
+	SessionUsage,
 	TaskOutcome,
 	ThinkingLevel,
 	Todo,
 	ToolCallStatus,
 	ToolCallView,
+	UsageDay,
 	UsageTotals,
 } from "../shared/types.ts";
 import { localDay } from "./budget.ts";
@@ -160,6 +162,24 @@ interface QueueRow {
 	body: string;
 	created_at: number;
 	updated_at: number;
+}
+
+interface UsageRow {
+	cost: number;
+	input: number;
+	output: number;
+	cache_read: number;
+	cache_write: number;
+}
+
+function usageTotals(row: UsageRow): UsageTotals {
+	return {
+		cost: row.cost,
+		input: row.input,
+		output: row.output,
+		cacheRead: row.cache_read,
+		cacheWrite: row.cache_write,
+	};
 }
 
 const MODEL_ROLES = "('system', 'user', 'assistant', 'toolResult')";
@@ -858,6 +878,35 @@ export class Store {
 			cost: number;
 		}[];
 		return Object.fromEntries(rows.map((row) => [row.session_id, row.cost]));
+	}
+
+	/** Cost and tokens of all sessions together on each day from `from` to `to`; days without use are left out. */
+	usageByDay(from: string, to: string): UsageDay[] {
+		const rows = this.#q(
+			`SELECT day, SUM(cost) AS cost, SUM(input) AS input, SUM(output) AS output,
+					SUM(cache_read) AS cache_read, SUM(cache_write) AS cache_write
+				FROM usage_daily WHERE day >= ? AND day <= ? GROUP BY day ORDER BY day`,
+		).all(from, to) as unknown as (UsageRow & { day: string })[];
+		return rows.map((row) => ({ day: row.day, ...usageTotals(row) }));
+	}
+
+	/** What each session used on a day, the one that cost most first. */
+	usageBySession(day: string): SessionUsage[] {
+		const rows = this.#q(
+			`SELECT u.session_id, s.name, s.archived_at, u.cost, u.input, u.output, u.cache_read, u.cache_write
+				FROM usage_daily u JOIN sessions s ON s.id = u.session_id
+				WHERE u.day = ? ORDER BY u.cost DESC, s.name`,
+		).all(day) as unknown as (UsageRow & {
+			session_id: string;
+			name: string;
+			archived_at: number | null;
+		})[];
+		return rows.map((row) => ({
+			sessionId: row.session_id,
+			name: row.name,
+			archived: row.archived_at !== null,
+			...usageTotals(row),
+		}));
 	}
 
 	setContextTokens(id: string, contextTokens: number): Session {

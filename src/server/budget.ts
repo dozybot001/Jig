@@ -30,6 +30,27 @@ export function localDay(at: number): string {
 	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** The `count` local calendar days that end with the day of `now`, oldest first. */
+export function lastDays(now: number, count: number): string[] {
+	const end = new Date(now);
+	const days: string[] = [];
+	for (let back = count - 1; back >= 0; back--) {
+		// Noon keeps the step clear of the hour a clock change adds or removes.
+		days.push(
+			localDay(new Date(end.getFullYear(), end.getMonth(), end.getDate() - back, 12).getTime()),
+		);
+	}
+	return days;
+}
+
+/** Whether text is a calendar day written as YYYY-MM-DD. */
+export function isDay(text: string): boolean {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+	if (!match) return false;
+	const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+	return localDay(date.getTime()) === text;
+}
+
 /** Checks a limit: dollars above zero, or null for none. */
 export function isBudget(value: unknown): value is number | null {
 	return (
