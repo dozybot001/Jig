@@ -30,6 +30,9 @@ import { getLang, setLang, systemLang } from "./i18n.ts";
 import {
 	type CenterState,
 	type CenterTab,
+	type DataCleanup,
+	type DataExport,
+	type DataOverview,
 	getState,
 	type McpServerView,
 	type ModelInfo,
@@ -929,6 +932,26 @@ export const patchSkill = (id: string, disabled: boolean) =>
 
 export async function revealSkill(id: string): Promise<void> {
 	await api("POST", "/api/skills/reveal", { id });
+}
+
+export const loadData = () => api<DataOverview>("GET", "/api/data");
+
+/** The system folder picker on the computer that runs Jig; null when the person cancels. */
+export async function pickFolder(): Promise<string | null> {
+	return (await api<{ path: string | null }>("POST", "/api/folders/pick")).path;
+}
+
+/** Writes everything Jig keeps into a new or empty folder, as `jig export` does. */
+export const exportData = (folder: string) =>
+	api<DataExport>("POST", "/api/data/export", { folder }, { idempotent: true });
+
+/** Deletes the over-long command output; the person confirmed it first. */
+export const cleanUpData = () =>
+	api<DataCleanup>("POST", "/api/data/cleanup", undefined, { idempotent: true });
+
+/** Shows the data folder, or the folder the last export went to, in the file manager. */
+export async function revealData(target: "home" | "export"): Promise<void> {
+	await api("POST", "/api/data/reveal", { target });
 }
 
 export const loadSystem = () => api<SystemStatus>("GET", "/api/system");

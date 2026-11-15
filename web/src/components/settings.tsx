@@ -8,12 +8,15 @@ import {
 } from "../../../src/shared/types.ts";
 import {
 	addMcpServer,
+	cleanUpData,
 	createPairing,
 	deleteArchivedSessions,
 	deleteCustomProvider,
 	deleteKey,
 	deleteSearchKey,
+	exportData,
 	loadArchived,
+	loadData,
 	loadMcpServers,
 	loadPhones,
 	loadSearchServices,
@@ -22,7 +25,9 @@ import {
 	openSettings,
 	patchMcpServer,
 	patchSkill,
+	pickFolder,
 	removeMcpServer,
+	revealData,
 	revealSkill,
 	revokeDevice,
 	saveCustomProvider,
@@ -34,8 +39,19 @@ import {
 	setPhoneAccess,
 	spentToday,
 } from "../actions.ts";
-import { formatAgo, formatCost, hasMessage, t, useLang } from "../i18n.ts";
 import {
+	formatAgo,
+	formatBytes,
+	formatClock,
+	formatCost,
+	hasMessage,
+	t,
+	useLang,
+} from "../i18n.ts";
+import {
+	type DataCleanup,
+	type DataExport,
+	type DataOverview,
 	type McpServerView,
 	NOTIFY_KINDS,
 	type ProviderSummary,
@@ -684,6 +700,7 @@ export function SettingsDialogs() {
 	if (which === "phones") return <PhonesDialog onClose={close} />;
 	if (which === "mcp") return <McpDialog onClose={close} />;
 	if (which === "skills") return <SkillsDialog onClose={close} />;
+	if (which === "data") return <DataDialog onClose={close} />;
 	if (which === "system") return <SystemDialog onClose={close} />;
 	if (which === "providers") return <ProvidersDialog onClose={close} />;
 	if (which === "about") {
@@ -710,7 +727,6 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 	useLang();
 	const settings = useAppState((state) => state.settings);
 	const [open, setOpen] = useState(false);
-	const [deleting, setDeleting] = useState(false);
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if ((event.metaKey || event.ctrlKey) && event.key === ",") {
@@ -761,17 +777,7 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 		{ label: t("defaultsMenu"), icon: <SlidersIcon />, onSelect: () => openSettings("defaults") },
 		{ label: t("phonesMenu"), icon: <PhoneIcon />, onSelect: () => openSettings("phones") },
 		{ label: t("systemMenu"), icon: <PowerIcon />, onSelect: () => openSettings("system") },
-		{
-			label: t("dataMenu"),
-			icon: <DataIcon />,
-			items: [
-				{
-					label: t("deleteArchivedMenu"),
-					danger: true,
-					onSelect: () => setDeleting(true),
-				},
-			],
-		},
+		{ label: t("dataMenu"), icon: <DataIcon />, onSelect: () => openSettings("data") },
 		{ separator: true, id: "line-2" },
 		{ label: t("aboutMenu"), icon: <InfoIcon />, onSelect: () => openSettings("about") },
 		{
@@ -783,30 +789,260 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 		},
 	];
 	return (
-		<>
-			<Menu
-				label={t("settings")}
-				items={items}
-				open={open}
-				onOpenChange={setOpen}
-				width={240}
-				trigger={
-					variant === "row"
-						? {
-								className: "nav-row",
-								title: `${t("settings")}（⌘,）`,
-								content: (
-									<>
-										<GearIcon />
-										{t("settings")}
-									</>
-								),
-							}
-						: { className: "btn btn-ghost btn-icon", title: t("settings"), content: <GearIcon /> }
-				}
-			/>
-			{deleting && <DeleteArchivedDialog onClose={() => setDeleting(false)} />}
-		</>
+		<Menu
+			label={t("settings")}
+			items={items}
+			open={open}
+			onOpenChange={setOpen}
+			width={240}
+			trigger={
+				variant === "row"
+					? {
+							className: "nav-row",
+							title: `${t("settings")}（⌘,）`,
+							content: (
+								<>
+									<GearIcon />
+									{t("settings")}
+								</>
+							),
+						}
+					: { className: "btn btn-ghost btn-icon", title: t("settings"), content: <GearIcon /> }
+			}
+		/>
+	);
+}
+
+/**
+ * Data (blueprint 6.10, item 36): what the data folder takes and where it is, exporting everything
+ * as `jig export` does, deleting the over-long command output, and deleting archived sessions. The
+ * sizes are read when the dialog opens and after each action; nothing here runs by itself.
+ */
+function DataDialog({ onClose }: { onClose: () => void }) {
+	useLang();
+	const [data, setData] = useState<DataOverview | null>(null);
+	const [loadError, setLoadError] = useState<unknown>(null);
+	const [exported, setExported] = useState<DataExport | null>(null);
+	const [cleaned, setCleaned] = useState<DataCleanup | null>(null);
+	const [typing, setTyping] = useState(false);
+	const [typed, setTyped] = useState("");
+	const [confirming, setConfirming] = useState(false);
+	const [deleting, setDeleting] = useState(false);
+	const pathId = useId();
+	const reload = useCallback(
+		() =>
+			loadData().then((loaded) => {
+				setData(loaded);
+				setLoadError(null);
+			}, setLoadError),
+		[],
+	);
+	useEffect(() => {
+		void reload();
+	}, [reload]);
+	const showHome = useAction(() => revealData("home"));
+	const showExport = useAction(() => revealData("export"));
+	const exportTo = async (folder: string) => {
+		setExported(await exportData(folder));
+		setTyping(false);
+		setTyped("");
+		await reload();
+	};
+	const pick = useAction(async () => {
+		let folder: string | null;
+		try {
+			folder = await pickFolder();
+		} catch (error) {
+			// No picker on this computer, or it did not open: the path can be typed.
+			setTyping(true);
+			throw error;
+		}
+		if (folder) await exportTo(folder);
+	});
+	const exportTyped = useAction(() => exportTo(typed.trim()));
+	const revealLabel = t(data?.reveal === "files" ? "skillRevealFiles" : "skillRevealFinder");
+	const temp = data?.temp;
+	const kept = temp ? temp.files - temp.removableFiles : 0;
+	return (
+		<Dialog
+			title={t("dataTitle")}
+			size="l"
+			onClose={onClose}
+			footer={<Button onClick={onClose}>{t("close")}</Button>}
+		>
+			{data === null && !loadError && <p className="hint">{t("loading")}</p>}
+			<ErrorBox error={loadError} />
+			{data && temp && (
+				<>
+					<SettingGroup title={t("dataStorage")}>
+						<div className="setting-row data-row">
+							<div className="setting-text">
+								<span className="setting-label">{t("dataFolder")}</span>
+								<span className="hint data-path">{data.folder}</span>
+							</div>
+							{data.reveal && (
+								<div className="setting-control">
+									<Button busy={showHome.busy} onClick={() => void showHome.run()}>
+										{revealLabel}
+									</Button>
+								</div>
+							)}
+						</div>
+						<div className="setting-row data-usage">
+							<div className="data-line data-total">
+								<span>{t("dataTotal")}</span>
+								<span className="data-size">{formatBytes(data.totalBytes)}</span>
+							</div>
+							<ul className="data-parts">
+								{data.parts.map((part) => (
+									<li key={part.id} className="data-part">
+										<div className="data-line">
+											<span>{t(`dataPart_${part.id}`)}</span>
+											<span className="data-size">{formatBytes(part.bytes)}</span>
+										</div>
+										<div className="data-bar" aria-hidden="true">
+											<span
+												style={{
+													width: `${data.totalBytes > 0 ? (part.bytes / data.totalBytes) * 100 : 0}%`,
+												}}
+											/>
+										</div>
+									</li>
+								))}
+							</ul>
+							<span className="hint">{t("dataReadAt", { time: formatClock(data.readAt) })}</span>
+						</div>
+						<ErrorBox error={showHome.error} />
+					</SettingGroup>
+
+					<SettingGroup title={t("dataExport")}>
+						<div className="setting-row data-row">
+							<div className="setting-text">
+								<span className="setting-label">{t("dataExportLabel")}</span>
+								<span className="hint">{t("dataExportHint")}</span>
+							</div>
+							<div className="setting-control">
+								<Button busy={pick.busy} onClick={() => void pick.run()}>
+									{t("dataExportButton")}
+								</Button>
+							</div>
+						</div>
+						{typing && (
+							<div className="setting-row data-row">
+								<div className="setting-text data-typed">
+									<label className="setting-label" htmlFor={pathId}>
+										{t("dataExportFolder")}
+									</label>
+									<input
+										id={pathId}
+										className="input mono-input"
+										value={typed}
+										placeholder={t("folderPath")}
+										spellCheck={false}
+										onChange={(event) => setTyped(event.target.value)}
+									/>
+								</div>
+								<div className="setting-control">
+									<Button
+										busy={exportTyped.busy}
+										disabled={!typed.trim()}
+										onClick={() => void exportTyped.run()}
+									>
+										{t("dataExportTyped")}
+									</Button>
+								</div>
+							</div>
+						)}
+						{exported && (
+							<div className="setting-row data-row" role="status">
+								<div className="setting-text">
+									<span className="data-result">{t("dataExportDone", { ...exported })}</span>
+								</div>
+								{data.reveal && (
+									<div className="setting-control">
+										<Button busy={showExport.busy} onClick={() => void showExport.run()}>
+											{revealLabel}
+										</Button>
+									</div>
+								)}
+							</div>
+						)}
+						<ErrorBox error={exportTyped.error ?? pick.error ?? showExport.error} />
+					</SettingGroup>
+
+					<SettingGroup title={t("dataTemp")}>
+						<div className="setting-row data-row">
+							<div className="setting-text">
+								<span className="setting-label">{t("dataTempLabel")}</span>
+								<span className="hint">
+									{temp.files === 0
+										? t("dataTempNone")
+										: t("dataTempHint", { n: temp.files, size: formatBytes(temp.bytes) })}
+									{kept > 0 && ` ${t("dataTempKept", { n: kept })}`}
+								</span>
+							</div>
+							<div className="setting-control">
+								<Button disabled={temp.removableFiles === 0} onClick={() => setConfirming(true)}>
+									{t("dataCleanButton")}
+								</Button>
+							</div>
+						</div>
+						{cleaned && (
+							<div className="setting-row data-row" role="status">
+								<span className="data-result">
+									{t("dataCleanDone", {
+										n: cleaned.deletedFiles,
+										size: formatBytes(cleaned.freedBytes),
+									})}
+									{cleaned.skippedFiles > 0 &&
+										` ${t("dataCleanSkipped", { n: cleaned.skippedFiles })}`}
+								</span>
+							</div>
+						)}
+					</SettingGroup>
+
+					<SettingGroup title={t("dataArchived")}>
+						<div className="setting-row data-row">
+							<div className="setting-text">
+								<span className="setting-label">{t("deleteArchivedLabel")}</span>
+								<span className="hint">{t("deleteArchivedHint")}</span>
+							</div>
+							<div className="setting-control">
+								<Button variant="danger" onClick={() => setDeleting(true)}>
+									{t("deleteArchivedButton")}
+								</Button>
+							</div>
+						</div>
+					</SettingGroup>
+				</>
+			)}
+			{confirming && temp && (
+				<ConfirmDialog
+					title={t("dataCleanTitle")}
+					body={`${t("dataCleanBody", {
+						n: temp.removableFiles,
+						size: formatBytes(temp.removableBytes),
+					})}${kept > 0 ? ` ${t("dataCleanBodyKept", { n: kept })}` : ""}`}
+					confirmLabel={t("dataCleanConfirm", { n: temp.removableFiles })}
+					onConfirm={async () => {
+						try {
+							setCleaned(await cleanUpData());
+						} finally {
+							await reload();
+						}
+					}}
+					onClose={() => setConfirming(false)}
+				/>
+			)}
+			{deleting && (
+				<DeleteArchivedDialog
+					onClose={() => {
+						setDeleting(false);
+						void reload();
+					}}
+				/>
+			)}
+		</Dialog>
 	);
 }
 

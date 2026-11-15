@@ -15,6 +15,7 @@ import type { SearchAccess } from "../tools/web-search.ts";
 import { agentRoutes } from "./agents.ts";
 import { api } from "./api.ts";
 import { artifactRoutes } from "./artifacts.ts";
+import { type DataRoutesOptions, dataRoutes } from "./data.ts";
 import { deviceRoutes } from "./devices.ts";
 import { DraftCache, eventRoutes } from "./events.ts";
 import { mailRoutes } from "./mail.ts";
@@ -62,6 +63,8 @@ export interface AppOptions {
 	mcp?: McpRoutesOptions;
 	/** The skills in the global and workspace folders, listed in the settings (item 35). */
 	skills?: SkillRoutesOptions;
+	/** The data folder's size, export and cleanup, in the settings (item 36). */
+	data?: DataRoutesOptions;
 	/** The search services' keys (item 30). */
 	search?: SearchAccess;
 	/** Starting at login and the launcher icon (item 33). */
@@ -119,6 +122,11 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 	if (options.notes) app.route("/api", noteRoutes(options.notes));
 	if (options.mcp) app.route("/api", mcpRoutes(store, { log, ...options.mcp }));
 	if (options.skills) app.route("/api", skillRoutes(store, options.skills));
+	if (options.data) {
+		// A session's output files are left alone while one of its commands may still write to them.
+		const inUse = agents ? (id: string) => agents.hasLiveCommands(id) : undefined;
+		app.route("/api", dataRoutes(store, { ...(inUse ? { inUse } : {}), ...options.data }));
+	}
 	if (options.search) app.route("/api", searchRoutes(options.search));
 	if (options.system) app.route("/api", systemRoutes(options.system));
 	if (options.artifacts) app.route("/", artifactRoutes(options.artifacts));

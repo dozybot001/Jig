@@ -186,9 +186,15 @@ export function authRoutes(store: Store, port: number): Hono<AppEnv> {
  * What a paired phone may not do through the relay (M3 plan, section 4): manage API keys, add or revoke
  * devices, or change remote access. Those stay on the Mac. So do the settings that decide what this
  * computer starts or holds as a secret: MCP servers, search keys, starting at login and the launcher,
- * and the skills in this computer's folders.
+ * the skills in this computer's folders, and the data folder: its size, export and cleanup.
  */
-const COMPUTER_ONLY = ["/api/mcp", "/api/search-services", "/api/system", "/api/skills"];
+const COMPUTER_ONLY = [
+	"/api/mcp",
+	"/api/search-services",
+	"/api/system",
+	"/api/skills",
+	"/api/data",
+];
 export function deviceLimits(): MiddlewareHandler<AppEnv> {
 	return async (c, next) => {
 		if (!c.env?.device) return next();

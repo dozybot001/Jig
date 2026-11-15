@@ -116,6 +116,7 @@ const FIELD_MESSAGES: Record<string, MessageKey> = {
 	env: "err_field_env",
 	headers: "err_field_headers",
 	remote: "err_field_remote",
+	folder: "err_field_folder",
 };
 
 const CODE_MESSAGES: Record<string, MessageKey> = {
@@ -137,6 +138,8 @@ const CODE_MESSAGES: Record<string, MessageKey> = {
 	"not-on-this-system": "err_notOnThisSystem",
 	"service-failed": "err_serviceFailed",
 	"reveal-failed": "err_revealFailed",
+	"temp-outside": "err_tempOutside",
+	"no-export": "err_noExport",
 };
 
 /** What went wrong and what to do, in the interface language (spec 4.1, 12.2); server text is a fallback. */

@@ -168,10 +168,40 @@ export interface TranscriptState {
 	outputs: Record<string, string>;
 }
 
+/** What Jig's data folder takes, by kind; `reveal` names the file manager, null where there is none. */
+export type DataPartId = "database" | "artifacts" | "logs" | "temp" | "other";
+export interface DataOverview {
+	folder: string;
+	totalBytes: number;
+	parts: { id: DataPartId; bytes: number }[];
+	/** Over-long command output: all of it, and what a cleanup would delete now. */
+	temp: { files: number; bytes: number; removableFiles: number; removableBytes: number };
+	reveal: "finder" | "files" | null;
+	readAt: number;
+}
+
+/** What an export wrote, as `jig export --json` prints it. */
+export interface DataExport {
+	folder: string;
+	sessions: number;
+	letters: number;
+	cards: number;
+	schedules: number;
+	artifacts: number;
+	files: number;
+}
+
+export interface DataCleanup {
+	deletedFiles: number;
+	freedBytes: number;
+	skippedFiles: number;
+}
+
 export type SettingsDialogName =
 	| "providers"
 	| "mcp"
 	| "skills"
+	| "data"
 	| "defaults"
 	| "phones"
 	| "system"

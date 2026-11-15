@@ -178,6 +178,7 @@ export function serveCommand(): Command {
 				artifacts,
 				mcp: { home, hub: mcp },
 				skills: { home, userHome: homedir() },
+				data: { home },
 				search,
 				system: systemControl({ home, env: io.env }),
 			});

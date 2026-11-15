@@ -2795,6 +2795,84 @@ button.about-row {
 .skill > .error-box {
 	margin: 0 14px 12px;
 }
+/* Data: where the folder is and what each kind takes, as rows with a thin bar each. */
+.data-row {
+	flex-wrap: wrap;
+}
+.data-row .setting-text {
+	flex: 1 1 16em;
+}
+.data-row .setting-control {
+	margin-left: auto;
+}
+@media (max-width: 480px) {
+	.data-row .setting-text {
+		flex: none;
+	}
+	.data-row .setting-control {
+		margin-left: 0;
+	}
+}
+.data-path {
+	font-family: var(--mono);
+	overflow-wrap: anywhere;
+	user-select: all;
+}
+.data-usage {
+	display: grid;
+	justify-content: stretch;
+	align-items: start;
+	gap: 12px;
+	padding-block: 14px;
+}
+.data-line {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 16px;
+}
+.data-total {
+	font-weight: 500;
+}
+.data-size {
+	flex: none;
+	font-variant-numeric: tabular-nums;
+}
+.data-part .data-size {
+	color: var(--text-2);
+}
+.data-parts {
+	display: grid;
+	gap: 10px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.data-part {
+	display: grid;
+	gap: 5px;
+}
+.data-bar {
+	height: 4px;
+	border-radius: 2px;
+	background: var(--hover);
+	overflow: hidden;
+}
+.data-bar > span {
+	display: block;
+	height: 100%;
+	border-radius: 2px;
+	background: var(--text-2);
+}
+.data-typed {
+	gap: 6px;
+}
+.data-result {
+	overflow-wrap: anywhere;
+}
+.setting-box > .error-box {
+	margin: 0 14px 12px;
+}
 /* Names with values (variables, headers): a line each, the value hidden as it is typed. */
 .pairs {
 	display: grid;

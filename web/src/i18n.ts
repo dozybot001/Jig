@@ -723,8 +723,47 @@ const zh = {
 	budgetNone: "不设",
 	canPostCards: "可以直接往审批中心放卡片",
 	canPostCardsHint: "主对话总是可以；其他会话默认要经主对话转交。",
-	dataMenu: "数据管理",
-	deleteArchivedMenu: "删除所有归档会话…",
+	dataMenu: "数据管理…",
+	dataTitle: "数据管理",
+	dataStorage: "占用",
+	dataFolder: "数据目录",
+	dataTotal: "合计",
+	dataReadAt: "{time} 读取",
+	dataPart_database: "会话记录、信件和设置",
+	dataPart_artifacts: "产物",
+	dataPart_logs: "运行日志",
+	dataPart_temp: "临时文件",
+	dataPart_other: "其他",
+	dataExport: "导出",
+	dataExportLabel: "导出全部数据",
+	dataExportHint:
+		"每个会话写成 Markdown，信件、决定卡、定时任务和设置写成 JSON，产物的每个版本各一个文件，和 jig export 相同。要选一个新建的或空的文件夹。API Key、配对的手机和登录令牌不导出。",
+	dataExportButton: "选择文件夹并导出…",
+	dataExportFolder: "导出到的文件夹",
+	dataExportTyped: "导出",
+	dataExportDone:
+		"已导出到 {folder}：{sessions} 个会话、{letters} 封信、{cards} 张决定卡、{schedules} 个定时任务、{artifacts} 个产物，共 {files} 个文件。",
+	dataTemp: "临时文件",
+	dataTempLabel: "超长的命令输出",
+	dataTempHint:
+		"命令的输出超过 50 KB 时，完整内容存成文件，供会话读取。现在有 {n} 个文件，共 {size}。",
+	dataTempNone: "命令的输出超过 50 KB 时，完整内容存成文件，供会话读取。现在没有这样的文件。",
+	dataTempKept: "其中 {n} 个属于正在运行命令的会话，清理时保留。",
+	dataCleanButton: "清理…",
+	dataCleanTitle: "清理临时文件",
+	dataCleanBody:
+		"将删除 {n} 个超长命令输出的文件，腾出 {size}，不能撤回。删除后会话不能再读这些命令的完整输出，对话记录里显示的末尾部分还在。",
+	dataCleanBodyKept: "正在运行命令的会话的 {n} 个文件保留。",
+	dataCleanConfirm: "删除 {n} 个文件",
+	dataCleanDone: "已删除 {n} 个文件，腾出 {size}。",
+	dataCleanSkipped: "{n} 个文件保留。",
+	dataArchived: "归档会话",
+	deleteArchivedLabel: "永久删除所有归档会话",
+	deleteArchivedHint: "连同它们的对话记录、工具调用和收到的信，不能撤回。删除前会列出是哪些。",
+	deleteArchivedButton: "删除…",
+	err_field_folder: "导出要一个已经存在的空文件夹。选一个新建的或空的文件夹。",
+	err_tempOutside: "数据目录里的 tmp 是一个指向别处的链接，Jig 不经过它删除文件。",
+	err_noExport: "Jig 重启后不再记得上次导出到了哪个文件夹。",
 	deleteArchivedTitle: "删除所有归档会话",
 	deleteArchivedBody:
 		"将永久删除 {n} 个归档会话，连同它们的对话记录、工具调用和收到的信，不能撤回。它们发出的信和提出的决定会保留。",
@@ -1579,8 +1618,50 @@ const en: Record<MessageKey, string> = {
 	budgetNone: "none",
 	canPostCards: "Can put cards in the approval center",
 	canPostCardsHint: "The main conversation always can; other sessions go through it by default.",
-	dataMenu: "Data",
-	deleteArchivedMenu: "Delete all archived sessions…",
+	dataMenu: "Data…",
+	dataTitle: "Data",
+	dataStorage: "Storage",
+	dataFolder: "Data folder",
+	dataTotal: "Total",
+	dataReadAt: "Read at {time}",
+	dataPart_database: "Sessions, letters and settings",
+	dataPart_artifacts: "Artifacts",
+	dataPart_logs: "Logs",
+	dataPart_temp: "Temporary files",
+	dataPart_other: "Other",
+	dataExport: "Export",
+	dataExportLabel: "Export all data",
+	dataExportHint:
+		"Each session is written as Markdown; letters, decision cards, scheduled tasks and settings as JSON; and every version of every artifact as a file, the same as jig export. Choose a new or empty folder. API keys, paired phones and sign-in tokens are not exported.",
+	dataExportButton: "Choose a folder and export…",
+	dataExportFolder: "Folder to export to",
+	dataExportTyped: "Export",
+	dataExportDone:
+		"Exported to {folder}: {sessions} sessions, {letters} letters, {cards} decision cards, {schedules} scheduled tasks and {artifacts} artifacts, in {files} files.",
+	dataTemp: "Temporary files",
+	dataTempLabel: "Over-long command output",
+	dataTempHint:
+		"When a command prints more than 50 KB, the full output is saved to a file for the session to read. Files now: {n}, {size} in all.",
+	dataTempNone:
+		"When a command prints more than 50 KB, the full output is saved to a file for the session to read. There are no such files now.",
+	dataTempKept: "Kept in a cleanup because their session has a running command: {n}.",
+	dataCleanButton: "Clean up…",
+	dataCleanTitle: "Clean up temporary files",
+	dataCleanBody:
+		"Files to delete: {n}, freeing {size}. They hold over-long command output. This cannot be undone. Sessions can no longer read the full output of those commands; the last part shown in the conversation stays.",
+	dataCleanBodyKept: "Files kept because their session has a running command: {n}.",
+	dataCleanConfirm: "Delete {n} for good",
+	dataCleanDone: "Files deleted: {n}. Freed {size}.",
+	dataCleanSkipped: "Files kept: {n}.",
+	dataArchived: "Archived sessions",
+	deleteArchivedLabel: "Delete all archived sessions for good",
+	deleteArchivedHint:
+		"With their conversations, tool calls and the letters they received. It cannot be undone. They are listed before anything is deleted.",
+	deleteArchivedButton: "Delete…",
+	err_field_folder: "Export needs an existing empty folder. Choose a new or empty one.",
+	err_tempOutside:
+		"The tmp folder in the data folder is a link to somewhere else. Jig does not delete through it.",
+	err_noExport: "Jig was restarted and no longer knows which folder the last export went to.",
 	deleteArchivedTitle: "Delete all archived sessions",
 	deleteArchivedBody:
 		"This permanently deletes {n} archived sessions with their conversations, tool calls and the letters sent to them. It cannot be undone. Letters they sent and decisions they asked for stay.",
@@ -1763,6 +1844,23 @@ export function useLang(): Lang {
 
 export function formatNumber(n: number): string {
 	return new Intl.NumberFormat(current === "zh" ? "zh-CN" : "en-US").format(n);
+}
+
+/** A size on disk in the units Finder uses (1 KB = 1000 bytes): "512 B", "61 KB", "4.3 MB". */
+export function formatBytes(bytes: number): string {
+	const units = ["B", "KB", "MB", "GB", "TB"];
+	let value = Math.max(0, bytes);
+	let unit = 0;
+	while (value >= 999.5 && unit < units.length - 1) {
+		value /= 1000;
+		unit += 1;
+	}
+	const digits = unit > 0 && value < 9.95 ? 1 : 0;
+	const number = new Intl.NumberFormat(current === "zh" ? "zh-CN" : "en-US", {
+		minimumFractionDigits: digits,
+		maximumFractionDigits: digits,
+	}).format(value);
+	return `${number} ${units[unit]}`;
 }
 
 export function formatCost(n: number): string {

@@ -327,6 +327,20 @@ export class Agents {
 		return this.#live.has(sessionId);
 	}
 
+	/**
+	 * Whether a command of this session may still be writing its output file: a turn is running, or a
+	 * background command has not ended. The data cleanup leaves such a session's files alone.
+	 */
+	hasLiveCommands(sessionId: string): boolean {
+		if (this.isRunning(sessionId)) return true;
+		return (
+			this.#jobs
+				.get(sessionId)
+				?.list()
+				.some((job) => !job.finished) ?? false
+		);
+	}
+
 	/** Resolves when the session is not running. */
 	async whenIdle(sessionId: string): Promise<void> {
 		await this.#live.get(sessionId)?.done;
