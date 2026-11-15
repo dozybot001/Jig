@@ -82,3 +82,10 @@ describe("jig export", () => {
 		await assert.rejects(exportCommand().run([], io), /needs one folder/);
 	});
 });
+
+test("JIG_KEYCHAIN=off keeps keys in memory, away from the system keychain", async () => {
+	const { MemoryKeyStore, systemKeys } = await import("../src/server/keys.ts");
+	const keys = systemKeys("provider", { JIG_KEYCHAIN: "off" });
+	assert.ok(keys instanceof MemoryKeyStore);
+	assert.equal(await keys.get("deepseek"), null);
+});

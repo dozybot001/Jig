@@ -36,6 +36,16 @@ export class KeychainStore implements KeyStore {
 	}
 }
 
+/**
+ * The key store Jig runs with: the system keychain, or one in memory when `JIG_KEYCHAIN=off`.
+ * The keychain is shared by every data folder on this computer, so a Jig started on a scratch
+ * `JIG_HOME` to try something out would otherwise hold the real API keys and could call a model
+ * with them. With the switch off it starts with no keys and forgets what is saved when it stops.
+ */
+export function systemKeys(prefix = "provider", env: NodeJS.ProcessEnv = process.env): KeyStore {
+	return env.JIG_KEYCHAIN === "off" ? new MemoryKeyStore() : new KeychainStore(prefix);
+}
+
 /** For tests: keeps keys in memory. */
 export class MemoryKeyStore implements KeyStore {
 	readonly #keys = new Map<string, string>();

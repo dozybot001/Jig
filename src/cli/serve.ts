@@ -136,10 +136,10 @@ export function serveCommand(): Command {
 				userHome: homedir(),
 			});
 			const { RemoteAccess } = await import("../remote/access.ts");
-			const { KeychainStore } = await import("../server/keys.ts");
+			const { systemKeys } = await import("../server/keys.ts");
 			// A paired phone's requests run in-process against the same app, as that device.
 			let handle: ((request: Request, device: string) => Promise<Response>) | null = null;
-			const remote = new RemoteAccess(store, new KeychainStore("remote"), {
+			const remote = new RemoteAccess(store, systemKeys("remote"), {
 				version: VERSION,
 				log,
 				handle: async (request, device) => {

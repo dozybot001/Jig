@@ -1,7 +1,7 @@
 import { VERSION } from "../shared/version.ts";
 import { openDatabase } from "./db/database.ts";
 import { EventBus } from "./events.ts";
-import { KeychainStore, type KeyStore } from "./keys.ts";
+import { type KeyStore, systemKeys } from "./keys.ts";
 import { ModelGateway } from "./model/gateway.ts";
 import { dbPath, ensureDir, jigHome } from "./paths.ts";
 import { Store } from "./store.ts";
@@ -23,7 +23,7 @@ export function openRuntime(
 	const bus = new EventBus();
 	const db = openDatabase(dbPath(home));
 	const store = new Store(db, bus);
-	const keys = options.keys ?? new KeychainStore();
+	const keys = options.keys ?? systemKeys();
 	const gateway = new ModelGateway({ keys, version: VERSION, custom: store.listCustomProviders() });
 	return { home, store, bus, keys, gateway, close: () => db.close() };
 }

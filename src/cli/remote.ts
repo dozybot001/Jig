@@ -94,10 +94,10 @@ export function remoteCommand(): Command {
 					io.stderr.write("jig: turn on phone access first: jig remote on\n");
 					return EXIT_ERROR;
 				}
-				const { KeychainStore } = await import("../server/keys.ts");
+				const { systemKeys } = await import("../server/keys.ts");
 				const { loadIdentity, createPairing } = await import("../remote/identity.ts");
 				const { desktopName } = await import("../remote/access.ts");
-				const identity = await loadIdentity(new KeychainStore("remote"));
+				const identity = await loadIdentity(systemKeys("remote"));
 				const { link, expiresAt } = createPairing(store, identity, {
 					relay: settings.relayUrl,
 					name: desktopName(),
