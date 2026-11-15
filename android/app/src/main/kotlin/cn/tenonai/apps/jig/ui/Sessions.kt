@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -139,12 +140,19 @@ fun SessionScreen(model: AppModel, session: SessionSummary, close: () -> Unit) {
     var status by remember { mutableStateOf(session.status) }
     var draft by remember { mutableStateOf<String?>(null) }
     var loaded by remember { mutableStateOf(false) }
+    // Where the part of the record before what is shown ends; null when all of it is shown.
+    var older by remember { mutableStateOf<Int?>(null) }
+    var loadingOlder by remember { mutableStateOf(false) }
     var message by rememberSaveable { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
 
     suspend fun load(): Int? {
         val transcript = model.transcript(session.id) ?: return null
-        entries = transcript.entries
+        // Read again after a drop: earlier parts that were already read stay.
+        val first = transcript.entries.firstOrNull()?.seq
+        val kept = if (first == null) emptyList() else entries.filter { it.seq < first }
+        if (kept.isEmpty()) older = transcript.olderCursor
+        entries = kept + transcript.entries
         status = transcript.session.status
         loaded = true
         return transcript.session.eventSeq
@@ -191,7 +199,9 @@ fun SessionScreen(model: AppModel, session: SessionSummary, close: () -> Unit) {
     val list = rememberLazyListState()
     val working = status == "working"
     val rows = steps.size + (if (!draft.isNullOrEmpty()) 1 else 0) + (if (working) 1 else 0)
-    LaunchedEffect(rows, draft?.length) { if (rows > 0) list.scrollToItem(rows - 1, Int.MAX_VALUE / 2) }
+    // New entries at the end bring the end into view; reading an earlier part leaves the view where it is.
+    val last = entries.lastOrNull()?.id
+    LaunchedEffect(last, working, draft?.length) { if (rows > 0) list.scrollToItem(list.layoutInfo.totalItemsCount - 1, Int.MAX_VALUE / 2) }
 
     Screen(
         title = session.name,
@@ -221,6 +231,8 @@ fun SessionScreen(model: AppModel, session: SessionSummary, close: () -> Unit) {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             if (loaded && entries.isEmpty()) Empty(Icons.Chat, stringResource(R.string.messages_empty))
+            // Reading the record through the relay can take seconds; the screen says it is on its way.
+            if (!loaded) CircularProgressIndicator(Modifier.align(Alignment.Center), color = colors.soft)
             SelectionContainer {
                 LazyColumn(
                     state = list,
@@ -228,6 +240,26 @@ fun SessionScreen(model: AppModel, session: SessionSummary, close: () -> Unit) {
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
+                    val before = older
+                    if (before != null) {
+                        item(key = "older") {
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                CapsuleButton(
+                                    stringResource(R.string.messages_older), kind = ButtonKind.Secondary, busy = loadingOlder,
+                                    onClick = {
+                                        loadingOlder = true
+                                        model.go {
+                                            model.transcript(session.id, before)?.let { page ->
+                                                entries = page.entries + entries
+                                                older = page.olderCursor
+                                            }
+                                            loadingOlder = false
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
                     items(steps, key = { it.id }) { StepView(it) }
                     if (!draft.isNullOrEmpty()) item(key = "draft") { AnswerText(draft.orEmpty()) }
                     if (working) {

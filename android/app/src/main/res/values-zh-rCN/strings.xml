@@ -38,6 +38,7 @@
         <item quantity="other">%d 条未读</item>
     </plurals>
     <string name="messages_empty">还没有消息</string>
+    <string name="messages_older">更早的记录</string>
     <string name="message_hint">消息</string>
     <string name="send">发送</string>
     <string name="stop">停下</string>

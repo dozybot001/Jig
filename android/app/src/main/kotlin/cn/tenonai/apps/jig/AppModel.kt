@@ -48,6 +48,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
+/** How many entries of a session's record the phone reads at a time. */
+const val TRANSCRIPT_PAGE = 30
+
 /** How the connection to the computer is doing, for the banner and the settings screen. */
 enum class Link {
     Connecting,
@@ -333,9 +336,14 @@ class AppModel(private val context: Context) {
         scope.launch { refreshSessions() }
     }
 
-    suspend fun transcript(sessionId: String): Transcript? {
+    /**
+     * The latest part of a session's record, or the part before [before]. A page is small because
+     * the whole of it crosses the relay before anything shows; older parts are read when asked for.
+     */
+    suspend fun transcript(sessionId: String, before: Int? = null): Transcript? {
         var result: Transcript? = null
-        attempt { result = Transcript.from(it.get("/api/sessions/$sessionId/transcript?limit=100")) }
+        val older = if (before != null) "&before=$before" else ""
+        attempt { result = Transcript.from(it.get("/api/sessions/$sessionId/transcript?limit=$TRANSCRIPT_PAGE$older")) }
         return result
     }
 

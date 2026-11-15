@@ -44,6 +44,7 @@
         <item quantity="other">%d unread</item>
     </plurals>
     <string name="messages_empty">No messages yet</string>
+    <string name="messages_older">Earlier messages</string>
     <string name="message_hint">Message</string>
     <string name="send">Send</string>
     <string name="stop">Stop</string>

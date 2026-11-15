@@ -113,11 +113,16 @@ class Entry(
     }
 }
 
-class Transcript(val session: SessionSummary, val entries: List<Entry>) {
+class Transcript(
+    val session: SessionSummary,
+    val entries: List<Entry>,
+    /** Where the page before this one ends, when there is one: the `before` of the next request. */
+    val olderCursor: Int?,
+) {
     companion object {
         fun from(json: JsonObject): Transcript? {
             val session = json.obj("session")?.let(SessionSummary::from) ?: return null
-            return Transcript(session, json.objects("entries").mapNotNull(Entry::from))
+            return Transcript(session, json.objects("entries").mapNotNull(Entry::from), json.int("olderCursor"))
         }
     }
 }

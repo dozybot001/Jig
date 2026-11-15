@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +59,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -73,6 +75,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.tenonai.apps.jig.R
 import cn.tenonai.apps.jig.api.Choice
+import cn.tenonai.apps.jig.api.InlineKind
+import cn.tenonai.apps.jig.api.inlinePieces
 
 /** A screen with a title bar: Back at the left when it was opened over another, actions at the right. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -346,49 +350,27 @@ fun GrowingField(
 
 /**
  * Text with its inline Markdown shown as such: `code`, **bold** and [links](https://…). Anything
- * else stays as written.
+ * else stays as written. Worked out once per text, not on every redraw.
  */
 @Composable
 fun inlineMarkdown(text: String): AnnotatedString {
-    val code = SpanStyle(fontFamily = FontFamily.Monospace, background = colors.bubble)
-    val link = SpanStyle(textDecoration = TextDecoration.Underline)
-    return buildAnnotatedString {
-        var i = 0
-        while (i < text.length) {
-            val rest = text.substring(i)
-            when {
-                rest.startsWith("`") && rest.indexOf('`', 1) > 1 -> {
-                    val end = rest.indexOf('`', 1)
-                    withStyle(code) { append(rest.substring(1, end)) }
-                    i += end + 1
-                }
-                rest.startsWith("**") && rest.indexOf("**", 2) > 2 -> {
-                    val end = rest.indexOf("**", 2)
-                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(rest.substring(2, end)) }
-                    i += end + 2
-                }
-                rest.startsWith("[") -> {
-                    val match = LINK.find(rest)
-                    if (match != null && match.range.first == 0) {
-                        withLink(LinkAnnotation.Url(match.groupValues[2], androidx.compose.ui.text.TextLinkStyles(link))) {
-                            append(match.groupValues[1])
-                        }
-                        i += match.value.length
-                    } else {
-                        append('[')
-                        i += 1
-                    }
-                }
-                else -> {
-                    append(text[i])
-                    i += 1
+    val codeBackground = colors.bubble
+    return remember(text, codeBackground) {
+        val code = SpanStyle(fontFamily = FontFamily.Monospace, background = codeBackground)
+        val bold = SpanStyle(fontWeight = FontWeight.SemiBold)
+        val link = TextLinkStyles(SpanStyle(textDecoration = TextDecoration.Underline))
+        buildAnnotatedString {
+            for (piece in inlinePieces(text)) {
+                when (piece.kind) {
+                    InlineKind.Plain -> append(piece.text)
+                    InlineKind.Code -> withStyle(code) { append(piece.text) }
+                    InlineKind.Bold -> withStyle(bold) { append(piece.text) }
+                    InlineKind.Link -> withLink(LinkAnnotation.Url(piece.url.orEmpty(), link)) { append(piece.text) }
                 }
             }
         }
     }
 }
-
-private val LINK = Regex("""^\[([^\]\n]+)]\((https?://[^)\s]+)\)""")
 
 /** The default text style of the content colour, for places that need one as a value. */
 @Composable

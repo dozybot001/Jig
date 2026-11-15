@@ -3,6 +3,8 @@ package cn.tenonai.apps.jig
 import cn.tenonai.apps.jig.api.ApprovalItem
 import cn.tenonai.apps.jig.api.Center
 import cn.tenonai.apps.jig.api.Entry
+import cn.tenonai.apps.jig.api.InlineKind
+import cn.tenonai.apps.jig.api.inlinePieces
 import cn.tenonai.apps.jig.api.SseParser
 import cn.tenonai.apps.jig.api.Step
 import cn.tenonai.apps.jig.api.ToolKinds
@@ -92,5 +94,24 @@ class ApiTest {
         val clear = checkNotNull(Note.parse("""{"v":1,"clear":["n1","n2"],"badge":0}"""))
         assertEquals(listOf("n1", "n2"), clear.clear)
         assertNull(Note.parse("not json"))
+    }
+
+    @Test
+    fun inlineMarkdownIsCutInOnePass() {
+        val pieces = inlinePieces("改了 `auth/session.ts`，**48 个**测试通过，见 [说明](https://example.com/a)。`没闭合 和 **也没闭合 [不是链接](ftp://x)")
+        assertEquals(
+            listOf(
+                InlineKind.Plain to "改了 ", InlineKind.Code to "auth/session.ts", InlineKind.Plain to "，",
+                InlineKind.Bold to "48 个", InlineKind.Plain to "测试通过，见 ", InlineKind.Link to "说明",
+                InlineKind.Plain to "。`没闭合 和 **也没闭合 [不是链接](ftp://x)",
+            ),
+            pieces.map { it.kind to it.text },
+        )
+        assertEquals("https://example.com/a", pieces[5].url)
+        // A long answer full of marks that never close: cutting it must not take longer per character.
+        val long = "`开头一个没闭合的，**也是，" + "一段很长的回复，带着 [ 和 * 的文字。".repeat(40_000)
+        val started = System.nanoTime()
+        assertEquals(long, inlinePieces(long).joinToString("") { it.text })
+        assertTrue((System.nanoTime() - started) / 1_000_000 < 3_000)
     }
 }
