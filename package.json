@@ -1,6 +1,6 @@
 {
 	"name": "@tenonai/jig",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "An AI-native multi-agent workbench",
 	"keywords": [
 		"agent",
