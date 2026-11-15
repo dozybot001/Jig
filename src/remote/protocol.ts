@@ -76,11 +76,18 @@ export interface Welcome {
 /**
  * Requests and responses inside the channel: the phone uses the Mac's local API as the web interface
  * does. A streamed response (the event stream) comes as `head`, then `chunk`s, then `end`.
+ *
+ * A phone that puts `z: 1` on a request can read a compressed answer: a body of `COMPRESS_FROM`
+ * characters or more then comes back with `z: 1` and `body` as base64 of the raw DEFLATE of its
+ * UTF-8 text. A long transcript shrinks to about a fifth, which is what a slow link to the relay
+ * needs. Phones that do not ask get the text as before.
  */
+export const COMPRESS_FROM = 1024;
+
 export type ChannelMessage =
-	| { t: "req"; id: number; method: string; path: string; body?: string }
+	| { t: "req"; id: number; method: string; path: string; body?: string; z?: 1 }
 	| { t: "cancel"; id: number }
-	| { t: "res"; id: number; status: number; type: string; body: string }
+	| { t: "res"; id: number; status: number; type: string; body: string; z?: 1 }
 	| { t: "head"; id: number; status: number; type: string }
 	| { t: "chunk"; id: number; data: string }
 	| { t: "end"; id: number };

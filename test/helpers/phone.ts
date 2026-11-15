@@ -1,3 +1,4 @@
+import { inflateRawSync } from "node:zlib";
 import WebSocket from "ws";
 import {
 	generateKeyPair,
@@ -79,6 +80,10 @@ export class TestPhone {
 		return welcome;
 	}
 
+	/** Ask for compressed answers, as the apps do; `packed` says whether the last one was. */
+	compress = false;
+	packed = false;
+
 	/** One request; resolves with the status and the parsed body. */
 	request(
 		method: string,
@@ -90,10 +95,13 @@ export class TestPhone {
 			this.#pending.set(id, (message) => {
 				if (message.t !== "res") return;
 				this.#pending.delete(id);
+				this.packed = message.z === 1;
+				const text = this.packed
+					? inflateRawSync(Buffer.from(message.body, "base64")).toString("utf8")
+					: message.body;
 				resolve({
 					status: message.status,
-					body:
-						message.body && message.type.includes("json") ? JSON.parse(message.body) : message.body,
+					body: text && message.type.includes("json") ? JSON.parse(text) : text,
 				});
 			});
 			this.#send({
@@ -102,6 +110,7 @@ export class TestPhone {
 				method,
 				path,
 				...(body === undefined ? {} : { body: JSON.stringify(body) }),
+				...(this.compress ? { z: 1 as const } : {}),
 			});
 		});
 	}

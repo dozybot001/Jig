@@ -79,7 +79,8 @@ actor RelayChannel {
 		guard let socket, var cipher = sender else { throw URLError(.networkConnectionLost) }
 		let id = nextId
 		nextId += 1
-		var message: [String: Any] = ["t": "req", "id": id, "method": method, "path": path]
+		// "z": the Mac may answer with the body compressed; long transcripts come much sooner on a slow link.
+		var message: [String: Any] = ["t": "req", "id": id, "method": method, "path": path, "z": 1]
 		if let body { message["body"] = String(decoding: body, as: UTF8.self) }
 		let parts = try noiseSeal(&cipher, JSONSerialization.data(withJSONObject: message))
 		sender = cipher
@@ -164,11 +165,24 @@ actor RelayChannel {
 			let status: Int?
 			let body: String?
 			let data: String?
+			let z: Int?
 		}
 		guard let reply = try? JSONDecoder().decode(Reply.self, from: data) else { return }
 		switch reply.t {
 		case "res":
-			waiting.removeValue(forKey: reply.id)?.resume(returning: (Data((reply.body ?? "").utf8), reply.status ?? 0))
+			guard let waiter = waiting.removeValue(forKey: reply.id) else { return }
+			if reply.z == 1 {
+				// Base64 of the raw DEFLATE of the body (what NSData calls zlib).
+				guard let packed = Data(base64Encoded: reply.body ?? ""),
+					let body = try? (packed as NSData).decompressed(using: .zlib) as Data
+				else {
+					waiter.resume(throwing: URLError(.cannotDecodeContentData))
+					return
+				}
+				waiter.resume(returning: (body, reply.status ?? 0))
+			} else {
+				waiter.resume(returning: (Data((reply.body ?? "").utf8), reply.status ?? 0))
+			}
 		case "chunk":
 			streams[reply.id]?.yield(reply.data ?? "")
 		case "end":

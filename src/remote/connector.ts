@@ -1,8 +1,15 @@
+import { deflateRawSync } from "node:zlib";
 import type { Store } from "../server/store.ts";
 import type { Device } from "../shared/types.ts";
 import { consumePairing, type Identity, signChallenge } from "./identity.ts";
 import { Opener, Responder, type Session, seal } from "./noise.ts";
-import { type ChannelMessage, type Hello, prologueFor, type Welcome } from "./protocol.ts";
+import {
+	type ChannelMessage,
+	COMPRESS_FROM,
+	type Hello,
+	prologueFor,
+	type Welcome,
+} from "./protocol.ts";
 import type { PushJob, PushResult } from "./push.ts";
 
 /**
@@ -259,12 +266,15 @@ class Channel {
 			const response = await this.#options.handle(request, device);
 			const type = response.headers.get("Content-Type") ?? "";
 			if (!type.startsWith("text/event-stream") || !response.body) {
+				const body = await response.text();
+				const packed = message.z === 1 && body.length >= COMPRESS_FROM;
 				this.#send({
 					t: "res",
 					id: message.id,
 					status: response.status,
 					type,
-					body: await response.text(),
+					body: packed ? deflateRawSync(body).toString("base64") : body,
+					...(packed ? { z: 1 as const } : {}),
 				});
 				return;
 			}

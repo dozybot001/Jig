@@ -225,6 +225,34 @@ describe("the relay", () => {
 		}
 	});
 
+	test("a phone that asks gets long answers compressed; others get them as before", async () => {
+		const { remote, store, close } = await setup();
+		try {
+			for (let n = 0; n < 12; n++) {
+				store.createSession({
+					name: `一个名字很长的会话，用来把列表撑过压缩的门槛 ${n}`,
+					kind: "standing",
+					provider: "p",
+					model: "m",
+				});
+			}
+			const phone = new TestPhone();
+			await phone.connect(await pair(remote), { pair: true });
+			const plain = await phone.request("GET", "/api/sessions");
+			assert.equal(phone.packed, false);
+			phone.compress = true;
+			const packed = await phone.request("GET", "/api/sessions");
+			assert.equal(phone.packed, true);
+			assert.deepEqual(packed.body, plain.body);
+			// A short answer is not worth compressing.
+			assert.equal((await phone.request("POST", "/api/devices/pairing")).status, 403);
+			assert.equal(phone.packed, false);
+			phone.close();
+		} finally {
+			await close();
+		}
+	});
+
 	test("a phone may remove itself when it unpairs, but no other phone", async () => {
 		const { remote, store, close } = await setup();
 		try {
