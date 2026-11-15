@@ -4,8 +4,9 @@
 //   node android/scripts/test-computer.ts <folder>
 // It writes the pairing link to <folder>/link.txt and takes commands as one line written to
 // <folder>/cmd:  pair | ask <command> | settle | drop | status
-// On the emulator, `adb reverse tcp:8791 tcp:8791` makes 127.0.0.1:8791 reach this relay; a debug
-// build then pairs with `adb shell am start -n cn.tenonai.apps.jig.debug/cn.tenonai.apps.jig.MainActivity --es jig.pair '<link>'`.
+// On the emulator (always name it: `-s emulator-5570` is Jig's own, see docs/android.md),
+// `adb -s <serial> reverse tcp:8791 tcp:8791` makes 127.0.0.1:8791 reach this relay; a debug
+// build then pairs with `adb -s <serial> shell am start -n cn.tenonai.apps.jig.debug/cn.tenonai.apps.jig.MainActivity --es jig.pair '<link>'`.
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import WebSocket from "ws";

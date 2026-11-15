@@ -65,11 +65,18 @@
 
 ```bash
 node android/scripts/test-computer.ts /tmp/jig-android    # 配对链接写在 /tmp/jig-android/link.txt
-adb reverse tcp:8791 tcp:8791
-adb shell am start -n cn.tenonai.apps.jig.debug/cn.tenonai.apps.jig.MainActivity --es jig.pair "'$(cat /tmp/jig-android/link.txt)'"
+emulator -avd jig37 -port 5570 &                            # Jig 自己的模拟器，固定端口，序列号 emulator-5570
+adb -s emulator-5570 reverse tcp:8791 tcp:8791
+adb -s emulator-5570 shell am start -n cn.tenonai.apps.jig.debug/cn.tenonai.apps.jig.MainActivity --es jig.pair "'$(cat /tmp/jig-android/link.txt)'"
 echo "ask git push origin main" > /tmp/jig-android/cmd      # 电脑端出现一个待授权的操作，手机收到通知
 echo settle > /tmp/jig-android/cmd                          # 电脑端处理掉，手机上的通知撤下
 ```
+
+这台 Mac 上别的会话也在用模拟器，创始人的真机也可能连着，所以：
+
+- 每条 `adb` 命令都带 `-s <序列号>`，不用不带序列号的 `adb`，也不「关掉全部模拟器」。Jig 的两台模拟器 `jig37`、`jig26` 固定用端口 5570 和 5572（序列号 `emulator-5570`、`emulator-5572`），操作前用 `adb -s <序列号> emu avd name` 核对是自己那台，结束时只关自己那台。
+- 真机（创始人的 Redmi）上有他的真实数据：没有他在本会话里明说，不往上装包、不操作。
+- 2026-11-15 15:41 我犯过一次错：没核对就认定 `emulator-5554` 是自己的，其实那是 PassBy 会话的 `passby37`。我往它上面装了 Jig 的调试包、打开过、点了一下、截了图，然后把它关了机；没有动 PassBy 的应用和数据。自己的 `jig37` 当时起在 5556 上，被留着没关。已告诉 PassBy 会话。
 
 ## 4. 设计
 
