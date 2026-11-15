@@ -196,6 +196,24 @@ export interface Letter {
 	deliveredAt: number | null;
 }
 
+/** Letters one session sent another within the map's window, added up for one line on the map. */
+export interface LetterFlow {
+	from: string;
+	to: string;
+	count: number;
+	/** When the latest of them was sent. */
+	lastAt: number;
+}
+
+/**
+ * What the sessions map adds to the session list (blueprint 6.9, item 26): who wrote to whom since
+ * `since`, the busiest pair first. Archived sessions are left out.
+ */
+export interface SessionMap {
+	since: number;
+	letters: LetterFlow[];
+}
+
 export interface CardOption {
 	label: string;
 	detail?: string;

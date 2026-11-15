@@ -179,7 +179,7 @@ export interface AppState {
 	 * The approval center is a page of its own: you go there to clear what waits across sessions, and
 	 * into a session to work on one thing (founder, 2026-11-09). Null shows the session or home.
 	 */
-	page: "center" | "schedules" | "artifacts" | "usage" | null;
+	page: "center" | "schedules" | "artifacts" | "usage" | "map" | null;
 	centerTab: CenterTab;
 	/** Scheduled tasks, read when their page first opens; null until then. */
 	schedules: Schedule[] | null;
@@ -188,6 +188,11 @@ export interface AppState {
 	artifactId: string | null;
 	/** The sessions list shows one team's sessions; null shows all (blueprint section 8). */
 	teamFilter: string | null;
+	/**
+	 * Goes up with every letter that is sent or changes state, and when the event stream reconnects:
+	 * the sessions map reads its letter lines again when it does.
+	 */
+	letterTick: number;
 }
 
 /** How many things wait for the person: approvals, questions, cards and held letters. */
@@ -249,6 +254,7 @@ let state: AppState = {
 	artifacts: null,
 	artifactId: null,
 	teamFilter: null,
+	letterTick: 0,
 };
 
 const listeners = new Set<() => void>();

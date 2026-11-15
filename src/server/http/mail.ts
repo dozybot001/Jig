@@ -1,9 +1,13 @@
 import { Hono } from "hono";
+import type { SessionMap } from "../../shared/types.ts";
 import { invalid } from "../errors.ts";
 import type { PostOffice } from "../mail/post.ts";
 import { idempotent } from "./idempotency.ts";
 import { optEnum, optString, pageParams, readJson } from "./input.ts";
 import type { AppEnv } from "./problem.ts";
+
+/** How far back the sessions map looks for letters. */
+const MAP_WINDOW_MS = 24 * 3600 * 1000;
 
 /** The approval center, decisions and letters (M2 plan, section 8). */
 export function mailRoutes(post: PostOffice): Hono<AppEnv> {
@@ -47,6 +51,13 @@ export function mailRoutes(post: PostOffice): Hono<AppEnv> {
 		const { limit, cursor } = pageParams(c);
 		const session = c.req.query("session") ?? null;
 		return c.json(post.mail.listLetters({ sessionId: session, cursor, limit }));
+	});
+
+	// The sessions map: letters of the last 24 hours added up per sender and receiver. The sessions
+	// themselves come from /sessions; a phone that may read those and the letters may read this.
+	app.get("/map", (c) => {
+		const since = Date.now() - MAP_WINDOW_MS;
+		return c.json({ since, letters: post.mail.letterFlows(since) } satisfies SessionMap);
 	});
 
 	app.post("/letters/:id/release", (c) => c.json(post.release(c.req.param("id"))));

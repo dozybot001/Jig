@@ -6,6 +6,7 @@ import {
 	exportSession,
 	openArtifacts,
 	openCenter,
+	openMap,
 	openSchedules,
 	openUsage,
 	renameGroup,
@@ -17,6 +18,7 @@ import {
 } from "../actions.ts";
 import { api } from "../api.ts";
 import { formatAgo, t, useLang } from "../i18n.ts";
+import { blockedSessions } from "../progress.ts";
 import {
 	centerCount,
 	setSidebarCollapsed,
@@ -41,6 +43,7 @@ import {
 	FolderIcon,
 	JigMark,
 	MainIcon,
+	MapIcon,
 	MenuPinIcon,
 	NewTeamIcon,
 	NewWorkspaceIcon,
@@ -424,12 +427,15 @@ function SessionRow({
 	selected,
 	groups,
 	now,
+	blocked = false,
 	depth = 0,
 }: {
 	session: Session;
 	selected: boolean;
 	groups: Group[];
 	now: number;
+	/** Something of this session's waits in the approval center, whatever the session does meanwhile. */
+	blocked?: boolean;
 	/** Sessions opened by another are listed under it, indented (blueprint section 8). */
 	depth?: number;
 }) {
@@ -497,7 +503,11 @@ function SessionRow({
 						{session.name}
 						<span className="visually-hidden">
 							{" "}
-							· {session.cwd ? t("mode_code") : t("mode_chat")} · {t(`status_${session.status}`)}
+							· {session.cwd ? t("mode_code") : t("mode_chat")} ·{" "}
+							{t(`status_${blocked && session.status === "idle" ? "waiting" : session.status}`)}
+							{blocked && !["idle", "waiting"].includes(session.status)
+								? ` · ${t("status_waiting")}`
+								: ""}
 							{isMain ? ` · ${t("mainConversation")}` : ""}
 							{team ? ` · ${team}` : ""}
 							{session.pinned ? ` · ${t("pinned")}` : ""}
@@ -512,6 +522,9 @@ function SessionRow({
 					 */}
 					{session.status !== "idle" ? (
 						<span className={`dot row-dot dot-${session.status}`} aria-hidden="true" />
+					) : blocked ? (
+						// Idle, with a decision card of its own in the approval center: it waits for you too.
+						<span className="dot row-dot dot-waiting" aria-hidden="true" />
 					) : session.unread > 0 ? (
 						<span className="unread-count" aria-hidden="true">
 							{session.unread}
@@ -650,6 +663,7 @@ function FixedEntries() {
 	const onSchedules = useAppState((state) => state.page === "schedules");
 	const onArtifacts = useAppState((state) => state.page === "artifacts");
 	const onUsage = useAppState((state) => state.page === "usage");
+	const onMap = useAppState((state) => state.page === "map");
 	return (
 		<>
 			{mainId && mainName && (
@@ -701,6 +715,15 @@ function FixedEntries() {
 			>
 				<ArtifactIcon />
 				<span className="nav-label">{t("artifacts")}</span>
+			</button>
+			<button
+				type="button"
+				className="nav-row"
+				aria-current={onMap ? "page" : undefined}
+				onClick={() => openMap()}
+			>
+				<MapIcon />
+				<span className="nav-label">{t("map")}</span>
 			</button>
 			<button
 				type="button"
@@ -856,6 +879,7 @@ export function SidebarRail() {
 	const onSchedules = useAppState((state) => state.page === "schedules");
 	const onArtifacts = useAppState((state) => state.page === "artifacts");
 	const onUsage = useAppState((state) => state.page === "usage");
+	const onMap = useAppState((state) => state.page === "map");
 	const [dialog, setDialog] = useState<"team" | "workspace" | null>(null);
 	return (
 		<nav className="rail" aria-label={t("sessions")}>
@@ -919,6 +943,15 @@ export function SidebarRail() {
 				onClick={() => openArtifacts()}
 			>
 				<ArtifactIcon />
+			</Button>
+			<Button
+				variant="icon"
+				aria-label={t("map")}
+				title={t("map")}
+				aria-current={onMap ? "page" : undefined}
+				onClick={() => openMap()}
+			>
+				<MapIcon />
 			</Button>
 			<Button
 				variant="icon"
@@ -993,6 +1026,8 @@ export function Sidebar() {
 	const hasArchived = useAppState((state) => state.hasArchived);
 	const chosen = useAppState((state) => state.teamFilter);
 	const now = useNow();
+	const center = useAppState((state) => state.center);
+	const blocked = blockedSessions(Object.values(center.approvals), Object.values(center.cards));
 	const [newSession, setNewSession] = useState<string | null>(null);
 
 	// A filter for a team that was deleted meanwhile shows everything.
@@ -1011,6 +1046,7 @@ export function Sidebar() {
 			selected={session.id === current}
 			groups={groups}
 			now={now}
+			blocked={blocked.has(session.id)}
 			depth={depth}
 		/>
 	);

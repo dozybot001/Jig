@@ -4,6 +4,7 @@ import type {
 	CardOption,
 	CardStatus,
 	Letter,
+	LetterFlow,
 	LetterKind,
 	LetterStatus,
 	Page,
@@ -339,6 +340,30 @@ export class MailStore {
 				AND status != 'refused' ORDER BY created_at, id`,
 		).all(from, to, since) as unknown as LetterRow[];
 		return rows.map(toLetter);
+	}
+
+	/**
+	 * For the sessions map: how many letters went from one session to another since a time, the busiest
+	 * pair first. Letters that were refused or dropped never arrived and are left out, as are letters to
+	 * or from an archived session, which the map does not show.
+	 */
+	letterFlows(since: number): LetterFlow[] {
+		const rows = this.#q(
+			`SELECT l.from_session AS sender, l.to_session AS receiver, COUNT(*) AS n, MAX(l.created_at) AS last
+				FROM letters l
+				JOIN sessions a ON a.id = l.from_session AND a.archived_at IS NULL
+				JOIN sessions b ON b.id = l.to_session AND b.archived_at IS NULL
+				WHERE l.created_at >= ? AND l.from_session != l.to_session
+					AND l.status NOT IN ('refused', 'dropped')
+				GROUP BY l.from_session, l.to_session
+				ORDER BY n DESC, last DESC, sender, receiver`,
+		).all(since) as { sender: string; receiver: string; n: number; last: number }[];
+		return rows.map((row) => ({
+			from: row.sender,
+			to: row.receiver,
+			count: row.n,
+			lastAt: row.last,
+		}));
 	}
 
 	/** All letters, newest first; with a session, the ones it sent or received. */

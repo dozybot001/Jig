@@ -39,6 +39,7 @@ import {
 	TodoIcon,
 	TodoPendingIcon,
 } from "./icons.tsx";
+import { ProgressLine } from "./progress.tsx";
 import { Transcript } from "./transcript.tsx";
 import { Button, ErrorBox, Select, useAction } from "./ui.tsx";
 import { useWorkspaces, WorkspacePicker, workspaceLabel } from "./workspaces.tsx";
@@ -179,7 +180,13 @@ export function SidebarToggle({ className = "" }: { className?: string }) {
 }
 
 /** The header names the session; its actions live in the composer and in the sidebar's row menu. */
-function SessionHeader({ session }: { session: Session }) {
+function SessionHeader({
+	session,
+	transcript,
+}: {
+	session: Session;
+	transcript: TranscriptState | null;
+}) {
 	useLang();
 	const workspaces = useWorkspaces();
 	const isMain = useAppState((state) => state.settings?.mainSessionId === session.id);
@@ -193,8 +200,9 @@ function SessionHeader({ session }: { session: Session }) {
 		<header className="session-header">
 			<SidebarToggle />
 			{/* The title takes the left; marks, status and usage sit on the right and give way first. */}
-			<div className="session-title">
+			<div className="session-title session-title-stack">
 				<h1>{session.name}</h1>
+				<ProgressLine session={session} transcript={transcript} />
 			</div>
 			<div className="session-aside">
 				{isMain && <span className="tag">{t("mainConversation")}</span>}
@@ -655,7 +663,10 @@ export function SessionView() {
 	}
 	return (
 		<main className="main">
-			<SessionHeader session={session} />
+			<SessionHeader
+				session={session}
+				transcript={transcript && transcript.sessionId === session.id ? transcript : null}
+			/>
 			<div className="session-body">
 				{transcript && transcript.sessionId === session.id ? (
 					<Transcript transcript={transcript} />

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { boot } from "./actions.ts";
 import { ArtifactsPage } from "./components/artifacts.tsx";
 import { CenterPage } from "./components/center.tsx";
+import { MapPage } from "./components/map.tsx";
 import { SchedulesPage } from "./components/schedules.tsx";
 import { SessionView } from "./components/session.tsx";
 import { SettingsDialogs } from "./components/settings.tsx";
@@ -93,6 +94,8 @@ function App() {
 					<ArtifactsPage />
 				) : page === "usage" ? (
 					<UsagePage />
+				) : page === "map" ? (
+					<MapPage />
 				) : (
 					<SessionView />
 				)}

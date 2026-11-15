@@ -10,7 +10,7 @@ import {
 	releaseLetter,
 	selectSession,
 } from "../actions.ts";
-import { formatAgo, type MessageKey, t, useLang } from "../i18n.ts";
+import { formatAgo, formatWaited, type MessageKey, t, useLang } from "../i18n.ts";
 import { type CenterTab, centerCount, useAppState } from "../state.ts";
 import { Capped, Markdown } from "./content.tsx";
 import {
@@ -51,12 +51,17 @@ function SenderLink({ letter }: { letter: Letter }) {
 	return <SessionLink id={letter.fromSession} fallback={letter.fromName} />;
 }
 
-/** Cards with a deadline first, by deadline; then the oldest first. */
+/**
+ * Cards with a deadline first, by deadline; then the one that has waited longest first. Permission
+ * requests, questions and held letters have no deadline and are listed the one that has waited longest
+ * first.
+ */
 function byDeadline(a: Card, b: Card): number {
-	if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline) || a.number - b.number;
+	const longest = a.createdAt - b.createdAt || a.number - b.number;
+	if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline) || longest;
 	if (a.deadline) return -1;
 	if (b.deadline) return 1;
-	return a.number - b.number;
+	return longest;
 }
 
 /**
@@ -98,7 +103,7 @@ function DecisionCard({ card }: { card: Card }) {
 						<WithLink text={t("cardVia", { name: "\u0000" })} link={<SessionLink id={via} />} />
 					),
 					others.length > 0 && t("cardAlsoInvolves", { names: others.join(t("listSeparator")) }),
-					formatAgo(card.createdAt, now),
+					formatWaited(card.createdAt, now),
 				]}
 				tags={
 					<>
@@ -199,7 +204,7 @@ function HeldLetter({ letter }: { letter: Letter }) {
 						<SenderLink letter={letter} /> → <SessionLink id={letter.toSession} />
 					</>,
 					t(`letterKind_${letter.kind}`),
-					formatAgo(letter.createdAt, now),
+					formatWaited(letter.createdAt, now),
 				]}
 			/>
 			<p className="request-title">{plainLine(letter.summary) || letter.summary}</p>

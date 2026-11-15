@@ -28,6 +28,7 @@ import {
 	MessageCircleQuestion,
 	MessagesSquare,
 	Minimize2,
+	Network,
 	PanelLeftClose,
 	PanelLeftOpen,
 	PencilLine,
@@ -95,6 +96,8 @@ export const ScheduleIcon = () => <Clock {...props} />;
 export const ArtifactIcon = () => <FileText {...props} />;
 /** What sessions cost, day by day. */
 export const UsageIcon = () => <ChartColumn {...props} />;
+/** The sessions map: who opened whom and who writes to whom. */
+export const MapIcon = () => <Network {...props} />;
 /** The main conversation, where the person usually works. */
 export const MainIcon = () => <MessagesSquare {...props} />;
 /** A team in the person's organization. */

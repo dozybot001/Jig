@@ -674,7 +674,7 @@ export function Menu({
 	// Moving the mouse across other items on the way to an open submenu must not close or swap it:
 	// while the pointer heads toward the submenu, what the item under it would do waits a moment,
 	// and is dropped when the pointer arrives.
-	const aim = useRef({ x: 0, dx: 0, timer: 0 });
+	const aim = useRef({ x: 0, y: 0, dx: 0, dy: 0, timer: 0 });
 	const settle = () => {
 		window.clearTimeout(aim.current.timer);
 		aim.current.timer = 0;
@@ -683,8 +683,12 @@ export function Menu({
 		settle();
 		const side = subMenu.current?.getBoundingClientRect();
 		const own = menu.current?.getBoundingClientRect();
-		const toward = side && own && (side.left >= own.left ? aim.current.dx > 0 : aim.current.dx < 0);
-		if (sub && toward) aim.current.timer = window.setTimeout(act, 220);
+		// Heading for the submenu means moving sideways toward it, not down or up the list: going
+		// from one item to the next must switch at once.
+		const { dx, dy } = aim.current;
+		const across = side && own ? (side.left >= own.left ? dx : -dx) : 0;
+		const toward = across >= 2 && across > Math.abs(dy) * 0.5;
+		if (sub && toward) aim.current.timer = window.setTimeout(act, 160);
 		else act();
 	};
 
@@ -822,7 +826,9 @@ export function Menu({
 				onKeyDown={onKeyDown}
 				onPointerMove={(event) => {
 					aim.current.dx = event.clientX - aim.current.x;
+					aim.current.dy = event.clientY - aim.current.y;
 					aim.current.x = event.clientX;
+					aim.current.y = event.clientY;
 				}}
 			>
 				<MenuEntries entries={items} render={renderItem} />
@@ -1009,13 +1015,18 @@ export function Field({
 	);
 }
 
-/** Re-renders every minute so relative times (in the sidebar, on cards) stay current. */
-export function useNow(): number {
+/**
+ * Re-renders every minute so relative times (in the sidebar, on cards) stay current; with a shorter
+ * interval, as often as that, for a time that counts seconds. An interval of 0 does not tick.
+ */
+export function useNow(interval = 60_000): number {
 	const [now, setNow] = useState(() => Date.now());
 	useEffect(() => {
-		const timer = setInterval(() => setNow(Date.now()), 60_000);
+		if (interval <= 0) return;
+		setNow(Date.now());
+		const timer = setInterval(() => setNow(Date.now()), interval);
 		return () => clearInterval(timer);
-	}, []);
+	}, [interval]);
 	return now;
 }
 

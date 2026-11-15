@@ -29,7 +29,8 @@ import {
 	type ToolCallView,
 } from "../../../src/shared/types.ts";
 import { answerApproval, loadEarlier, markRead, selectSession, toolCallFor } from "../actions.ts";
-import { formatAgo, formatCost, hasMessage, type MessageKey, t, useLang } from "../i18n.ts";
+import { formatCost, formatWaited, hasMessage, type MessageKey, t, useLang } from "../i18n.ts";
+import { JIG_NOTE, tally } from "../progress.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
 import { ArtifactChip } from "./artifacts.tsx";
 import { Capped, Diff, Markdown, ScrollBlock, useStickToBottom } from "./content.tsx";
@@ -44,6 +45,7 @@ import {
 	SendIcon,
 	ShieldIcon,
 } from "./icons.tsx";
+import { tallyText } from "./progress.tsx";
 import { Button, CardHead, describeRule, ErrorBox, useAction, useNow } from "./ui.tsx";
 
 function resultText(result: ToolResultMessage | undefined): string {
@@ -341,11 +343,7 @@ export function PermissionCard({ approval, session }: { approval: Approval; sess
 		<section className="card request-card" aria-label={headline}>
 			<CardHead
 				icon={<ShieldIcon />}
-				parts={
-					session
-						? [session, t("waitingOnYou"), formatAgo(approval.createdAt, now)]
-						: [t("approvalTitle")]
-				}
+				parts={session ? [session, formatWaited(approval.createdAt, now)] : [t("approvalTitle")]}
 				tags={
 					request.mustConfirm ? (
 						<span className="tag" title={t("confirmEachTimeHint")}>
@@ -500,10 +498,8 @@ export function QuestionCard({ approval, session }: { approval: Approval; sessio
 						? [
 								session,
 								// A question Jig took from the end of a reply, not one asked with ask_user.
-								t(
-									(approval.request as QuestionRequest).fromReply ? "askedInReply" : "waitingOnYou",
-								),
-								formatAgo(approval.createdAt, now),
+								(approval.request as QuestionRequest).fromReply && t("askedInReply"),
+								formatWaited(approval.createdAt, now),
 							]
 						: [t("questionTitle")]
 				}
@@ -725,8 +721,6 @@ const ToolCard = memo(function ToolCard({
 	);
 });
 
-const JIG_NOTE = "[From Jig, not from the person]";
-
 /** One step of a turn's work: a thought, a tool call, or a note Jig added to the context. */
 type Step =
 	| { kind: "thinking"; key: string; text: string; live: boolean }
@@ -804,30 +798,6 @@ function buildItems(transcript: TranscriptState, working: boolean): Item[] {
 	return items;
 }
 
-const SUMMARY_KINDS = [
-	"read",
-	"edit",
-	"write",
-	"search",
-	"shell",
-	"web",
-	"letter",
-	"session",
-	"card",
-] as const;
-type SummaryKind = (typeof SUMMARY_KINDS)[number];
-
-function summaryKind(tool: string): SummaryKind | null {
-	if (tool === "read" || tool === "edit" || tool === "write") return tool;
-	if (tool === "grep" || tool === "glob") return "search";
-	if (tool === "shell" || tool === "shell_job") return "shell";
-	if (tool === "web_fetch") return "web";
-	if (tool === "send_letter") return "letter";
-	if (tool === "open_session") return "session";
-	if (tool === "post_card" || tool === "update_card" || tool === "withdraw_card") return "card";
-	return null;
-}
-
 function failed(
 	step: Step,
 	transcript: TranscriptState,
@@ -843,30 +813,14 @@ function failed(
 
 /** "读取 6 个文件，运行 4 条命令，编辑 2 处": what a run did, counted by kind. */
 function summarize(steps: Step[]): string {
-	const counts = new Map<SummaryKind, number>();
-	let thoughts = 0;
-	let others = 0;
-	for (const step of steps) {
-		if (step.kind === "thinking") thoughts++;
-		else if (step.kind === "note") others++;
-		else {
-			const kind = summaryKind(step.block.name);
-			if (kind) counts.set(kind, (counts.get(kind) ?? 0) + 1);
-			else others++;
-		}
-	}
-	const parts = SUMMARY_KINDS.filter((kind) => counts.has(kind)).map((kind) => {
-		const n = counts.get(kind) ?? 0;
-		return t(n === 1 ? `sum_${kind}_one` : `sum_${kind}`, { n });
-	});
-	if (others > 0) parts.push(t(others === 1 ? "sum_other_one" : "sum_other", { n: others }));
-	if (parts.length === 0) {
-		parts.push(t(thoughts === 1 ? "sum_think_one" : "sum_think", { n: thoughts }));
-	}
-	// "Read 1 file, ran 2 commands": only the first part keeps its capital (Chinese has none).
-	return parts
-		.map((part, index) => (index === 0 ? part : part.charAt(0).toLowerCase() + part.slice(1)))
-		.join(t("listSeparator"));
+	const tools = steps.flatMap((step) => (step.kind === "tool" ? [step.block.name] : []));
+	const counted = tally(tools);
+	const notes = steps.filter((step) => step.kind === "note").length;
+	const thoughts = steps.filter((step) => step.kind === "thinking").length;
+	return (
+		tallyText({ ...counted, others: counted.others + notes }) ||
+		t(thoughts === 1 ? "sum_think_one" : "sum_think", { n: thoughts })
+	);
 }
 
 function StepView({

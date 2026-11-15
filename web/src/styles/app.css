@@ -3144,3 +3144,177 @@ button.about-row {
 	stroke-width: 4px;
 	stroke-linejoin: round;
 }
+
+/* --- the sessions map: who opened whom, where letters went, each session's status (blueprint 6.9) --- */
+
+.map-page {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	align-content: start;
+	gap: 12px;
+}
+.map-caption {
+	display: grid;
+	gap: 6px;
+	max-width: 760px;
+}
+.map-caption p {
+	margin: 0;
+}
+.map-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 14px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.map-legend li {
+	display: inline-flex;
+	align-items: center;
+}
+.map-legend .row-dot {
+	margin-left: 0;
+}
+/* The picture keeps its size and scrolls both ways inside this box when it is larger. */
+.map-scroll {
+	overflow: auto;
+	overscroll-behavior: contain;
+	max-height: max(240px, calc(100dvh - 230px));
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+.map-canvas {
+	position: relative;
+}
+.map-lines {
+	position: absolute;
+	inset: 0;
+	display: block;
+	pointer-events: none;
+}
+.map-opened {
+	fill: none;
+	stroke: var(--control-strong);
+	stroke-width: 1.5;
+}
+.map-flow {
+	fill: none;
+	stroke: var(--text-2);
+	stroke-width: 1;
+}
+.map-arrow {
+	fill: var(--text-2);
+}
+/* The count keeps a margin of page colour, so the line under it does not run into the digits. */
+.map-flow-count {
+	fill: var(--text);
+	font-weight: 600;
+	paint-order: stroke;
+	stroke: var(--bg);
+	stroke-width: 4px;
+	stroke-linejoin: round;
+}
+/* While one session is pointed at or focused, the letters of the others step back. */
+.map-faded {
+	opacity: 0.12;
+}
+.map-head {
+	position: absolute;
+	color: var(--text-2);
+	font-size: var(--fs-s);
+	line-height: 20px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.map-node {
+	position: absolute;
+	display: grid;
+	grid-template-columns: 16px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 8px;
+	padding: 0 10px;
+	border: 1px solid var(--control);
+	border-radius: var(--radius);
+	background: var(--surface);
+	color: var(--text);
+	text-align: left;
+	cursor: pointer;
+}
+.map-node[data-main] {
+	border-color: var(--control-strong);
+	font-weight: 600;
+}
+.map-node .row-dot {
+	margin: 0 2px;
+}
+.map-node-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+@media (hover: hover) {
+	.map-node:hover {
+		background: var(--hover);
+	}
+}
+.map-outline {
+	max-width: 760px;
+}
+.map-outline summary {
+	width: max-content;
+	color: var(--text-2);
+	font-size: var(--fs-s);
+	cursor: pointer;
+}
+.map-outline h2 {
+	margin: 12px 0 4px;
+	font-size: var(--fs-m);
+	font-weight: 600;
+}
+.map-list {
+	margin: 0;
+	padding-left: 18px;
+}
+.map-list li {
+	margin: 2px 0;
+}
+.map-list .link-button {
+	text-align: left;
+}
+
+/* --- a session's progress: one line under its name, inside the header's height (blueprint 6.9) --- */
+
+.session-title-stack {
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0;
+}
+.session-title-stack h1 {
+	max-width: 100%;
+}
+.progress-line {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	max-width: 100%;
+	color: var(--text-2);
+	font-size: var(--fs-s);
+	line-height: 16px;
+	font-variant-numeric: tabular-nums;
+}
+.progress-text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.progress-line .row-dot {
+	flex: none;
+	margin: 0 -1px 0 1px;
+}
+.progress-time {
+	flex: none;
+	color: var(--text-3);
+}

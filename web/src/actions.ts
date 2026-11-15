@@ -18,6 +18,7 @@ import type {
 	Session,
 	SessionEvent,
 	SessionKind,
+	SessionMap,
 	ThinkingLevel,
 	ToolCallView,
 	Transcript,
@@ -157,6 +158,9 @@ export async function boot(): Promise<void> {
 		} else if (view === "usage") {
 			connect(null, null);
 			openUsage();
+		} else if (view === "map") {
+			connect(null, null);
+			openMap();
 		} else if (viewed && getState().sessions[viewed]) await selectSession(viewed);
 		else if (view === "home") connect(null, null);
 		else if (main && getState().sessions[main]) await selectSession(main);
@@ -192,6 +196,7 @@ function connect(sessionId: string | null, after: number | null): void {
 		if (connectedOnce) {
 			void reloadSessions();
 			void loadCenter();
+			setState((current) => ({ letterTick: current.letterTick + 1 }));
 			if (getState().schedules) void loadSchedules();
 			if (getState().artifacts) void loadArtifacts();
 		}
@@ -201,6 +206,7 @@ function connect(sessionId: string | null, after: number | null): void {
 		if (source !== stream) return;
 		void reloadSessions();
 		void loadCenter();
+		setState((current) => ({ letterTick: current.letterTick + 1 }));
 		if (sessionId) void loadTranscript(sessionId);
 	});
 	stream.addEventListener("global", (message) => {
@@ -354,6 +360,7 @@ function applyGlobalEvent(event: GlobalEvent): void {
 								: without(current.center.held, letter.id),
 					},
 					letters: current.letters.loaded ? { ...current.letters, items: next } : current.letters,
+					letterTick: current.letterTick + 1,
 				};
 			});
 			return;
@@ -654,6 +661,15 @@ export function openUsage(): void {
 	setState({ page: "usage", drawerOpen: false });
 	rememberView("usage");
 }
+
+/** The sessions map; it reads its letter lines each time it opens and when a letter changes. */
+export function openMap(): void {
+	setState({ page: "map", drawerOpen: false });
+	rememberView("map");
+}
+
+/** Who wrote to whom in the last 24 hours, added up per pair, the busiest first. */
+export const loadMap = () => api<SessionMap>("GET", "/api/map");
 
 /** What all sessions together cost on each of the last days, oldest first, with the daily limit. */
 export const loadUsage = (days = 30) => api<UsageOverview>("GET", `/api/usage?days=${days}`);

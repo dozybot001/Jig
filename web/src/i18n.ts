@@ -216,7 +216,6 @@ const zh = {
 	linesRemoved: "−{n}",
 	// approvals
 	approvalTitle: "需要你授权",
-	waitingOnYou: "在等你",
 	askedInReply: "在回复里问你",
 	confirmEachTime: "每次确认",
 	confirmEachTimeHint: "这类操作每次都要你确认，不能设为总是允许",
@@ -578,6 +577,35 @@ const zh = {
 	usageCacheRead: "缓存读取",
 	usageTotal: "合计",
 	usageDayEmpty: "这一天没有会话用过模型。",
+	// the sessions map, a session's progress and how long things have waited (blueprint 6.9)
+	map: "会话关系",
+	mapEmpty: "还没有会话。",
+	mapPicture: "会话关系图",
+	mapCaption:
+		"实线：上面的会话开了下面的会话。带箭头的细线：最近 24 小时的信，从寄信的会话指向收信的会话，多于一封时标出封数。指到或聚焦一个会话时，只突出它收发的信。",
+	mapCapped: "信只画了往来最多的 {n} 对，其余 {m} 对在下面的列表里。",
+	mapColumn_main: "主对话开的会话",
+	mapColumn_none: "未分团队",
+	mapOutline: "列表形式",
+	mapOutlineSessions: "会话和它开的会话",
+	mapOutlineLetters: "最近 24 小时的信",
+	mapFlow: "{from} → {to}：{n} 封",
+	mapNoLetters: "最近 24 小时没有会话之间的信。",
+	progressWaiting_permission: "在等你授权",
+	progressWaiting_question: "在等你回答",
+	progressWaiting_decision: "在等你审批",
+	progressWaitingMany: "有 {n} 件事在等你",
+	progressStarted: "{time} 开始",
+	progressSince: "从 {time} 等到现在",
+	progressSpent: "已用 {t}",
+	progressWaited: "等了 {t}",
+	elapsed_s: "{s} 秒",
+	elapsed_ms: "{m} 分 {s} 秒",
+	elapsed_hm: "{h} 小时 {m} 分",
+	waitedNow: "刚到",
+	waitedMinutes: "等了 {n} 分钟",
+	waitedHours: "等了 {n} 小时",
+	waitedDays: "等了 {n} 天",
 	today: "今天",
 	schedules: "定时任务",
 	schedulesCount: "{n} 个",
@@ -1017,7 +1045,6 @@ const en: Record<MessageKey, string> = {
 	linesAdded: "+{n}",
 	linesRemoved: "−{n}",
 	approvalTitle: "Needs your permission",
-	waitingOnYou: "Waiting on you",
 	askedInReply: "Asked in a reply",
 	confirmEachTime: "Asks every time",
 	confirmEachTimeHint: "Operations like this ask every time and can't be always allowed",
@@ -1390,6 +1417,35 @@ const en: Record<MessageKey, string> = {
 	usageCacheRead: "Cache read",
 	usageTotal: "Total",
 	usageDayEmpty: "No session used a model on this day.",
+	map: "Sessions map",
+	mapEmpty: "No sessions yet.",
+	mapPicture: "Picture of the sessions map",
+	mapCaption:
+		"Solid lines: the session above opened the one below. Thin lines with an arrow: letters of the last 24 hours, from the sender to the receiver, with the count when there is more than one. Point at a session or focus it to bring out its own letters.",
+	mapCapped:
+		"Letters are drawn for the {n} busiest pairs only; the other {m} are in the list below.",
+	mapColumn_main: "Opened by the main conversation",
+	mapColumn_none: "No team",
+	mapOutline: "As a list",
+	mapOutlineSessions: "Sessions and the sessions they opened",
+	mapOutlineLetters: "Letters of the last 24 hours",
+	mapFlow: "{from} → {to}: {n}",
+	mapNoLetters: "No letters between sessions in the last 24 hours.",
+	progressWaiting_permission: "Waiting for your permission",
+	progressWaiting_question: "Waiting for your answer",
+	progressWaiting_decision: "Waiting for your decision",
+	progressWaitingMany: "{n} things are waiting for you",
+	progressStarted: "Started at {time}",
+	progressSince: "Waiting since {time}",
+	progressSpent: "{t} so far",
+	progressWaited: "{t} so far",
+	elapsed_s: "{s}s",
+	elapsed_ms: "{m}m {s}s",
+	elapsed_hm: "{h}h {m}m",
+	waitedNow: "Just arrived",
+	waitedMinutes: "Waiting {n} min",
+	waitedHours: "Waiting {n} h",
+	waitedDays: "Waiting {n} d",
 	today: "Today",
 	schedules: "Scheduled tasks",
 	schedulesCount: "{n}",
@@ -1708,5 +1764,34 @@ export function formatAgo(ms: number, now: number): string {
 	return new Intl.DateTimeFormat(current === "zh" ? "zh-CN" : "en-US", {
 		month: "short",
 		day: "numeric",
+	}).format(ms);
+}
+
+/** How long something has waited for the person, in whole units: "等了 12 分钟", "Waiting 12 min". */
+export function formatWaited(ms: number, now: number): string {
+	const minutes = Math.floor((now - ms) / 60_000);
+	if (minutes < 1) return t("waitedNow");
+	if (minutes < 60) return t("waitedMinutes", { n: minutes });
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return t("waitedHours", { n: hours });
+	return t("waitedDays", { n: Math.floor(hours / 24) });
+}
+
+/** A length of time that ticks by the second: "45 秒", "2 分 05 秒", "1h 02m". */
+export function formatElapsed(ms: number): string {
+	const total = Math.max(0, Math.floor(ms / 1000));
+	const two = (n: number) => String(n).padStart(2, "0");
+	const [h, m, s] = [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60];
+	if (h > 0) return t("elapsed_hm", { h, m: two(m) });
+	if (m > 0) return t("elapsed_ms", { m, s: two(s) });
+	return t("elapsed_s", { s });
+}
+
+/** The time of day, for "started at 14:05". */
+export function formatClock(ms: number): string {
+	return new Intl.DateTimeFormat(current === "zh" ? "zh-CN" : "en-US", {
+		hour: "2-digit",
+		minute: "2-digit",
+		hourCycle: "h23",
 	}).format(ms);
 }
