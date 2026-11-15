@@ -22,7 +22,10 @@ import kotlinx.coroutines.launch
  * Keeps the app's connection to the relay while the app is not on screen, so the computer can tell
  * this phone when something needs the person (blueprint section 13: no push service is used).
  * Android requires a standing notification for it, which says whether the computer is reached.
- * When the system stops the app, nothing arrives until it runs again; Settings says so.
+ *
+ * By default the connection lives only while Jig is open: closing Jig (swiping it away) ends it and
+ * nothing starts it again but opening Jig. With "keep receiving after Jig is closed" on in Settings
+ * it stays, and comes back after the phone starts, after an update, and after the system stopped it.
  */
 class LinkService : Service() {
     private val scope = MainScope()
@@ -50,8 +53,15 @@ class LinkService : Service() {
         }
     }
 
-    // Restarted by the system after it was stopped for memory, as long as the person wants notifications.
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    // Restarted by the system after it was stopped for memory only when the person chose to keep it.
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int =
+        if ((application as JigApp).model.notifier.keepAfterClose) START_STICKY else START_NOT_STICKY
+
+    // Jig was closed (swiped away from recent apps).
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (!(application as JigApp).model.notifier.keepAfterClose) stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
 
     override fun onDestroy() {
         scope.cancel()
@@ -74,11 +84,15 @@ class LinkService : Service() {
     }
 }
 
-/** After the phone starts, or the app is updated, the connection is kept again without opening the app. */
+/**
+ * After the phone starts, or the app is updated, the connection is kept again without opening the
+ * app, when the person chose to keep it after Jig is closed. Otherwise nothing happens here.
+ */
 class StartReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-            (context.applicationContext as JigApp).model.syncService()
+            val model = (context.applicationContext as JigApp).model
+            if (model.notifier.keepAfterClose) model.syncService()
         }
     }
 }

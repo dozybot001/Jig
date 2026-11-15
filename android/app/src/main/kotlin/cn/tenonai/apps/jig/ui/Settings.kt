@@ -94,6 +94,7 @@ fun SettingsScreen(model: AppModel, close: () -> Unit) {
     val allowed = remember(version) { model.notifier.allowed }
     val wanted = remember(version) { model.notifier.wanted }
     val asked = remember(version) { model.notifier.asked }
+    val keep = remember(version) { model.notifier.keepAfterClose }
     val unrestricted = remember(version) {
         context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
     }
@@ -160,6 +161,23 @@ fun SettingsScreen(model: AppModel, close: () -> Unit) {
                                 Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
                             )
                         })
+                    }
+                    if (allowed && wanted) {
+                        GroupDivider()
+                        GroupRow(
+                            stringResource(R.string.after_close),
+                            stringResource(if (keep) R.string.after_close_keep else R.string.after_close_stop),
+                        )
+                        GroupDivider()
+                        GroupRow(
+                            stringResource(if (keep) R.string.after_close_turn_off else R.string.after_close_turn_on),
+                            onClick = {
+                                model.notifier.keepAfterClose = !keep
+                                // Started again so the service picks up whether the system may restart it.
+                                model.syncService()
+                                changes += 1
+                            },
+                        )
                     }
                     GroupDivider()
                     GroupRow(

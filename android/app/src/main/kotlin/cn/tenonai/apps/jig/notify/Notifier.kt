@@ -174,6 +174,14 @@ class Notifier(private val context: Context) {
         get() = prefs.getBoolean(WANTED, true)
         set(value) = prefs.edit { putBoolean(WANTED, value) }
 
+    /**
+     * Whether the connection is kept after Jig is closed (swiped away), after the phone starts and
+     * after an update. Off until the person turns it on: then Jig connects only while it is open.
+     */
+    var keepAfterClose: Boolean
+        get() = prefs.getBoolean(KEEP, false)
+        set(value) = prefs.edit { putBoolean(KEEP, value) }
+
     /** Android has been asked for the permission once; after a refusal only system settings can change it. */
     var asked: Boolean
         get() = prefs.getBoolean(ASKED, false)
@@ -189,5 +197,6 @@ class Notifier(private val context: Context) {
         private const val SEEN = "seen"
         private const val WANTED = "wanted"
         private const val ASKED = "asked"
+        private const val KEEP = "keep-after-close"
     }
 }
