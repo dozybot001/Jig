@@ -242,7 +242,7 @@ fun AboutScreen(model: AppModel, close: () -> Unit) {
                 })
                 GroupDivider()
                 GroupRow(stringResource(R.string.website), stringResource(R.string.website_host), onClick = {
-                    context.open(Intent(Intent.ACTION_VIEW, "https://tenon.asia/".toUri()))
+                    context.open(Intent(Intent.ACTION_VIEW, "https://tenonai.cn/".toUri()))
                 })
             }
             Spacer(Modifier.height(16.dp))
