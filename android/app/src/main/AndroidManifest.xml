@@ -48,8 +48,10 @@
             android:exported="false"
             android:foregroundServiceType="remoteMessaging" />
 
+        <!-- Off unless the person chose to keep receiving after Jig is closed (AppModel.applyKeep). -->
         <receiver
             android:name=".notify.StartReceiver"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

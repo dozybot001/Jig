@@ -1,7 +1,9 @@
 package cn.tenonai.apps.jig
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.Build
@@ -26,6 +28,7 @@ import cn.tenonai.apps.jig.api.str
 import cn.tenonai.apps.jig.data.Vault
 import cn.tenonai.apps.jig.notify.LinkService
 import cn.tenonai.apps.jig.notify.Notifier
+import cn.tenonai.apps.jig.notify.StartReceiver
 import cn.tenonai.apps.jig.remote.ChannelClosed
 import cn.tenonai.apps.jig.remote.Pairing
 import cn.tenonai.apps.jig.remote.PairingLink
@@ -487,8 +490,39 @@ class AppModel(private val context: Context) {
     /** Whether this phone should be listening for notifications now. */
     val wantsNotes: Boolean get() = paired && notifier.wanted && notifier.allowed
 
+    /**
+     * Whether Android may start Jig by itself (after the phone starts, after an update): only when
+     * the person chose to keep receiving after Jig is closed. Otherwise the receiver is disabled, so
+     * the system has nothing of Jig's to start.
+     */
+    fun applyKeep() {
+        val state = if (notifier.keepAfterClose) {
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+        } else {
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        }
+        context.packageManager.setComponentEnabledSetting(
+            ComponentName(context, StartReceiver::class.java),
+            state,
+            PackageManager.DONT_KILL_APP,
+        )
+    }
+
+    /**
+     * Jig was closed (swiped away) and is not to keep receiving: nothing listens any more and the
+     * connection to the computer is closed, so a process the system leaves around for a while holds
+     * no connection. Opening Jig again connects again.
+     */
+    fun closed() {
+        listen(false)
+        eventsJob?.cancel()
+        eventsJob = null
+        channel?.close()
+    }
+
     /** Starts or stops the connection service to match the pairing, the person's switch and Android's permission. */
     fun syncService() {
+        applyKeep()
         val service = Intent(context, LinkService::class.java)
         if (wantsNotes) {
             // Android refuses to start it from the background in some states; the next time the app is opened it starts.

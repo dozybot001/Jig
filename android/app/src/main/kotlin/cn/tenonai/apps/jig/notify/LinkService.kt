@@ -59,7 +59,11 @@ class LinkService : Service() {
 
     // Jig was closed (swiped away from recent apps).
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (!(application as JigApp).model.notifier.keepAfterClose) stopSelf()
+        val model = (application as JigApp).model
+        if (!model.notifier.keepAfterClose) {
+            stopSelf()
+            model.closed()
+        }
         super.onTaskRemoved(rootIntent)
     }
 
