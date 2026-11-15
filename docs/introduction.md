@@ -112,7 +112,7 @@ Jig 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 | `letters` | 主张 2 | Jig 信件列表：会话之间的请求、回报和通知，以及命令行寄来的信 / Jig's letters: requests, reports and notices between sessions, and a letter from the command line |
 | `permission` | 主张 3 | Jig 代码会话：网站改好首页、跑完测试，推送前停下来等你授权 / A code session in Jig: Website finished the page and ran the tests, then stopped to ask before pushing |
 | `phone` | 主张 4 | Jig iPhone 应用的审批页：网站等你允许推送首页改版，后端提出的决定也在这里 / Approvals in Jig on iPhone: Website waiting for you to allow pushing the home page redesign, and a decision raised by Backend |
-| `models` | 主张 5 | Jig 给后端会话选服务商：国内、境外分组列出，没设密钥的会标出 / Choosing a provider for the Backend session in Jig: providers grouped into Mainland China and Outside mainland China, with the ones that have no key marked |
+| `models` | 主张 5 | Jig 给后端会话选服务商：国内、境外分组列出，没设密钥的会标出 / Choosing a provider for the Backend session in Jig: providers grouped into Chinese providers and Other providers, with the ones that have no key marked |
 
 ## 修改记录
 
