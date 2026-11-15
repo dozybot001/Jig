@@ -2,6 +2,7 @@ import {
 	Archive,
 	ArrowUp,
 	Ban,
+	BookOpen,
 	ChartColumn,
 	Check,
 	CheckCheck,
@@ -61,6 +62,8 @@ const props = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
 export const PlusIcon = () => <Plus {...props} />;
 /** MCP servers: tools plugged into Jig. */
 export const ToolsIcon = () => <Plug {...props} />;
+/** Skills: written instructions a session reads. */
+export const SkillsIcon = () => <BookOpen {...props} />;
 /** Starting Jig at login and from the launcher icon. */
 export const PowerIcon = () => <Power {...props} />;
 export const FolderIcon = () => <Folder {...props} />;

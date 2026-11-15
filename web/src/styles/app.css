@@ -2749,6 +2749,52 @@ button.about-row {
 	padding: 0;
 	list-style: none;
 }
+/* Skills: a row per skill; the description is one line until it is clicked. */
+.skill + .skill {
+	border-top: 1px solid var(--border);
+}
+.skill-row {
+	flex-wrap: wrap;
+}
+.skill-row .setting-text {
+	flex: 1 1 14em;
+}
+.skill-row .setting-control {
+	margin-left: auto;
+}
+.skill-name {
+	gap: 8px;
+	overflow-wrap: anywhere;
+}
+.skill-mark {
+	flex: none;
+	padding: 0 6px;
+	border: 1px solid var(--control-strong);
+	border-radius: var(--radius-s);
+	color: var(--warning);
+	font-size: var(--fs-s);
+	font-weight: 400;
+}
+.skill-description {
+	display: block;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	font-family: inherit;
+	text-align: left;
+	cursor: pointer;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.skill-description.open {
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+.skill > .error-box {
+	margin: 0 14px 12px;
+}
 /* Names with values (variables, headers): a line each, the value hidden as it is typed. */
 .pairs {
 	display: grid;

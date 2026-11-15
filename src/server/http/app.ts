@@ -31,6 +31,7 @@ import {
 	requireBrowser,
 	securityHeaders,
 } from "./security.ts";
+import { type SkillRoutesOptions, skillRoutes } from "./skills.ts";
 import { type SystemControl, systemRoutes } from "./system.ts";
 
 export interface AppOptions {
@@ -59,6 +60,8 @@ export interface AppOptions {
 	artifacts?: ArtifactStore;
 	/** The MCP servers in mcp.json, managed from the settings (blueprint 6.10, item 29). */
 	mcp?: McpRoutesOptions;
+	/** The skills in the global and workspace folders, listed in the settings (item 35). */
+	skills?: SkillRoutesOptions;
 	/** The search services' keys (item 30). */
 	search?: SearchAccess;
 	/** Starting at login and the launcher icon (item 33). */
@@ -115,6 +118,7 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 	if (options.scheduler) app.route("/api", scheduleRoutes(store, options.scheduler));
 	if (options.notes) app.route("/api", noteRoutes(options.notes));
 	if (options.mcp) app.route("/api", mcpRoutes(store, { log, ...options.mcp }));
+	if (options.skills) app.route("/api", skillRoutes(store, options.skills));
 	if (options.search) app.route("/api", searchRoutes(options.search));
 	if (options.system) app.route("/api", systemRoutes(options.system));
 	if (options.artifacts) app.route("/", artifactRoutes(options.artifacts));

@@ -17,10 +17,13 @@ import {
 	loadMcpServers,
 	loadPhones,
 	loadSearchServices,
+	loadSkills,
 	loadSystem,
 	openSettings,
 	patchMcpServer,
+	patchSkill,
 	removeMcpServer,
+	revealSkill,
 	revokeDevice,
 	saveCustomProvider,
 	saveKey,
@@ -37,6 +40,8 @@ import {
 	NOTIFY_KINDS,
 	type ProviderSummary,
 	type SearchServiceView,
+	type SkillList,
+	type SkillView,
 	type SystemStatus,
 	setState,
 	useAppState,
@@ -55,6 +60,7 @@ import {
 	PhoneIcon,
 	PlusIcon,
 	PowerIcon,
+	SkillsIcon,
 	SlidersIcon,
 	ThemeIcon,
 	ToolsIcon,
@@ -677,6 +683,7 @@ export function SettingsDialogs() {
 	if (which === "defaults") return <DefaultsDialog onClose={close} />;
 	if (which === "phones") return <PhonesDialog onClose={close} />;
 	if (which === "mcp") return <McpDialog onClose={close} />;
+	if (which === "skills") return <SkillsDialog onClose={close} />;
 	if (which === "system") return <SystemDialog onClose={close} />;
 	if (which === "providers") return <ProvidersDialog onClose={close} />;
 	if (which === "about") {
@@ -750,6 +757,7 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 		{ separator: true, id: "line-1" },
 		{ label: t("providersMenu"), icon: <KeyIcon />, onSelect: () => openSettings("providers") },
 		{ label: t("mcpMenu"), icon: <ToolsIcon />, onSelect: () => openSettings("mcp") },
+		{ label: t("skillsMenu"), icon: <SkillsIcon />, onSelect: () => openSettings("skills") },
 		{ label: t("defaultsMenu"), icon: <SlidersIcon />, onSelect: () => openSettings("defaults") },
 		{ label: t("phonesMenu"), icon: <PhoneIcon />, onSelect: () => openSettings("phones") },
 		{ label: t("systemMenu"), icon: <PowerIcon />, onSelect: () => openSettings("system") },
@@ -1527,6 +1535,141 @@ function McpDialog({ onClose }: { onClose: () => void }) {
 					onClose={() => setRemoving(null)}
 				/>
 			)}
+		</Dialog>
+	);
+}
+
+function SkillRow({
+	skill,
+	reveal,
+	onChanged,
+}: {
+	skill: SkillView;
+	reveal: SkillList["reveal"];
+	onChanged: () => Promise<unknown>;
+}) {
+	useLang();
+	const [full, setFull] = useState(false);
+	const nameId = useId();
+	const toggle = useAction(async (enabled: boolean) => {
+		await patchSkill(skill.id, !enabled);
+		await onChanged();
+	});
+	const show = useAction(() => revealSkill(skill.id));
+	return (
+		<div className="skill">
+			<div className="setting-row skill-row">
+				<div className="setting-text">
+					<span className="setting-label skill-name">
+						<span id={nameId}>{skill.name}</span>
+						{skill.problem && <span className="skill-mark">{t("skillUnread")}</span>}
+					</span>
+					{skill.problem ? (
+						<span className="hint">{t(`skillProblem_${skill.problem}`)}</span>
+					) : skill.description ? (
+						// One line; a click shows the rest, so it can be read without a pointer too.
+						<button
+							type="button"
+							className={`hint skill-description${full ? " open" : ""}`}
+							aria-expanded={full}
+							title={full ? undefined : skill.description}
+							onClick={() => setFull(!full)}
+						>
+							{skill.description}
+						</button>
+					) : (
+						<span className="hint">{t("skillNoDescription")}</span>
+					)}
+				</div>
+				<div className="setting-control">
+					{reveal && (
+						<Button variant="ghost" busy={show.busy} onClick={() => void show.run()}>
+							{t(reveal === "finder" ? "skillRevealFinder" : "skillRevealFiles")}
+						</Button>
+					)}
+					{!skill.problem && (
+						<Switch
+							checked={!skill.disabled}
+							busy={toggle.busy}
+							labelledBy={nameId}
+							onChange={(value) => void toggle.run(value)}
+						/>
+					)}
+				</div>
+			</div>
+			<ErrorBox error={toggle.error ?? show.error} />
+		</div>
+	);
+}
+
+/**
+ * Skills (blueprint 6.10, item 35): what Jig read from the global folders and the saved workspaces,
+ * a switch for each, and its folder in the file manager. Folders that could not be read are listed
+ * with the reason. A skill's content is edited in its folder, not here.
+ */
+function SkillsDialog({ onClose }: { onClose: () => void }) {
+	useLang();
+	const [list, setList] = useState<SkillList | null>(null);
+	const [error, setError] = useState<unknown>(null);
+	const reload = useCallback(
+		() =>
+			loadSkills().then((loaded) => {
+				setList(loaded);
+				setError(null);
+			}, setError),
+		[],
+	);
+	useEffect(() => {
+		void reload();
+	}, [reload]);
+	const globalPaths = list?.folders.find((group) => group.source.kind === "global")?.paths ?? [];
+	const inGroup = (source: SkillList["folders"][number]["source"]) =>
+		(list?.items ?? []).filter((item) =>
+			source.kind === "global"
+				? item.source.kind === "global"
+				: item.source.kind === "workspace" && item.source.path === source.path,
+		);
+	return (
+		<Dialog
+			title={t("skillsTitle")}
+			size="l"
+			onClose={onClose}
+			footer={<Button onClick={onClose}>{t("close")}</Button>}
+		>
+			{list && (
+				<p className="hint">{t("skillsHelp", { global: globalPaths.join(t("listSeparator")) })}</p>
+			)}
+			{list === null && !error && <p className="hint">{t("loading")}</p>}
+			{(list?.folders ?? []).map(({ source }) => {
+				const skills = inGroup(source);
+				// A workspace without skills folders is left out; the global group always shows.
+				if (source.kind === "workspace" && skills.length === 0) return null;
+				return (
+					<SettingGroup
+						key={source.kind === "global" ? "global" : source.path}
+						title={
+							source.kind === "global"
+								? t("skillsGlobal")
+								: `${source.name}${t("hintSeparator")}${source.path}`
+						}
+					>
+						{skills.length === 0 && (
+							<p className="hint setting-empty">
+								{t("skillsNone", { folder: globalPaths[0] ?? "" })}
+							</p>
+						)}
+						{skills.map((skill) => (
+							<SkillRow
+								key={skill.id}
+								skill={skill}
+								reveal={list?.reveal ?? null}
+								onChanged={reload}
+							/>
+						))}
+					</SettingGroup>
+				);
+			})}
+			<ErrorBox error={error} />
 		</Dialog>
 	);
 }

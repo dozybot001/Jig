@@ -61,6 +61,29 @@ export interface McpServerView {
 	tools: string[];
 }
 
+/** Where a skill comes from: the global folders, or a saved workspace's. */
+export type SkillSource = { kind: "global" } | { kind: "workspace"; name: string; path: string };
+
+/** A skill folder Jig found; `problem` says why one could not be read, and such a row has no switch. */
+export interface SkillView {
+	/** The folder's real path. */
+	id: string;
+	name: string;
+	description: string;
+	dir: string;
+	source: SkillSource;
+	disabled: boolean;
+	problem: "no-file" | "unreadable" | "bad-name" | null;
+}
+
+export interface SkillList {
+	items: SkillView[];
+	/** The folders read, in the order the list is grouped. */
+	folders: { source: SkillSource; paths: string[] }[];
+	/** Which file manager can show a folder on this computer; null when Jig knows none. */
+	reveal: "finder" | "files" | null;
+}
+
 /** A web search service and whether its key is in the keychain. */
 export interface SearchServiceView {
 	id: string;
@@ -145,7 +168,14 @@ export interface TranscriptState {
 	outputs: Record<string, string>;
 }
 
-export type SettingsDialogName = "providers" | "mcp" | "defaults" | "phones" | "system" | "about";
+export type SettingsDialogName =
+	| "providers"
+	| "mcp"
+	| "skills"
+	| "defaults"
+	| "phones"
+	| "system"
+	| "about";
 
 export interface AppState {
 	phase: "loading" | "signin" | "ready" | "failed";

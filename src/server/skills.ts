@@ -47,22 +47,62 @@ export function frontMatter(source: string): Record<string, string> {
 	return fields;
 }
 
-function skillsIn(folder: string): Skill[] {
+/** Why a folder in a skills folder is not a skill sessions can use. */
+export type SkillProblem = "no-file" | "unreadable" | "bad-name";
+
+/** A folder that looks like a skill but cannot be used, for the settings list. */
+export interface BrokenSkill {
+	/** The folder's own name. */
+	name: string;
+	dir: string;
+	reason: SkillProblem;
+}
+
+const realOr = (path: string): string => {
+	try {
+		return realpathSync(path);
+	} catch {
+		return path;
+	}
+};
+
+/** Everything in one skills folder: the skills, and the folders that are not usable with the reason. */
+function scan(folder: string): { skills: Skill[]; broken: BrokenSkill[] } {
+	const skills: Skill[] = [];
+	const broken: BrokenSkill[] = [];
 	let names: string[];
 	try {
 		names = readdirSync(folder).sort();
 	} catch {
-		return [];
+		return { skills, broken };
 	}
-	const skills: Skill[] = [];
 	for (const entry of names) {
 		const dir = join(folder, entry);
 		const file = join(dir, "SKILL.md");
+		const fail = (reason: SkillProblem) => broken.push({ name: entry, dir: realOr(dir), reason });
 		try {
-			if (!statSync(file).isFile()) continue;
+			// Loose files and hidden folders in a skills folder are not skills that went wrong.
+			if (!statSync(dir).isDirectory()) continue;
+		} catch {
+			continue;
+		}
+		try {
+			if (!statSync(file).isFile()) {
+				if (!entry.startsWith(".")) fail("no-file");
+				continue;
+			}
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT") fail("unreadable");
+			else if (!entry.startsWith(".")) fail("no-file");
+			continue;
+		}
+		try {
 			const fields = frontMatter(readFileSync(file, "utf8"));
 			const name = (fields.name || entry).trim();
-			if (!/^[\w.-]{1,64}$/.test(name)) continue;
+			if (!/^[\w.-]{1,64}$/.test(name)) {
+				fail("bad-name");
+				continue;
+			}
 			skills.push({
 				name,
 				description: (fields.description ?? "").replace(/\s+/g, " ").slice(0, 400),
@@ -70,10 +110,10 @@ function skillsIn(folder: string): Skill[] {
 				file: realpathSync(file),
 			});
 		} catch {
-			// A folder without a readable SKILL.md is not a skill.
+			fail("unreadable");
 		}
 	}
-	return skills;
+	return { skills, broken };
 }
 
 /** The folders skills are looked for in, later ones winning over earlier ones with the same name. */
@@ -90,16 +130,105 @@ export function skillFolders(
 	return folders;
 }
 
+/**
+ * The skills a session working in `cwd` gets. `disabled` holds the folders of the skills switched off
+ * in the settings (a skill's identifier is its folder's real path); a skill that is off is left out
+ * before names are compared, so turning off a project's skill leaves the global one of the same name.
+ */
 export function findSkills(
 	cwd: string | null,
 	jigHome: string,
 	userHome: string | null = homedir(),
+	disabled: readonly string[] = [],
 ): Skill[] {
 	const byName = new Map<string, Skill>();
 	for (const folder of skillFolders(cwd, jigHome, userHome)) {
-		for (const skill of skillsIn(folder)) byName.set(skill.name, skill);
+		for (const skill of scan(folder).skills) {
+			if (!disabled.includes(skill.dir)) byName.set(skill.name, skill);
+		}
 	}
 	return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name)).slice(0, MAX_SKILLS);
+}
+
+/** Where a listed skill comes from: the global folders, or a saved workspace's folders. */
+export type SkillSource = { kind: "global" } | { kind: "workspace"; name: string; path: string };
+
+/** One row of the skills list in the settings (blueprint 6.10, item 35). */
+export interface SkillEntry {
+	/** The skill folder's real path: it tells a global skill from a project's with the same name. */
+	id: string;
+	name: string;
+	description: string;
+	dir: string;
+	source: SkillSource;
+	disabled: boolean;
+	/** Set when the folder cannot be used as a skill; such an entry has no switch. */
+	problem: SkillProblem | null;
+}
+
+export interface SkillListing {
+	items: SkillEntry[];
+	/** The folders read, in the order the list is grouped: the global ones, then each workspace's. */
+	folders: { source: SkillSource; paths: string[] }[];
+}
+
+/**
+ * Every skill the settings show: the global folders' and those of the saved workspaces, which are the
+ * folders a session working there is given. Within a source, usable skills come first, by name.
+ */
+export function listSkills(
+	workspaces: readonly { name: string; path: string }[],
+	jigHome: string,
+	userHome: string | null,
+	disabled: readonly string[] = [],
+): SkillListing {
+	const global = skillFolders(null, jigHome, userHome);
+	const groups: SkillListing["folders"] = [
+		{ source: { kind: "global" }, paths: global },
+		...workspaces.map((workspace) => ({
+			source: { kind: "workspace" as const, name: workspace.name, path: workspace.path },
+			paths: skillFolders(workspace.path, jigHome, userHome).slice(global.length),
+		})),
+	];
+	const items: SkillEntry[] = [];
+	const seen = new Set<string>();
+	for (const { source, paths } of groups) {
+		const good: SkillEntry[] = [];
+		const bad: SkillEntry[] = [];
+		for (const folder of paths) {
+			const found = scan(folder);
+			for (const skill of found.skills) {
+				good.push({
+					id: skill.dir,
+					name: skill.name,
+					description: skill.description,
+					dir: skill.dir,
+					source,
+					disabled: disabled.includes(skill.dir),
+					problem: null,
+				});
+			}
+			for (const skill of found.broken) {
+				bad.push({
+					id: skill.dir,
+					name: skill.name,
+					description: "",
+					dir: skill.dir,
+					source,
+					disabled: false,
+					problem: skill.reason,
+				});
+			}
+		}
+		const byName = (a: SkillEntry, b: SkillEntry) => a.name.localeCompare(b.name);
+		for (const entry of [...good.sort(byName), ...bad.sort(byName)]) {
+			// One folder reached twice (a link, or a workspace inside another) is listed once.
+			if (seen.has(entry.id)) continue;
+			seen.add(entry.id);
+			items.push(entry);
+		}
+	}
+	return { items, folders: groups };
 }
 
 /** What the prompt says about skills: one line each. */
@@ -155,7 +284,12 @@ export function memoryNote(dirs: string[]): string {
 }
 
 /** Reads one skill in full. Offered when the session has any skill. */
-export function skillTool(jigHome: string, userHome: string | null = homedir()): ToolDefinition {
+export function skillTool(
+	jigHome: string,
+	userHome: string | null = homedir(),
+	/** The skills switched off in the settings, read each time so a change applies at once. */
+	disabled: () => readonly string[] = () => [],
+): ToolDefinition {
 	return {
 		name: "skill",
 		description:
@@ -168,11 +302,11 @@ export function skillTool(jigHome: string, userHome: string | null = homedir()):
 		},
 		readOnly: true,
 		needsFolder: false,
-		offered: (session) => findSkills(session.cwd, jigHome, userHome).length > 0,
+		offered: (session) => findSkills(session.cwd, jigHome, userHome, disabled()).length > 0,
 		subject: () => ({ kind: "none" }),
 		async run(args, ctx): Promise<ToolResult> {
 			const name = str(args, "name", true).trim();
-			const skills = findSkills(ctx.session.cwd, jigHome, userHome);
+			const skills = findSkills(ctx.session.cwd, jigHome, userHome, disabled());
 			const skill =
 				skills.find((s) => s.name === name) ?? skills.find((s) => basename(s.dir) === name);
 			if (!skill) {

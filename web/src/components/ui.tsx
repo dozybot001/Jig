@@ -136,6 +136,7 @@ const CODE_MESSAGES: Record<string, MessageKey> = {
 	"mcp-unreadable": "err_mcpUnreadable",
 	"not-on-this-system": "err_notOnThisSystem",
 	"service-failed": "err_serviceFailed",
+	"reveal-failed": "err_revealFailed",
 };
 
 /** What went wrong and what to do, in the interface language (spec 4.1, 12.2); server text is a fallback. */

@@ -523,6 +523,7 @@ export class Agents {
 		return {
 			memoryDirs: this.#store.getSetting<string[]>("memoryDirs", []),
 			userHome: this.#userHome,
+			disabledSkills: this.#store.getSetting<string[]>("disabledSkills", []),
 		};
 	}
 

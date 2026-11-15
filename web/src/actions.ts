@@ -39,6 +39,8 @@ import {
 	type Settings,
 	type SettingsDialogName,
 	type SettingsPatch,
+	type SkillList,
+	type SkillView,
 	type SystemStatus,
 	setState,
 	updateTranscript,
@@ -918,6 +920,15 @@ export const patchMcpServer = (
 
 export async function removeMcpServer(name: string): Promise<void> {
 	await api("DELETE", `/api/mcp/${encodeURIComponent(name)}`);
+}
+
+export const loadSkills = () => api<SkillList>("GET", "/api/skills");
+
+export const patchSkill = (id: string, disabled: boolean) =>
+	api<SkillView>("PATCH", "/api/skills", { id, disabled });
+
+export async function revealSkill(id: string): Promise<void> {
+	await api("POST", "/api/skills/reveal", { id });
 }
 
 export const loadSystem = () => api<SystemStatus>("GET", "/api/system");

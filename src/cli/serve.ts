@@ -122,7 +122,7 @@ export function serveCommand(): Command {
 			const artifacts = new ArtifactStore(store, home);
 			const extraTools = [
 				webSearchTool(search, { version: VERSION }),
-				skillTool(home, homedir()),
+				skillTool(home, homedir(), () => store.getSetting<string[]>("disabledSkills", [])),
 				saveArtifactTool(artifacts),
 			];
 			const agents = new Agents({
@@ -177,6 +177,7 @@ export function serveCommand(): Command {
 				notes,
 				artifacts,
 				mcp: { home, hub: mcp },
+				skills: { home, userHome: homedir() },
 				search,
 				system: systemControl({ home, env: io.env }),
 			});

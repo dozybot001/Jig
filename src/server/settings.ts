@@ -48,6 +48,8 @@ export const SETTING_DEFAULTS = {
 	/** The saved workspace the interface preselects for a new session; null for none. */
 	defaultWorkspaceId: null as string | null,
 	notify: { waiting: true, error: true, task: true, budget: true } as NotifySettings,
+	/** Skills switched off in the settings, each by its folder's real path (blueprint 6.10, item 35). */
+	disabledSkills: [] as string[],
 };
 
 export interface RemoteSettings {
@@ -82,6 +84,7 @@ export function readSettings(store: Store): Settings {
 			? defaultWorkspaceId
 			: null,
 		notify: { ...SETTING_DEFAULTS.notify, ...store.getSetting("notify", SETTING_DEFAULTS.notify) },
+		disabledSkills: store.getSetting("disabledSkills", SETTING_DEFAULTS.disabledSkills),
 	};
 }
 

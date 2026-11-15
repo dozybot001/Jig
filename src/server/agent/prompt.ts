@@ -170,7 +170,7 @@ export function loadInstructions(
 			if (index && !seen.has(index.path)) files.push(index);
 		}
 	}
-	const skills = findSkills(cwd, jigHome, userHome);
+	const skills = findSkills(cwd, jigHome, userHome, extras.disabledSkills);
 	if (skills.length > 0) files.push({ path: "skills", content: skillsNote(skills) });
 	return files;
 }
@@ -181,6 +181,8 @@ export interface InstructionExtras {
 	memoryDirs?: string[];
 	/** The person's home folder, for `~/.claude`; absent, nothing outside Jig's folder is read. */
 	userHome?: string | null;
+	/** The skills switched off in the settings, by folder; they are not listed. */
+	disabledSkills?: string[];
 }
 
 export function takeSnapshot(
