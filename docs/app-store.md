@@ -1,26 +1,35 @@
 # Jig iPhone 应用上架
 
-版本 0.2（2026-11-15）。创始人 2026-11-15 定「Jig iPhone 应用推进上架」（产品组转达）。本文记上架要填的内容和进度；文案以[对外介绍](introduction.md)为准，规范见第 17 节。提交审核和首次上线前请创始人确认一次。
+版本 0.3（2026-11-15）。创始人 2026-11-15 定「Jig iPhone 应用推进上架」（产品组转达）。本文记上架要填的内容和进度；文案以[对外介绍](introduction.md)为准，规范见第 17 节。提交审核和首次上线前请创始人确认一次。
 
 ## 一、进度
 
 | 步骤 | 状态 |
 | --- | --- |
 | 工程：自动签名，Team `3U6LT38JKB`，Bundle ID `cn.tenonai.apps.jig`（通知扩展 `.push`） | 已有 |
-| 归档并导出 App Store 用的包（云端管理的分发证书） | 11-15 在本机试过，成功，没有上传 |
-| 出口合规：`ITSAppUsesNonExemptEncryption = NO` | 已写进工程（cef51bb） |
-| App Store Connect 里建应用记录 | 没做，要创始人登录 |
-| 商店文案、截图、隐私标签、审核说明 | 文案见第二节；截图没拍（要 6.9 英寸，1320×2868） |
-| 隐私政策网址、技术支持网址 | 平台组已给：隐私政策 https://tenonai.cn/products/jig/privacy/ （中文 https://tenonai.cn/zh/products/jig/privacy/ ），技术支持和营销 https://tenonai.cn/products/jig/ （中文 https://tenonai.cn/zh/products/jig/ ）。官网的政策文字从 `src/shared/policy.ts` 导出，改了政策要把提交号告诉平台组 |
-| 上传到 TestFlight | 没做 |
+| 出口合规：`ITSAppUsesNonExemptEncryption = NO`；隐私清单申报设备 ID | 已写进工程 |
+| App Store Connect 里的应用记录 | 11-15 建好，Apple ID `6835049683`，SKU `jig-ios`，主要语言英语（美国） |
+| 构建 | 1.0.3（1）11-15 上传到 App Store Connect，对应提交 d949b40；没有公开，没有提交审核 |
+| 版本页（英文）：描述、关键词、技术支持和营销网址、版权、审核备注、5 张截图 | 已填并保存；「需要登录」已取消；发布方式选了「手动发布」 |
+| 应用信息：副标题、类别（软件开发工具） | 已填并保存 |
+| 年龄分级问卷、内容版权 | 没填 |
+| App 隐私：隐私政策网址、隐私标签（设备 ID） | 没填 |
+| 价格（免费）和销售范围（先不含中国大陆） | 没填 |
+| 审核联系人（姓名、电话、邮箱） | 没填，要创始人给 |
+| 给版本选上构建 | 没做（构建处理完才能选） |
+| 简体中文的本地化（名称、副标题、描述、关键词、截图） | 没做；截图已拍好 |
 | 提交审核 | 没做，要创始人确认 |
+
+商店里的名称：「Jig」已被别的应用占用，现在用的是「Jig — Multi-Agent Workbench」。副标题限 30 个字符，一句话定义的英文放不下（34 个），现在填的是「Approve your agents' requests」。两处提交前都能改，由创始人定。
+
+截图：App Store Connect 现在以 6.3 英寸（1206×2622）为准，用 iPhone 17 Pro 模拟器拍，启动参数 `-JigDemo YES`、`-JigTab <approvals|letters|artifacts>`、`-JigSession website` 直接进演示的各页，状态栏统一为 9:41、满格、满电。五张：审批、会话列表、会话、信件、产物；中英文各一套。原图不入库，要用时重拍。
 
 ## 二、商店里填什么
 
 | 项 | 中文 | English |
 | --- | --- | --- |
-| 名称 | Jig | Jig |
-| 副标题 | AI 原生的多 Agent 工作台 | An AI-native multi-agent workbench |
+| 名称 | Jig — Multi-Agent Workbench（「Jig」已被占用） | Jig — Multi-Agent Workbench |
+| 副标题（限 30 个字符） | AI 原生的多 Agent 工作台 | Approve your agents' requests |
 | 类别 | 开发者工具 | Developer Tools |
 | 年龄分级 | 照问卷如实答，结果是几岁就是几岁 | |
 | 价格 | 免费，没有内购 | Free, no in-app purchases |
@@ -70,5 +79,6 @@ Description (English):
 
 ## 修改记录
 
+- **0.3（2026-11-15）** 应用记录建好，1.0.3 的构建已上传，英文的版本页和应用信息已填；记下名称被占用、副标题的字数限制和截图的拍法。
 - **0.2（2026-11-15）** 按法务组的意见：隐私标签改为申报「设备 ID」（默认中继的连接日志），隐私清单同步；年龄分级照问卷如实答；审核说明加上通知怎样送达；记下卖家名显示个人姓名。
 - **0.1（2026-11-15）** 首版。
