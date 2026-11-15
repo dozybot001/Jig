@@ -352,6 +352,7 @@ export function Select({
 		list.current?.querySelector(".active")?.scrollIntoView({ block: "nearest" });
 	}, [active]);
 
+	const press = usePress(() => (open ? setOpen(false) : openList()));
 	const openList = () => {
 		setActive(
 			Math.max(
@@ -404,7 +405,7 @@ export function Select({
 				aria-activedescendant={open ? `${id}-${active}` : undefined}
 				disabled={disabled || busy}
 				aria-busy={busy ? "true" : undefined}
-				onClick={() => (open ? setOpen(false) : openList())}
+				{...press}
 				onKeyDown={onKeyDown}
 			>
 				<span>{selected?.label ?? value}</span>
@@ -605,6 +606,27 @@ function MenuEntries({
 }
 
 /**
+ * Opens on the press, as menus on the desktop do: with a mouse the list shows when the button goes
+ * down, not when it comes up. Touch and the keyboard open it with the click, so a scroll that starts
+ * on the trigger does not open anything.
+ */
+function usePress(toggle: () => void) {
+	const pointer = useRef("");
+	return {
+		onPointerDown: (event: { pointerType: string; button: number }) => {
+			pointer.current = event.pointerType;
+			if (event.pointerType === "mouse" && event.button === 0) toggle();
+		},
+		onClick: (event: { detail: number; stopPropagation(): void }) => {
+			event.stopPropagation();
+			// The click that ends a mouse press: the press already did it. A keyboard click has detail 0.
+			if (event.detail > 0 && pointer.current === "mouse") return;
+			toggle();
+		},
+	};
+}
+
+/**
  * A menu behind a button (APG menu button): by default a "…" icon button, or a visible trigger such as
  * the sidebar's settings row. It can be opened from outside (a keyboard shortcut) through `open`.
  */
@@ -637,6 +659,23 @@ export function Menu({
 	const [sub, setSub] = useState<{ key: string; anchor: HTMLButtonElement; focus: boolean } | null>(
 		null,
 	);
+	const press = usePress(() => setOpen(!open));
+	// Moving the mouse across other items on the way to an open submenu must not close or swap it:
+	// while the pointer heads toward the submenu, what the item under it would do waits a moment,
+	// and is dropped when the pointer arrives.
+	const aim = useRef({ x: 0, dx: 0, timer: 0 });
+	const settle = () => {
+		window.clearTimeout(aim.current.timer);
+		aim.current.timer = 0;
+	};
+	const hover = (act: () => void) => {
+		settle();
+		const side = subMenu.current?.getBoundingClientRect();
+		const own = menu.current?.getBoundingClientRect();
+		const toward = side && own && (side.left >= own.left ? aim.current.dx > 0 : aim.current.dx < 0);
+		if (sub && toward) aim.current.timer = window.setTimeout(act, 220);
+		else act();
+	};
 
 	useLayoutEffect(() => {
 		const element = menu.current;
@@ -648,7 +687,10 @@ export function Menu({
 		} else if (element.matches(":popover-open")) {
 			element.hidePopover?.();
 		}
-		if (!open) setSub(null);
+		if (!open) {
+			window.clearTimeout(aim.current.timer);
+			setSub(null);
+		}
 	}, [open, width]);
 
 	useLayoutEffect(() => {
@@ -724,7 +766,14 @@ export function Menu({
 				close={close}
 				submenu={{
 					open: sub?.key === key,
-					show: (anchor, focus) => setSub({ key, anchor, focus }),
+					show: (anchor, focus) => {
+						const show = () => setSub({ key, anchor, focus });
+						// The keyboard and a click open it at once; a hover minds where the pointer is going.
+						if (focus || sub?.key === key) {
+							settle();
+							show();
+						} else hover(show);
+					},
 				}}
 			/>
 		) : (
@@ -733,7 +782,7 @@ export function Menu({
 				item={item}
 				close={close}
 				// Moving onto a plain item closes an open submenu, as menus do elsewhere.
-				onPointerEnter={() => setSub(null)}
+				onPointerEnter={() => hover(() => setSub(null))}
 			/>
 		);
 
@@ -748,10 +797,7 @@ export function Menu({
 				aria-haspopup="menu"
 				aria-expanded={open}
 				aria-controls={id}
-				onClick={(event) => {
-					event.stopPropagation();
-					setOpen(!open);
-				}}
+				{...press}
 			>
 				{trigger ? trigger.content : <span aria-hidden="true">⋯</span>}
 			</button>
@@ -763,6 +809,10 @@ export function Menu({
 				popover="manual"
 				className="menu"
 				onKeyDown={onKeyDown}
+				onPointerMove={(event) => {
+					aim.current.dx = event.clientX - aim.current.x;
+					aim.current.x = event.clientX;
+				}}
 			>
 				<MenuEntries entries={items} render={renderItem} />
 			</div>
@@ -774,6 +824,7 @@ export function Menu({
 					popover="manual"
 					className="menu submenu"
 					onKeyDown={onSubKeyDown}
+					onPointerEnter={settle}
 				>
 					<MenuEntries
 						entries={subItems}
