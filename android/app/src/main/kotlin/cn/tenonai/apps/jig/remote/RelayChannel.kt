@@ -1,9 +1,13 @@
 package cn.tenonai.apps.jig.remote
 
+import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.zip.DataFormatException
+import java.util.zip.Inflater
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -14,6 +18,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -44,6 +49,37 @@ sealed class RelayException(message: String) : IOException(message) {
 
 /** This end closed the channel (unpairing, or a new connection replacing it). */
 class ChannelClosed : IOException("closed")
+
+/** The most an answer may grow to when it is unpacked, as the channel's own limit on a message. */
+private const val MAX_UNPACKED = 16 * 1024 * 1024
+
+/**
+ * The body of an answer as the computer wrote it. A packed one (`z: 1`, src/remote/protocol.ts) is
+ * the UTF-8 text deflated without a zlib header (RFC 1951) and then base64; the computer packs
+ * answers of a kilobyte or more when the request asked for it, before they are encrypted.
+ */
+fun unpackBody(body: String, packed: Boolean): String {
+    if (!packed) return body
+    val inflater = Inflater(true)
+    try {
+        inflater.setInput(Base64.getDecoder().decode(body))
+        val out = ByteArrayOutputStream()
+        val buffer = ByteArray(16 * 1024)
+        while (!inflater.finished()) {
+            val n = inflater.inflate(buffer)
+            if (n == 0 && (inflater.needsInput() || inflater.needsDictionary())) throw IOException("a packed answer is cut short")
+            out.write(buffer, 0, n)
+            if (out.size() > MAX_UNPACKED) throw IOException("a packed answer is too large")
+        }
+        return out.toString("UTF-8")
+    } catch (error: DataFormatException) {
+        throw IOException(error)
+    } catch (error: IllegalArgumentException) {
+        throw IOException(error)
+    } finally {
+        inflater.end()
+    }
+}
 
 /** An answer with a status outside 200–299 to a request that was meant to stream. */
 class StreamRefused(val status: Int, val body: String) : IOException("HTTP $status")
@@ -179,6 +215,8 @@ class RelayChannel(
                 put("method", method)
                 put("path", path)
                 if (body != null) put("body", body)
+                // Asks for a compressed answer; a computer that does not know this ignores it.
+                put("z", 1)
             }.toString())
             // The connection may have dropped between the lookup and the send being registered.
             if (live !== to) answer.completeExceptionally(IOException("the connection dropped"))
@@ -218,7 +256,13 @@ class RelayChannel(
         when (reply["t"]?.jsonPrimitive?.content) {
             "res" -> {
                 val status = reply["status"]?.jsonPrimitive?.int ?: 0
-                val body = reply["body"]?.jsonPrimitive?.content.orEmpty()
+                val packed = reply["z"]?.jsonPrimitive?.intOrNull == 1
+                val body = try {
+                    unpackBody(reply["body"]?.jsonPrimitive?.content.orEmpty(), packed)
+                } catch (error: IOException) {
+                    waiting.remove(id)?.completeExceptionally(error)
+                    return
+                }
                 waiting.remove(id)?.complete(body to status)
                 // A stream the computer refused (404, 403) comes back as a plain answer.
                 streams.remove(id)?.close(StreamRefused(status, body))

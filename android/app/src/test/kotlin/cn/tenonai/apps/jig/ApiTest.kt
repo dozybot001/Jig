@@ -10,6 +10,9 @@ import cn.tenonai.apps.jig.api.Step
 import cn.tenonai.apps.jig.api.ToolKinds
 import cn.tenonai.apps.jig.notify.Note
 import cn.tenonai.apps.jig.notify.NoteText
+import cn.tenonai.apps.jig.remote.unpackBody
+import java.io.IOException
+import org.junit.Assert.assertThrows
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
@@ -113,5 +116,19 @@ class ApiTest {
         val started = System.nanoTime()
         assertEquals(long, inlinePieces(long).joinToString("") { it.text })
         assertTrue((System.nanoTime() - started) / 1_000_000 < 3_000)
+    }
+
+    // The packed bytes come from the computer's own code: zlib.deflateRawSync of the JSON, then base64.
+    @Test
+    fun packedAnswerFromTheComputerIsUnpacked() {
+        val packed = "fdQ7asMAEIThq4StXWRm/FSbYwQXhqgwyA5YEgSML2LIGXyBHCdFjhGlSDViumX5u4/dax2H9tRX83qt41s11T/Xos6HUzvN31/3n8fn09+mHw7DOGVT1LV1W/zXsBqhptUMtaxWqJdWL0O9snoV6rXV61BvrN6Eemv1NtQ7q3dJxzERNWc4kyccFEkUTopkCkdFUoWzIrnCYZFk4bRItnBcJF04L5Iv3ZfJl+7LeK8zB5t86b5MvnRfJl+6L5Mv3ZfJl+7L5Ev3ZfKl+zL5yn2VfOW+Sr5yX8WPPPOSk6/cV8lX7qvkK/dV8pX7KvnKfZV85b6a8d1PUfsxvIyX/v1SzXnsutsv"
+        val text = unpackBody(packed, packed = true)
+        assertEquals(1769, text.length)
+        val items = json(text).getValue("items") as kotlinx.serialization.json.JsonArray
+        assertEquals(40, items.size)
+        assertTrue(text.contains("会话 39"))
+        assertEquals("plain", unpackBody("plain", packed = false))
+        assertThrows(IOException::class.java) { unpackBody(packed.dropLast(12), packed = true) }
+        assertThrows(IOException::class.java) { unpackBody("not base64 !!", packed = true) }
     }
 }
