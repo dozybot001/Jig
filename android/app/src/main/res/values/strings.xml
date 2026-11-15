@@ -19,7 +19,7 @@
 
     <!-- Not paired yet -->
     <string name="connect_scan">Scan the QR code on your computer</string>
-    <string name="connect_scan_help">In Jig on your computer, open Settings → Phone access, click Add iPhone (it pairs an Android phone too), then scan the QR code it shows.</string>
+    <string name="connect_scan_help">In Jig on your computer, open Settings → Phone access, click Add phone, then scan the QR code it shows.</string>
     <string name="connect_paste_title">Or paste the pairing link</string>
     <string name="connect_paste_hint" translatable="false">jig://pair?…</string>
     <string name="pair">Pair</string>

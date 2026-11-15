@@ -16,7 +16,7 @@
     <string name="problem_title">没有办成</string>
 
     <string name="connect_scan">扫描电脑上的二维码</string>
-    <string name="connect_scan_help">在电脑上的 Jig 里打开 设置 → 手机访问，点「添加 iPhone」（安卓手机也用这个按钮），再扫描出现的二维码。</string>
+    <string name="connect_scan_help">在电脑上的 Jig 里打开 设置 → 手机访问，点「添加手机」，再扫描出现的二维码。</string>
     <string name="connect_paste_title">或者粘贴配对链接</string>
     <string name="pair">配对</string>
     <string name="demo_try">看演示</string>
