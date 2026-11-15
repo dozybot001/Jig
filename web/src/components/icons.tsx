@@ -33,7 +33,9 @@ import {
 	PencilLine,
 	Pin,
 	Play,
+	Plug,
 	Plus,
+	Power,
 	Search,
 	Send,
 	Settings,
@@ -56,6 +58,10 @@ import {
 const props = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
 
 export const PlusIcon = () => <Plus {...props} />;
+/** MCP servers: tools plugged into Jig. */
+export const ToolsIcon = () => <Plug {...props} />;
+/** Starting Jig at login and from the launcher icon. */
+export const PowerIcon = () => <Power {...props} />;
 export const FolderIcon = () => <Folder {...props} />;
 export const GearIcon = () => <Settings {...props} />;
 export const MenuIcon = () => <Menu {...props} />;

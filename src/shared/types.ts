@@ -65,6 +65,9 @@ export function letterQuotaOf(options: SessionOptions, isMain: boolean): number 
 export const TASK_OUTCOMES = ["done", "given_up", "failed"] as const;
 export type TaskOutcome = (typeof TASK_OUTCOMES)[number];
 
+/** The relay Tenon runs, which phone access uses unless the person sets their own. */
+export const DEFAULT_RELAY_URL = "wss://relay.tenonai.cn";
+
 export const PERMISSION_MODES = ["auto", "manual", "skip"] as const;
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
 

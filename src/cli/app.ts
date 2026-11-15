@@ -39,7 +39,7 @@ export interface AppHost {
 	run(command: string, args: string[]): number | null;
 }
 
-function realHost(): AppHost {
+export function realAppHost(): AppHost {
 	const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 	const icon = ["../../web/dist/icons/app-icon.png", "../../web/public/icons/app-icon.png"]
 		.map(here)
@@ -116,7 +116,71 @@ exit 1
 
 const SIZES = [16, 32, 128, 256, 512] as const;
 
-export function appCommand(host: AppHost = realHost()): Command {
+/** Where the launcher goes: the person's own Applications folder. */
+export const appPath = (host: AppHost) => join(host.homeDir, "Applications", "Jig.app");
+
+export const appInstalled = (host: AppHost) =>
+	existsSync(join(appPath(host), "Contents", "MacOS", "jig-launcher"));
+
+/** Makes Jig.app; returns whether its icon could be made (the app works without it). */
+export function installApp(
+	host: AppHost,
+	home: string,
+	env: Record<string, string | undefined>,
+): { app: string; icon: boolean } {
+	const app = appPath(host);
+	// Sessions' commands need your PATH; an app starts with a bare one.
+	const vars: Record<string, string> = { PATH: env.PATH ?? "/usr/bin:/bin" };
+	if (env.JIG_HOME) vars.JIG_HOME = home;
+	rmSync(app, { recursive: true, force: true });
+	const contents = join(app, "Contents");
+	mkdirSync(join(contents, "MacOS"), { recursive: true });
+	mkdirSync(join(contents, "Resources"), { recursive: true });
+	writeFileSync(join(contents, "Info.plist"), infoPlist());
+	const launcher = join(contents, "MacOS", "jig-launcher");
+	writeFileSync(launcher, launcherScript(host, vars, join(home, "logs", "serve.log")));
+	chmodSync(launcher, 0o755);
+
+	// The icon: macOS's own tools make the sizes and the .icns. Without it the app still works.
+	let icon = false;
+	if (host.icon) {
+		const work = mkdtempSync(join(tmpdir(), "jig-icon-"));
+		const set = join(work, "AppIcon.iconset");
+		mkdirSync(set);
+		const made = SIZES.every((size) =>
+			[1, 2].every(
+				(factor) =>
+					host.run("sips", [
+						"-z",
+						String(size * factor),
+						String(size * factor),
+						host.icon as string,
+						"--out",
+						join(set, `icon_${size}x${size}${factor === 2 ? "@2x" : ""}.png`),
+					]) === 0,
+			),
+		);
+		icon =
+			made &&
+			host.run("iconutil", [
+				"-c",
+				"icns",
+				set,
+				"-o",
+				join(contents, "Resources", "AppIcon.icns"),
+			]) === 0;
+		rmSync(work, { recursive: true, force: true });
+	}
+	// Tells Finder and the Dock about the new app and its icon.
+	host.run("touch", [app]);
+	return { app, icon };
+}
+
+export function uninstallApp(host: AppHost): void {
+	rmSync(appPath(host), { recursive: true, force: true });
+}
+
+export function appCommand(host: AppHost = realAppHost()): Command {
 	return {
 		name: "app",
 		summary: "Put a Jig icon in Applications (macOS)",
@@ -136,8 +200,8 @@ export function appCommand(host: AppHost = realHost()): Command {
 				throw new UsageError("jig app needs one of install, uninstall or status");
 			}
 			if (host.platform !== "darwin") throw new Error("jig app works on macOS.");
-			const app = join(host.homeDir, "Applications", "Jig.app");
-			const installed = existsSync(join(app, "Contents", "MacOS", "jig-launcher"));
+			const app = appPath(host);
+			const installed = appInstalled(host);
 
 			if (action === "status") {
 				if (values.json) io.stdout.write(`${JSON.stringify({ installed, app })}\n`);
@@ -145,58 +209,14 @@ export function appCommand(host: AppHost = realHost()): Command {
 				return EXIT_OK;
 			}
 			if (action === "uninstall") {
-				rmSync(app, { recursive: true, force: true });
+				uninstallApp(host);
 				if (values.json) io.stdout.write(`${JSON.stringify({ installed: false, app })}\n`);
 				else io.stdout.write(installed ? `Removed ${app}.\n` : "The Jig icon was not installed.\n");
 				return EXIT_OK;
 			}
 
 			const { jigHome } = await import("../server/paths.ts");
-			const home = jigHome(io.env);
-			// Sessions' commands need your PATH; an app starts with a bare one.
-			const env: Record<string, string> = { PATH: io.env.PATH ?? "/usr/bin:/bin" };
-			if (io.env.JIG_HOME) env.JIG_HOME = home;
-			rmSync(app, { recursive: true, force: true });
-			const contents = join(app, "Contents");
-			mkdirSync(join(contents, "MacOS"), { recursive: true });
-			mkdirSync(join(contents, "Resources"), { recursive: true });
-			writeFileSync(join(contents, "Info.plist"), infoPlist());
-			const launcher = join(contents, "MacOS", "jig-launcher");
-			writeFileSync(launcher, launcherScript(host, env, join(home, "logs", "serve.log")));
-			chmodSync(launcher, 0o755);
-
-			// The icon: macOS's own tools make the sizes and the .icns. Without it the app still works.
-			let icon = false;
-			if (host.icon) {
-				const work = mkdtempSync(join(tmpdir(), "jig-icon-"));
-				const set = join(work, "AppIcon.iconset");
-				mkdirSync(set);
-				const made = SIZES.every((size) =>
-					[1, 2].every(
-						(factor) =>
-							host.run("sips", [
-								"-z",
-								String(size * factor),
-								String(size * factor),
-								host.icon as string,
-								"--out",
-								join(set, `icon_${size}x${size}${factor === 2 ? "@2x" : ""}.png`),
-							]) === 0,
-					),
-				);
-				icon =
-					made &&
-					host.run("iconutil", [
-						"-c",
-						"icns",
-						set,
-						"-o",
-						join(contents, "Resources", "AppIcon.icns"),
-					]) === 0;
-				rmSync(work, { recursive: true, force: true });
-			}
-			// Tells Finder and the Dock about the new app and its icon.
-			host.run("touch", [app]);
+			const { icon } = installApp(host, jigHome(io.env), io.env);
 			if (values.json) io.stdout.write(`${JSON.stringify({ installed: true, app, icon })}\n`);
 			else {
 				io.stdout.write(

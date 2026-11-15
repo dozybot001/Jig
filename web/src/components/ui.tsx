@@ -109,6 +109,13 @@ const FIELD_MESSAGES: Record<string, MessageKey> = {
 	cron: "err_field_cron",
 	session: "err_field_session",
 	message: "err_field_message",
+	server: "err_field_server",
+	command: "err_field_command",
+	url: "err_field_url",
+	args: "err_field_args",
+	env: "err_field_env",
+	headers: "err_field_headers",
+	remote: "err_field_remote",
 };
 
 const CODE_MESSAGES: Record<string, MessageKey> = {
@@ -125,6 +132,10 @@ const CODE_MESSAGES: Record<string, MessageKey> = {
 	"not-supported": "err_noPicker",
 	"picker-failed": "err_pickerFailed",
 	"schedule-busy": "err_scheduleBusy",
+	"mcp-exists": "err_mcpExists",
+	"mcp-unreadable": "err_mcpUnreadable",
+	"not-on-this-system": "err_notOnThisSystem",
+	"service-failed": "err_serviceFailed",
 };
 
 /** What went wrong and what to do, in the interface language (spec 4.1, 12.2); server text is a fallback. */

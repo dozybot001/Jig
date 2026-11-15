@@ -30,10 +30,15 @@ import {
 	type CenterState,
 	type CenterTab,
 	getState,
+	type McpServerView,
 	type ModelInfo,
 	type PhonesState,
 	type ProviderSummary,
+	type SearchServiceView,
 	type Settings,
+	type SettingsDialogName,
+	type SettingsPatch,
+	type SystemStatus,
 	setState,
 	updateTranscript,
 	upsertEntry,
@@ -416,7 +421,7 @@ async function loadTranscript(sessionId: string): Promise<number> {
 }
 
 /** Opens a settings dialog over the conversation; the conversation stays where it is. */
-export function openSettings(dialog: "providers" | "defaults" | "about" | "phones"): void {
+export function openSettings(dialog: SettingsDialogName): void {
 	setState({ settingsDialog: dialog });
 }
 
@@ -860,6 +865,50 @@ export async function deleteCustomProvider(id: string): Promise<void> {
 	await reloadProviders();
 }
 
+// --- search services, MCP servers, this computer (blueprint 6.10) ---
+
+export const loadSearchServices = () => all<SearchServiceView>("/api/search-services");
+
+export async function saveSearchKey(id: string, key: string): Promise<void> {
+	await api("PUT", `/api/search-services/${encodeURIComponent(id)}/key`, { key });
+}
+
+export async function deleteSearchKey(id: string): Promise<void> {
+	await api("DELETE", `/api/search-services/${encodeURIComponent(id)}/key`);
+}
+
+export const loadMcpServers = () => all<McpServerView>("/api/mcp");
+
+export interface NewMcpServer {
+	name: string;
+	command?: string;
+	args?: string[];
+	env?: Record<string, string>;
+	url?: string;
+	headers?: Record<string, string>;
+}
+
+export const addMcpServer = (server: NewMcpServer) =>
+	api<McpServerView>("POST", "/api/mcp", server, { idempotent: true });
+
+export const patchMcpServer = (
+	name: string,
+	patch: {
+		disabled?: boolean;
+		env?: Record<string, string | null>;
+		headers?: Record<string, string | null>;
+	},
+) => api<McpServerView>("PATCH", `/api/mcp/${encodeURIComponent(name)}`, patch);
+
+export async function removeMcpServer(name: string): Promise<void> {
+	await api("DELETE", `/api/mcp/${encodeURIComponent(name)}`);
+}
+
+export const loadSystem = () => api<SystemStatus>("GET", "/api/system");
+
+export const saveSystem = (patch: { startAtLogin?: boolean; launcher?: boolean }) =>
+	api<SystemStatus>("PATCH", "/api/system", patch);
+
 // --- phone access (M3 plan, section 6) ---
 
 export async function loadPhones(): Promise<void> {
@@ -891,7 +940,7 @@ export async function revokeDevice(id: string): Promise<void> {
 export const spentToday = () =>
 	api<{ day: string; total: number; sessions: Record<string, number> }>("GET", "/api/usage/today");
 
-export async function saveSettings(patch: Partial<Settings>): Promise<void> {
+export async function saveSettings(patch: SettingsPatch): Promise<void> {
 	const settings = await api<Settings>("PATCH", "/api/settings", patch);
 	setState({ settings });
 	applyAppearance(settings);

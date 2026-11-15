@@ -1073,6 +1073,29 @@ describe("organizing sessions", () => {
 		assert.match(JSON.stringify(notices[1]), /"by":"总办"/);
 	});
 
+	test("a session it creates starts with the default permission mode when that is lower than its own", async () => {
+		const { store, agents, make, script, said } = harness();
+		const helper = make("助手", { options: { permissionMode: "skip", canOrganize: true } });
+		store.setSetting("defaultModel", {
+			provider: helper.provider,
+			model: helper.model,
+			thinking: "off",
+		});
+		store.setSetting("defaultPermissionMode", "manual");
+		script(helper, [
+			toolUse(fauxToolCall("manage_jig", { sessions: [{ name: "文档" }] }, { id: "d1" })),
+			fauxAssistantMessage("好"),
+		]);
+		agents.send(helper.id, "开个文档会话");
+		await until(() => {
+			for (const approval of store.pendingApprovals(helper.id)) {
+				agents.answer(approval.id, { decision: "allow_once" });
+			}
+			return said(helper).some((text) => text.includes('"text":"好"'));
+		});
+		assert.equal(store.findSessionByName("文档")?.options.permissionMode, "manual");
+	});
+
 	test("a session cannot widen itself; a session it creates gets no more room than it has", async () => {
 		const { store, agents, make, script, said } = harness();
 		const helper = make("助手", { options: { permissionMode: "manual", canOrganize: true } });

@@ -522,7 +522,12 @@ function HomeView() {
 	const settings = useAppState((state) => state.settings);
 	const homeFolder = useAppState((state) => state.homeFolder);
 	const [text, setText] = useState("");
-	const [folder, setFolder] = useState<string | null>(null);
+	// The default workspace from the settings is chosen to start with; the bar changes it.
+	const [folder, setFolder] = useState<string | null>(
+		() =>
+			settings?.workspaces.find((workspace) => workspace.id === settings.defaultWorkspaceId)
+				?.path ?? null,
+	);
 	const [template, setTemplate] = useState<TemplateKey | null>(null);
 	const [model, setModel] = useState(
 		() =>

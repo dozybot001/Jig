@@ -13,8 +13,10 @@ connects, and the tools it offers. The file uses the usual shape:
       "search": { "url": "https://example.com/mcp", "headers": { "Authorization": "Bearer \${TOKEN}" } } } }
 
 \${NAME} is taken from the environment Jig runs in. Sessions ask you before
-they use a tool of a server for the first time. A project's own .mcp.json is
-not read.
+they use a tool of a server for the first time. A server with "disabled": true
+stays in the file and is not started. A project's own .mcp.json is not read.
+Servers can also be added, disabled and removed in the settings of the web
+interface.
 
 Options:
       --json  Print as JSON
@@ -60,7 +62,7 @@ export function mcpCommand(): Command {
 				}
 				for (const server of servers) {
 					io.stdout.write(
-						`${server.name} (${server.kind}): ${server.state === "ready" ? `${server.tools.length} tools` : `not connected: ${server.error ?? "unknown"}`}\n`,
+						`${server.name} (${server.kind}): ${server.state === "ready" ? `${server.tools.length} tools` : server.state === "disabled" ? "disabled" : `not connected: ${server.error ?? "unknown"}`}\n`,
 					);
 					for (const tool of server.tools) io.stdout.write(`  ${tool}\n`);
 				}

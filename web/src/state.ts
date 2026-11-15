@@ -8,6 +8,7 @@ import type {
 	Entry,
 	Group,
 	Letter,
+	PermissionMode,
 	QueuedMessage,
 	Schedule,
 	Session,
@@ -28,6 +29,52 @@ export interface Settings {
 	dailyBudget: number | null;
 	/** Folders of notes sessions may read, such as ~/memory. */
 	memoryDirs: string[];
+	/** The permission mode new sessions start with. */
+	defaultPermissionMode: PermissionMode;
+	/** The saved workspace preselected for a new session; null for none. */
+	defaultWorkspaceId: string | null;
+	/** Which kinds of events notify the phone. */
+	notify: Record<NotifyKind, boolean>;
+}
+
+export const NOTIFY_KINDS = ["waiting", "error", "task", "budget"] as const;
+export type NotifyKind = (typeof NOTIFY_KINDS)[number];
+
+/** What PATCH /api/settings takes: `notify` may name some kinds, the relay may be null for the default. */
+export type SettingsPatch = Partial<Omit<Settings, "notify" | "remote">> & {
+	notify?: Partial<Record<NotifyKind, boolean>>;
+	remote?: { enabled?: boolean; relayUrl?: string | null };
+};
+
+/** An MCP server from mcp.json with its connection; values of variables and headers never arrive. */
+export interface McpServerView {
+	name: string;
+	kind: "stdio" | "http";
+	disabled: boolean;
+	command: string | null;
+	args: string[];
+	envNames: string[];
+	url: string | null;
+	headerNames: string[];
+	state: "connecting" | "ready" | "error" | "disabled";
+	error: string | null;
+	tools: string[];
+}
+
+/** A web search service and whether its key is in the keychain. */
+export interface SearchServiceView {
+	id: string;
+	name: string;
+	region: "cn" | "global";
+	hasKey: boolean;
+	/** The one web search uses now. */
+	active: boolean;
+}
+
+/** Starting at login and the launcher icon on this computer. */
+export interface SystemStatus {
+	startAtLogin: { supported: boolean; on: boolean; file: string | null };
+	launcher: { supported: boolean; on: boolean; path: string | null };
 }
 
 /** Paired phones and the relay connection, for the phone access dialog. */
@@ -98,6 +145,8 @@ export interface TranscriptState {
 	outputs: Record<string, string>;
 }
 
+export type SettingsDialogName = "providers" | "mcp" | "defaults" | "phones" | "system" | "about";
+
 export interface AppState {
 	phase: "loading" | "signin" | "ready" | "failed";
 	failure: string | null;
@@ -115,7 +164,7 @@ export interface AppState {
 	hasArchived: boolean;
 	/** The main area shows a session, or the settings page. */
 	/** A settings dialog opened from the settings menu, over the conversation. */
-	settingsDialog: "providers" | "defaults" | "about" | "phones" | null;
+	settingsDialog: SettingsDialogName | null;
 	phones: PhonesState | null;
 	/** A folder the home page should preselect, set when you open a workspace from the sidebar. */
 	homeFolder: string | null;

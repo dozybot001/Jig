@@ -159,6 +159,7 @@ export function serveCommand(): Command {
 				// iPhones through Apple's service; phones that keep their own connection directly.
 				send: (note, mode, id) => remote.push(note, mode, id) + notes.send(note),
 			});
+			const { systemControl } = await import("./system.ts");
 			// Scheduled tasks run from the service, whether or not a page is open (blueprint 6.5).
 			const scheduler = new Scheduler(store, agents.post, agents.schedules, log);
 			const app = createApp({
@@ -175,6 +176,9 @@ export function serveCommand(): Command {
 				onPresence: () => notifier.seen(),
 				notes,
 				artifacts,
+				mcp: { home, hub: mcp },
+				search,
+				system: systemControl({ home, env: io.env }),
 			});
 			handle = async (request, device) => app.fetch(request, { device });
 

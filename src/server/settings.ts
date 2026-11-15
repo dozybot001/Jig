@@ -1,7 +1,7 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join } from "node:path";
-import type { ThinkingLevel } from "../shared/types.ts";
+import { DEFAULT_RELAY_URL, type PermissionMode, type ThinkingLevel } from "../shared/types.ts";
 import { invalid } from "./errors.ts";
 import type { Store } from "./store.ts";
 
@@ -19,6 +19,11 @@ export interface Workspace {
 	path: string;
 }
 
+/** Which kinds of events notify the phone (blueprint 6.10, item 34). All on unless turned off. */
+export const NOTIFY_KINDS = ["waiting", "error", "task", "budget"] as const;
+export type NotifyKind = (typeof NOTIFY_KINDS)[number];
+export type NotifySettings = Record<NotifyKind, boolean>;
+
 export const SETTING_DEFAULTS = {
 	defaultModel: {
 		provider: "deepseek",
@@ -33,11 +38,16 @@ export const SETTING_DEFAULTS = {
 	/** A Markdown file each decision is added to (blueprint 6.4, item 14). */
 	decisionLog: null as string | null,
 	/** Phones reach this Mac through the relay (blueprint 6.7, M3 plan section 6). */
-	remote: { enabled: false, relayUrl: "wss://relay.tenonai.cn" } as RemoteSettings,
+	remote: { enabled: false, relayUrl: DEFAULT_RELAY_URL } as RemoteSettings,
 	/** The most all sessions together may spend in a day, in US dollars (M3 plan, section 10). */
 	dailyBudget: null as number | null,
 	/** Folders of notes sessions may read, such as ~/memory (M4 plan, section 4). */
 	memoryDirs: [] as string[],
+	/** The permission mode new sessions start with (blueprint 6.10, item 32). */
+	defaultPermissionMode: "auto" as PermissionMode,
+	/** The saved workspace the interface preselects for a new session; null for none. */
+	defaultWorkspaceId: null as string | null,
+	notify: { waiting: true, error: true, task: true, budget: true } as NotifySettings,
 };
 
 export interface RemoteSettings {
@@ -48,16 +58,30 @@ export interface RemoteSettings {
 export type Settings = typeof SETTING_DEFAULTS;
 
 export function readSettings(store: Store): Settings {
+	const workspaces = store.getSetting("workspaces", SETTING_DEFAULTS.workspaces);
+	const defaultWorkspaceId = store.getSetting(
+		"defaultWorkspaceId",
+		SETTING_DEFAULTS.defaultWorkspaceId,
+	);
 	return {
 		defaultModel: store.getSetting("defaultModel", SETTING_DEFAULTS.defaultModel),
 		theme: store.getSetting("theme", SETTING_DEFAULTS.theme),
 		language: store.getSetting("language", SETTING_DEFAULTS.language),
-		workspaces: store.getSetting("workspaces", SETTING_DEFAULTS.workspaces),
+		workspaces,
 		mainSessionId: store.getSetting("mainSessionId", SETTING_DEFAULTS.mainSessionId),
 		decisionLog: store.getSetting("decisionLog", SETTING_DEFAULTS.decisionLog),
 		remote: { ...SETTING_DEFAULTS.remote, ...store.getSetting("remote", SETTING_DEFAULTS.remote) },
 		dailyBudget: store.getSetting("dailyBudget", SETTING_DEFAULTS.dailyBudget),
 		memoryDirs: store.getSetting("memoryDirs", SETTING_DEFAULTS.memoryDirs),
+		defaultPermissionMode: store.getSetting(
+			"defaultPermissionMode",
+			SETTING_DEFAULTS.defaultPermissionMode,
+		),
+		// A workspace that was removed is no longer the default.
+		defaultWorkspaceId: workspaces.some((workspace) => workspace.id === defaultWorkspaceId)
+			? defaultWorkspaceId
+			: null,
+		notify: { ...SETTING_DEFAULTS.notify, ...store.getSetting("notify", SETTING_DEFAULTS.notify) },
 	};
 }
 

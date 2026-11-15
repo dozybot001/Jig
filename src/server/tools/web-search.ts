@@ -14,7 +14,7 @@ export interface SearchHit {
 	snippet: string;
 }
 
-interface SearchService {
+export interface SearchService {
 	/** The name its key is saved under: `jig key set search-bocha`. */
 	id: string;
 	name: string;
@@ -132,6 +132,21 @@ export class SearchAccess {
 
 	key(service: SearchService): Promise<string | null> {
 		return this.#keys.get(service.id);
+	}
+
+	async hasKey(service: SearchService): Promise<boolean> {
+		return Boolean(await this.#keys.get(service.id));
+	}
+
+	/** Saves a service's key in the keychain; web search is offered from the next turn on. */
+	async saveKey(service: SearchService, key: string): Promise<void> {
+		await this.#keys.set(service.id, key);
+		await this.refresh();
+	}
+
+	async deleteKey(service: SearchService): Promise<void> {
+		await this.#keys.delete(service.id);
+		await this.refresh();
 	}
 }
 

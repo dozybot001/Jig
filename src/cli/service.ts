@@ -41,7 +41,7 @@ export interface ServiceHost {
 	run(command: string, args: string[]): number | null;
 }
 
-function realHost(): ServiceHost {
+export function realServiceHost(): ServiceHost {
 	return {
 		platform: process.platform,
 		homeDir: homedir(),
@@ -122,7 +122,11 @@ WantedBy=default.target
 `;
 }
 
-function serviceFile(host: ServiceHost): string {
+/** Starting at login is done with launchd on macOS and systemd on Linux. */
+export const serviceSupported = (host: ServiceHost) =>
+	host.platform === "darwin" || host.platform === "linux";
+
+export function serviceFile(host: ServiceHost): string {
 	if (host.platform === "darwin") {
 		return join(host.homeDir, "Library", "LaunchAgents", `${SERVICE_LABEL}.plist`);
 	}
@@ -130,7 +134,93 @@ function serviceFile(host: ServiceHost): string {
 	throw new Error("jig service works on macOS and Linux.");
 }
 
-export function serviceCommand(host: ServiceHost = realHost()): Command {
+const target = (host: ServiceHost) => `gui/${host.uid}/${SERVICE_LABEL}`;
+
+/** The service file is there and the system has it loaded (macOS) or enabled (Linux). */
+export function serviceLoaded(host: ServiceHost): boolean {
+	return (
+		existsSync(serviceFile(host)) &&
+		(host.platform === "darwin"
+			? host.run("launchctl", ["print", target(host)]) === 0
+			: host.run("systemctl", ["--user", "is-enabled", "--quiet", UNIT]) === 0)
+	);
+}
+
+/**
+ * Whether Jig will be started at the next login. On macOS the file is enough: launchd loads what is
+ * in LaunchAgents when the person logs in. On Linux the unit has to be enabled.
+ */
+export function serviceAtLogin(host: ServiceHost): boolean {
+	if (!existsSync(serviceFile(host))) return false;
+	return (
+		host.platform === "darwin" ||
+		host.run("systemctl", ["--user", "is-enabled", "--quiet", UNIT]) === 0
+	);
+}
+
+export interface ServiceInstall {
+	/** The exit code of launchctl or systemctl; 0 when the service was set up. */
+	code: number | null;
+	file: string;
+	log: string;
+}
+
+/**
+ * Writes the service file and registers it. With `start` (what `jig service install` does) the
+ * service is also started now; without it Jig starts at the next login and what runs now is left
+ * alone, which is what the settings need: they are served by the Jig that is running.
+ */
+export function installService(
+	host: ServiceHost,
+	home: string,
+	env: Record<string, string | undefined>,
+	options: { start: boolean },
+): ServiceInstall {
+	const file = serviceFile(host);
+	const mac = host.platform === "darwin";
+	const log = join(home, "logs", "serve.log");
+	mkdirSync(join(home, "logs"), { recursive: true, mode: 0o700 });
+	// Shell commands the sessions run need your PATH; launchd and systemd start with a bare one.
+	const vars: Record<string, string> = { PATH: env.PATH ?? "/usr/bin:/bin" };
+	if (env.JIG_HOME) vars.JIG_HOME = home;
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, mac ? launchAgent(host, vars, log) : systemdUnit(host, vars, log), {
+		mode: 0o644,
+	});
+	let code: number | null = 0;
+	if (mac) {
+		if (options.start) {
+			// Loading it again picks up a new Node.js or Jig path after an update.
+			host.run("launchctl", ["bootout", target(host)]);
+			code = host.run("launchctl", ["bootstrap", `gui/${host.uid}`, file]);
+		}
+	} else {
+		host.run("systemctl", ["--user", "daemon-reload"]);
+		code = host.run("systemctl", ["--user", "enable", ...(options.start ? ["--now"] : []), UNIT]);
+	}
+	return { code, file, log };
+}
+
+/**
+ * Removes the service file and its registration; returns whether the file was there. With `stop`
+ * (what `jig service uninstall` does) the running service is stopped too; without it the Jig that
+ * is running keeps running and is only not started at the next login.
+ */
+export function uninstallService(host: ServiceHost, options: { stop: boolean }): boolean {
+	const file = serviceFile(host);
+	const mac = host.platform === "darwin";
+	const had = existsSync(file);
+	if (mac) {
+		if (options.stop) host.run("launchctl", ["bootout", target(host)]);
+	} else if (had) {
+		host.run("systemctl", ["--user", "disable", ...(options.stop ? ["--now"] : []), UNIT]);
+	}
+	rmSync(file, { force: true });
+	if (!mac && had) host.run("systemctl", ["--user", "daemon-reload"]);
+	return had;
+}
+
+export function serviceCommand(host: ServiceHost = realServiceHost()): Command {
 	return {
 		name: "service",
 		summary: "Start Jig when you log in",
@@ -149,19 +239,13 @@ export function serviceCommand(host: ServiceHost = realHost()): Command {
 			if (positionals.length !== 1 || !["install", "uninstall", "status"].includes(action ?? "")) {
 				throw new UsageError("jig service needs one of install, uninstall or status");
 			}
-			const { jigHome, ensureDir } = await import("../server/paths.ts");
+			const { jigHome } = await import("../server/paths.ts");
 			const home = jigHome(io.env);
 			const file = serviceFile(host);
 			const mac = host.platform === "darwin";
-			const target = `gui/${host.uid}/${SERVICE_LABEL}`;
-			const loaded = () =>
-				existsSync(file) &&
-				(mac
-					? host.run("launchctl", ["print", target]) === 0
-					: host.run("systemctl", ["--user", "is-enabled", "--quiet", UNIT]) === 0);
 
 			if (action === "status") {
-				const state = { installed: loaded(), running: serviceRunning(home), file };
+				const state = { installed: serviceLoaded(host), running: serviceRunning(home), file };
 				if (values.json) io.stdout.write(`${JSON.stringify(state)}\n`);
 				else {
 					io.stdout.write(
@@ -172,11 +256,7 @@ export function serviceCommand(host: ServiceHost = realHost()): Command {
 			}
 
 			if (action === "uninstall") {
-				const had = existsSync(file);
-				if (mac) host.run("launchctl", ["bootout", target]);
-				else if (had) host.run("systemctl", ["--user", "disable", "--now", UNIT]);
-				rmSync(file, { force: true });
-				if (!mac && had) host.run("systemctl", ["--user", "daemon-reload"]);
+				const had = uninstallService(host, { stop: true });
 				if (values.json) io.stdout.write(`${JSON.stringify({ installed: false, file })}\n`);
 				else {
 					io.stdout.write(
@@ -188,30 +268,13 @@ export function serviceCommand(host: ServiceHost = realHost()): Command {
 				return EXIT_OK;
 			}
 
-			if (!loaded() && serviceRunning(home)) {
+			if (!serviceLoaded(host) && serviceRunning(home)) {
 				io.stderr.write(
 					"jig: Jig is already running, started by hand. Stop that 'jig serve' first, then run this again.\n",
 				);
 				return EXIT_ERROR;
 			}
-			const logs = ensureDir(join(home, "logs"));
-			const log = join(logs, "serve.log");
-			// Shell commands the sessions run need your PATH; launchd and systemd start with a bare one.
-			const env: Record<string, string> = { PATH: io.env.PATH ?? "/usr/bin:/bin" };
-			if (io.env.JIG_HOME) env.JIG_HOME = home;
-			mkdirSync(dirname(file), { recursive: true });
-			writeFileSync(file, mac ? launchAgent(host, env, log) : systemdUnit(host, env, log), {
-				mode: 0o644,
-			});
-			let code: number | null;
-			if (mac) {
-				// Loading it again picks up a new Node.js or Jig path after an update.
-				host.run("launchctl", ["bootout", target]);
-				code = host.run("launchctl", ["bootstrap", `gui/${host.uid}`, file]);
-			} else {
-				host.run("systemctl", ["--user", "daemon-reload"]);
-				code = host.run("systemctl", ["--user", "enable", "--now", UNIT]);
-			}
+			const { code, log } = installService(host, home, io.env, { start: true });
 			if (code !== 0) {
 				io.stderr.write(
 					`jig: ${mac ? "launchctl" : "systemctl"} could not start the service (exit ${code ?? "none"}). The file is at ${file}.\n`,

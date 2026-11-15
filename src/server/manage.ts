@@ -229,7 +229,8 @@ export class Manager {
 				if (!name) throw invalid("A new session needs a name.", "name");
 				const valid = validateSessionName(name);
 				if (store.findSessionByName(valid)) throw invalid(`"${valid}" is taken.`, "name");
-				const defaults = readSettings(store).defaultModel;
+				const settings = readSettings(store);
+				const defaults = settings.defaultModel;
 				const model = modelValue
 					? parseModel(modelValue, "model")
 					: { provider: defaults.provider, model: defaults.model };
@@ -238,10 +239,11 @@ export class Manager {
 				const team = teamValue === undefined || none(teamValue) ? null : teamRef(teamValue);
 				reach("configure");
 				if (cwd && !(by.cwd && isInside(cwd, by.cwd))) widen("change-folder", null);
+				// The default for new sessions, but never more than the session that creates it has.
 				const mode: PermissionMode =
-					MODE_RANK[permissionModeOf(by.options)] < MODE_RANK.auto
+					MODE_RANK[permissionModeOf(by.options)] < MODE_RANK[settings.defaultPermissionMode]
 						? permissionModeOf(by.options)
-						: "auto";
+						: settings.defaultPermissionMode;
 				if (commit) {
 					store.createSession({
 						name: valid,

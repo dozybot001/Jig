@@ -1,27 +1,50 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import { POLICY_VERSION } from "../../../src/shared/policy.ts";
-import type { Session } from "../../../src/shared/types.ts";
 import {
+	DEFAULT_RELAY_URL,
+	PERMISSION_MODES,
+	type PermissionMode,
+	type Session,
+} from "../../../src/shared/types.ts";
+import {
+	addMcpServer,
 	createPairing,
 	deleteArchivedSessions,
 	deleteCustomProvider,
 	deleteKey,
+	deleteSearchKey,
 	loadArchived,
+	loadMcpServers,
 	loadPhones,
+	loadSearchServices,
+	loadSystem,
 	openSettings,
+	patchMcpServer,
+	removeMcpServer,
 	revokeDevice,
 	saveCustomProvider,
 	saveKey,
+	saveSearchKey,
 	saveSettings,
+	saveSystem,
 	setDevicePush,
 	setPhoneAccess,
 	spentToday,
 } from "../actions.ts";
-import { formatAgo, formatCost, t, useLang } from "../i18n.ts";
-import { type ProviderSummary, setState, useAppState } from "../state.ts";
+import { formatAgo, formatCost, hasMessage, t, useLang } from "../i18n.ts";
+import {
+	type McpServerView,
+	NOTIFY_KINDS,
+	type ProviderSummary,
+	type SearchServiceView,
+	type SystemStatus,
+	setState,
+	useAppState,
+} from "../state.ts";
 import { ConfirmDialog, cleanAmount } from "./dialogs.tsx";
 import {
 	ChevronIcon,
+	CloseIcon,
 	DataIcon,
 	GearIcon,
 	InfoIcon,
@@ -31,8 +54,10 @@ import {
 	MailIcon,
 	PhoneIcon,
 	PlusIcon,
+	PowerIcon,
 	SlidersIcon,
 	ThemeIcon,
+	ToolsIcon,
 } from "./icons.tsx";
 import { ModelPicker } from "./session.tsx";
 import {
@@ -42,6 +67,7 @@ import {
 	Field,
 	Menu,
 	type MenuEntry,
+	Select,
 	SettingGroup,
 	SettingRow,
 	Switch,
@@ -49,25 +75,43 @@ import {
 	useNow,
 } from "./ui.tsx";
 
-function ProviderRow({ provider }: { provider: ProviderSummary }) {
+/**
+ * One service that takes an API key: its name and whether a key is saved, with save, replace and
+ * delete. The key goes to the system keychain and is never shown again.
+ */
+function KeyRow({
+	name,
+	note,
+	hasKey,
+	takesKey,
+	deleteBody,
+	onSave,
+	onDelete,
+	extra,
+}: {
+	name: string;
+	note: string;
+	hasKey: boolean;
+	takesKey: boolean;
+	deleteBody: string;
+	onSave: (key: string) => Promise<unknown>;
+	onDelete: () => Promise<unknown>;
+	/** Further actions on the row, shown while the key is not being typed. */
+	extra?: ReactNode;
+}) {
 	useLang();
 	const [editing, setEditing] = useState(false);
 	const [key, setKey] = useState("");
-	const [confirming, setConfirming] = useState<"key" | "provider" | null>(null);
+	const [confirming, setConfirming] = useState(false);
 	const save = useAction(async () => {
-		await saveKey(provider.id, key.trim());
+		await onSave(key.trim());
 		setKey("");
 		setEditing(false);
 	});
-	const status = !provider.keyRequired
-		? t("keyless")
-		: provider.hasKey
-			? t("keySaved")
-			: t("noKey");
 	return (
 		<div className="provider-row">
 			<div>
-				<strong>{provider.name}</strong> <span className="hint">· {status}</span>
+				<strong>{name}</strong> <span className="hint">· {note}</span>
 				{editing && (
 					<div className="provider-key">
 						{/* An API key is not a sign-in password, so it is not marked as one (spec 18.5). */}
@@ -77,7 +121,7 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
 							autoComplete="off"
 							spellCheck={false}
 							data-1p-ignore="true"
-							aria-label={t("keyPlaceholder")}
+							aria-label={`${name} · ${t("keyPlaceholder")}`}
 							placeholder={t("keyPlaceholder")}
 							value={key}
 							onChange={(event) => setKey(event.target.value)}
@@ -101,39 +145,174 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
 						</Button>
 					</>
 				) : (
-					provider.keyRequired && (
+					takesKey && (
 						<Button onClick={() => setEditing(true)}>
-							{provider.hasKey ? t("replaceKey") : t("setKey")}
+							{hasKey ? t("replaceKey") : t("setKey")}
 						</Button>
 					)
 				)}
-				{provider.hasKey && provider.keyRequired && !editing && (
-					<Button variant="danger" onClick={() => setConfirming("key")}>
+				{hasKey && takesKey && !editing && (
+					<Button variant="danger" onClick={() => setConfirming(true)}>
 						{t("deleteKey")}
 					</Button>
 				)}
-				{provider.custom && !editing && (
-					<Button variant="danger" onClick={() => setConfirming("provider")}>
-						{t("deleteProvider")}
-					</Button>
-				)}
+				{!editing && extra}
 			</div>
 			{confirming && (
 				<ConfirmDialog
-					title={confirming === "key" ? t("deleteKey") : t("deleteProvider")}
-					body={
-						confirming === "key"
-							? t("deleteKeyBody", { name: provider.name })
-							: t("deleteProviderBody", { name: provider.name })
-					}
+					title={t("deleteKey")}
+					body={deleteBody}
 					confirmLabel={t("delete")}
-					onConfirm={() =>
-						confirming === "key" ? deleteKey(provider.id) : deleteCustomProvider(provider.id)
-					}
-					onClose={() => setConfirming(null)}
+					onConfirm={onDelete}
+					onClose={() => setConfirming(false)}
 				/>
 			)}
 		</div>
+	);
+}
+
+function ProviderRow({ provider }: { provider: ProviderSummary }) {
+	useLang();
+	const [removing, setRemoving] = useState(false);
+	const status = !provider.keyRequired
+		? t("keyless")
+		: provider.hasKey
+			? t("keySaved")
+			: t("noKey");
+	return (
+		<>
+			<KeyRow
+				name={provider.name}
+				note={status}
+				hasKey={provider.hasKey}
+				takesKey={provider.keyRequired}
+				deleteBody={t("deleteKeyBody", { name: provider.name })}
+				onSave={(key) => saveKey(provider.id, key)}
+				onDelete={() => deleteKey(provider.id)}
+				extra={
+					provider.custom && (
+						<Button variant="danger" onClick={() => setRemoving(true)}>
+							{t("deleteProvider")}
+						</Button>
+					)
+				}
+			/>
+			{removing && (
+				<ConfirmDialog
+					title={t("deleteProvider")}
+					body={t("deleteProviderBody", { name: provider.name })}
+					confirmLabel={t("delete")}
+					onConfirm={() => deleteCustomProvider(provider.id)}
+					onClose={() => setRemoving(false)}
+				/>
+			)}
+		</>
+	);
+}
+
+/** A search service's name in the interface language; the server's own name when Jig has none. */
+function searchName(service: SearchServiceView): string {
+	const key = `searchName_${service.id.replace(/^search-/, "")}`;
+	return hasMessage(key) ? t(key) : service.name;
+}
+
+/**
+ * The search services (blueprint 6.10, item 30): which have a key, and saving, replacing and
+ * deleting it. Each row says who provides the service, since the query is sent to them.
+ */
+function SearchServices() {
+	useLang();
+	const [services, setServices] = useState<SearchServiceView[] | null>(null);
+	const [error, setError] = useState<unknown>(null);
+	const reload = useCallback(() => loadSearchServices().then(setServices, setError), []);
+	useEffect(() => {
+		void reload();
+	}, [reload]);
+	return (
+		<section className="settings-section" aria-label={t("searchServices")}>
+			<p className="hint">{t("searchHelp")}</p>
+			<div className="provider-group">
+				{(services ?? []).map((service) => (
+					<KeyRow
+						key={service.id}
+						name={searchName(service)}
+						note={[
+							service.hasKey ? t("keySaved") : t("noKey"),
+							service.active ? t("searchInUse") : null,
+							t(`search_${service.region}`),
+						]
+							.filter(Boolean)
+							.join(t("hintSeparator"))}
+						hasKey={service.hasKey}
+						takesKey
+						deleteBody={t("deleteSearchKeyBody", { name: searchName(service) })}
+						onSave={async (key) => {
+							await saveSearchKey(service.id, key);
+							await reload();
+						}}
+						onDelete={async () => {
+							await deleteSearchKey(service.id);
+							await reload();
+						}}
+					/>
+				))}
+			</div>
+			<ErrorBox error={error} />
+		</section>
+	);
+}
+
+const KEY_TABS = ["models", "search"] as const;
+
+/**
+ * Providers and keys: the model providers on one tab and the search services on the other, so the
+ * three search services are not under the long list of providers.
+ */
+function ProvidersDialog({ onClose }: { onClose: () => void }) {
+	useLang();
+	const [tab, setTab] = useState<(typeof KEY_TABS)[number]>("models");
+	const id = useId();
+	// Arrow keys move between tabs, as in any tab list (WAI-ARIA).
+	const onKeyDown = (event: React.KeyboardEvent) => {
+		const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+		if (!step) return;
+		event.preventDefault();
+		const next = KEY_TABS[(KEY_TABS.indexOf(tab) + step + KEY_TABS.length) % KEY_TABS.length];
+		if (!next) return;
+		setTab(next);
+		document.getElementById(`${id}-${next}`)?.focus();
+	};
+	return (
+		<Dialog
+			title={t("providers")}
+			size="l"
+			onClose={onClose}
+			footer={<Button onClick={onClose}>{t("close")}</Button>}
+			tabs={
+				<div className="panel-tabs dialog-tabs" role="tablist" aria-label={t("providers")}>
+					{KEY_TABS.map((name) => (
+						<button
+							key={name}
+							id={`${id}-${name}`}
+							type="button"
+							role="tab"
+							className="panel-tab"
+							aria-selected={tab === name}
+							aria-controls={`${id}-panel`}
+							tabIndex={tab === name ? 0 : -1}
+							onKeyDown={onKeyDown}
+							onClick={() => setTab(name)}
+						>
+							{name === "models" ? t("modelProviders") : t("searchServices")}
+						</button>
+					))}
+				</div>
+			}
+		>
+			<div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-${tab}`}>
+				{tab === "models" ? <Providers /> : <SearchServices />}
+			</div>
+		</Dialog>
 	);
 }
 
@@ -271,6 +450,12 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 	useLang();
 	const settings = useAppState((state) => state.settings);
 	const [model, setModel] = useState(settings?.defaultModel);
+	const savedMode = settings?.defaultPermissionMode ?? "auto";
+	const [mode, setMode] = useState<PermissionMode>(savedMode);
+	const modeId = useId();
+	const savedWorkspace = settings?.defaultWorkspaceId ?? "";
+	const [workspace, setWorkspace] = useState(savedWorkspace);
+	const workspaceId = useId();
 	const [log, setLog] = useState(settings?.decisionLog ?? "");
 	const logId = useId();
 	const savedBudget = settings?.dailyBudget ? String(settings.dailyBudget) : "";
@@ -288,6 +473,8 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 	const save = useAction(async () => {
 		await saveSettings({
 			...(model ? { defaultModel: model } : {}),
+			...(mode !== savedMode ? { defaultPermissionMode: mode } : {}),
+			...(workspace !== savedWorkspace ? { defaultWorkspaceId: workspace || null } : {}),
 			...(memory !== savedMemory
 				? {
 						memoryDirs: memory
@@ -303,6 +490,8 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 	});
 	const dirty =
 		JSON.stringify(model) !== JSON.stringify(settings?.defaultModel) ||
+		mode !== savedMode ||
+		workspace !== savedWorkspace ||
 		log.trim() !== (settings?.decisionLog ?? "") ||
 		budget !== savedBudget ||
 		memory !== savedMemory;
@@ -339,6 +528,33 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 					/>
 				</Field>
 			)}
+			<Field label={t("defaultPermission")} labelId={modeId} info={t("defaultPermissionHelp")}>
+				<Select
+					labelledBy={modeId}
+					value={mode}
+					options={PERMISSION_MODES.map((value) => ({
+						value,
+						label: t(`perm_${value}`),
+						hint: t(`perm_${value}_hint`),
+					}))}
+					onChange={(value) => setMode(value as PermissionMode)}
+				/>
+			</Field>
+			<Field label={t("defaultWorkspace")} labelId={workspaceId} info={t("defaultWorkspaceHelp")}>
+				<Select
+					labelledBy={workspaceId}
+					value={workspace}
+					options={[
+						{ value: "", label: t("defaultWorkspaceNone") },
+						...(settings?.workspaces ?? []).map((item) => ({
+							value: item.id,
+							label: item.name,
+							hint: item.path,
+						})),
+					]}
+					onChange={setWorkspace}
+				/>
+			</Field>
 			<Field label={t("decisionLog")} htmlFor={logId} info={t("decisionLogHelp")}>
 				<input
 					id={logId}
@@ -460,15 +676,18 @@ export function SettingsDialogs() {
 	const close = () => setState({ settingsDialog: null });
 	if (which === "defaults") return <DefaultsDialog onClose={close} />;
 	if (which === "phones") return <PhonesDialog onClose={close} />;
-	if (which === "providers" || which === "about") {
+	if (which === "mcp") return <McpDialog onClose={close} />;
+	if (which === "system") return <SystemDialog onClose={close} />;
+	if (which === "providers") return <ProvidersDialog onClose={close} />;
+	if (which === "about") {
 		return (
 			<Dialog
-				title={which === "providers" ? t("providers") : t("about")}
+				title={t("about")}
 				size="l"
 				onClose={close}
 				footer={<Button onClick={close}>{t("close")}</Button>}
 			>
-				{which === "providers" ? <Providers /> : <About />}
+				<About />
 			</Dialog>
 		);
 	}
@@ -530,8 +749,10 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 		},
 		{ separator: true, id: "line-1" },
 		{ label: t("providersMenu"), icon: <KeyIcon />, onSelect: () => openSettings("providers") },
+		{ label: t("mcpMenu"), icon: <ToolsIcon />, onSelect: () => openSettings("mcp") },
 		{ label: t("defaultsMenu"), icon: <SlidersIcon />, onSelect: () => openSettings("defaults") },
 		{ label: t("phonesMenu"), icon: <PhoneIcon />, onSelect: () => openSettings("phones") },
+		{ label: t("systemMenu"), icon: <PowerIcon />, onSelect: () => openSettings("system") },
 		{
 			label: t("dataMenu"),
 			icon: <DataIcon />,
@@ -643,8 +864,14 @@ function PhonesDialog({ onClose }: { onClose: () => void }) {
 		null,
 	);
 	const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
+	const [relaying, setRelaying] = useState(false);
+	const settings = useAppState((state) => state.settings);
+	const notify = useAction((kind: (typeof NOTIFY_KINDS)[number], on: boolean) =>
+		saveSettings({ notify: { [kind]: on } }),
+	);
 	const now = useNow();
 	const switchId = useId();
+	const notifyId = useId();
 	const toggle = useAction((enabled: boolean) => setPhoneAccess(enabled));
 	const pair = useAction(async () => {
 		const result = await createPairing();
@@ -681,14 +908,19 @@ function PhonesDialog({ onClose }: { onClose: () => void }) {
 						onChange={(value) => void toggle.run(value)}
 					/>
 				</SettingRow>
-				{remote?.enabled && (
-					<SettingRow
-						label={t("relay")}
-						hint={remote.connected ? t("relayConnected") : t("relayConnecting")}
-					>
-						<code className="relay-url">{remote.relayUrl}</code>
-					</SettingRow>
-				)}
+				<SettingRow
+					label={t("relay")}
+					hint={
+						remote?.enabled
+							? remote.connected
+								? t("relayConnected")
+								: t("relayConnecting")
+							: undefined
+					}
+				>
+					<code className="relay-url">{remote?.relayUrl ?? settings?.remote.relayUrl}</code>
+					<Button onClick={() => setRelaying(true)}>{t("relayChange")}</Button>
+				</SettingRow>
 			</SettingGroup>
 			<SettingGroup title={t("pairedPhones")}>
 				{devices.length === 0 && <p className="hint setting-empty">{t("noPairedPhones")}</p>}
@@ -716,6 +948,23 @@ function PhonesDialog({ onClose }: { onClose: () => void }) {
 						>
 							{t("removePhone")}
 						</Button>
+					</SettingRow>
+				))}
+			</SettingGroup>
+			<SettingGroup title={t("notifyTitle")} info={t("notifyHelp")}>
+				{NOTIFY_KINDS.map((kind) => (
+					<SettingRow
+						key={kind}
+						label={t(`notify_${kind}`)}
+						hint={t(`notify_${kind}_hint`)}
+						labelId={`${notifyId}-${kind}`}
+					>
+						<Switch
+							checked={settings?.notify[kind] ?? true}
+							busy={notify.busy}
+							labelledBy={`${notifyId}-${kind}`}
+							onChange={(on) => void notify.run(kind, on)}
+						/>
 					</SettingRow>
 				))}
 			</SettingGroup>
@@ -747,7 +996,14 @@ function PhonesDialog({ onClose }: { onClose: () => void }) {
 					</>
 				)}
 			</div>
-			<ErrorBox error={toggle.error ?? pair.error} />
+			<ErrorBox error={toggle.error ?? pair.error ?? notify.error} />
+			{relaying && (
+				<RelayDialog
+					current={remote?.relayUrl ?? settings?.remote.relayUrl ?? DEFAULT_RELAY_URL}
+					paired={devices.length > 0}
+					onClose={() => setRelaying(false)}
+				/>
+			)}
 			{removing && (
 				<ConfirmDialog
 					title={t("removePhoneTitle", { name: removing.name })}
@@ -757,6 +1013,589 @@ function PhonesDialog({ onClose }: { onClose: () => void }) {
 					onClose={() => setRemoving(null)}
 				/>
 			)}
+		</Dialog>
+	);
+}
+
+/**
+ * The relay address (blueprint 6.10, item 31): your own relay in place of the one Jig comes with.
+ * A phone keeps the address it was paired with, so after a change it has to pair again.
+ */
+function RelayDialog({
+	current,
+	paired,
+	onClose,
+}: {
+	current: string;
+	paired: boolean;
+	onClose: () => void;
+}) {
+	useLang();
+	const [url, setUrl] = useState(current);
+	const id = useId();
+	const noteId = useId();
+	const save = useAction(async () => {
+		const value = url.trim();
+		// The default is sent as null, so the saved setting follows Jig's own default.
+		await saveSettings({ remote: { relayUrl: value === DEFAULT_RELAY_URL ? null : value } });
+		await loadPhones();
+		onClose();
+	});
+	return (
+		<Dialog
+			title={t("relayTitle")}
+			size="m"
+			onClose={onClose}
+			footer={
+				<>
+					<Button
+						disabled={url.trim() === DEFAULT_RELAY_URL}
+						onClick={() => setUrl(DEFAULT_RELAY_URL)}
+					>
+						{t("relayRestore")}
+					</Button>
+					<Button onClick={onClose}>{t("cancel")}</Button>
+					<Button
+						variant="primary"
+						busy={save.busy}
+						disabled={!url.trim() || url.trim() === current}
+						onClick={() => void save.run()}
+					>
+						{t("save")}
+					</Button>
+				</>
+			}
+		>
+			<Field label={t("relayTitle")} htmlFor={id}>
+				<input
+					id={id}
+					className="input mono-input"
+					spellCheck={false}
+					autoComplete="off"
+					autoCapitalize="off"
+					placeholder={DEFAULT_RELAY_URL}
+					aria-describedby={noteId}
+					value={url}
+					onChange={(event) => setUrl(event.target.value)}
+				/>
+				<span className="hint" id={noteId}>
+					{t("relayHelp")}
+					{paired ? ` ${t("relayRepair")}` : ""}
+				</span>
+			</Field>
+			<ErrorBox error={save.error} />
+		</Dialog>
+	);
+}
+
+/** Names with values, typed a line at a time; values are hidden as they are typed, like API keys. */
+interface Pair {
+	id: number;
+	name: string;
+	value: string;
+}
+
+function PairsEditor({
+	pairs,
+	onChange,
+	addLabel,
+	namePlaceholder,
+}: {
+	pairs: Pair[];
+	onChange: (pairs: Pair[]) => void;
+	addLabel: string;
+	namePlaceholder: string;
+}) {
+	useLang();
+	const next = useRef(1);
+	const set = (id: number, patch: Partial<Pair>) =>
+		onChange(pairs.map((pair) => (pair.id === id ? { ...pair, ...patch } : pair)));
+	return (
+		<div className="pairs">
+			{pairs.map((pair) => (
+				<div key={pair.id} className="pair-row">
+					<input
+						className="input mono-input"
+						spellCheck={false}
+						autoComplete="off"
+						autoCapitalize="off"
+						aria-label={t("mcpPairName")}
+						placeholder={namePlaceholder}
+						value={pair.name}
+						onChange={(event) => set(pair.id, { name: event.target.value })}
+					/>
+					<input
+						className="input secret-input"
+						type="text"
+						spellCheck={false}
+						autoComplete="off"
+						data-1p-ignore="true"
+						aria-label={t("mcpPairValue")}
+						placeholder={t("mcpPairValue")}
+						value={pair.value}
+						onChange={(event) => set(pair.id, { value: event.target.value })}
+					/>
+					<Button
+						variant="icon"
+						aria-label={t("mcpRemovePair")}
+						title={t("mcpRemovePair")}
+						onClick={() => onChange(pairs.filter((other) => other.id !== pair.id))}
+					>
+						<CloseIcon />
+					</Button>
+				</div>
+			))}
+			<Button
+				onClick={() => {
+					onChange([...pairs, { id: next.current, name: "", value: "" }]);
+					next.current += 1;
+				}}
+			>
+				<PlusIcon />
+				{addLabel}
+			</Button>
+		</div>
+	);
+}
+
+const pairsToRecord = (pairs: Pair[]): Record<string, string> =>
+	Object.fromEntries(
+		pairs.filter((pair) => pair.name.trim()).map((pair) => [pair.name.trim(), pair.value]),
+	);
+
+/** Adding an MCP server: a command Jig starts on this computer, or a URL it connects to. */
+function McpAddDialog({
+	onClose,
+	onAdded,
+}: {
+	onClose: () => void;
+	onAdded: () => Promise<unknown>;
+}) {
+	useLang();
+	const [name, setName] = useState("");
+	const [kind, setKind] = useState<"stdio" | "http">("stdio");
+	const [command, setCommand] = useState("");
+	const [args, setArgs] = useState("");
+	const [env, setEnv] = useState<Pair[]>([]);
+	const [url, setUrl] = useState("");
+	const [headers, setHeaders] = useState<Pair[]>([]);
+	const ids = {
+		name: useId(),
+		nameHint: useId(),
+		kind: useId(),
+		command: useId(),
+		args: useId(),
+		url: useId(),
+	};
+	const add = useAction(async () => {
+		await addMcpServer(
+			kind === "stdio"
+				? {
+						name: name.trim(),
+						command: command.trim(),
+						args: args
+							.split("\n")
+							.map((line) => line.trim())
+							.filter(Boolean),
+						env: pairsToRecord(env),
+					}
+				: { name: name.trim(), url: url.trim(), headers: pairsToRecord(headers) },
+		);
+		await onAdded();
+		onClose();
+	});
+	return (
+		<Dialog
+			title={t("mcpAdd")}
+			size="m"
+			onClose={onClose}
+			footer={
+				<>
+					<Button onClick={onClose}>{t("cancel")}</Button>
+					<Button
+						variant="primary"
+						busy={add.busy}
+						disabled={!name.trim() || !(kind === "stdio" ? command.trim() : url.trim())}
+						onClick={() => void add.run()}
+					>
+						{t("mcpAdd")}
+					</Button>
+				</>
+			}
+		>
+			<Field label={t("mcpName")} htmlFor={ids.name}>
+				<input
+					id={ids.name}
+					className="input mono-input"
+					spellCheck={false}
+					autoComplete="off"
+					autoCapitalize="off"
+					maxLength={32}
+					aria-describedby={ids.nameHint}
+					value={name}
+					onChange={(event) => setName(event.target.value)}
+				/>
+				<span className="hint" id={ids.nameHint}>
+					{t("mcpNameHint")}
+				</span>
+			</Field>
+			<Field label={t("mcpKind")} labelId={ids.kind}>
+				<Select
+					labelledBy={ids.kind}
+					value={kind}
+					options={(["stdio", "http"] as const).map((value) => ({
+						value,
+						label: t(`mcpKind_${value}`),
+						hint: t(`mcpKind_${value}_hint`),
+					}))}
+					onChange={(value) => setKind(value as "stdio" | "http")}
+				/>
+			</Field>
+			{kind === "stdio" ? (
+				<>
+					<Field label={t("mcpCommand")} htmlFor={ids.command}>
+						<input
+							id={ids.command}
+							className="input mono-input"
+							spellCheck={false}
+							autoComplete="off"
+							autoCapitalize="off"
+							placeholder="npx"
+							value={command}
+							onChange={(event) => setCommand(event.target.value)}
+						/>
+					</Field>
+					<Field label={t("mcpArgs")} htmlFor={ids.args}>
+						<textarea
+							id={ids.args}
+							className="textarea mono-input"
+							spellCheck={false}
+							rows={2}
+							placeholder={t("mcpArgsHint")}
+							value={args}
+							onChange={(event) => setArgs(event.target.value)}
+						/>
+					</Field>
+					<Field label={t("mcpEnv")} info={t("mcpEnvHelp")}>
+						<PairsEditor
+							pairs={env}
+							onChange={setEnv}
+							addLabel={t("mcpAddEnv")}
+							namePlaceholder="API_KEY"
+						/>
+					</Field>
+				</>
+			) : (
+				<>
+					<Field label={t("mcpUrl")} htmlFor={ids.url}>
+						<input
+							id={ids.url}
+							className="input mono-input"
+							spellCheck={false}
+							autoComplete="off"
+							autoCapitalize="off"
+							inputMode="url"
+							placeholder="https://example.com/mcp"
+							value={url}
+							onChange={(event) => setUrl(event.target.value)}
+						/>
+					</Field>
+					<Field label={t("mcpHeaders")} info={t("mcpHeadersHelp")}>
+						<PairsEditor
+							pairs={headers}
+							onChange={setHeaders}
+							addLabel={t("mcpAddHeader")}
+							namePlaceholder="Authorization"
+						/>
+					</Field>
+				</>
+			)}
+			<ErrorBox error={add.error} />
+		</Dialog>
+	);
+}
+
+/** One saved variable or header: its name, and a way to type its value again. The value is never shown. */
+function McpValue({ name, onSave }: { name: string; onSave: (value: string) => Promise<unknown> }) {
+	useLang();
+	const [editing, setEditing] = useState(false);
+	const [value, setValue] = useState("");
+	const save = useAction(async () => {
+		await onSave(value);
+		setValue("");
+		setEditing(false);
+	});
+	return (
+		<div className="mcp-value">
+			<code className="mcp-code">{name}</code>
+			{editing ? (
+				<>
+					<input
+						className="input secret-input"
+						type="text"
+						spellCheck={false}
+						autoComplete="off"
+						data-1p-ignore="true"
+						aria-label={t("mcpNewValue", { name })}
+						placeholder={t("mcpNewValue", { name })}
+						value={value}
+						onChange={(event) => setValue(event.target.value)}
+					/>
+					<Button onClick={() => setEditing(false)}>{t("cancel")}</Button>
+					<Button variant="primary" busy={save.busy} onClick={() => void save.run()}>
+						{t("save")}
+					</Button>
+				</>
+			) : (
+				<Button variant="ghost" onClick={() => setEditing(true)}>
+					{t("mcpReenter")}
+				</Button>
+			)}
+			<ErrorBox error={save.error} />
+		</div>
+	);
+}
+
+function McpServerRow({
+	server,
+	onChanged,
+	onRemove,
+}: {
+	server: McpServerView;
+	onChanged: () => Promise<unknown>;
+	onRemove: () => void;
+}) {
+	useLang();
+	const [open, setOpen] = useState(false);
+	const detailId = useId();
+	const toggle = useAction(async (enabled: boolean) => {
+		await patchMcpServer(server.name, { disabled: !enabled });
+		await onChanged();
+	});
+	const state =
+		server.state === "ready"
+			? t("mcpState_ready", { n: server.tools.length })
+			: server.state === "error" && server.error
+				? `${t("mcpState_error")}${t("hintSeparator")}${server.error}`
+				: t(`mcpState_${server.state}`);
+	const values = server.kind === "stdio" ? server.envNames : server.headerNames;
+	return (
+		<div className="mcp-server">
+			<div className="setting-row mcp-row">
+				<div className="setting-text">
+					<span className="setting-label">
+						<span className="mcp-code">{server.name}</span>
+					</span>
+					<span className="hint" role="status">
+						{state}
+					</span>
+				</div>
+				<div className="setting-control">
+					<Button
+						variant="ghost"
+						aria-expanded={open}
+						aria-controls={detailId}
+						onClick={() => setOpen(!open)}
+					>
+						{t("mcpDetails")}
+					</Button>
+					<Switch
+						label={t("mcpEnabled")}
+						checked={!server.disabled}
+						busy={toggle.busy}
+						onChange={(value) => void toggle.run(value)}
+					/>
+					<Button variant="danger" onClick={onRemove}>
+						{t("mcpRemove")}
+					</Button>
+				</div>
+			</div>
+			{open && (
+				<div className="mcp-detail" id={detailId}>
+					<div className="mcp-line">
+						<span>{server.kind === "stdio" ? t("mcpCommand") : t("mcpUrl")}</span>
+						<code className="mcp-code">
+							{server.kind === "stdio" ? [server.command, ...server.args].join(" ") : server.url}
+						</code>
+					</div>
+					<div className="mcp-line">
+						<span>{server.kind === "stdio" ? t("mcpEnv") : t("mcpHeaders")}</span>
+						<div className="mcp-values">
+							{values.length === 0 && <span className="hint">{t("mcpNoValues")}</span>}
+							{values.map((name) => (
+								<McpValue
+									key={name}
+									name={name}
+									onSave={async (value) => {
+										await patchMcpServer(
+											server.name,
+											server.kind === "stdio"
+												? { env: { [name]: value } }
+												: { headers: { [name]: value } },
+										);
+										await onChanged();
+									}}
+								/>
+							))}
+						</div>
+					</div>
+					{server.state === "ready" && (
+						<div className="mcp-line">
+							<span>{t("mcpTools")}</span>
+							{server.tools.length === 0 ? (
+								<span className="hint">{t("mcpNoTools")}</span>
+							) : (
+								<ul className="mcp-tools">
+									{server.tools.map((tool) => (
+										<li key={tool}>
+											<code className="mcp-code">{tool}</code>
+										</li>
+									))}
+								</ul>
+							)}
+						</div>
+					)}
+					<ErrorBox error={toggle.error} />
+				</div>
+			)}
+			{!open && <ErrorBox error={toggle.error} />}
+		</div>
+	);
+}
+
+/**
+ * MCP servers (blueprint 6.10, item 29): the servers in mcp.json, whether each is connected and the
+ * tools it offers; add one, turn one off, remove one. Changes apply to the running Jig at once.
+ */
+function McpDialog({ onClose }: { onClose: () => void }) {
+	useLang();
+	const [servers, setServers] = useState<McpServerView[] | null>(null);
+	const [error, setError] = useState<unknown>(null);
+	const [adding, setAdding] = useState(false);
+	const [removing, setRemoving] = useState<string | null>(null);
+	const reload = useCallback(
+		() =>
+			loadMcpServers().then((items) => {
+				setServers(items);
+				setError(null);
+			}, setError),
+		[],
+	);
+	// A server connects or fails without an event; look again while the dialog is open.
+	useEffect(() => {
+		void reload();
+		const timer = setInterval(() => void reload(), 2000);
+		return () => clearInterval(timer);
+	}, [reload]);
+	return (
+		<Dialog
+			title={t("mcpTitle")}
+			size="l"
+			onClose={onClose}
+			footer={<Button onClick={onClose}>{t("close")}</Button>}
+		>
+			<p className="hint">{t("mcpHelp")}</p>
+			<SettingGroup title={t("mcpAdded")}>
+				{servers === null && !error && <p className="hint setting-empty">{t("loading")}</p>}
+				{servers?.length === 0 && <p className="hint setting-empty">{t("mcpNone")}</p>}
+				{(servers ?? []).map((server) => (
+					<McpServerRow
+						key={server.name}
+						server={server}
+						onChanged={reload}
+						onRemove={() => setRemoving(server.name)}
+					/>
+				))}
+			</SettingGroup>
+			<div>
+				<Button onClick={() => setAdding(true)}>
+					<PlusIcon />
+					{t("mcpAdd")}
+				</Button>
+			</div>
+			<ErrorBox error={error} />
+			{adding && <McpAddDialog onClose={() => setAdding(false)} onAdded={reload} />}
+			{removing && (
+				<ConfirmDialog
+					title={t("mcpRemoveTitle", { name: removing })}
+					body={t("mcpRemoveBody")}
+					confirmLabel={t("mcpRemove")}
+					onConfirm={async () => {
+						await removeMcpServer(removing);
+						await reload();
+					}}
+					onClose={() => setRemoving(null)}
+				/>
+			)}
+		</Dialog>
+	);
+}
+
+/**
+ * Starting at login and the launcher icon (blueprint 6.10, item 33): the same as `jig service` and
+ * `jig app`, as two switches. Where the system does not support one, its row says so.
+ */
+function SystemDialog({ onClose }: { onClose: () => void }) {
+	useLang();
+	const [status, setStatus] = useState<SystemStatus | null>(null);
+	const [error, setError] = useState<unknown>(null);
+	useEffect(() => {
+		loadSystem().then(setStatus, setError);
+	}, []);
+	const change = useAction(async (patch: { startAtLogin?: boolean; launcher?: boolean }) => {
+		setStatus(await saveSystem(patch));
+	});
+	const loginId = useId();
+	const launcherId = useId();
+	const login = status?.startAtLogin;
+	const launcher = status?.launcher;
+	const hint = (
+		text: string,
+		unsupported: string,
+		item?: { supported: boolean; on: boolean },
+		path?: string | null,
+	) =>
+		item && !item.supported
+			? unsupported
+			: item?.on && path
+				? `${text} ${t("writtenTo", { path })}`
+				: text;
+	return (
+		<Dialog
+			title={t("systemTitle")}
+			size="l"
+			onClose={onClose}
+			footer={<Button onClick={onClose}>{t("close")}</Button>}
+		>
+			<SettingGroup title={t("systemTitle")}>
+				<SettingRow
+					label={t("startAtLogin")}
+					hint={hint(t("startAtLoginHint"), t("startAtLoginUnsupported"), login, login?.file)}
+					labelId={loginId}
+				>
+					<Switch
+						checked={login?.on ?? false}
+						disabled={!login?.supported}
+						busy={change.busy}
+						labelledBy={loginId}
+						onChange={(on) => void change.run({ startAtLogin: on })}
+					/>
+				</SettingRow>
+				<SettingRow
+					label={t("launcher")}
+					hint={hint(t("launcherHint"), t("launcherUnsupported"), launcher, launcher?.path)}
+					labelId={launcherId}
+				>
+					<Switch
+						checked={launcher?.on ?? false}
+						disabled={!launcher?.supported}
+						busy={change.busy}
+						labelledBy={launcherId}
+						onChange={(on) => void change.run({ launcher: on })}
+					/>
+				</SettingRow>
+			</SettingGroup>
+			<ErrorBox error={error ?? change.error} />
 		</Dialog>
 	);
 }

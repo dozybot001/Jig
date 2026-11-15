@@ -11,16 +11,19 @@ import { PostOffice } from "../mail/post.ts";
 import type { ModelGateway } from "../model/gateway.ts";
 import type { Scheduler } from "../schedules.ts";
 import type { Store } from "../store.ts";
+import type { SearchAccess } from "../tools/web-search.ts";
 import { agentRoutes } from "./agents.ts";
 import { api } from "./api.ts";
 import { artifactRoutes } from "./artifacts.ts";
 import { deviceRoutes } from "./devices.ts";
 import { DraftCache, eventRoutes } from "./events.ts";
 import { mailRoutes } from "./mail.ts";
+import { type McpRoutesOptions, mcpRoutes } from "./mcp.ts";
 import { type NoteStreams, noteRoutes } from "./notes.ts";
 import { type AppEnv, errorHandler, problemResponse, requestId, titleFor } from "./problem.ts";
 import { providerRoutes } from "./providers.ts";
 import { scheduleRoutes } from "./schedules.ts";
+import { searchRoutes } from "./search.ts";
 import {
 	authRoutes,
 	deviceLimits,
@@ -28,6 +31,7 @@ import {
 	requireBrowser,
 	securityHeaders,
 } from "./security.ts";
+import { type SystemControl, systemRoutes } from "./system.ts";
 
 export interface AppOptions {
 	store: Store;
@@ -53,6 +57,12 @@ export interface AppOptions {
 	notes?: NoteStreams;
 	/** What sessions saved for the person to look at (M4 plan, section 6). */
 	artifacts?: ArtifactStore;
+	/** The MCP servers in mcp.json, managed from the settings (blueprint 6.10, item 29). */
+	mcp?: McpRoutesOptions;
+	/** The search services' keys (item 30). */
+	search?: SearchAccess;
+	/** Starting at login and the launcher icon (item 33). */
+	system?: SystemControl;
 }
 
 const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Jig</title>
@@ -104,6 +114,9 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 	if (bus) app.route("/api", eventRoutes(store, bus, new DraftCache(bus)));
 	if (options.scheduler) app.route("/api", scheduleRoutes(store, options.scheduler));
 	if (options.notes) app.route("/api", noteRoutes(options.notes));
+	if (options.mcp) app.route("/api", mcpRoutes(store, { log, ...options.mcp }));
+	if (options.search) app.route("/api", searchRoutes(options.search));
+	if (options.system) app.route("/api", systemRoutes(options.system));
 	if (options.artifacts) app.route("/", artifactRoutes(options.artifacts));
 
 	const root = options.webRoot;

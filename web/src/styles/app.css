@@ -2686,6 +2686,88 @@ button.about-row {
 	background: #ffffff;
 }
 
+/* Tabs under a dialog's title, in line with its body. */
+.dialog-tabs {
+	padding: 0 22px 8px;
+}
+
+/* Addresses, commands and names typed in the settings. */
+.mono-input {
+	font-family: var(--mono);
+	font-size: var(--fs-s);
+}
+
+/* MCP servers: a row per server in the box; its details open under it. */
+.mcp-server + .mcp-server {
+	border-top: 1px solid var(--border);
+}
+.mcp-row {
+	flex-wrap: wrap;
+}
+.mcp-row .setting-control {
+	flex-wrap: wrap;
+}
+.mcp-code {
+	font-family: var(--mono);
+	font-size: var(--fs-s);
+	overflow-wrap: anywhere;
+}
+.mcp-detail {
+	display: grid;
+	gap: 10px;
+	padding: 0 14px 12px;
+}
+.mcp-line {
+	display: grid;
+	grid-template-columns: 7em minmax(0, 1fr);
+	gap: 8px;
+	align-items: baseline;
+	font-size: var(--fs-s);
+}
+.mcp-line > span:first-child {
+	color: var(--text-2);
+}
+.mcp-values {
+	display: grid;
+	gap: 6px;
+}
+.mcp-value {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+.mcp-value .input {
+	flex: 1 1 12em;
+	width: auto;
+}
+.mcp-tools {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 14px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+/* Names with values (variables, headers): a line each, the value hidden as it is typed. */
+.pairs {
+	display: grid;
+	gap: 8px;
+	justify-items: start;
+}
+.pair-row {
+	display: grid;
+	grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
+	gap: 8px;
+	width: 100%;
+}
+@media (max-width: 480px) {
+	.mcp-line {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 2px;
+	}
+}
+
 /* Scheduled tasks (M3 plan, section 9): one card per task, its times, session, letter and last run. */
 .schedule-list {
 	display: grid;

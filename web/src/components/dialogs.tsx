@@ -103,7 +103,11 @@ export function NewSessionDialog({
 	const [name, setName] = useState("");
 	const [kind, setKind] = useState<SessionKind>("task");
 	const [group, setGroup] = useState<string>(groupId ?? "");
-	const [cwd, setCwd] = useState("");
+	const [cwd, setCwd] = useState(
+		() =>
+			settings?.workspaces.find((workspace) => workspace.id === settings.defaultWorkspaceId)
+				?.path ?? "",
+	);
 	const [responsibility, setResponsibility] = useState("");
 	const [model, setModel] = useState({
 		provider: settings?.defaultModel.provider ?? "deepseek",

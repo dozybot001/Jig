@@ -9,6 +9,7 @@ import type {
 	UsageOverview,
 } from "../../shared/types.ts";
 import {
+	DEFAULT_RELAY_URL,
 	PERMISSION_MODES,
 	RECEIVE_POLICIES,
 	SESSION_KINDS,
@@ -19,7 +20,13 @@ import { invalid } from "../errors.ts";
 import { type ExportLanguage, exportFileName, sessionMarkdown } from "../export.ts";
 import { pickFolder } from "../folder-picker.ts";
 import { resolveWorkingFolder } from "../paths.ts";
-import { type DefaultModel, readSettings, resolveLogFile, type Workspace } from "../settings.ts";
+import {
+	type DefaultModel,
+	NOTIFY_KINDS,
+	readSettings,
+	resolveLogFile,
+	type Workspace,
+} from "../settings.ts";
 import { resolveMemoryDir } from "../skills.ts";
 import type { SessionPatch, Store } from "../store.ts";
 import { idempotent } from "./idempotency.ts";
@@ -196,8 +203,8 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			rules: [],
 			// Named after the first message (the home page): Jig gives it a short name after one turn.
 			options: optBoolean(fields, "autoName")
-				? { permissionMode: "auto", autoName: true }
-				: { permissionMode: "auto" },
+				? { permissionMode: settings.defaultPermissionMode, autoName: true }
+				: { permissionMode: settings.defaultPermissionMode },
 		});
 		return c.json(session, 201);
 	});
@@ -417,7 +424,9 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			// Remote access is changed on the Mac only (M3 plan, section 4).
 			if (c.env?.device) throw invalid("Phone access can only be changed on the Mac.", "remote");
 			const enabled = optBoolean(remote, "enabled");
-			const relayUrl = optString(remote, "relayUrl", 500);
+			// null goes back to the relay Jig comes with.
+			const asked = optNullableString(remote, "relayUrl", 500);
+			const relayUrl = asked === null ? DEFAULT_RELAY_URL : asked?.trim();
 			if (relayUrl !== undefined && !RELAY_URL.test(relayUrl)) {
 				throw invalid(
 					"The relay must be a wss:// address (ws:// only inside this network).",
@@ -430,6 +439,22 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 				relayUrl: relayUrl ?? current.relayUrl,
 			});
 			deps.onRemoteChanged?.();
+		}
+		const mode = optEnum(fields, "defaultPermissionMode", PERMISSION_MODES);
+		if (mode) store.setSetting("defaultPermissionMode", mode);
+		const defaultWorkspace = optNullableString(fields, "defaultWorkspaceId", 64);
+		if (defaultWorkspace !== undefined) {
+			const saved = readSettings(store).workspaces;
+			if (defaultWorkspace !== null && !saved.some((item) => item.id === defaultWorkspace)) {
+				throw invalid("The default workspace must be one of the saved ones.", "defaultWorkspaceId");
+			}
+			store.setSetting("defaultWorkspaceId", defaultWorkspace);
+		}
+		const notify = optObject(fields, "notify");
+		if (notify) {
+			const next = { ...readSettings(store).notify };
+			for (const kind of NOTIFY_KINDS) next[kind] = optBoolean(notify, kind) ?? next[kind];
+			store.setSetting("notify", next);
 		}
 		const memoryDirs = optArray(fields, "memoryDirs");
 		if (memoryDirs) {

@@ -19,6 +19,8 @@ export interface McpServerConfig {
 	env?: Record<string, string>;
 	url?: string;
 	headers?: Record<string, string>;
+	/** `"disabled": true` in mcp.json: the server stays in the file and is not started. */
+	disabled?: boolean;
 }
 
 export interface McpToolInfo {
@@ -31,7 +33,7 @@ export interface McpToolInfo {
 export interface McpStatus {
 	name: string;
 	kind: "stdio" | "http";
-	state: "connecting" | "ready" | "error";
+	state: "connecting" | "ready" | "error" | "disabled";
 	error: string | null;
 	tools: string[];
 }
@@ -71,9 +73,10 @@ export function readMcpConfig(
 		// The name becomes part of tool names, which providers restrict to these characters.
 		if (!/^[A-Za-z0-9_-]{1,32}$/.test(name) || !raw || typeof raw !== "object") continue;
 		const entry = raw as Record<string, unknown>;
+		const off = entry.disabled === true ? { disabled: true } : {};
 		if (typeof entry.url === "string" && /^https?:\/\//.test(entry.url)) {
 			const headers = strings(entry.headers);
-			configs[name] = { url: expand(entry.url, env), ...(headers ? { headers } : {}) };
+			configs[name] = { url: expand(entry.url, env), ...(headers ? { headers } : {}), ...off };
 		} else if (typeof entry.command === "string" && entry.command) {
 			const envs = strings(entry.env);
 			configs[name] = {
@@ -82,6 +85,7 @@ export function readMcpConfig(
 					? entry.args.filter((arg) => typeof arg === "string").map((arg) => expand(arg, env))
 					: [],
 				...(envs ? { env: envs } : {}),
+				...off,
 			};
 		}
 	}
@@ -285,6 +289,10 @@ class Server {
 	}
 
 	async connect(make: (config: McpServerConfig) => Transport, version: string): Promise<void> {
+		if (this.config.disabled) {
+			this.state = "disabled";
+			return;
+		}
 		try {
 			const transport = make(this.config);
 			this.#transport = transport;
@@ -348,6 +356,8 @@ export class McpHub {
 	readonly #servers = new Map<string, Server>();
 	#configAt = -1;
 	#definitions: ToolDefinition[] = [];
+	/** Settles when the servers being connected now have connected or failed. */
+	#connecting: Promise<void> = Promise.resolve();
 
 	constructor(options: McpHubOptions) {
 		this.#options = options;
@@ -357,7 +367,10 @@ export class McpHub {
 	async refresh(): Promise<void> {
 		const file = join(this.#options.jigHome, "mcp.json");
 		const stamp = existsSync(file) ? statSync(file).mtimeMs : 0;
-		if (stamp === this.#configAt) return;
+		if (stamp === this.#configAt) {
+			await this.#connecting;
+			return;
+		}
 		this.#configAt = stamp;
 		let configs: Record<string, McpServerConfig> = {};
 		try {
@@ -375,7 +388,14 @@ export class McpHub {
 			config.url
 				? new HttpTransport(config, this.#options.version, this.#options.fetch ?? fetch)
 				: new StdioTransport(config, env);
-		await Promise.all(
+		const offer = () => {
+			this.#definitions = [...this.#servers.values()].flatMap((server) =>
+				server.tools.map((tool) => this.#definition(server, tool)),
+			);
+		};
+		// The tools of removed servers go at once; each new server's tools come when it has connected.
+		offer();
+		const connecting = Promise.all(
 			Object.entries(configs)
 				.filter(([name]) => !this.#servers.has(name))
 				.map(async ([name, config]) => {
@@ -383,11 +403,23 @@ export class McpHub {
 					this.#servers.set(name, server);
 					await server.connect(make, this.#options.version);
 					if (server.error) this.#options.log?.(`mcp: ${name}: ${server.error}`);
+					// Removed or replaced while it was connecting: its tools are not offered.
+					if (this.#servers.get(name) === server) offer();
 				}),
-		);
-		this.#definitions = [...this.#servers.values()].flatMap((server) =>
-			server.tools.map((tool) => this.#definition(server, tool)),
-		);
+		).then(() => {});
+		const earlier = this.#connecting;
+		this.#connecting = Promise.all([earlier, connecting]).then(() => {});
+		await this.#connecting;
+	}
+
+	/**
+	 * Reads mcp.json again now, whether or not its time stamp changed: the settings call this right
+	 * after they write the file. Resolves when every server has connected or failed; the new servers
+	 * are in `status()` as connecting as soon as this is called.
+	 */
+	reload(): Promise<void> {
+		this.#configAt = -1;
+		return this.refresh();
 	}
 
 	status(): McpStatus[] {

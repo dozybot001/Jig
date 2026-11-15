@@ -10,6 +10,7 @@ import type {
 import { dollars } from "./budget.ts";
 import type { BusEvent, EventBus } from "./events.ts";
 import type { MailStore } from "./mail/store.ts";
+import { type NotifyKind, SETTING_DEFAULTS } from "./settings.ts";
 import type { Store } from "./store.ts";
 
 /**
@@ -23,6 +24,8 @@ import type { Store } from "./store.ts";
  *   that need you wait and go out when you have left and they are still open; the rest is not sent.
  * - Afterwards: when an item is handled, its notification is taken off the phone, and the app's badge
  *   is the number of items waiting in the approval center.
+ * - Which: the person chooses the kinds in the settings (blueprint 6.10, item 34). A kind that is
+ *   turned off is not sent to any phone, whichever way its notifications travel.
  */
 
 export type NoteKind =
@@ -89,6 +92,19 @@ export interface NotifierOptions {
 	/** How long an item that could not be sent (no relay, no phone) is kept for a later try. */
 	keepMs?: number;
 }
+
+/** The setting each kind of item belongs to. */
+const NOTIFY_KIND: Record<Item["kind"], NotifyKind> = {
+	permission: "waiting",
+	question: "waiting",
+	card: "waiting",
+	letter: "waiting",
+	error: "error",
+	review: "error",
+	task: "task",
+	schedule: "task",
+	budget: "budget",
+};
 
 const TITLE_MAX = 80;
 const BODY_MAX = 240;
@@ -157,6 +173,12 @@ export class Notifier {
 		this.#seenAt = this.#options.now();
 	}
 
+	/** Whether the person wants to hear about this kind of item. */
+	#wanted(kind: Item["kind"]): boolean {
+		const chosen = this.#options.store.getSetting("notify", SETTING_DEFAULTS.notify);
+		return chosen[NOTIFY_KIND[kind]] ?? true;
+	}
+
 	#remember(session: Session): void {
 		this.#sessions.set(session.id, { status: session.status, outcome: session.outcome });
 	}
@@ -168,6 +190,7 @@ export class Notifier {
 			if (inner.type !== "entry" || inner.entry.role !== "notice") return;
 			const notice = inner.entry.notice;
 			if (notice.kind !== "budget") return;
+			if (!this.#wanted("budget")) return;
 			const data = notice.data ?? {};
 			const amounts =
 				typeof data.spent === "number" && typeof data.limit === "number"
@@ -208,6 +231,7 @@ export class Notifier {
 				this.#schedules.set(schedule.id, run);
 				if (before === undefined || before === run) continue;
 				if (schedule.lastStatus !== "done" && schedule.lastStatus !== "error") continue;
+				if (!this.#wanted("schedule")) continue;
 				this.#news.push({
 					key: `schedule:${schedule.id}:${schedule.lastRunAt}`,
 					kind: "schedule",
@@ -225,6 +249,7 @@ export class Notifier {
 	}
 
 	#tell(session: Session, kind: Item["kind"], body: string, code?: string): void {
+		if (!this.#wanted(kind)) return;
 		this.#news.push({
 			key: `${kind}:${session.id}:${this.#options.now()}`,
 			kind,
@@ -299,7 +324,8 @@ export class Notifier {
 		for (const item of pending) {
 			if (this.#known.has(item.key)) continue;
 			this.#known.add(item.key);
-			this.#waiting.set(item.key, item);
+			// Not wanted now: it stays known, so turning the kind on later does not send old items.
+			if (this.#wanted(item.kind)) this.#waiting.set(item.key, item);
 		}
 		// Handled items: not sent any more, and their notifications come off the phone.
 		const cleared: string[] = [];
@@ -326,6 +352,11 @@ export class Notifier {
 		if (present) this.#news = [];
 		this.#news = this.#news.filter((item) => now - item.at < this.#options.keepMs);
 		if (present) return;
+		// A kind turned off while its items were waiting to go out is dropped here.
+		for (const [key, item] of this.#waiting) {
+			if (!this.#wanted(item.kind)) this.#waiting.delete(key);
+		}
+		this.#news = this.#news.filter((item) => this.#wanted(item.kind));
 		const due = [...this.#waiting.values(), ...this.#news].filter(
 			(item) => now - item.at >= this.#options.settleMs,
 		);
