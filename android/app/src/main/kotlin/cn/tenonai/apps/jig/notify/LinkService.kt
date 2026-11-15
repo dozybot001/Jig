@@ -30,6 +30,9 @@ import kotlinx.coroutines.launch
 class LinkService : Service() {
     private val scope = MainScope()
 
+    /** False once the service is ending: nothing posts the standing notification after that. */
+    private var alive = true
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -42,15 +45,29 @@ class LinkService : Service() {
             startForeground(Notifier.SERVICE, first)
         }
         if (!model.wantsNotes) {
+            end()
             stopSelf()
             return
         }
         model.listen(true)
         scope.launch {
             snapshotFlow { model.listening to model.desktopName }.collect { (listening, name) ->
-                getSystemService(NotificationManager::class.java).notify(Notifier.SERVICE, status(listening, name))
+                // Posted with notify(), this is an ordinary ongoing notification: once the service has
+                // stopped being a foreground service nothing takes it down again. It stayed in the
+                // shade saying "Jig keeps trying" after Jig was closed (1.1.0). So not after end().
+                if (alive) {
+                    getSystemService(NotificationManager::class.java).notify(Notifier.SERVICE, status(listening, name))
+                }
             }
         }
+    }
+
+    /** Stops updating the standing notification and takes it down. */
+    private fun end() {
+        alive = false
+        scope.cancel()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        getSystemService(NotificationManager::class.java).cancel(Notifier.SERVICE)
     }
 
     // Restarted by the system after it was stopped for memory only when the person chose to keep it.
@@ -61,6 +78,7 @@ class LinkService : Service() {
     override fun onTaskRemoved(rootIntent: Intent?) {
         val model = (application as JigApp).model
         if (!model.notifier.keepAfterClose) {
+            end()
             stopSelf()
             model.closed()
         }
@@ -68,7 +86,7 @@ class LinkService : Service() {
     }
 
     override fun onDestroy() {
-        scope.cancel()
+        end()
         (application as JigApp).model.listen(false)
         super.onDestroy()
     }

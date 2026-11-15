@@ -518,6 +518,7 @@ class AppModel(private val context: Context) {
         eventsJob?.cancel()
         eventsJob = null
         channel?.close()
+        notifier.clearStanding()
     }
 
     /** Starts or stops the connection service to match the pairing, the person's switch and Android's permission. */
@@ -529,6 +530,8 @@ class AppModel(private val context: Context) {
             runCatching { context.startForegroundService(service) }
         } else {
             context.stopService(service)
+            // A standing notification left behind by an earlier version or a killed process.
+            notifier.clearStanding()
         }
     }
 

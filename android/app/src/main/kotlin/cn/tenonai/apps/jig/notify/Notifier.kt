@@ -166,6 +166,9 @@ class Notifier(private val context: Context) {
         prefs.edit { remove(SEEN) }
     }
 
+    /** Takes down the connection service's standing notification, when it is not running. */
+    fun clearStanding() = manager.cancel(SERVICE)
+
     /** The system lets this app show notifications (the permission on Android 13 and later, and the app's switch). */
     val allowed: Boolean get() = manager.areNotificationsEnabled()
 
