@@ -37,6 +37,7 @@ Jig 不收集任何数据，也不含统计、遥测或上报代码。会话、�
 - 实现计划：[M1](docs/archive/m1-plan.md)、[M2](docs/archive/m2-plan.md)、[M3](docs/archive/m3-plan.md)
 - [可借鉴的开源项目](docs/prior-art.md)
 - [数据清单](docs/data-inventory.md)：Jig 在你电脑上存了哪些数据、怎么删除
+- [iPhone 应用上架](docs/app-store.md)：商店里填什么、进度
 - [更新记录](CHANGELOG.md)
 - [开发约定](AGENTS.md)
 
