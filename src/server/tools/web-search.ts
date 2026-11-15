@@ -4,7 +4,7 @@ import { errorResult, int, str, type ToolDefinition, type ToolResult, text } fro
 /**
  * Web search through a search service the person chose and holds a key for (M4 plan, section 3).
  * The key is in the system keychain; the request carries the query and nothing of the conversation.
- * Bocha is in mainland China and comes first; Tavily and Brave are abroad and are the person's own
+ * Bocha is run by a Chinese company and comes first; Tavily and Brave are run abroad and are the person's own
  * choice (spec 21.6).
  */
 
