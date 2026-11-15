@@ -514,12 +514,12 @@
         }
       }
     },
-    "In Jig on your Mac, open Settings → Phone access, click Add iPhone, then scan the QR code it shows.": {
+    "In Jig on your Mac, open Settings → Phone access, click Add phone, then scan the QR code it shows.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在 Mac 上的 Jig 里打开 设置 → 手机访问，点「添加 iPhone」，再扫描出现的二维码。"
+            "value": "在 Mac 上的 Jig 里打开 设置 → 手机访问，点「添加手机」，再扫描出现的二维码。"
           }
         }
       }

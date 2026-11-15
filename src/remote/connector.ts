@@ -215,7 +215,7 @@ class Channel {
 				throw new Error("a phone that is not paired tried to connect");
 			}
 			const name =
-				typeof hello.name === "string" && hello.name.trim() ? hello.name.trim() : "iPhone";
+				typeof hello.name === "string" && hello.name.trim() ? hello.name.trim() : "Phone";
 			device = store.addDevice(name.slice(0, 60), key);
 		}
 		store.touchDevice(device.id);

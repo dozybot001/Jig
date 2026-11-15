@@ -6,7 +6,7 @@ import { serviceRunning } from "./serve.ts";
 
 const HELP = `Usage: jig remote <on|off|status|pair> [options]
 
-Let your iPhone reach Jig on this Mac through Jig's relay. Both sides connect
+Let your phone reach Jig on this Mac through Jig's relay. Both sides connect
 out to the relay, so this Mac opens no port; everything between them is
 end-to-end encrypted, and the relay sees only ciphertext.
 
@@ -14,7 +14,7 @@ Commands:
   on      Turn on phone access
   off     Turn it off; paired phones stay paired
   status  Show whether it is on, the relay and the paired phones
-  pair    Show a QR code to pair an iPhone (valid for 5 minutes, once)
+  pair    Show a QR code to pair a phone (valid for 5 minutes, once)
 
 Options:
       --relay <url>  With on: the relay to use (default wss://relay.tenonai.cn)
@@ -25,7 +25,7 @@ Options:
 export function remoteCommand(): Command {
 	return {
 		name: "remote",
-		summary: "Let your iPhone reach this Mac",
+		summary: "Let your phone reach this Mac",
 		async run(args: string[], io: CliIo): Promise<number> {
 			const { values, positionals } = parseArgs({
 				args,
@@ -108,7 +108,7 @@ export function remoteCommand(): Command {
 				}
 				const { renderUnicodeCompact } = await import("uqr");
 				io.stdout.write(
-					`${renderUnicodeCompact(link)}\nScan this with Jig on your iPhone within 5 minutes.\n`,
+					`${renderUnicodeCompact(link)}\nScan this with Jig on your phone within 5 minutes.\n`,
 				);
 				if (!running) io.stderr.write("jig: Jig is not running; start it with 'jig serve'.\n");
 				return EXIT_OK;

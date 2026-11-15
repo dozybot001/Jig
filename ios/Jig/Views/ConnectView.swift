@@ -34,7 +34,7 @@ struct ConnectView: View {
 					}
 					.disabled(!ScannerView.available || busy)
 				} footer: {
-					Text("In Jig on your Mac, open Settings → Phone access, click Add iPhone, then scan the QR code it shows.")
+					Text("In Jig on your Mac, open Settings → Phone access, click Add phone, then scan the QR code it shows.")
 				}
 				Section("Or paste the pairing link") {
 					TextField("jig://pair?…", text: $pairLink, axis: .vertical)

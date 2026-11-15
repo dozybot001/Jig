@@ -633,7 +633,7 @@ function DeleteArchivedDialog({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * Phone access (M3 plan, sections 4 and 6): turn it on, see the relay connection, pair an iPhone by
+ * Phone access (M3 plan, sections 4 and 6): turn it on, see the relay connection, pair a phone by
  * QR code and remove paired phones. Everything between the phone and this Mac is end-to-end encrypted.
  */
 function PhonesDialog({ onClose }: { onClose: () => void }) {
@@ -741,7 +741,7 @@ function PhonesDialog({ onClose }: { onClose: () => void }) {
 							onClick={() => void pair.run()}
 						>
 							<PhoneIcon />
-							{t("addIphone")}
+							{t("addPhone")}
 						</Button>
 						{!remote?.enabled && <p className="hint">{t("turnOnFirst")}</p>}
 					</>
