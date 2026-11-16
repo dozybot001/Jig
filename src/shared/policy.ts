@@ -7,7 +7,7 @@ export const POLICY_VERSION = "2.3";
 
 export const POLICY = {
 	zh: {
-		date: "2026 年 11 月 16 日",
+		date: "2026 年 11 月 17 日",
 		privacy: [
 			"Jig 是在你自己的电脑上运行的软件，手机上的 Jig（iPhone 和安卓）只连接你自己电脑上的 Jig。榫卯 Tenon AI 不收集、不接收你在 Jig 里的内容，Jig 里没有统计、遥测或上报代码。",
 			"保存在你电脑上的数据：会话、消息、工具调用记录、操作授权、会话之间的信件、你在审批中心做的决定、定时任务和设置存在 Jig 的数据目录（默认 ~/.jig）里的数据库中；服务商的 API Key 存在系统钥匙串里；超长的命令输出存在数据目录的 tmp 文件夹里；会话存下的产物（文档、页面、数据和图表）的各个版本存在数据目录的 artifacts 文件夹里。Jig 自带浏览器的资料（你在这个浏览器里登录过的网站的 Cookie、缓存和浏览记录）存在数据目录的 browser 文件夹里。用 jig service 设了开机启动时，运行日志（启动、出错和连接中继的记录，不含对话内容）存在数据目录的 logs 文件夹里。这些数据一直保存，直到你删除。你在设置里指定了审批记录文件时，Jig 把每个决定追加到那个文件里。",
@@ -24,7 +24,7 @@ export const POLICY = {
 		],
 	},
 	en: {
-		date: "Nov 16, 2026",
+		date: "Nov 17, 2026",
 		privacy: [
 			"Jig runs on your own computer, and Jig on your phone (iPhone or Android) connects only to Jig on your own computer. Tenon AI does not collect or receive your content in Jig, and Jig contains no analytics, telemetry or reporting code.",
 			"Data kept on your computer: sessions, messages, tool call records, permissions you granted, letters between sessions, the decisions you make in the approval center, scheduled tasks and settings are stored in a database in Jig's data folder (~/.jig by default); provider API keys are stored in the system keychain; very long command output is stored in the tmp folder of the data folder; every version of the artifacts sessions save (documents, pages, data and charts) is stored in its artifacts folder. The profile of Jig's built-in browser (cookies, cache and history of the sites you signed in to there) is stored in the browser folder of the data folder. When you set Jig to start at login with jig service, its service log (start-up, errors and relay connection lines, without conversation content) is stored in the logs folder of the data folder. This data stays until you delete it. If you set a decision log file in Settings, Jig adds each decision to that file.",
