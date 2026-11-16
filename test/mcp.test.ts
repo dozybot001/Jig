@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { JigError } from "../src/server/errors.ts";
-import { McpHub, readMcpConfig } from "../src/server/mcp.ts";
+import { decisionFromPhone } from "../src/server/http/agents.ts";
+import { McpHub, readMcpConfig, special as specialFor } from "../src/server/mcp.ts";
 import { builtinInstaller, builtinMcp, serverEnv } from "../src/server/mcp-builtin.ts";
 import { listMcpEntries, patchMcpEntry, removeMcpEntry } from "../src/server/mcp-config.ts";
 import { inheritableRules, PermissionEngine } from "../src/server/permissions/engine.ts";
@@ -260,6 +261,33 @@ describe("the browser and computer control", () => {
 		} finally {
 			other.hub.stop();
 		}
+	});
+
+	test("opening an address counts as acting; going back does not", async () => {
+		const { hub } = await tools("browser");
+		try {
+			const fresh = session([]);
+			const warningOf = (tool: string) => {
+				const subject = { kind: "act", tool: `mcp__browser__${tool}`, summary: "", always: true };
+				// The hub decides by the tool's name; ask it through the definition it would build.
+				const definition = hub.tools()[0];
+				assert.ok(definition);
+				return engine.decide({ ...subject, ...specialFor("browser", tool) } as never, fresh);
+			};
+			const go = warningOf("browser_navigate");
+			assert.ok(go.effect === "ask" && go.request.warning === "acts-as-you");
+			const back = warningOf("browser_navigate_back");
+			assert.ok(back.effect === "ask" && back.request.warning === undefined);
+		} finally {
+			hub.stop();
+		}
+	});
+
+	test("always-allow from a phone, for a request that carries the warning, allows once", () => {
+		assert.equal(decisionFromPhone("allow_always", { warning: "acts-as-you" }), "allow_once");
+		assert.equal(decisionFromPhone("allow_always", { tool: "shell" }), "allow_always");
+		assert.equal(decisionFromPhone("deny", { warning: "acts-as-you" }), "deny");
+		assert.equal(decisionFromPhone("allow_once", { warning: "acts-as-you" }), "allow_once");
 	});
 
 	test("always-allow for these tools is not taken over by a new session", () => {

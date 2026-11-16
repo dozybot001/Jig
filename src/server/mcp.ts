@@ -42,7 +42,8 @@ const BROWSER_READS = new Set([
 	"browser_resize",
 	"browser_emulate_media",
 	"browser_hover",
-	"browser_navigate",
+	// Not browser_navigate: opening an address in a signed-in profile can act by itself, and an
+	// address can carry out what a page talked the session into putting in it.
 	"browser_navigate_back",
 	"browser_close",
 ]);
@@ -56,10 +57,10 @@ const BROWSER_READS = new Set([
  *   earlier "always allow" does not cover it. Looking (a screenshot, the pointer's place) can be.
  * - The browser acts only in its own window, so its actions can be remembered, with the scope said.
  */
-function special(
+export function special(
 	server: string,
 	tool: string,
-	args: JsonObject,
+	args: JsonObject = {},
 ): { reasons?: ConfirmReason[]; warning?: "acts-as-you" } {
 	if (server === "computer") {
 		const action = typeof args.action === "string" ? args.action : "";

@@ -25,6 +25,19 @@ function questionAnswer(value: unknown): QuestionAnswer {
 }
 
 /** Sending messages, stopping, continuing, and answering approvals and questions. */
+/**
+ * A decision made on a paired phone. "Always allow" for a tool that acts with the person's sign-ins
+ * is only given where its scope is said (spec 21.2), and the phone's card does not show that yet:
+ * from a phone it allows this one call. Security review, 2026-11-16.
+ */
+export function decisionFromPhone<T extends string>(
+	decision: T,
+	request: unknown,
+): T | "allow_once" {
+	const warned = (request as { warning?: unknown } | null)?.warning !== undefined;
+	return decision === "allow_always" && warned ? "allow_once" : decision;
+}
+
 export function agentRoutes(
 	store: Store,
 	agents: Agents,
@@ -64,7 +77,11 @@ export function agentRoutes(
 
 	app.post("/approvals/:id", async (c) => {
 		const fields = await readJson(c);
-		const decision = optEnum(fields, "decision", ["allow_once", "allow_always", "deny"] as const);
+		const asked = optEnum(fields, "decision", ["allow_once", "allow_always", "deny"] as const);
+		const decision =
+			asked && c.env?.device
+				? decisionFromPhone(asked, store.getApproval(c.req.param("id")).request)
+				: asked;
 		const reason = optString(fields, "reason", 2000);
 		const answer = optString(fields, "answer", 10_000);
 		const answers = optArray(fields, "answers")?.map(questionAnswer);
