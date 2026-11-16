@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { invalid, notFound } from "../errors.ts";
+import { invalid, JigError, notFound } from "../errors.ts";
 import type { CustomProviderConfig, ModelGateway } from "../model/gateway.ts";
 import type { Store } from "../store.ts";
 import {
@@ -86,9 +86,42 @@ export function providerRoutes(store: Store, gateway: ModelGateway): Hono<AppEnv
 				...provider,
 				hasKey: await gateway.hasKey(provider.id),
 				modelCount: gateway.models(provider.id).length,
+				// Whether the provider can be asked for the account's balance with the key.
+				balance: gateway.hasBalance(provider.id),
 			})),
 		);
 		return c.json({ items, nextCursor: null });
+	});
+
+	// One short request with the stored key: does it work from here, and how long does it take.
+	app.post("/providers/:id/test", async (c) => {
+		const id = c.req.param("id");
+		if (!gateway.provider(id)) throw notFound("Provider", id);
+		const body = (await c.req.json().catch(() => ({}))) as { model?: unknown };
+		const model = typeof body.model === "string" && body.model ? body.model : undefined;
+		return c.json(await gateway.ping(id, model));
+	});
+
+	// What the provider says is left on the account; only for providers that offer this for a key.
+	app.get("/providers/:id/balance", async (c) => {
+		const id = c.req.param("id");
+		if (!gateway.provider(id)) throw notFound("Provider", id);
+		try {
+			return c.json({ ok: true, ...(await gateway.balance(id)) });
+		} catch (error) {
+			// The provider saying no, or not answering, is a result to show, not a fault of Jig's.
+			if (
+				error instanceof JigError &&
+				(error.code === "provider-refused" || error.code === "provider-unreachable")
+			) {
+				return c.json({
+					ok: false,
+					reason: error.code === "provider-refused" ? "refused" : "unreachable",
+					status: (error.details?.status as number | undefined) ?? null,
+				});
+			}
+			throw error;
+		}
 	});
 
 	app.get("/providers/:id/models", (c) => {

@@ -28,6 +28,7 @@ import type { AssistantMessage, JsonObject, ModelMessage } from "../../shared/me
 import type { ThinkingLevel } from "../../shared/types.ts";
 import { invalid, JigError } from "../errors.ts";
 import type { KeyStore } from "../keys.ts";
+import { type Balance, hasBalance, readBalance } from "./balance.ts";
 
 // Compile-time guarantees that Jig's stored message shapes and the library's stay interchangeable.
 type Assert<T extends true> = T;
@@ -293,7 +294,44 @@ export interface GatewayOptions {
 	providers?: Provider[];
 	retry?: RetryOptions;
 	idleMs?: number;
+	/** Replaces the providers' balance addresses; tests point them at a local server. */
+	balanceUrls?: Record<string, string>;
 }
+
+/** What one short request to a provider came to. */
+export interface PingResult {
+	ok: boolean;
+	model: string;
+	/** Until the first piece of the answer arrived, and until the answer was complete. */
+	firstMs: number | null;
+	totalMs: number;
+	error?: string;
+}
+
+/**
+ * A provider's error as one readable line: "401 {json}" becomes "401: <the message in the json>".
+ * Anything that does not look like that is returned as it is, cut to a sensible length.
+ */
+export function plainError(text: string): string {
+	const match = /^(\d{3}):?\s*(\{[\s\S]*\})\s*$/.exec(text.trim());
+	if (match) {
+		try {
+			const body = JSON.parse(match[2] as string) as {
+				message?: unknown;
+				error?: { message?: unknown } | string;
+			};
+			const inner = typeof body.error === "string" ? body.error : body.error?.message;
+			const message = typeof inner === "string" ? inner : body.message;
+			if (typeof message === "string" && message.trim()) return `${match[1]}: ${message.trim()}`;
+		} catch {
+			// Not JSON after all.
+		}
+	}
+	return text.length > 400 ? `${text.slice(0, 400)}…` : text;
+}
+
+/** How long a connection test may take. */
+const PING_MS = 30_000;
 
 export class ModelGateway {
 	readonly #models: MutableModels;
@@ -301,11 +339,15 @@ export class ModelGateway {
 	readonly #custom = new Map<string, CustomProviderConfig>();
 	readonly #retry: RetryOptions;
 	readonly #idleMs: number;
+	readonly #version: string;
+	readonly #balanceUrls: Record<string, string>;
 
 	constructor(options: GatewayOptions) {
 		this.#keys = options.keys;
 		this.#retry = options.retry ?? DEFAULT_RETRY;
 		this.#idleMs = options.idleMs ?? DEFAULT_IDLE_MS;
+		this.#version = options.version;
+		this.#balanceUrls = options.balanceUrls ?? {};
 		this.#models = createModels({
 			credentials: new KeychainCredentials(options.keys),
 			authContext: NO_AMBIENT_AUTH,
@@ -494,6 +536,74 @@ export class ModelGateway {
 			};
 		} finally {
 			if (timer) clearTimeout(timer);
+		}
+	}
+
+	/** Whether the provider can be asked what is left on the account. */
+	hasBalance(provider: string): boolean {
+		return hasBalance(provider);
+	}
+
+	/** What the provider says is left on the account behind the stored key. */
+	async balance(provider: string): Promise<Balance> {
+		if (!this.#models.getProvider(provider))
+			throw invalid(`Unknown provider: ${provider}.`, "provider");
+		const key = await this.#keys.get(provider);
+		if (!key) {
+			throw new JigError("missing-api-key", 400, `There is no API key for ${provider}.`, {
+				provider,
+			});
+		}
+		return readBalance(provider, key, this.#version, this.#balanceUrls);
+	}
+
+	/**
+	 * Sends one very short request with the stored key and times it: it shows that the address, the key
+	 * and the model work from this computer, and how long the provider takes to start answering. It
+	 * uses a few tokens. Without `modelId`, the provider's cheapest model is asked. Not tried again on
+	 * failure: the failure is the result.
+	 */
+	async ping(provider: string, modelId?: string): Promise<PingResult> {
+		const listed = this.#models.getModels(provider);
+		const model = modelId
+			? this.#models.getModel(provider, modelId)
+			: [...listed].sort((a, b) => a.cost.input - b.cost.input || a.id.localeCompare(b.id))[0];
+		if (!model)
+			throw invalid(`${provider} has no model ${modelId ?? ""}.`.replace(" .", "."), "model");
+		if (!(await this.hasKey(provider))) {
+			throw new JigError("missing-api-key", 400, `There is no API key for ${provider}.`, {
+				provider,
+			});
+		}
+		const started = Date.now();
+		let firstMs: number | null = null;
+		const limit = new AbortController();
+		const timer = setTimeout(() => limit.abort(), PING_MS);
+		try {
+			const message = await this.#once(
+				model,
+				{ systemPrompt: "", messages: [{ role: "user", content: "ping", timestamp: started }] },
+				{ cacheRetention: "none", maxRetries: 0, maxTokens: 16 },
+				limit.signal,
+				() => {
+					firstMs ??= Date.now() - started;
+				},
+			);
+			const totalMs = Date.now() - started;
+			if (message.stopReason === "error" || message.stopReason === "aborted") {
+				return {
+					ok: false,
+					model: model.id,
+					firstMs: null,
+					totalMs,
+					error: limit.signal.aborted
+						? `No answer within ${PING_MS / 1000} seconds.`
+						: plainError(message.errorMessage ?? "The request failed."),
+				};
+			}
+			return { ok: true, model: model.id, firstMs: firstMs ?? totalMs, totalMs };
+		} finally {
+			clearTimeout(timer);
 		}
 	}
 

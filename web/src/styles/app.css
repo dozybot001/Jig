@@ -1808,6 +1808,13 @@ body.scroll-locked {
 	gap: 6px;
 	margin-top: 8px;
 }
+.provider-detail p {
+	margin: 4px 0 0;
+	overflow-wrap: anywhere;
+}
+.provider-failed {
+	color: var(--danger);
+}
 /*
  * Settings dialogs: groups under a small title, each a rounded box of rows; a row has the name and a
  * short explanation on the left and a control sized to its value on the right.

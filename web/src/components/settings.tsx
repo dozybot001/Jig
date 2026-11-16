@@ -26,6 +26,7 @@ import {
 	patchMcpServer,
 	patchSkill,
 	pickFolder,
+	providerBalance,
 	removeMcpServer,
 	revealData,
 	revealSkill,
@@ -38,6 +39,7 @@ import {
 	setDevicePush,
 	setPhoneAccess,
 	spentToday,
+	testProvider,
 } from "../actions.ts";
 import {
 	formatAgo,
@@ -54,6 +56,8 @@ import {
 	type DataOverview,
 	type McpServerView,
 	NOTIFY_KINDS,
+	type PingResult,
+	type ProviderBalance,
 	type ProviderSummary,
 	type SearchServiceView,
 	type SkillList,
@@ -110,6 +114,7 @@ function KeyRow({
 	onSave,
 	onDelete,
 	extra,
+	detail,
 }: {
 	name: string;
 	note: string;
@@ -120,6 +125,8 @@ function KeyRow({
 	onDelete: () => Promise<unknown>;
 	/** Further actions on the row, shown while the key is not being typed. */
 	extra?: ReactNode;
+	/** Lines under the name: the result of a test, a balance. */
+	detail?: ReactNode;
 }) {
 	useLang();
 	const [editing, setEditing] = useState(false);
@@ -134,6 +141,7 @@ function KeyRow({
 		<div className="provider-row">
 			<div>
 				<strong>{name}</strong> <span className="hint">· {note}</span>
+				{detail}
 				{editing && (
 					<div className="provider-key">
 						{/* An API key is not a sign-in password, so it is not marked as one (spec 18.5). */}
@@ -154,6 +162,7 @@ function KeyRow({
 				)}
 			</div>
 			<div className="request-actions">
+				{!editing && extra}
 				{editing ? (
 					<>
 						<Button onClick={() => setEditing(false)}>{t("cancel")}</Button>
@@ -178,7 +187,6 @@ function KeyRow({
 						{t("deleteKey")}
 					</Button>
 				)}
-				{!editing && extra}
 			</div>
 			{confirming && (
 				<ConfirmDialog
@@ -193,9 +201,39 @@ function KeyRow({
 	);
 }
 
+/** "320 毫秒" below a second, "1.4 秒" above. */
+function formatLatency(ms: number): string {
+	return ms < 1000
+		? t("latencyMs", { n: Math.round(ms) })
+		: t("latencySeconds", { n: (ms / 1000).toFixed(1) });
+}
+
+/** "CNY 110.00（赠送 10.00，充值 100.00）": the provider's own figures, unchanged. */
+function balanceText(amount: NonNullable<ProviderBalance["amounts"]>[number]): string {
+	const parts = [
+		amount.granted !== undefined ? t("balanceGranted", { n: amount.granted }) : "",
+		amount.paid !== undefined ? t("balancePaid", { n: amount.paid }) : "",
+	].filter(Boolean);
+	const total = `${amount.currency} ${amount.total}`;
+	return parts.length > 0
+		? t("balanceWithParts", { total, parts: parts.join(t("listSeparator")) })
+		: total;
+}
+
 function ProviderRow({ provider }: { provider: ProviderSummary }) {
 	useLang();
 	const [removing, setRemoving] = useState(false);
+	const [ping, setPing] = useState<PingResult | null>(null);
+	const [balance, setBalance] = useState<ProviderBalance | null>(null);
+	const test = useAction(async () => {
+		setPing(null);
+		setPing(await testProvider(provider.id));
+	});
+	const ask = useAction(async () => {
+		setBalance(null);
+		setBalance(await providerBalance(provider.id));
+	});
+	const usable = provider.hasKey || !provider.keyRequired;
 	const status = !provider.keyRequired
 		? t("keyless")
 		: provider.hasKey
@@ -211,12 +249,57 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
 				deleteBody={t("deleteKeyBody", { name: provider.name })}
 				onSave={(key) => saveKey(provider.id, key)}
 				onDelete={() => deleteKey(provider.id)}
+				detail={
+					<div className="provider-detail" aria-live="polite">
+						{ping && (
+							<p className={ping.ok ? "hint" : "hint provider-failed"}>
+								{ping.ok
+									? t("testOk", {
+											first: formatLatency(ping.firstMs ?? ping.totalMs),
+											total: formatLatency(ping.totalMs),
+											model: ping.model,
+										})
+									: t("testFailed", { model: ping.model, error: ping.error ?? "" })}
+							</p>
+						)}
+						<ErrorBox error={test.error} />
+						{balance?.ok && (
+							<p className="hint">
+								{t("balanceLine", {
+									name: provider.name,
+									amounts: (balance.amounts ?? []).map(balanceText).join(t("listSeparator")),
+								})}
+								{balance.available === false && ` ${t("balanceShort")}`}
+							</p>
+						)}
+						{balance && !balance.ok && (
+							<p className="hint provider-failed">
+								{balance.reason === "refused"
+									? t("balanceRefused", { name: provider.name, status: balance.status ?? "" })
+									: t("balanceUnreachable", { name: provider.name })}
+							</p>
+						)}
+						<ErrorBox error={ask.error} />
+					</div>
+				}
 				extra={
-					provider.custom && (
-						<Button variant="danger" onClick={() => setRemoving(true)}>
-							{t("deleteProvider")}
-						</Button>
-					)
+					<>
+						{usable && (
+							<Button busy={test.busy} title={t("testHint")} onClick={() => void test.run()}>
+								{t("testConnection")}
+							</Button>
+						)}
+						{provider.balance && provider.hasKey && (
+							<Button busy={ask.busy} onClick={() => void ask.run()}>
+								{t("showBalance")}
+							</Button>
+						)}
+						{provider.custom && (
+							<Button variant="danger" onClick={() => setRemoving(true)}>
+								{t("deleteProvider")}
+							</Button>
+						)}
+					</>
 				}
 			/>
 			{removing && (
