@@ -1,5 +1,5 @@
 import { rmSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { join } from "node:path";
 import {
 	type AssistantMessage,
 	type EntryBody,
@@ -10,19 +10,16 @@ import {
 	type ToolCallBlock,
 	type ToolResultMessage,
 } from "../../shared/messages.ts";
-import {
-	type Approval,
-	type ApprovalDecision,
-	type Entry,
-	type Letter,
-	type PermissionMode,
-	permissionModeOf,
-	type QuestionAnswer,
-	type QuestionRequest,
-	type QueuedMessage,
-	type Session,
-	type SessionStatus,
-	type ToolCallView,
+import type {
+	Approval,
+	ApprovalDecision,
+	Entry,
+	QuestionAnswer,
+	QuestionRequest,
+	QueuedMessage,
+	Session,
+	SessionStatus,
+	ToolCallView,
 } from "../../shared/types.ts";
 import {
 	type BudgetMark,
@@ -33,13 +30,10 @@ import {
 	reached,
 } from "../budget.ts";
 import { conflict, invalid, JigError } from "../errors.ts";
-import { decisionRef, letterRef, letterText, type ScheduleRef } from "../mail/envelope.ts";
-import { BODY_MAX, PostOffice, reasonText, SUMMARY_MAX } from "../mail/post.ts";
+import { PostOffice } from "../mail/post.ts";
 import { Manager } from "../manage.ts";
 import type { ModelGateway, ModelInfo } from "../model/gateway.ts";
-import { resolveWorkingFolder } from "../paths.ts";
 import type { PermissionEngine } from "../permissions/engine.ts";
-import { isInside } from "../permissions/paths.ts";
 import { ScheduleBook } from "../schedules.ts";
 import { skillFolders } from "../skills.ts";
 import { type Store, validateSessionName } from "../store.ts";
@@ -50,22 +44,20 @@ import { ALL_TOOLS, specs, toolsFor } from "../tools/registry.ts";
 import {
 	type Lookup,
 	type MailContext,
-	type OpenInput,
 	type Roles,
 	type ToolContext,
 	type ToolDefinition,
 	ToolInputError,
 	type ToolResult,
-	type WaitResult,
 } from "../tools/types.ts";
 import { ContextKeeper, notice } from "./compaction.ts";
 import { JIG_NOTE, sanitizeInterrupted, toModelMessages, usageTotals } from "./context.ts";
 import { Held } from "./held.ts";
+import { freeName, Mailroom } from "./mailroom.ts";
 import {
 	type ContextSnapshot,
 	type InstructionExtras,
 	NAMING_PROMPT,
-	PERMISSION_MODE,
 	type Placement,
 	systemPrompt,
 } from "./prompt.ts";
@@ -103,30 +95,6 @@ interface Live {
 	controller: AbortController;
 	done: Promise<void>;
 	waiters: Map<string, (answer: Answer | null) => void>;
-}
-
-/** A turn a scheduled task started (M3 plan, section 9). */
-interface ScheduledRun {
-	letterId: string;
-	scheduleId: string;
-	name: string;
-	/** The permission mode for this run; null keeps the session's own. */
-	mode: PermissionMode | null;
-	/** Nobody is there to approve or answer, until the person writes to the session. */
-	unattended: boolean;
-	/** What Jig refused for want of the person, for the report. */
-	refused: string[];
-}
-
-/** One turn of a session: what it sent and read, who started it, and the scheduled run it is. */
-interface Turn {
-	sent: Letter[];
-	read: Map<string, number>;
-	/** The person started it with a message or by continuing. */
-	byPerson: boolean;
-	/** Letters were delivered at least once. */
-	started: boolean;
-	run: ScheduledRun | null;
 }
 
 export interface AgentsOptions {
@@ -230,19 +198,9 @@ export class Agents {
 	readonly post: PostOffice;
 	/** Scheduled tasks, whose runs end in this runner. */
 	readonly schedules: ScheduleBook;
-	readonly #waitMs: number;
+	readonly #mail: Mailroom;
 	/** Each working session's latest written reply in this turn. */
 	readonly #lastText = new Map<string, string>();
-	/** Sessions blocked in send_letter or open_session: the session, letter and tool call each waits on. */
-	readonly #waits = new Map<
-		string,
-		{ target: string; letterId: string; callId: string; resolve: (result: WaitResult) => void }
-	>();
-	/**
-	 * Each working session's current turn: the letters it sent, and for each letter it read, how many it
-	 * had sent by then, so Jig can tell what it asked after reading a request.
-	 */
-	readonly #turns = new Map<string, Turn>();
 	readonly #userHome: string | null;
 	/**
 	 * Sessions the person stopped (letters wait until the person writes to them or continues them) and
@@ -262,8 +220,6 @@ export class Agents {
 			return null;
 		}
 	};
-	/** Letters handed to a waiting tool call, by the call's id, until the call's result is stored. */
-	readonly #handed = new Map<string, string>();
 
 	constructor(options: AgentsOptions) {
 		this.#store = options.store;
@@ -277,7 +233,6 @@ export class Agents {
 		this.#draftInterval = options.draftIntervalMs ?? 50;
 		this.post = options.post ?? new PostOffice(options.store, this.#log);
 		this.schedules = options.schedules ?? new ScheduleBook(options.store);
-		this.#waitMs = options.waitMs ?? WAIT_MS;
 		this.#userHome = options.userHome ?? null;
 		this.#held = new Held(options.store);
 		this.#maxSteps = options.maxSteps ?? MAX_STEPS;
@@ -293,7 +248,18 @@ export class Agents {
 			...this.#store.getSetting<string[]>("memoryDirs", []),
 			...skillFolders(null, this.#home, this.#userHome),
 		];
-		this.post.setHooks({ queued: (letter) => this.#onQueued(letter) });
+		this.#mail = new Mailroom({
+			store: this.#store,
+			gateway: this.#gateway,
+			post: this.post,
+			schedules: this.schedules,
+			log: this.#log,
+			waitMs: options.waitMs ?? WAIT_MS,
+			isRunning: (id) => this.isRunning(id),
+			wake: (id) => this.#wake(id),
+			quiet: (session, said) => this.#askFromReply(session, said),
+		});
+		this.post.setHooks({ queued: (letter) => this.#mail.queued(letter) });
 		this.#manager = new Manager({
 			store: this.#store,
 			schedules: this.schedules,
@@ -438,11 +404,7 @@ export class Agents {
 		const letters = this.post.mail.dropWaiting(sessionId, "archived");
 		for (const letter of letters) this.schedules.finished(letter, "skipped", "archived");
 		const dropped = new Set(letters.map((letter) => letter.id));
-		for (const waiting of [...this.#waits.values()]) {
-			if (waiting.target === sessionId && dropped.has(waiting.letterId)) {
-				waiting.resolve({ kind: "archived" });
-			}
-		}
+		this.#mail.archived(sessionId, dropped);
 	}
 
 	/**
@@ -478,13 +440,7 @@ export class Agents {
 		const live: Live = { controller, done: Promise.resolve(), waiters: new Map() };
 		this.#live.set(sessionId, live);
 		this.#lastText.delete(sessionId);
-		this.#turns.set(sessionId, {
-			sent: [],
-			read: new Map(),
-			byPerson: options.byPerson ?? false,
-			started: false,
-			run: null,
-		});
+		this.#mail.begin(sessionId, options.byPerson ?? false);
 		live.done = this.#run(sessionId, live, options.resume ?? false)
 			.catch((error: unknown) =>
 				this.#log(`session ${sessionId}: ${(error as Error).stack ?? error}`),
@@ -696,8 +652,10 @@ export class Agents {
 			if (capped && !signal.aborted) this.#held.cap(sessionId, localDay(Date.now()));
 			else this.#held.uncap(sessionId);
 			// To the sessions that wait for this one, a stop at a spending limit is a turn that failed.
-			if (capped && !signal.aborted) this.#endTurn(sessionId, "error", capped, false);
-			else this.#endTurn(sessionId, endStatus, detail, signal.aborted);
+			const said = this.#lastText.get(sessionId) ?? "";
+			this.#lastText.delete(sessionId);
+			if (capped && !signal.aborted) this.#mail.endTurn(sessionId, "error", capped, false, said);
+			else this.#mail.endTurn(sessionId, endStatus, detail, signal.aborted, said);
 			if (endStatus === "idle" && !signal.aborted && !capped) {
 				this.#nameAfterFirstTurn(sessionId).catch((error: unknown) =>
 					this.#log(`session ${sessionId}: naming failed: ${(error as Error).message}`),
@@ -755,7 +713,7 @@ export class Agents {
 		if (reply.stopReason !== "stop" || !name || now.name !== session.name) return;
 		let chosen: string;
 		try {
-			chosen = this.#freeName(validateSessionName(clip(name, 40)));
+			chosen = freeName(this.#store, validateSessionName(clip(name, 40)));
 		} catch {
 			return;
 		}
@@ -875,7 +833,7 @@ export class Agents {
 				// In the automatic mode the model asks for a person's approval itself, with `confirm`.
 				const flagged = (row.args as { confirm?: unknown }).confirm === true;
 				const subject = tool.subject(row.args, session, this.#lookup(session));
-				decision = this.#permissions.decide(subject, this.#withRunMode(session), flagged);
+				decision = this.#permissions.decide(subject, this.#mail.withRunMode(session), flagged);
 			} catch (error) {
 				const message =
 					error instanceof ToolInputError
@@ -892,7 +850,7 @@ export class Agents {
 				});
 				continue;
 			}
-			const run = this.#turns.get(sessionId)?.run;
+			const run = this.#mail.run(sessionId);
 			if (decision.effect === "ask" && run?.unattended) {
 				// Nobody is there to say yes: refuse now rather than wait (blueprint 6.1, item 6).
 				run.refused.push(decision.request.summary);
@@ -994,11 +952,8 @@ export class Agents {
 			finishedAt: Date.now(),
 		});
 		// A letter this call waited for is now in the transcript, inside the result.
-		const handed = this.#handed.get(row.id);
-		if (handed) {
-			this.#handed.delete(row.id);
-			this.post.mail.setLetterEntry(handed, entry.id);
-		}
+		const handed = this.#mail.takeHanded(row.id);
+		if (handed) this.post.mail.setLetterEntry(handed, entry.id);
 	}
 
 	/** After a restart: calls that were running get an honest "unknown" result; calls that never ran are checked again. */
@@ -1060,7 +1015,7 @@ export class Agents {
 			},
 			setTodos: (todos) => this.#store.setTodos(sessionId, todos),
 			ask: async (request) => {
-				const run = this.#turns.get(sessionId)?.run;
+				const run = this.#mail.run(sessionId);
 				if (run?.unattended) {
 					const first = request.questions?.[0]?.question ?? request.question ?? "";
 					run.refused.push(`Question: ${clip(plainLine(first), 200)}`);
@@ -1090,10 +1045,10 @@ export class Agents {
 			canPostCards: this.post.canPostCards(this.#store.getSession(sessionId)),
 			send: (out) => {
 				const session = this.#store.getSession(sessionId);
-				return this.#sent(sessionId, this.post.send({ kind: "session", session }, out));
+				return this.#mail.sent(sessionId, this.post.send({ kind: "session", session }, out));
 			},
-			wait: (letter) => this.#awaitReply(sessionId, letter, live, callId),
-			open: (input) => this.#openChild(this.#store.getSession(sessionId), input),
+			wait: (letter) => this.#mail.awaitReply(sessionId, letter, live.controller.signal, callId),
+			open: (input) => this.#mail.openChild(this.#store.getSession(sessionId), input),
 			finish: (outcome) => this.#store.setOutcome(sessionId, outcome),
 			manage: (args) => {
 				const by = this.#store.getSession(sessionId);
@@ -1107,37 +1062,6 @@ export class Agents {
 				return this.#manager.apply(by, args);
 			},
 		};
-	}
-
-	/** Notes a letter the session sent in this turn, for what Jig sends on its behalf at the end. */
-	#sent(sessionId: string, letter: Letter): Letter {
-		this.#turns.get(sessionId)?.sent.push(letter);
-		return letter;
-	}
-
-	/** Notes that the session read a letter in this turn. */
-	#read(sessionId: string, letterId: string): void {
-		const turn = this.#turns.get(sessionId);
-		turn?.read.set(letterId, turn.sent.length);
-	}
-
-	/**
-	 * A letter is queued: a reply to the letter a session waits on goes to that waiting call; anything
-	 * else wakes the recipient (or reaches it between tool calls).
-	 */
-	#onQueued(letter: Letter): void {
-		const waiting = this.#waits.get(letter.toSession);
-		if (waiting && letter.fromSession === waiting.target && letter.replyTo === waiting.letterId) {
-			this.post.mail.setLetterStatus(letter.id, "delivered", {
-				entryId: null,
-				deliveredAt: Date.now(),
-			});
-			this.#handed.set(waiting.callId, letter.id);
-			this.#read(letter.toSession, letter.id);
-			waiting.resolve({ kind: "letter", letter: this.post.mail.getLetter(letter.id) });
-			return;
-		}
-		this.#wake(letter.toSession);
 	}
 
 	/**
@@ -1211,271 +1135,6 @@ export class Agents {
 	}
 
 	/**
-	 * Moves queued letters into the transcript; the model reads them, the interface shows letters. A
-	 * scheduled task's letter starts a turn of its own: only a turn that Jig started for waiting letters
-	 * takes it, as its first delivery, and one per turn. Its own permission mode and the rule that nobody
-	 * is watching then hold for that turn alone.
-	 */
-	#deliverLetters(sessionId: string, first: boolean): number {
-		const turn = this.#turns.get(sessionId);
-		let letters = this.post.mail.queuedFor(sessionId);
-		let adopted: Letter | null = null;
-		if (first && turn && !turn.byPerson) {
-			adopted = letters.find((letter) => letter.scheduleId !== null) ?? null;
-		}
-		letters = letters.filter((letter) => letter.scheduleId === null || letter === adopted);
-		if (letters.length === 0) return 0;
-		const session = this.#store.getSession(sessionId);
-		if (adopted && turn) {
-			const schedule = this.schedules.find(adopted.scheduleId as string);
-			turn.run = {
-				letterId: adopted.id,
-				scheduleId: adopted.scheduleId as string,
-				name: schedule?.name ?? adopted.fromName,
-				mode: schedule?.permissionMode ?? null,
-				unattended: true,
-				refused: [],
-			};
-		}
-		this.#store.tx(() => {
-			for (const letter of letters) {
-				let decision = null;
-				if (letter.decision !== null) {
-					try {
-						decision = decisionRef(this.post.mail.cardByNumber(letter.decision));
-					} catch {
-						decision = null;
-					}
-				}
-				const schedule = this.#scheduleRef(letter);
-				const note = letter === adopted && turn?.run ? this.#runNote(session, turn.run) : null;
-				const entry = this.#store.appendEntry(sessionId, {
-					role: "user",
-					message: {
-						role: "user",
-						content: letterText(letter, decision, schedule, note),
-						timestamp: Date.now(),
-					},
-					letter: letterRef(letter, decision, schedule),
-				});
-				this.post.mail.setLetterStatus(letter.id, "delivered", {
-					entryId: entry.id,
-					deliveredAt: Date.now(),
-				});
-				this.#read(sessionId, letter.id);
-			}
-		});
-		this.post.enterChain(sessionId, letters);
-		return letters.length;
-	}
-
-	/** The scheduled task a letter belongs to, if it still exists. */
-	#scheduleRef(letter: Letter): ScheduleRef | null {
-		if (!letter.scheduleId) return null;
-		const schedule = this.schedules.find(letter.scheduleId);
-		return schedule ? { id: schedule.id, name: schedule.name } : null;
-	}
-
-	/** What Jig tells a session about the scheduled run it is starting. */
-	#runNote(session: Session, run: ScheduledRun): string {
-		const lines = [
-			"This is a scheduled run and nobody is watching: Jig refuses calls that need the person's approval, and questions for them.",
-		];
-		if (run.mode && run.mode !== permissionModeOf(session.options)) {
-			lines.push(`For this run: ${PERMISSION_MODE[run.mode]}`);
-		}
-		const main = this.post.mainSessionId();
-		const mainName = main && main !== session.id ? this.post.sessionName(main) : null;
-		lines.push(
-			mainName
-				? `When you finish, Jig sends your last reply to the main conversation (${mainName}) as the report.`
-				: "Your last reply is the report.",
-		);
-		return lines.join(" ");
-	}
-
-	/** The session as the permission check sees it: with the scheduled run's own mode, if it has one. */
-	#withRunMode(session: Session): Session {
-		const mode = this.#turns.get(session.id)?.run?.mode;
-		if (!mode) return session;
-		return { ...session, options: { ...session.options, permissionMode: mode } };
-	}
-
-	/**
-	 * The turn is over (blueprint 6.3, item 11). Sessions waiting for this one get its last reply. Every
-	 * session whose request it read and has not answered hears how the turn ended: when the turn finished
-	 * normally and nothing it asked others is still open, its last reply goes back as the report and the
-	 * request is done; after an error, a stop, or while it waits for answers of its own, a notice says so
-	 * and the request stays open, so the real result still follows. A task session's opener hears about
-	 * every turn (M2 plan, section 6). What is owed is read from the database, so a restart in the middle
-	 * loses nothing. Jig's letters never ask for more letters, so this cannot loop.
-	 */
-	#endTurn(
-		sessionId: string,
-		status: SessionStatus,
-		detail: string | null,
-		stopped: boolean,
-	): void {
-		this.post.resetChain(sessionId);
-		const said = this.#lastText.get(sessionId) ?? "";
-		this.#lastText.delete(sessionId);
-		const turn: Turn = this.#turns.get(sessionId) ?? {
-			sent: [],
-			read: new Map<string, number>(),
-			byPerson: false,
-			started: true,
-			run: null,
-		};
-		this.#turns.delete(sessionId);
-		const mail = this.post.mail;
-		const session = this.#store.getSession(sessionId);
-		const failed = stopped || status === "error";
-		const open = (letter: Letter) =>
-			["queued", "held", "delivered"].includes(mail.getLetter(letter.id).status);
-
-		const sawEnd = new Set<string>();
-		for (const [waiter, waiting] of [...this.#waits]) {
-			if (waiting.target !== sessionId) continue;
-			if (mail.getLetter(waiting.letterId).status === "queued") {
-				// A letter not read yet starts the next turn at once: wait for that turn. Not when the
-				// person stopped this session or archived it.
-				if (session.archivedAt !== null) {
-					waiting.resolve({ kind: "archived" });
-					continue;
-				}
-				if (!stopped) continue;
-			}
-			sawEnd.add(waiter);
-			waiting.resolve({ kind: "ended", status, text: said, detail, stopped });
-		}
-
-		const owed = new Map<string, Letter[]>();
-		for (const request of mail.openRequests(sessionId)) {
-			if (!request.fromSession) continue;
-			owed.set(request.fromSession, [...(owed.get(request.fromSession) ?? []), request]);
-		}
-		if (session.parentId && !owed.has(session.parentId)) owed.set(session.parentId, []);
-
-		for (const [requester, requests] of owed) {
-			const close = () => {
-				for (const request of requests) mail.closeRequest(request.id);
-			};
-			let target: Session | null = null;
-			try {
-				target = this.#store.getSession(requester);
-			} catch {
-				target = null;
-			}
-			if (!target || target.archivedAt !== null) {
-				close();
-				continue;
-			}
-			// What it sent after reading these requests (all of this turn for requests read earlier).
-			const since =
-				requests.length === 0
-					? 0
-					: Math.min(...requests.map((request) => turn.read.get(request.id) ?? 0));
-			const after = turn.sent.slice(since);
-			// A question back or work handed on that is still open: its reply is not the answer yet.
-			const asking = after.some((letter) => letter.kind === "request" && open(letter));
-			const finished = !failed && !asking;
-			// It saw the end through its wait; a normal end answered it.
-			if (sawEnd.has(requester)) {
-				if (finished) close();
-				continue;
-			}
-			const wrote = after.filter(
-				(letter) =>
-					letter.toSession === requester &&
-					letter.status !== "refused" &&
-					letter.status !== "dropped",
-			);
-			const replyTo = requests.at(-1)?.id ?? null;
-			if (finished) {
-				// A task session that already reported to its opener in this turn has said it.
-				if (requests.length === 0 && wrote.some((letter) => letter.kind === "report")) continue;
-				this.#autoLetter(session, requester, {
-					kind: "report",
-					summary: plainLine(said) || `${session.name} finished without a written reply.`,
-					body: said,
-					replyTo,
-				});
-				close();
-				continue;
-			}
-			// Waiting for answers and already in touch with the requester: nothing to add.
-			if (!failed && wrote.length > 0) continue;
-			const follows = `When ${session.name} goes on, its reply comes to you.`;
-			this.#autoLetter(session, requester, {
-				kind: "notice",
-				summary: stopped
-					? `The person stopped ${session.name} before it finished.`
-					: status === "error"
-						? `${session.name} stopped with an error.`
-						: plainLine(said) || `${session.name} is waiting for answers from other sessions.`,
-				body: [status === "error" && !stopped ? (detail ?? "") : said, follows]
-					.filter(Boolean)
-					.join("\n\n"),
-				replyTo,
-			});
-		}
-		// Runs of scheduled tasks this turn read end with it; read from the database, so a run that a
-		// restart interrupted ends with the turn that continues it.
-		let reported = false;
-		for (const letter of mail.scheduledRead(sessionId)) {
-			const run = turn.run?.letterId === letter.id ? turn.run : null;
-			if (this.#finishRun(session, letter, run, { status, detail, said, stopped })) reported = true;
-		}
-		mail.finishRead(sessionId);
-		if (!failed && owed.size === 0 && !reported) this.#askFromReply(session, said);
-	}
-
-	/**
-	 * A scheduled run ended. Its result goes on the task, and to the main conversation as a report, which
-	 * sums it up for the person (M3 plan, decision 3); a run the person stopped needs no report. Returns
-	 * whether a report went out.
-	 */
-	#finishRun(
-		session: Session,
-		letter: Letter,
-		run: ScheduledRun | null,
-		end: { status: SessionStatus; detail: string | null; said: string; stopped: boolean },
-	): boolean {
-		const outcome = end.stopped ? "stopped" : end.status === "error" ? "error" : "done";
-		const first = plainLine(end.said);
-		this.schedules.finished(
-			letter,
-			outcome,
-			outcome === "error" ? end.detail : outcome === "done" ? first || null : null,
-		);
-		const main = this.post.mainSessionId();
-		if (outcome === "stopped" || !main || main === session.id) return false;
-		const name = this.#scheduleRef(letter)?.name ?? letter.fromName;
-		const refused = run?.refused ?? [];
-		const body = [
-			outcome === "error" ? (end.detail ?? "") : "",
-			end.said,
-			refused.length > 0
-				? `Refused because nobody was watching:\n${refused.map((line) => `- ${line}`).join("\n")}`
-				: "",
-		]
-			.filter(Boolean)
-			.join("\n\n");
-		this.#autoLetter(session, main, {
-			kind: outcome === "done" ? "report" : "notice",
-			summary:
-				outcome === "error"
-					? `The scheduled task "${name}" stopped with an error in ${session.name}.`
-					: first ||
-						`${session.name} finished the scheduled task "${name}" without a written reply.`,
-			body,
-			replyTo: null,
-			schedule: letter.scheduleId,
-		});
-		return true;
-	}
-
-	/**
 	 * A code session's last reply that nobody else reads, ending with a question or an offer, becomes a
 	 * question in the approval center, and the session shows that it waits. The latest such question
 	 * replaces an older one; the person's next message, or continuing, takes it away.
@@ -1506,145 +1165,6 @@ export class Agents {
 
 	#dropReplyQuestions(sessionId: string): void {
 		for (const approval of this.#replyQuestions(sessionId)) this.#store.cancelApproval(approval.id);
-	}
-
-	/** A letter Jig sends on a session's behalf at the end of its turn. */
-	#autoLetter(
-		session: Session,
-		to: string,
-		letter: {
-			kind: "report" | "notice";
-			summary: string;
-			body: string;
-			replyTo: string | null;
-			schedule?: string | null;
-		},
-	): void {
-		try {
-			this.post.send(
-				{ kind: "session", session },
-				{
-					to,
-					kind: letter.kind,
-					summary: clip(letter.summary, SUMMARY_MAX),
-					body: clip(letter.body, BODY_MAX),
-					replyTo: letter.replyTo,
-					auto: true,
-					schedule: letter.schedule ?? null,
-				},
-			);
-		} catch (error) {
-			if (!(error instanceof JigError)) throw error;
-			this.#log(`session ${session.id}: no ${letter.kind} to ${to}: ${error.message}`);
-		}
-	}
-
-	/**
-	 * Waits until the recipient of `letter` replies to it or ends its turn, at most `waitMs`. Refuses to
-	 * wait when the recipient already waits for this session, directly or through others: neither could
-	 * go on.
-	 */
-	#awaitReply(sessionId: string, letter: Letter, live: Live, callId: string): Promise<WaitResult> {
-		const target = letter.toSession;
-		for (let at: string | undefined = target, hops = 0; at && hops < 100; hops++) {
-			if (at === sessionId) return Promise.resolve({ kind: "cycle" });
-			at = this.#waits.get(at)?.target;
-		}
-		const current = this.post.mail.getLetter(letter.id);
-		if (current.status === "queued" && !this.isRunning(target)) {
-			return Promise.resolve({
-				kind: "not-running",
-				status: this.#store.getSession(target).status,
-			});
-		}
-		const signal = live.controller.signal;
-		return new Promise<WaitResult>((resolve) => {
-			const finish = (result: WaitResult) => {
-				clearTimeout(timer);
-				signal.removeEventListener("abort", onAbort);
-				if (this.#waits.get(sessionId)?.resolve === finish) this.#waits.delete(sessionId);
-				resolve(result);
-			};
-			const onAbort = () => finish({ kind: "stopped" });
-			const timer = setTimeout(() => finish({ kind: "timeout" }), this.#waitMs);
-			this.#waits.set(sessionId, { target, letterId: letter.id, callId, resolve: finish });
-			if (signal.aborted) onAbort();
-			else signal.addEventListener("abort", onAbort, { once: true });
-		});
-	}
-
-	/**
-	 * Opens a task session for `parent` and sends it the brief as a request (blueprint 6.2, item 8). Its
-	 * permissions are never above the parent's: same mode and rules, the parent's folder or one inside it.
-	 */
-	#openChild(parent: Session, input: OpenInput): { session: Session; letter: Letter } {
-		const brief = input.brief.trim();
-		if (!brief) throw invalid("The brief is empty.", "brief");
-		if ([...brief].length > BODY_MAX) {
-			throw invalid(`The brief can be at most ${BODY_MAX} characters.`, "brief");
-		}
-		// The brief must be able to go out before there is a session to send it to.
-		const blocked = this.post.blockedNew(parent);
-		if (blocked) {
-			throw conflict(`Not opened: ${reasonText(blocked)}.`, undefined, "letter-refused");
-		}
-		let cwd = parent.cwd;
-		if (input.cwd === null) cwd = null;
-		else if (input.cwd !== undefined) {
-			if (!parent.cwd) {
-				throw invalid("You have no working folder, so the new session cannot have one.", "folder");
-			}
-			const folder = resolveWorkingFolder(
-				isAbsolute(input.cwd) ? input.cwd : join(parent.cwd, input.cwd),
-			);
-			if (!isInside(folder, parent.cwd)) {
-				throw invalid("The folder must be your working folder or inside it.", "folder");
-			}
-			cwd = folder;
-		}
-		let provider = parent.provider;
-		let model = parent.model;
-		if (input.provider && input.model) {
-			if (!this.#gateway.model(input.provider, input.model)) {
-				throw invalid(`${input.provider} has no model ${input.model}.`, "model");
-			}
-			provider = input.provider;
-			model = input.model;
-		}
-		const session = this.#store.createSession({
-			name: this.#freeName(validateSessionName(input.name)),
-			kind: "task",
-			groupId: parent.groupId,
-			cwd,
-			provider,
-			model,
-			thinking: parent.thinking,
-			rules: parent.rules,
-			options: { permissionMode: permissionModeOf(parent.options) },
-			parentId: parent.id,
-		});
-		const letter = this.#sent(
-			parent.id,
-			this.post.send(
-				{ kind: "session", session: parent },
-				{
-					to: session.id,
-					kind: "request",
-					summary: clip(plainLine(brief), SUMMARY_MAX),
-					body: brief,
-				},
-			),
-		);
-		return { session: this.#store.getSession(session.id), letter };
-	}
-
-	/** Session names are unique: "修复登录", then "修复登录 2"… */
-	#freeName(base: string): string {
-		if (!this.#store.findSessionByName(base)) return base;
-		for (let n = 2; ; n++) {
-			const name = `${base.slice(0, 55)} ${n}`;
-			if (!this.#store.findSessionByName(name)) return name;
-		}
 	}
 
 	/** The main conversation and the session's opener, as the system prompt names them. */
@@ -1723,15 +1243,12 @@ export class Agents {
 		for (const note of notes) {
 			this.#store.appendEntry(sessionId, userEntry(`${JIG_NOTE} ${note}`));
 		}
-		const turn = this.#turns.get(sessionId);
-		const first = turn ? !turn.started : false;
-		if (turn) turn.started = true;
-		const letters = this.#deliverLetters(sessionId, first);
+		const letters = this.#mail.deliver(sessionId, this.#mail.firstDelivery(sessionId));
 		const fromPerson = this.#store.deliverQueue(sessionId, userEntry).length;
 		if (fromPerson > 0) {
 			// What the person wrote starts a new chain of hand-offs, and they are watching now.
 			this.post.resetChain(sessionId);
-			if (turn?.run) turn.run.unattended = false;
+			this.#mail.watched(sessionId);
 		}
 		return letters > 0 || fromPerson > 0 || notes.length > 0;
 	}
