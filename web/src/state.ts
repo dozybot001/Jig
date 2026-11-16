@@ -143,8 +143,6 @@ export interface ProviderSummary {
 	custom: boolean;
 	hasKey: boolean;
 	modelCount: number;
-	/** The provider can be asked what is left on the account. */
-	balance: boolean;
 }
 
 /** What one short request to a provider came to. */
@@ -154,16 +152,6 @@ export interface PingResult {
 	firstMs: number | null;
 	totalMs: number;
 	error?: string;
-}
-
-/** What a provider says is left on the account, in its own figures. */
-export interface ProviderBalance {
-	/** False when the provider refused or could not be reached; `reason` and `status` say which. */
-	ok: boolean;
-	reason?: "refused" | "unreachable";
-	status?: number | null;
-	amounts?: { currency: string; total: string; granted?: string; paid?: string }[];
-	available?: boolean;
 }
 
 export interface ModelInfo {

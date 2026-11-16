@@ -28,7 +28,6 @@ import type { AssistantMessage, JsonObject, ModelMessage } from "../../shared/me
 import type { ThinkingLevel } from "../../shared/types.ts";
 import { invalid, JigError } from "../errors.ts";
 import type { KeyStore } from "../keys.ts";
-import { type Balance, hasBalance, readBalance } from "./balance.ts";
 
 // Compile-time guarantees that Jig's stored message shapes and the library's stay interchangeable.
 type Assert<T extends true> = T;
@@ -294,8 +293,6 @@ export interface GatewayOptions {
 	providers?: Provider[];
 	retry?: RetryOptions;
 	idleMs?: number;
-	/** Replaces the providers' balance addresses; tests point them at a local server. */
-	balanceUrls?: Record<string, string>;
 }
 
 /** What one short request to a provider came to. */
@@ -339,15 +336,11 @@ export class ModelGateway {
 	readonly #custom = new Map<string, CustomProviderConfig>();
 	readonly #retry: RetryOptions;
 	readonly #idleMs: number;
-	readonly #version: string;
-	readonly #balanceUrls: Record<string, string>;
 
 	constructor(options: GatewayOptions) {
 		this.#keys = options.keys;
 		this.#retry = options.retry ?? DEFAULT_RETRY;
 		this.#idleMs = options.idleMs ?? DEFAULT_IDLE_MS;
-		this.#version = options.version;
-		this.#balanceUrls = options.balanceUrls ?? {};
 		this.#models = createModels({
 			credentials: new KeychainCredentials(options.keys),
 			authContext: NO_AMBIENT_AUTH,
@@ -537,24 +530,6 @@ export class ModelGateway {
 		} finally {
 			if (timer) clearTimeout(timer);
 		}
-	}
-
-	/** Whether the provider can be asked what is left on the account. */
-	hasBalance(provider: string): boolean {
-		return hasBalance(provider);
-	}
-
-	/** What the provider says is left on the account behind the stored key. */
-	async balance(provider: string): Promise<Balance> {
-		if (!this.#models.getProvider(provider))
-			throw invalid(`Unknown provider: ${provider}.`, "provider");
-		const key = await this.#keys.get(provider);
-		if (!key) {
-			throw new JigError("missing-api-key", 400, `There is no API key for ${provider}.`, {
-				provider,
-			});
-		}
-		return readBalance(provider, key, this.#version, this.#balanceUrls);
 	}
 
 	/**

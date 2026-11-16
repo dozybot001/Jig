@@ -26,7 +26,6 @@ import {
 	patchMcpServer,
 	patchSkill,
 	pickFolder,
-	providerBalance,
 	removeMcpServer,
 	revealData,
 	revealSkill,
@@ -57,7 +56,6 @@ import {
 	type McpServerView,
 	NOTIFY_KINDS,
 	type PingResult,
-	type ProviderBalance,
 	type ProviderSummary,
 	type SearchServiceView,
 	type SkillList,
@@ -91,7 +89,6 @@ import {
 	ThemeIcon,
 	ToolsIcon,
 	TrashIcon,
-	WalletIcon,
 } from "./icons.tsx";
 import { ModelPicker } from "./session.tsx";
 import {
@@ -133,7 +130,7 @@ function KeyRow({
 	onDelete: () => Promise<unknown>;
 	/** Further actions on the row, shown while the key is not being typed. */
 	extra?: ReactNode;
-	/** Lines under the name: the result of a test, a balance. */
+	/** Lines under the name: the result of a test. */
 	detail?: ReactNode;
 }) {
 	useLang();
@@ -219,30 +216,13 @@ function formatLatency(ms: number): string {
 		: t("latencySeconds", { n: (ms / 1000).toFixed(1) });
 }
 
-/** "CNY 110.00（赠送 10.00，充值 100.00）": the provider's own figures, unchanged. */
-function balanceText(amount: NonNullable<ProviderBalance["amounts"]>[number]): string {
-	const parts = [
-		amount.granted !== undefined ? t("balanceGranted", { n: amount.granted }) : "",
-		amount.paid !== undefined ? t("balancePaid", { n: amount.paid }) : "",
-	].filter(Boolean);
-	const total = `${amount.currency} ${amount.total}`;
-	return parts.length > 0
-		? t("balanceWithParts", { total, parts: parts.join(t("listSeparator")) })
-		: total;
-}
-
 function ProviderRow({ provider }: { provider: ProviderSummary }) {
 	useLang();
 	const [removing, setRemoving] = useState(false);
 	const [ping, setPing] = useState<PingResult | null>(null);
-	const [balance, setBalance] = useState<ProviderBalance | null>(null);
 	const test = useAction(async () => {
 		setPing(null);
 		setPing(await testProvider(provider.id));
-	});
-	const ask = useAction(async () => {
-		setBalance(null);
-		setBalance(await providerBalance(provider.id));
 	});
 	const usable = provider.hasKey || !provider.keyRequired;
 	const status = !provider.keyRequired
@@ -274,23 +254,6 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
 							</p>
 						)}
 						<ErrorBox error={test.error} />
-						{balance?.ok && (
-							<p className="hint">
-								{t("balanceLine", {
-									name: provider.name,
-									amounts: (balance.amounts ?? []).map(balanceText).join(t("listSeparator")),
-								})}
-								{balance.available === false && ` ${t("balanceShort")}`}
-							</p>
-						)}
-						{balance && !balance.ok && (
-							<p className="hint provider-failed">
-								{balance.reason === "refused"
-									? t("balanceRefused", { name: provider.name, status: balance.status ?? "" })
-									: t("balanceUnreachable", { name: provider.name })}
-							</p>
-						)}
-						<ErrorBox error={ask.error} />
 					</div>
 				}
 				extra={
@@ -299,12 +262,6 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
 							<Button busy={test.busy} title={t("testHint")} onClick={() => void test.run()}>
 								<PulseIcon />
 								{t("testConnection")}
-							</Button>
-						)}
-						{provider.balance && provider.hasKey && (
-							<Button busy={ask.busy} onClick={() => void ask.run()}>
-								<WalletIcon />
-								{t("showBalance")}
 							</Button>
 						)}
 						{provider.custom && (

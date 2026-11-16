@@ -38,7 +38,6 @@ import {
 	type ModelInfo,
 	type PhonesState,
 	type PingResult,
-	type ProviderBalance,
 	type ProviderSummary,
 	type SearchServiceView,
 	type Settings,
@@ -883,10 +882,6 @@ export async function saveKey(provider: string, key: string): Promise<void> {
 /** One short request with the stored key: whether it works, and how long the provider takes. */
 export function testProvider(provider: string): Promise<PingResult> {
 	return api<PingResult>("POST", `/api/providers/${encodeURIComponent(provider)}/test`, {});
-}
-
-export function providerBalance(provider: string): Promise<ProviderBalance> {
-	return api<ProviderBalance>("GET", `/api/providers/${encodeURIComponent(provider)}/balance`);
 }
 
 export async function deleteKey(provider: string): Promise<void> {

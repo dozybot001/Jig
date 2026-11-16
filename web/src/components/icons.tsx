@@ -53,7 +53,6 @@ import {
 	Trash2,
 	UserRoundPlus,
 	Users,
-	Wallet,
 	X,
 } from "lucide-react";
 
@@ -156,7 +155,5 @@ export function JigMark({ className, size }: { className?: string; size: number 
 export const TrashIcon = () => <Trash2 {...props} />;
 /** Test a connection: is it alive, and how fast. */
 export const PulseIcon = () => <Activity {...props} />;
-/** What is left on an account. */
-export const WalletIcon = () => <Wallet {...props} />;
 /** Try again, or put back the original value. */
 export const RetryIcon = () => <RotateCcw {...props} />;

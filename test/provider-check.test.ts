@@ -1,5 +1,5 @@
 /**
- * The connection test and the balance of a provider (settings, "providers and keys"). Local servers
+ * The connection test of a provider (settings, "providers and keys"). Local servers
  * stand in for the providers; nothing here reaches a real one.
  */
 import assert from "node:assert/strict";
@@ -117,87 +117,4 @@ test("a provider's error is shown as one line", () => {
 	);
 	assert.equal(plainError('401: {"message":"Authentication Fails"}'), "401: Authentication Fails");
 	assert.equal(plainError("fetch failed"), "fetch failed");
-});
-
-describe("balance", () => {
-	const gateway = (urls: Record<string, string>, keys: Record<string, string>) =>
-		new ModelGateway({ keys: new MemoryKeyStore(keys), version: "9.9.9", balanceUrls: urls });
-
-	test("DeepSeek's figures come through unchanged, and the key goes only in the header", async () => {
-		const provider = await server(
-			json(200, {
-				is_available: true,
-				balance_infos: [
-					{
-						currency: "CNY",
-						total_balance: "110.00",
-						granted_balance: "10.00",
-						topped_up_balance: "100.00",
-					},
-				],
-			}),
-		);
-		try {
-			const balance = await gateway({ deepseek: provider.url }, { deepseek: "sk-test-1" }).balance(
-				"deepseek",
-			);
-			assert.deepEqual(balance, {
-				amounts: [{ currency: "CNY", total: "110.00", granted: "10.00", paid: "100.00" }],
-				available: true,
-			});
-			assert.equal(provider.seen[0]?.authorization, "Bearer sk-test-1");
-			assert.equal(provider.seen[0]?.["user-agent"], "jig/9.9.9");
-		} finally {
-			provider.close();
-		}
-	});
-
-	test("Moonshot's balance is read in yuan", async () => {
-		const provider = await server(
-			json(200, {
-				code: 0,
-				data: { available_balance: 49.58894, voucher_balance: 46.58893, cash_balance: 3.00001 },
-				status: true,
-			}),
-		);
-		try {
-			const balance = await gateway(
-				{ "moonshotai-cn": provider.url },
-				{ "moonshotai-cn": "sk-test-2" },
-			).balance("moonshotai-cn");
-			assert.deepEqual(balance, {
-				amounts: [{ currency: "CNY", total: "49.58894", granted: "46.58893", paid: "3.00001" }],
-				available: true,
-			});
-		} finally {
-			provider.close();
-		}
-	});
-
-	test("a refusal says the status and nothing the provider wrote; other providers have no balance", async () => {
-		const provider = await server(json(401, { error: { message: "bad key sk-test-3" } }));
-		try {
-			await assert.rejects(
-				gateway({ deepseek: provider.url }, { deepseek: "sk-test-3" }).balance("deepseek"),
-				(e) =>
-					e instanceof JigError &&
-					e.code === "provider-refused" &&
-					/401/.test(e.message) &&
-					!e.message.includes("sk-test-3"),
-			);
-			await assert.rejects(
-				gateway({}, {}).balance("deepseek"),
-				(e) => e instanceof JigError && e.code === "missing-api-key",
-			);
-			await assert.rejects(
-				gateway({}, { anthropic: "sk-test-4" }).balance("anthropic"),
-				(e) => e instanceof JigError && e.code === "no-balance",
-			);
-			const flags = gateway({}, {});
-			assert.equal(flags.hasBalance("deepseek"), true);
-			assert.equal(flags.hasBalance("anthropic"), false);
-		} finally {
-			provider.close();
-		}
-	});
 });
