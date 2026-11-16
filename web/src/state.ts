@@ -50,6 +50,8 @@ export type SettingsPatch = Partial<Omit<Settings, "notify" | "remote">> & {
 export interface McpServerView {
 	name: string;
 	kind: "stdio" | "http";
+	/** Set up by Jig itself: it can be turned off, not removed. */
+	builtin: boolean;
 	disabled: boolean;
 	command: string | null;
 	args: string[];

@@ -75,7 +75,9 @@ export function mcpRoutes(store: Store, options: McpRoutesOptions): Hono<AppEnv>
 		void hub.reload().catch((error: Error) => options.log?.(`mcp: ${error.message}`));
 	};
 
-	app.get("/mcp", (c) => c.json({ items: listMcpEntries(home).map(shown), nextCursor: null }));
+	app.get("/mcp", (c) =>
+		c.json({ items: listMcpEntries(home, hub.builtin).map(shown), nextCursor: null }),
+	);
 
 	app.post("/mcp", once, async (c) => {
 		const fields = await readJson(c);
@@ -104,17 +106,22 @@ export function mcpRoutes(store: Store, options: McpRoutesOptions): Hono<AppEnv>
 		const disabled = optBoolean(fields, "disabled");
 		const env = values<string | null>(fields, "env", true);
 		const headers = values<string | null>(fields, "headers", true);
-		const entry = patchMcpEntry(home, c.req.param("name"), {
-			...(disabled !== undefined ? { disabled } : {}),
-			...(env ? { env } : {}),
-			...(headers ? { headers } : {}),
-		});
+		const entry = patchMcpEntry(
+			home,
+			c.req.param("name"),
+			{
+				...(disabled !== undefined ? { disabled } : {}),
+				...(env ? { env } : {}),
+				...(headers ? { headers } : {}),
+			},
+			hub.builtin,
+		);
 		reload();
 		return c.json(shown(entry));
 	});
 
 	app.delete("/mcp/:name", (c) => {
-		removeMcpEntry(home, c.req.param("name"));
+		removeMcpEntry(home, c.req.param("name"), hub.builtin);
 		reload();
 		return c.body(null, 204);
 	});

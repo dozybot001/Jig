@@ -1694,13 +1694,18 @@ function McpServerRow({
 				? `${t("mcpState_error")}${t("hintSeparator")}${server.error}`
 				: t(`mcpState_${server.state}`);
 	const values = server.kind === "stdio" ? server.envNames : server.headerNames;
+	// What a server Jig sets up by itself is for, in the interface language.
+	const titleKey = `mcpBuiltin_${server.name}`;
+	const helpKey = `mcpBuiltinHelp_${server.name}`;
 	return (
 		<div className="mcp-server">
 			<div className="setting-row mcp-row">
 				<div className="setting-text">
 					<span className="setting-label">
+						{server.builtin && hasMessage(titleKey) && <>{t(titleKey)} </>}
 						<span className="mcp-code">{server.name}</span>
 					</span>
+					{server.builtin && hasMessage(helpKey) && <span className="hint">{t(helpKey)}</span>}
 					<span className="hint" role="status">
 						{state}
 					</span>
@@ -1721,10 +1726,12 @@ function McpServerRow({
 						busy={toggle.busy}
 						onChange={(value) => void toggle.run(value)}
 					/>
-					<Button variant="danger" onClick={onRemove}>
-						<TrashIcon />
-						{t("mcpRemove")}
-					</Button>
+					{!server.builtin && (
+						<Button variant="danger" onClick={onRemove}>
+							<TrashIcon />
+							{t("mcpRemove")}
+						</Button>
+					)}
 				</div>
 			</div>
 			{open && (
@@ -1812,17 +1819,35 @@ function McpDialog({ onClose }: { onClose: () => void }) {
 			footer={<Button onClick={onClose}>{t("close")}</Button>}
 		>
 			<p className="hint">{t("mcpHelp")}</p>
+			{(servers ?? []).some((server) => server.builtin) && (
+				<SettingGroup title={t("mcpBuiltin")}>
+					{(servers ?? [])
+						.filter((server) => server.builtin)
+						.map((server) => (
+							<McpServerRow
+								key={server.name}
+								server={server}
+								onChanged={reload}
+								onRemove={() => {}}
+							/>
+						))}
+				</SettingGroup>
+			)}
 			<SettingGroup title={t("mcpAdded")}>
 				{servers === null && !error && <p className="hint setting-empty">{t("loading")}</p>}
-				{servers?.length === 0 && <p className="hint setting-empty">{t("mcpNone")}</p>}
-				{(servers ?? []).map((server) => (
-					<McpServerRow
-						key={server.name}
-						server={server}
-						onChanged={reload}
-						onRemove={() => setRemoving(server.name)}
-					/>
-				))}
+				{servers?.filter((server) => !server.builtin).length === 0 && (
+					<p className="hint setting-empty">{t("mcpNone")}</p>
+				)}
+				{(servers ?? [])
+					.filter((server) => !server.builtin)
+					.map((server) => (
+						<McpServerRow
+							key={server.name}
+							server={server}
+							onChanged={reload}
+							onRemove={() => setRemoving(server.name)}
+						/>
+					))}
 			</SettingGroup>
 			<div>
 				<Button onClick={() => setAdding(true)}>

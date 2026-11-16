@@ -115,7 +115,13 @@ export function serveCommand(): Command {
 			const search = new SearchAccess(runtime.keys);
 			// MCP servers from mcp.json in the data folder; their tools ask before the first use.
 			const { McpHub } = await import("../server/mcp.ts");
-			const mcp = new McpHub({ jigHome: home, version: VERSION, log });
+			const { builtinMcp } = await import("../server/mcp-builtin.ts");
+			const mcp = new McpHub({
+				jigHome: home,
+				version: VERSION,
+				log,
+				builtin: builtinMcp(home, io.env as NodeJS.ProcessEnv),
+			});
 			const { skillTool } = await import("../server/skills.ts");
 			const { homedir } = await import("node:os");
 			const { ArtifactStore, saveArtifactTool } = await import("../server/artifacts.ts");

@@ -40,7 +40,8 @@ export interface McpStatus {
 
 const PROTOCOL = "2025-06-18";
 const REQUEST_MS = 60_000;
-const CONNECT_MS = 20_000;
+/** Long enough for npx to fetch a server the first time it is started. */
+const CONNECT_MS = 120_000;
 const MAX_RESULT_CHARS = 50_000;
 const MAX_LINE = 8 * 1024 * 1024;
 
@@ -48,19 +49,25 @@ const MAX_LINE = 8 * 1024 * 1024;
 const expand = (value: string, env: NodeJS.ProcessEnv) =>
 	value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, name: string) => env[name] ?? "");
 
+/**
+ * The servers to run: the ones Jig sets up by itself (`builtin`), then mcp.json. An entry in the
+ * file replaces a built-in one of the same name; one that only says `"disabled": true` turns the
+ * built-in one off.
+ */
 export function readMcpConfig(
 	jigHome: string,
 	env: NodeJS.ProcessEnv = process.env,
+	builtin: Record<string, McpServerConfig> = {},
 ): Record<string, McpServerConfig> {
 	const file = join(jigHome, "mcp.json");
-	if (!existsSync(file)) return {};
+	if (!existsSync(file)) return { ...builtin };
 	const parsed = JSON.parse(readFileSync(file, "utf8")) as {
 		mcpServers?: unknown;
 		servers?: unknown;
 	};
 	const servers = parsed.mcpServers ?? parsed.servers;
-	if (!servers || typeof servers !== "object") return {};
-	const configs: Record<string, McpServerConfig> = {};
+	if (!servers || typeof servers !== "object") return { ...builtin };
+	const configs: Record<string, McpServerConfig> = { ...builtin };
 	const strings = (value: unknown) =>
 		value && typeof value === "object"
 			? Object.fromEntries(
@@ -87,6 +94,8 @@ export function readMcpConfig(
 				...(envs ? { env: envs } : {}),
 				...off,
 			};
+		} else if (entry.disabled === true && builtin[name]) {
+			configs[name] = { ...builtin[name], disabled: true };
 		}
 	}
 	return configs;
@@ -348,6 +357,8 @@ export interface McpHubOptions {
 	env?: NodeJS.ProcessEnv;
 	fetch?: typeof fetch;
 	log?: (line: string) => void;
+	/** Servers Jig sets up by itself, run unless mcp.json replaces or disables them. */
+	builtin?: Record<string, McpServerConfig>;
 }
 
 /** The configured servers, connected, and their tools as tools sessions can call. */
@@ -363,6 +374,11 @@ export class McpHub {
 		this.#options = options;
 	}
 
+	/** The servers Jig sets up by itself. */
+	get builtin(): Record<string, McpServerConfig> {
+		return this.#options.builtin ?? {};
+	}
+
 	/** Reads the configuration again when the file changed; connects new servers, stops removed ones. */
 	async refresh(): Promise<void> {
 		const file = join(this.#options.jigHome, "mcp.json");
@@ -372,9 +388,9 @@ export class McpHub {
 			return;
 		}
 		this.#configAt = stamp;
-		let configs: Record<string, McpServerConfig> = {};
+		let configs: Record<string, McpServerConfig> = { ...this.builtin };
 		try {
-			configs = readMcpConfig(this.#options.jigHome, this.#options.env);
+			configs = readMcpConfig(this.#options.jigHome, this.#options.env, this.builtin);
 		} catch (error) {
 			this.#options.log?.(`mcp: mcp.json could not be read: ${(error as Error).message}`);
 		}

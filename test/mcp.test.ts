@@ -3,7 +3,10 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { JigError } from "../src/server/errors.ts";
 import { McpHub, readMcpConfig } from "../src/server/mcp.ts";
+import { BUILTIN_VERSIONS, builtinMcp } from "../src/server/mcp-builtin.ts";
+import { listMcpEntries, patchMcpEntry, removeMcpEntry } from "../src/server/mcp-config.ts";
 import type { ToolContext } from "../src/server/tools/types.ts";
 import type { JsonObject } from "../src/shared/messages.ts";
 import type { Session } from "../src/shared/types.ts";
@@ -38,6 +41,75 @@ describe("MCP configuration", () => {
 			search: { url: "https://mcp.example.com/mcp", headers: { Authorization: "Bearer t0" } },
 		});
 		assert.deepEqual(readMcpConfig(tempDir("jig-home-")), {});
+	});
+});
+
+describe("servers Jig sets up by itself", () => {
+	const builtin = {
+		browser: { command: "npx", args: ["-y", "a-browser@1.0.0"] },
+		computer: { command: "npx", args: ["-y", "a-computer@1.0.0"] },
+	};
+
+	test("run without anything in mcp.json, beside the person's own", () => {
+		assert.deepEqual(readMcpConfig(tempDir("jig-home-"), {}, builtin), builtin);
+		const jigHome = home({ files: { command: "node", args: ["server.js"] } });
+		assert.deepEqual(Object.keys(readMcpConfig(jigHome, {}, builtin)), [
+			"browser",
+			"computer",
+			"files",
+		]);
+		assert.deepEqual(
+			listMcpEntries(jigHome, builtin).map((entry) => [entry.name, entry.builtin, entry.disabled]),
+			[
+				["browser", true, false],
+				["computer", true, false],
+				["files", false, false],
+			],
+		);
+	});
+
+	test("are turned off and on from the settings; the file only records that one is off", () => {
+		const jigHome = tempDir("jig-home-");
+		assert.equal(patchMcpEntry(jigHome, "computer", { disabled: true }, builtin).disabled, true);
+		assert.deepEqual(readMcpConfig(jigHome, {}, builtin).computer, {
+			...builtin.computer,
+			disabled: true,
+		});
+		assert.deepEqual(readMcpConfig(jigHome, {}, builtin).browser, builtin.browser);
+		assert.equal(listMcpEntries(jigHome, builtin)[1]?.disabled, true);
+		assert.equal(patchMcpEntry(jigHome, "computer", { disabled: false }, builtin).disabled, false);
+		assert.deepEqual(readMcpConfig(jigHome, {}, builtin), builtin);
+	});
+
+	test("cannot be removed, and an entry of the same name in mcp.json replaces one", () => {
+		assert.throws(
+			() => removeMcpEntry(tempDir("jig-home-"), "browser", builtin),
+			(e) => e instanceof JigError && e.code === "mcp-builtin",
+		);
+		const jigHome = home({ browser: { command: "node", args: ["my-browser.js"] } });
+		assert.deepEqual(readMcpConfig(jigHome, {}, builtin).browser, {
+			command: "node",
+			args: ["my-browser.js"],
+		});
+		const shown = listMcpEntries(jigHome, builtin).find((entry) => entry.name === "browser");
+		assert.deepEqual([shown?.builtin, shown?.command], [false, "node"]);
+		// The person's own entry is theirs to remove; Jig's own then comes back.
+		removeMcpEntry(jigHome, "browser", builtin);
+		assert.deepEqual(readMcpConfig(jigHome, {}, builtin).browser, builtin.browser);
+	});
+
+	test("are started at exact versions, with the browser's profile in Jig's data folder", () => {
+		const servers = builtinMcp("/data/jig", {});
+		assert.deepEqual(servers.browser?.args, [
+			"-y",
+			BUILTIN_VERSIONS.browser,
+			"--user-data-dir",
+			"/data/jig/browser",
+			"--output-dir",
+			"/data/jig/tmp/browser",
+		]);
+		for (const spec of Object.values(BUILTIN_VERSIONS)) assert.match(spec, /@\d+\.\d+\.\d+$/);
+		assert.deepEqual(builtinMcp("/data/jig", { JIG_MCP_BUILTIN: "off" }), {});
 	});
 });
 

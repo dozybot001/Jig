@@ -22,6 +22,8 @@ const MAX_VALUE = 8192;
 export interface McpEntryView {
 	name: string;
 	kind: "stdio" | "http";
+	/** Set up by Jig itself, not written in mcp.json: it can be turned off, not removed. */
+	builtin: boolean;
 	disabled: boolean;
 	command: string | null;
 	args: string[];
@@ -111,6 +113,7 @@ function view(name: string, entry: Raw): McpEntryView | null {
 		return {
 			name,
 			kind: "http",
+			builtin: false,
 			disabled,
 			command: null,
 			args: [],
@@ -123,6 +126,7 @@ function view(name: string, entry: Raw): McpEntryView | null {
 		return {
 			name,
 			kind: "stdio",
+			builtin: false,
 			disabled,
 			command: entry.command,
 			args: Array.isArray(entry.args) ? entry.args.filter((arg) => typeof arg === "string") : [],
@@ -134,13 +138,39 @@ function view(name: string, entry: Raw): McpEntryView | null {
 	return null;
 }
 
-/** The servers Jig reads from the file, in the file's order. */
-export function listMcpEntries(jigHome: string): McpEntryView[] {
+/** What Jig sets up by itself, by name: how each server is started. */
+export type BuiltinServers = Record<string, { command?: string; args?: string[] }>;
+
+/** A built-in server as the settings show it; `off` when mcp.json turns it off. */
+function builtinView(name: string, builtin: BuiltinServers, off: boolean): McpEntryView {
+	return {
+		name,
+		kind: "stdio",
+		builtin: true,
+		disabled: off,
+		command: builtin[name]?.command ?? null,
+		args: builtin[name]?.args ?? [],
+		envNames: [],
+		url: null,
+		headerNames: [],
+	};
+}
+
+/** In mcp.json a built-in server is either replaced by a full entry or turned off by `disabled`. */
+const turnsOff = (entry: unknown): boolean =>
+	isObject(entry) && entry.disabled === true && !view("x", entry);
+
+/** The servers Jig runs: its own first, then the file's in the file's order. */
+export function listMcpEntries(jigHome: string, builtin: BuiltinServers = {}): McpEntryView[] {
 	const { servers } = readFile(jigHome);
-	return Object.entries(servers).flatMap(([name, entry]) => {
+	const own = Object.keys(builtin)
+		.filter((name) => !Object.hasOwn(servers, name) || turnsOff(servers[name]))
+		.map((name) => builtinView(name, builtin, turnsOff(servers[name])));
+	const written = Object.entries(servers).flatMap(([name, entry]) => {
 		const shown = MCP_NAME.test(name) && isObject(entry) ? view(name, entry) : null;
 		return shown ? [shown] : [];
 	});
+	return [...own, ...written];
 }
 
 function checkValues(
@@ -217,8 +247,23 @@ function entryOf(servers: Raw, name: string): Raw {
 	return entry;
 }
 
-export function patchMcpEntry(jigHome: string, name: string, patch: McpServerPatch): McpEntryView {
+export function patchMcpEntry(
+	jigHome: string,
+	name: string,
+	patch: McpServerPatch,
+	builtin: BuiltinServers = {},
+): McpEntryView {
 	const { doc, servers } = readFile(jigHome);
+	if (builtin[name] && (!Object.hasOwn(servers, name) || turnsOff(servers[name]))) {
+		// One of Jig's own: the file only records that it is off.
+		if (patch.env || patch.headers) {
+			throw invalid("A server Jig sets up by itself has no variables to set.", "env");
+		}
+		if (patch.disabled === true) servers[name] = { disabled: true };
+		else if (patch.disabled === false) delete servers[name];
+		if (patch.disabled !== undefined) writeFile(jigHome, doc);
+		return builtinView(name, builtin, turnsOff(servers[name]));
+	}
 	const entry = entryOf(servers, name);
 	const http = typeof entry.url === "string";
 	if (patch.disabled === true) entry.disabled = true;
@@ -248,8 +293,15 @@ export function patchMcpEntry(jigHome: string, name: string, patch: McpServerPat
 	return view(name, entry) as McpEntryView;
 }
 
-export function removeMcpEntry(jigHome: string, name: string): void {
+export function removeMcpEntry(jigHome: string, name: string, builtin: BuiltinServers = {}): void {
 	const { doc, servers } = readFile(jigHome);
+	if (builtin[name] && (!Object.hasOwn(servers, name) || turnsOff(servers[name]))) {
+		throw conflict(
+			`${name} is set up by Jig itself. It can be turned off, not removed.`,
+			undefined,
+			"mcp-builtin",
+		);
+	}
 	entryOf(servers, name);
 	delete servers[name];
 	writeFile(jigHome, doc);

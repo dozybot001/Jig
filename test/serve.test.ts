@@ -25,7 +25,8 @@ describe("jig serve", () => {
 		const home = tempDir("jig-serve-");
 		const port = await freePort();
 		const child = spawn(process.execPath, [main, "serve", "--port", String(port)], {
-			env: { ...process.env, JIG_HOME: home, NO_COLOR: "1" },
+			// The servers Jig sets up by itself are fetched with npx: not in a test.
+			env: { ...process.env, JIG_HOME: home, NO_COLOR: "1", JIG_MCP_BUILTIN: "off" },
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 		let stdout = "";

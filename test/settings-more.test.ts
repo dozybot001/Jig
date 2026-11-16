@@ -223,6 +223,7 @@ describe("settings: MCP servers", () => {
 				{
 					name: "test",
 					kind: "stdio",
+					builtin: false,
 					disabled: false,
 					command: process.execPath,
 					args: [mcpServer],
@@ -319,6 +320,7 @@ describe("settings: MCP servers", () => {
 				{
 					name: "remote",
 					kind: "http",
+					builtin: false,
 					disabled: true,
 					command: null,
 					args: [],

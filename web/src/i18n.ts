@@ -800,6 +800,13 @@ const zh = {
 	mcpTitle: "MCP 服务",
 	mcpHelp:
 		"MCP 服务给会话增加工具。服务记在 Jig 数据目录的 mcp.json 里；会话第一次用某个服务的工具前会先问你。用命令添加的服务是在这台电脑上运行的程序，只添加你信得过的。",
+	mcpBuiltin: "Jig 自带",
+	mcpBuiltin_browser: "浏览器",
+	mcpBuiltinHelp_browser:
+		"会话可以打开网页、点击和填写。它开一个单独的 Chrome 窗口，在里面登录过的网站会一直保持登录，记录存在 Jig 的数据目录里，和你平时用的 Chrome 分开。由微软的 Playwright MCP 提供，第一次启动时用 npx 从 npm 下载。",
+	mcpBuiltin_computer: "电脑操控",
+	mcpBuiltinHelp_computer:
+		"会话可以看屏幕截图、移动鼠标、敲键盘，能操作这台电脑上的任何程序。第一次用时 macOS 会请你给运行 Jig 的程序「屏幕录制」和「辅助功能」权限。由开源的 computer-use-mcp 提供，第一次启动时用 npx 从 npm 下载。",
 	mcpAdded: "已添加的服务",
 	mcpNone: "还没有 MCP 服务。",
 	mcpAdd: "添加服务",
@@ -1712,6 +1719,13 @@ const en: Record<MessageKey, string> = {
 	mcpTitle: "MCP servers",
 	mcpHelp:
 		"MCP servers give sessions more tools. They are kept in mcp.json in Jig's data folder; a session asks you before it first uses a server's tools. A server added as a command is a program run on this computer, so add only ones you trust.",
+	mcpBuiltin: "Set up by Jig",
+	mcpBuiltin_browser: "Browser",
+	mcpBuiltinHelp_browser:
+		"Sessions can open pages, click and fill in forms. It opens a Chrome window of its own; sites you sign in to there stay signed in, kept in Jig's data folder and apart from the Chrome you use. Provided by Microsoft's Playwright MCP, fetched from npm with npx the first time it starts.",
+	mcpBuiltin_computer: "Computer control",
+	mcpBuiltinHelp_computer:
+		"Sessions can take screenshots, move the mouse and type, so they can use any program on this computer. The first time, macOS asks you to give the program that runs Jig the Screen Recording and Accessibility permissions. Provided by the open-source computer-use-mcp, fetched from npm with npx the first time it starts.",
 	mcpAdded: "Added servers",
 	mcpNone: "No MCP servers yet.",
 	mcpAdd: "Add server",
