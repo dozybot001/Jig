@@ -16,7 +16,7 @@ import {
 } from "../map-layout.ts";
 import { blockedSessions } from "../progress.ts";
 import { useAppState } from "../state.ts";
-import { ChatIcon, CodeIcon } from "./icons.tsx";
+import { ChatIcon, CodeIcon, RetryIcon } from "./icons.tsx";
 import { SidebarToggle } from "./session.tsx";
 import { Button, ErrorBox } from "./ui.tsx";
 
@@ -155,7 +155,9 @@ export function MapPage() {
 						<>
 							<ErrorBox error={error} />
 							<div>
-								<Button onClick={() => setTries((n) => n + 1)}>{t("retry")}</Button>
+								<Button onClick={() => setTries((n) => n + 1)}>
+									<RetryIcon /> {t("retry")}
+								</Button>
 							</div>
 						</>
 					) : null}

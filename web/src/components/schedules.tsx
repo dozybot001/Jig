@@ -17,7 +17,7 @@ import { ApiError } from "../api.ts";
 import { formatWhen, type MessageKey, t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
 import { ConfirmDialog } from "./dialogs.tsx";
-import { PlayIcon, PlusIcon } from "./icons.tsx";
+import { CheckIcon, PlayIcon, PlusIcon, RenameIcon, TrashIcon } from "./icons.tsx";
 import { SidebarToggle } from "./session.tsx";
 import {
 	Button,
@@ -130,8 +130,11 @@ function ScheduleItem({ schedule, onEdit }: { schedule: Schedule; onEdit: () => 
 					<PlayIcon />
 					{t("scheduleRunNow")}
 				</Button>
-				<Button onClick={onEdit}>{t("edit")}</Button>
+				<Button onClick={onEdit}>
+					<RenameIcon /> {t("edit")}
+				</Button>
 				<Button variant="ghost" onClick={() => setDeleting(true)}>
+					<TrashIcon />
 					{t("delete")}
 				</Button>
 			</div>
@@ -285,6 +288,7 @@ function ScheduleDialog({ schedule, onClose }: { schedule: Schedule | null; onCl
 						disabled={!ready}
 						onClick={() => void save.run()}
 					>
+						<CheckIcon />
 						{schedule ? t("save") : t("create")}
 					</Button>
 				</>

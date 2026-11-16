@@ -72,6 +72,7 @@ export function WorkspaceDialog({
 						disabled={!path.trim()}
 						onClick={() => void create.run()}
 					>
+						<PlusIcon />
 						{t("createWorkspace")}
 					</Button>
 				</>

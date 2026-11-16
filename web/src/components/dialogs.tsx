@@ -13,7 +13,7 @@ import { createGroup, createSession, renameGroup, spentToday, updateSession } fr
 import { ApiError } from "../api.ts";
 import { formatCost, t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
-import { CloseIcon } from "./icons.tsx";
+import { CheckIcon, CloseIcon, PlusIcon } from "./icons.tsx";
 import { ModelPicker } from "./session.tsx";
 import {
 	Button,
@@ -149,6 +149,7 @@ export function NewSessionDialog({
 						disabled={!name.trim()}
 						onClick={() => void create.run()}
 					>
+						<PlusIcon />
 						{t("create")}
 					</Button>
 				</>
@@ -290,6 +291,7 @@ export function SessionSettingsDialog({
 					)}
 					<Button onClick={onClose}>{t("cancel")}</Button>
 					<Button variant="primary" busy={save.busy} onClick={() => void save.run()}>
+						<CheckIcon />
 						{t("save")}
 					</Button>
 				</>
@@ -429,6 +431,7 @@ export function GroupDialog({
 						disabled={!name.trim()}
 						onClick={() => void save.run()}
 					>
+						<CheckIcon />
 						{group ? t("save") : t("create")}
 					</Button>
 				</>

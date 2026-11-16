@@ -11,6 +11,7 @@ import { formatNumber, formatWhen, t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
 import { Markdown } from "./content.tsx";
 import { ConfirmDialog } from "./dialogs.tsx";
+import { TrashIcon } from "./icons.tsx";
 import { SidebarToggle } from "./session.tsx";
 import { Button, ErrorBox, Select, useAction } from "./ui.tsx";
 
@@ -261,6 +262,7 @@ function ArtifactViewer({ artifact }: { artifact: Artifact }) {
 						{t("download")}
 					</a>
 					<Button variant="danger" onClick={() => setDeleting(true)}>
+						<TrashIcon />
 						{t("delete")}
 					</Button>
 				</div>

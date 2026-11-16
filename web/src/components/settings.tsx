@@ -68,9 +68,12 @@ import {
 } from "../state.ts";
 import { ConfirmDialog, cleanAmount } from "./dialogs.tsx";
 import {
+	CheckIcon,
 	ChevronIcon,
 	CloseIcon,
 	DataIcon,
+	ExportIcon,
+	FolderIcon,
 	GearIcon,
 	InfoIcon,
 	JigMark,
@@ -80,10 +83,15 @@ import {
 	PhoneIcon,
 	PlusIcon,
 	PowerIcon,
+	PulseIcon,
+	RenameIcon,
+	RetryIcon,
 	SkillsIcon,
 	SlidersIcon,
 	ThemeIcon,
 	ToolsIcon,
+	TrashIcon,
+	WalletIcon,
 } from "./icons.tsx";
 import { ModelPicker } from "./session.tsx";
 import {
@@ -172,18 +180,21 @@ function KeyRow({
 							disabled={!key.trim()}
 							onClick={() => void save.run()}
 						>
+							<CheckIcon />
 							{t("save")}
 						</Button>
 					</>
 				) : (
 					takesKey && (
 						<Button onClick={() => setEditing(true)}>
+							<KeyIcon />
 							{hasKey ? t("replaceKey") : t("setKey")}
 						</Button>
 					)
 				)}
 				{hasKey && takesKey && !editing && (
 					<Button variant="danger" onClick={() => setConfirming(true)}>
+						<TrashIcon />
 						{t("deleteKey")}
 					</Button>
 				)}
@@ -286,16 +297,19 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
 					<>
 						{usable && (
 							<Button busy={test.busy} title={t("testHint")} onClick={() => void test.run()}>
+								<PulseIcon />
 								{t("testConnection")}
 							</Button>
 						)}
 						{provider.balance && provider.hasKey && (
 							<Button busy={ask.busy} onClick={() => void ask.run()}>
+								<WalletIcon />
 								{t("showBalance")}
 							</Button>
 						)}
 						{provider.custom && (
 							<Button variant="danger" onClick={() => setRemoving(true)}>
+								<TrashIcon />
 								{t("deleteProvider")}
 							</Button>
 						)}
@@ -494,6 +508,7 @@ function CustomProviderForm() {
 								}
 								onClick={() => void save.run()}
 							>
+								<CheckIcon />
 								{t("save")}
 							</Button>
 						</>
@@ -619,6 +634,7 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 						disabled={!dirty}
 						onClick={() => void save.run()}
 					>
+						<CheckIcon />
 						{t("save")}
 					</Button>
 				</>
@@ -966,6 +982,7 @@ function DataDialog({ onClose }: { onClose: () => void }) {
 							{data.reveal && (
 								<div className="setting-control">
 									<Button busy={showHome.busy} onClick={() => void showHome.run()}>
+										<FolderIcon />
 										{revealLabel}
 									</Button>
 								</div>
@@ -1006,6 +1023,7 @@ function DataDialog({ onClose }: { onClose: () => void }) {
 							</div>
 							<div className="setting-control">
 								<Button busy={pick.busy} onClick={() => void pick.run()}>
+									<ExportIcon />
 									{t("dataExportButton")}
 								</Button>
 							</div>
@@ -1031,6 +1049,7 @@ function DataDialog({ onClose }: { onClose: () => void }) {
 										disabled={!typed.trim()}
 										onClick={() => void exportTyped.run()}
 									>
+										<ExportIcon />
 										{t("dataExportTyped")}
 									</Button>
 								</div>
@@ -1044,6 +1063,7 @@ function DataDialog({ onClose }: { onClose: () => void }) {
 								{data.reveal && (
 									<div className="setting-control">
 										<Button busy={showExport.busy} onClick={() => void showExport.run()}>
+											<FolderIcon />
 											{revealLabel}
 										</Button>
 									</div>
@@ -1066,6 +1086,7 @@ function DataDialog({ onClose }: { onClose: () => void }) {
 							</div>
 							<div className="setting-control">
 								<Button disabled={temp.removableFiles === 0} onClick={() => setConfirming(true)}>
+									<TrashIcon />
 									{t("dataCleanButton")}
 								</Button>
 							</div>
@@ -1092,6 +1113,7 @@ function DataDialog({ onClose }: { onClose: () => void }) {
 							</div>
 							<div className="setting-control">
 								<Button variant="danger" onClick={() => setDeleting(true)}>
+									<TrashIcon />
 									{t("deleteArchivedButton")}
 								</Button>
 							</div>
@@ -1156,6 +1178,7 @@ function DeleteArchivedDialog({ onClose }: { onClose: () => void }) {
 					<Button onClick={onClose}>{t("cancel")}</Button>
 					{count > 0 && (
 						<Button variant="danger" busy={remove.busy} onClick={() => void remove.run()}>
+							<TrashIcon />
 							{t("deleteArchivedConfirm", { n: count })}
 						</Button>
 					)}
@@ -1246,7 +1269,9 @@ function PhonesDialog({ onClose }: { onClose: () => void }) {
 					}
 				>
 					<code className="relay-url">{remote?.relayUrl ?? settings?.remote.relayUrl}</code>
-					<Button onClick={() => setRelaying(true)}>{t("relayChange")}</Button>
+					<Button onClick={() => setRelaying(true)}>
+						<RenameIcon /> {t("relayChange")}
+					</Button>
 				</SettingRow>
 			</SettingGroup>
 			<SettingGroup title={t("pairedPhones")}>
@@ -1273,6 +1298,7 @@ function PhonesDialog({ onClose }: { onClose: () => void }) {
 							variant="danger"
 							onClick={() => setRemoving({ id: device.id, name: device.name })}
 						>
+							<TrashIcon />
 							{t("removePhone")}
 						</Button>
 					</SettingRow>
@@ -1379,6 +1405,7 @@ function RelayDialog({
 						disabled={url.trim() === DEFAULT_RELAY_URL}
 						onClick={() => setUrl(DEFAULT_RELAY_URL)}
 					>
+						<RetryIcon />
 						{t("relayRestore")}
 					</Button>
 					<Button onClick={onClose}>{t("cancel")}</Button>
@@ -1388,6 +1415,7 @@ function RelayDialog({
 						disabled={!url.trim() || url.trim() === current}
 						onClick={() => void save.run()}
 					>
+						<CheckIcon />
 						{t("save")}
 					</Button>
 				</>
@@ -1545,6 +1573,7 @@ function McpAddDialog({
 						disabled={!name.trim() || !(kind === "stdio" ? command.trim() : url.trim())}
 						onClick={() => void add.run()}
 					>
+						<PlusIcon />
 						{t("mcpAdd")}
 					</Button>
 				</>
@@ -1670,11 +1699,13 @@ function McpValue({ name, onSave }: { name: string; onSave: (value: string) => P
 					/>
 					<Button onClick={() => setEditing(false)}>{t("cancel")}</Button>
 					<Button variant="primary" busy={save.busy} onClick={() => void save.run()}>
+						<CheckIcon />
 						{t("save")}
 					</Button>
 				</>
 			) : (
 				<Button variant="ghost" onClick={() => setEditing(true)}>
+					<KeyIcon />
 					{t("mcpReenter")}
 				</Button>
 			)}
@@ -1724,6 +1755,7 @@ function McpServerRow({
 						aria-controls={detailId}
 						onClick={() => setOpen(!open)}
 					>
+						<InfoIcon />
 						{t("mcpDetails")}
 					</Button>
 					<Switch
@@ -1733,6 +1765,7 @@ function McpServerRow({
 						onChange={(value) => void toggle.run(value)}
 					/>
 					<Button variant="danger" onClick={onRemove}>
+						<TrashIcon />
 						{t("mcpRemove")}
 					</Button>
 				</div>
@@ -1903,6 +1936,7 @@ function SkillRow({
 				<div className="setting-control">
 					{reveal && (
 						<Button variant="ghost" busy={show.busy} onClick={() => void show.run()}>
+							<FolderIcon />
 							{t(reveal === "finder" ? "skillRevealFinder" : "skillRevealFiles")}
 						</Button>
 					)}

@@ -3,6 +3,7 @@ import type { UsageDay, UsageDetail, UsageOverview } from "../../../src/shared/t
 import { loadUsage, loadUsageDay, selectSession } from "../actions.ts";
 import { formatCost, formatNumber, getLang, t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
+import { RetryIcon } from "./icons.tsx";
 import { SidebarToggle } from "./session.tsx";
 import { Button, ErrorBox } from "./ui.tsx";
 
@@ -316,7 +317,9 @@ export function UsagePage() {
 						<>
 							<ErrorBox error={error} />
 							<div>
-								<Button onClick={() => setTries((n) => n + 1)}>{t("retry")}</Button>
+								<Button onClick={() => setTries((n) => n + 1)}>
+									<RetryIcon /> {t("retry")}
+								</Button>
 							</div>
 						</>
 					) : null}

@@ -26,6 +26,7 @@ import { NewSessionDialog } from "./dialogs.tsx";
 import {
 	ArrowUpIcon,
 	ChatIcon,
+	CheckIcon,
 	ChevronIcon,
 	CodeIcon,
 	CompactIcon,
@@ -33,11 +34,14 @@ import {
 	MenuIcon,
 	NotesIcon,
 	PlayIcon,
+	RenameIcon,
+	SlidersIcon,
 	StopIcon,
 	TodoActiveIcon,
 	TodoDoneIcon,
 	TodoIcon,
 	TodoPendingIcon,
+	TrashIcon,
 } from "./icons.tsx";
 import { ProgressLine } from "./progress.tsx";
 import { Transcript } from "./transcript.tsx";
@@ -302,12 +306,16 @@ function QueuedItem({ sessionId, id, text }: { sessionId: string; id: string; te
 			)}
 			{editing ? (
 				<Button busy={save.busy} onClick={() => void save.run()}>
+					<CheckIcon />
 					{t("save")}
 				</Button>
 			) : (
-				<Button onClick={() => setEditing(true)}>{t("edit")}</Button>
+				<Button onClick={() => setEditing(true)}>
+					<RenameIcon /> {t("edit")}
+				</Button>
 			)}
 			<Button busy={withdraw.busy} onClick={() => void withdraw.run()}>
+				<TrashIcon />
 				{t("remove")}
 			</Button>
 			<ErrorBox error={save.error ?? withdraw.error} />
@@ -643,6 +651,7 @@ function HomeView() {
 					))}
 				</div>
 				<Button variant="ghost" className="home-more" onClick={() => setDialog(true)}>
+					<SlidersIcon />
 					{t("moreOptions")}
 				</Button>
 				{dialog && <NewSessionDialog onClose={() => setDialog(false)} />}
