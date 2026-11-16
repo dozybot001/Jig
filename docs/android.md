@@ -8,8 +8,8 @@
 
 ### 现状
 
-- 已放出：1.1.1，Releases 上的 `Jig-1.1.1.apk`（7.5）。本机留着同一个文件：`android/build/release/Jig-1.1.1.apk` 和 `SHA256SUMS`（不进 git，`./gradlew clean` 不会删它，但再跑一次 `release.sh` 会）。
-- main 上没有比 1.1.1 新、还没发出去的安卓改动。
+- 已放出：1.2.0，Releases 上的 `Jig-1.2.0.apk`（7.5）。本机留着同一个文件：`android/build/release/Jig-1.2.0.apk` 和 `SHA256SUMS`（不进 git，`./gradlew clean` 不会删它，但再跑一次 `release.sh` 会）。
+- main 上没有比 1.2.0 新、还没发出去的安卓改动。
 - 创始人的 Redmi（序列号 `89DEU8ZDBEB6VWRO`）上装着 Releases 的 1.0.1，已经和他电脑上的 Jig 配对（6.4）。手机上有他的真实数据，没有他明说不装包、不操作。
 - 没有未提交的改动，没有还在跑的模拟器和测试进程。本机多出来的东西：两台模拟器 `jig37`、`jig26`（`~/.android/avd/`，用的是已有镜像）。
 
@@ -372,6 +372,7 @@ English:
 | 1.0.3 | 2026-11-15 | `v1.0.3`，指向 67a5b05 | `1fa774224d3d8247e971619a87a8bc0932474725d325bcfe522d85f6af6f37e9` |
 | 1.1.0 | 2026-11-16 | `v1.1.0`，指向 1e973ec | `6b22dd3ca3a3f44d8d3fd08c80942d84cc196e7c48f39529ca89afd56c0b7d94` |
 | 1.1.1 | 2026-11-16 | `v1.1.1`，指向 1f861da | `be0ae54def251bcc28ea7f59e9f75cb4f2a7ab701998279813c9e0e8b2ac6210` |
+| 1.2.0 | 2026-11-17 | `v1.2.0`，指向 4a3c63c | `d4646618a2e6a26e3b5adf3772b06d25a337ba3c298e83e43d3c06ccc06ecd6c` |
 
 - 地址：https://github.com/dozybot001/Jig/releases/tag/v1.0.1 、https://gitee.com/dozybot/jig/releases/tag/v1.0.1 。就是 7.4 那个候选包，由主开发会话上传；它从两边各下载一次核对过校验值，已告诉安全组。
 - 我另查了 GitHub 这个 Release 的附件信息（没有下载）：`Jig-1.0.1.apk` 2,455,041 字节，GitHub 记的 SHA-256 和上表一致；本地的 `v1.0.1` 标签指向 9920519。Gitee 那边我没有自己核对。
@@ -381,6 +382,7 @@ English:
 - 1.0.3：https://github.com/dozybot001/Jig/releases/tag/v1.0.3 、https://gitee.com/dozybot/jig/releases/tag/v1.0.3 。创始人 11-15：「发 1.0.3」。相对 1.0.2 只改了隐私政策的文字（2.2）和关于页的官网地址，清单、权限、依赖没动，按安全组的规矩先传后报；上传后从两边各下载一次，校验值一致。
 - 1.1.0：https://github.com/dozybot001/Jig/releases/tag/v1.1.0 、https://gitee.com/dozybot/jig/releases/tag/v1.1.0 。创始人 11-16：「发 1.1.0」。安卓端的改动是「关掉 Jig 后继续接收通知」的开关（默认关），动了保持连接的服务，候选包先由安全组验过；上传后从两边各下载一次，校验值一致。开机后的恢复和小米系统上的表现没验。
 - 1.1.1：https://github.com/dozybot001/Jig/releases/tag/v1.1.1 、https://gitee.com/dozybot/jig/releases/tag/v1.1.1 。创始人 11-16：「发布并装上」。修掉关掉 Jig 后留下的常驻通知，开关关着时停用开机接收器、划掉后关闭连接；安全组验过候选包，上传后两边下载核对一致。同一个包装到了创始人的 Redmi 上（他明说的），装后版本 1.1.1、通知栏里那条通知已没有、开机接收器在停用列表里；他划掉后通知是否不再留下，等他看。npm 上没有 1.1.1，电脑端没有变化。
+- 1.2.0：https://github.com/dozybot001/Jig/releases/tag/v1.2.0 、https://gitee.com/dozybot/jig/releases/tag/v1.2.0 。创始人 11-17：「我们发布 1.2」。安卓端和 1.1.1 相比只有隐私政策和用户协议的文字（2.3），清单、权限、依赖、签名和网络代码都没动，按「只改文案」的规则先上传再报安全组。两边下载核对一致（2,455,041 字节）。
 - 以后每次放出照 7.3 出包。安全组 11-15 定：清单、权限、依赖、签名脚本、联网和加密相关的代码有变化，候选包先发它验、等结论再传；只是界面、文案和不碰这些的改动不用等，传完把 SHA-256、提交号和两边下载核对的结果发它备案。
 
 ## 8. 交给别的会话的事
