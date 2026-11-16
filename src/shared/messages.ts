@@ -106,6 +106,11 @@ export type ModelMessage = SystemMessage | UserMessage | AssistantMessage | Tool
 /** Marks where older history was summarized; the model sees `summary` in place of messages before `firstKeptSeq`. */
 export interface CompactionRecord {
 	summary: string;
+	/**
+	 * The latest message from the person (or letter) in the removed part, word for word, when the
+	 * kept part has none: the request still being worked on. A summary only paraphrases it.
+	 */
+	request?: string;
 	firstKeptSeq: number;
 	tokensBefore: number;
 	timestamp: number;

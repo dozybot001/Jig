@@ -2,11 +2,11 @@
  * Keeps what the model is sent in bounds while a session works: a system prompt that stays the same
  * between turns, and a transcript that is summarized when it nears the model's context window.
  */
-import type { JsonObject, Notice } from "../../shared/messages.ts";
+import { type JsonObject, messageText, type Notice } from "../../shared/messages.ts";
 import { type Entry, permissionModeOf, type Session } from "../../shared/types.ts";
 import type { ModelGateway, ModelInfo } from "../model/gateway.ts";
 import type { Store } from "../store.ts";
-import { estimateTokens, transcriptForSummary, usageTotals } from "./context.ts";
+import { estimateTokens, JIG_NOTE, transcriptForSummary, usageTotals } from "./context.ts";
 import {
 	type ContextSnapshot,
 	type InstructionExtras,
@@ -28,9 +28,25 @@ const MAX_COMPACT_AT = 200_000;
 /** What an attempt to shorten the context came to. "nothing": there was nothing older to summarize. */
 export type Compacted = "done" | "nothing" | "failed";
 
-/** Added to the summary request when the cut falls inside a turn: the request being worked on is in the removed part. */
-const MID_TURN =
-	"[From Jig] The transcript above stops in the middle of a turn. The work on the person's latest request goes on right after your summary, so state that request in full and what is left of it.";
+const MAX_REQUEST_CHARS = 20_000;
+
+/** The context size at which a session's history is summarized. */
+function compactAt(session: Session, model: ModelInfo): number {
+	return (
+		session.options.compactAt ?? Math.min(Math.floor(model.contextWindow * 0.8), MAX_COMPACT_AT)
+	);
+}
+
+/** A message from the person or a letter, not one of Jig's own notes to the model. */
+function isRequest(entry: Entry): boolean {
+	return entry.role === "user" && !messageText(entry.message).startsWith(JIG_NOTE);
+}
+
+function clipRequest(text: string): string {
+	return text.length > MAX_REQUEST_CHARS
+		? `${text.slice(0, MAX_REQUEST_CHARS)}\n[cut by Jig: the message was longer]`
+		: text;
+}
 
 /** What a session is told when the person's main conversation changes. */
 function mainUpdate(session: Session, before: SessionRef | null, now: SessionRef | null): string {
@@ -182,17 +198,18 @@ export class ContextKeeper {
 		model: ModelInfo,
 		signal: AbortSignal,
 	): Promise<Compacted> {
-		const threshold =
-			session.options.compactAt ?? Math.min(Math.floor(model.contextWindow * 0.8), MAX_COMPACT_AT);
-		if (session.contextTokens < threshold) return "nothing";
+		if (session.contextTokens < compactAt(session, model)) return "nothing";
 		return this.compact(session, model, signal, false);
 	}
 
 	/**
-	 * Summarizes older history with the session's own model and keeps roughly the last 20,000 tokens.
+	 * Summarizes older history with the session's own model and keeps roughly the last 20,000 tokens
+	 * (less for a model with a small context window, so that what is kept fits well under the limit).
 	 * The kept part starts at a message or at a step of the model, never at a tool result, so a tool
 	 * call is never separated from its result (prior-art 4.4). A turn of hundreds of steps after one
-	 * message is cut inside the turn. The next prompt is built fresh, with a new environment snapshot.
+	 * message is cut inside the turn; the message being worked on is then carried over word for word,
+	 * because a summary only paraphrases it and loses its constraints. The next prompt is built fresh,
+	 * with a new environment snapshot.
 	 */
 	async compact(
 		session: Session,
@@ -201,13 +218,14 @@ export class ContextKeeper {
 		force: boolean,
 	): Promise<Compacted> {
 		const entries = this.#store.contextEntries(session.id);
+		const keep = Math.min(KEEP_RECENT_TOKENS, Math.floor(compactAt(session, model) / 4));
 		let kept = 0;
 		let firstKept: Entry | null = null;
 		for (let i = entries.length - 1; i >= 0; i--) {
 			const entry = entries[i] as Entry;
 			kept += estimateTokens(entry);
 			if (entry.role === "user" || entry.role === "system" || entry.role === "assistant") {
-				if (kept > KEEP_RECENT_TOKENS && firstKept) break;
+				if (kept > keep && firstKept) break;
 				firstKept = entry;
 			}
 		}
@@ -215,7 +233,18 @@ export class ContextKeeper {
 		const older = entries.filter((entry) => entry.seq < (firstKept as Entry).seq);
 		if (older.length === 0 || (!force && older.every((entry) => entry.role === "compaction")))
 			return "nothing";
-		const midTurn = firstKept.role !== "user";
+		const remaining = entries.filter((entry) => entry.seq >= (firstKept as Entry).seq);
+		let request: string | undefined;
+		if (!remaining.some(isRequest)) {
+			const asked = older.findLast(isRequest);
+			const before = older.find((entry) => entry.role === "compaction");
+			request =
+				asked?.role === "user"
+					? clipRequest(messageText(asked.message))
+					: before?.role === "compaction"
+						? before.compaction.request
+						: undefined;
+		}
 
 		this.#store.live(session.id, { type: "draftCleared" });
 		const summary = await this.#gateway.stream({
@@ -226,9 +255,7 @@ export class ContextKeeper {
 			messages: [
 				{
 					role: "user",
-					content: midTurn
-						? `${transcriptForSummary(older)}\n\n${MID_TURN}`
-						: transcriptForSummary(older),
+					content: transcriptForSummary(older),
 					timestamp: Date.now(),
 				},
 			],
@@ -254,12 +281,12 @@ export class ContextKeeper {
 				);
 			return "failed";
 		}
-		const remaining = entries.filter((entry) => entry.seq >= (firstKept as Entry).seq);
 		this.#store.tx(() => {
 			this.#store.appendEntry(session.id, {
 				role: "compaction",
 				compaction: {
 					summary: text,
+					...(request ? { request } : {}),
 					firstKeptSeq: (firstKept as Entry).seq,
 					tokensBefore: session.contextTokens,
 					timestamp: Date.now(),
@@ -277,7 +304,10 @@ export class ContextKeeper {
 			);
 			this.#store.setContextTokens(
 				session.id,
-				remaining.reduce((sum, entry) => sum + estimateTokens(entry), Math.ceil(text.length / 4)),
+				remaining.reduce(
+					(sum, entry) => sum + estimateTokens(entry),
+					Math.ceil((text.length + (request?.length ?? 0)) / 4),
+				),
 			);
 		});
 		return "done";

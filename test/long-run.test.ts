@@ -191,13 +191,21 @@ describe("model requests that fail", () => {
 
 describe("a long turn", () => {
 	/** One message from the person, then `steps` tool calls with large results: a single long turn. */
-	function longTurn(store: ReturnType<typeof setup>["store"], sessionId: string, steps: number) {
-		store.appendEntry(sessionId, {
-			role: "user",
-			message: { role: "user", content: "把仓库里的文件都读一遍", timestamp: 1 },
-		});
+	function longTurn(
+		store: ReturnType<typeof setup>["store"],
+		sessionId: string,
+		steps: number,
+		withMessage = true,
+	) {
+		if (withMessage) {
+			store.appendEntry(sessionId, {
+				role: "user",
+				message: { role: "user", content: "把仓库里的文件都读一遍", timestamp: 1 },
+			});
+		}
+		const batch = `${withMessage ? "a" : "b"}`;
 		for (let i = 0; i < steps; i++) {
-			const call = fauxToolCall("read", { path: `file-${i}.txt` }, { id: `old-${i}` });
+			const call = fauxToolCall("read", { path: `file-${i}.txt` }, { id: `${batch}-${i}` });
 			store.appendEntry(sessionId, {
 				role: "assistant",
 				message: { ...toolUse(call), timestamp: 1 },
@@ -206,7 +214,7 @@ describe("a long turn", () => {
 				role: "toolResult",
 				message: {
 					role: "toolResult",
-					toolCallId: `old-${i}`,
+					toolCallId: `${batch}-${i}`,
 					toolName: "read",
 					content: [{ type: "text", text: `file ${i} `.repeat(3000) }],
 					isError: false,
@@ -221,14 +229,10 @@ describe("a long turn", () => {
 		store.updateSession(session.id, { options: { compactAt: 10_000 } });
 		longTurn(store, session.id, 30);
 		store.setContextTokens(session.id, 200_000);
-		let summaryInput = "";
 		faux.setResponses([
-			(context: unknown) => {
-				summaryInput = JSON.stringify((context as Context).messages);
-				return fauxAssistantMessage("The person asked to read every file; 27 are read.");
-			},
+			fauxAssistantMessage("27 files are read so far."),
 			capture(fauxAssistantMessage("接着读。")),
-		] as never);
+		]);
 		agents.continue(session.id);
 		await agents.whenIdle(session.id);
 
@@ -237,11 +241,13 @@ describe("a long turn", () => {
 		assert.ok(compaction?.role === "compaction", "the context was shortened");
 		const firstKept = entries.find((entry) => entry.seq === compaction.compaction.firstKeptSeq);
 		assert.equal(firstKept?.role, "assistant", "the cut falls at a step, not at the first message");
-		assert.match(summaryInput, /stops in the middle of a turn/);
+		assert.equal(compaction.compaction.request, "把仓库里的文件都读一遍");
 		assert.ok(store.getSession(session.id).contextTokens < 40_000);
 
 		const messages = contexts[0]?.messages.filter((m) => m.role !== "system") ?? [];
-		assert.match(JSON.stringify(messages[0]), /27 are read/);
+		assert.match(JSON.stringify(messages[0]), /27 files are read/);
+		// The request being worked on is carried over word for word, not only as the summary retells it.
+		assert.match(JSON.stringify(messages[0]), /word for word.*把仓库里的文件都读一遍/);
 		assert.ok(messages.length < 20, "most of the old steps are gone");
 		// Every tool result follows the call that made it.
 		const calls = new Set<string>();
@@ -254,6 +260,34 @@ describe("a long turn", () => {
 			if (message.role === "toolResult") assert.ok(calls.has(message.toolCallId ?? ""));
 		}
 		assert.equal(store.getSession(session.id).status, "idle");
+	});
+
+	test("shortened a second time, it still carries the person's message word for word", async () => {
+		const { faux, store, agents, session, contexts, capture } = setup();
+		store.updateSession(session.id, { options: { compactAt: 10_000 } });
+		longTurn(store, session.id, 30);
+		store.setContextTokens(session.id, 200_000);
+		faux.setResponses([fauxAssistantMessage("first summary"), fauxAssistantMessage("接着读。")]);
+		agents.continue(session.id);
+		await agents.whenIdle(session.id);
+
+		longTurn(store, session.id, 30, false);
+		store.setContextTokens(session.id, 200_000);
+		faux.setResponses([
+			fauxAssistantMessage("second summary"),
+			capture(fauxAssistantMessage("读完了。")),
+		]);
+		agents.continue(session.id);
+		await agents.whenIdle(session.id);
+		const compactions = entriesOf(store, session.id).flatMap((entry) =>
+			entry.role === "compaction" ? [entry.compaction] : [],
+		);
+		assert.deepEqual(
+			compactions.map((compaction) => compaction.request),
+			["把仓库里的文件都读一遍", "把仓库里的文件都读一遍"],
+		);
+		const first = contexts[0]?.messages.filter((m) => m.role !== "system")[0];
+		assert.match(JSON.stringify(first), /second summary.*word for word.*把仓库里的文件都读一遍/);
 	});
 
 	test("stops with a reason when the context cannot be shortened", async () => {

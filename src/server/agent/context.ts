@@ -9,6 +9,10 @@ import type { Entry, UsageTotals } from "../../shared/types.ts";
 
 export const SUMMARY_HEADING =
 	"[Summary of the earlier conversation, written by Jig when it shortened the context]";
+export const REQUEST_HEADING =
+	"[The latest message to you before that summary, word for word; it is still what you are working on]";
+/** What Jig puts in front of its own messages to the model, which are stored like the person's. */
+export const JIG_NOTE = "[From Jig, not from the person]";
 
 function placeholder(call: ToolCallBlock, timestamp: number): ToolResultMessage {
 	return {
@@ -39,7 +43,9 @@ export function toModelMessages(entries: Entry[]): ModelMessage[] {
 			case "compaction":
 				out.push({
 					role: "user",
-					content: `${SUMMARY_HEADING}\n\n${entry.compaction.summary}`,
+					content: entry.compaction.request
+						? `${SUMMARY_HEADING}\n\n${entry.compaction.summary}\n\n${REQUEST_HEADING}\n\n${entry.compaction.request}`
+						: `${SUMMARY_HEADING}\n\n${entry.compaction.summary}`,
 					timestamp: entry.compaction.timestamp,
 				});
 				break;
@@ -76,8 +82,10 @@ const TOOL_RESULT_CHARS = 2000;
 export function transcriptForSummary(entries: Entry[]): string {
 	const lines: string[] = [];
 	for (const entry of entries) {
-		if (entry.role === "compaction") lines.push(`## Earlier summary\n${entry.compaction.summary}`);
-		else if (entry.role === "user") lines.push(`## Person\n${messageText(entry.message)}`);
+		if (entry.role === "compaction") {
+			lines.push(`## Earlier summary\n${entry.compaction.summary}`);
+			if (entry.compaction.request) lines.push(`## Person\n${entry.compaction.request}`);
+		} else if (entry.role === "user") lines.push(`## Person\n${messageText(entry.message)}`);
 		else if (entry.role === "system") lines.push(`## Update from Jig\n${entry.message.content}`);
 		else if (entry.role === "assistant") {
 			const text = entry.message.content

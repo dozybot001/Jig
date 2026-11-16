@@ -59,7 +59,7 @@ import {
 	type WaitResult,
 } from "../tools/types.ts";
 import { ContextKeeper, notice } from "./compaction.ts";
-import { sanitizeInterrupted, toModelMessages, usageTotals } from "./context.ts";
+import { JIG_NOTE, sanitizeInterrupted, toModelMessages, usageTotals } from "./context.ts";
 import { Held } from "./held.ts";
 import {
 	type ContextSnapshot,
@@ -1721,7 +1721,7 @@ export class Agents {
 		const notes = this.#notes.get(sessionId) ?? [];
 		this.#notes.delete(sessionId);
 		for (const note of notes) {
-			this.#store.appendEntry(sessionId, userEntry(`[From Jig, not from the person] ${note}`));
+			this.#store.appendEntry(sessionId, userEntry(`${JIG_NOTE} ${note}`));
 		}
 		const turn = this.#turns.get(sessionId);
 		const first = turn ? !turn.started : false;

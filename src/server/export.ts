@@ -8,6 +8,7 @@ import type {
 } from "../shared/messages.ts";
 import { askedQuestion } from "../shared/messages.ts";
 import type { Entry, Session, ToolCallStatus, ToolCallView } from "../shared/types.ts";
+import { JIG_NOTE } from "./agent/context.ts";
 import { dollars } from "./budget.ts";
 
 export type ExportLanguage = "zh" | "en";
@@ -252,7 +253,7 @@ function entryMarkdown(
 		case "user": {
 			const text = userText(entry.message, strings);
 			// Jig's own notes to the model; the interface hides them and shows the matching notice.
-			if (!text || text.startsWith("[From Jig, not from the person]")) return "";
+			if (!text || text.startsWith(JIG_NOTE)) return "";
 			return `## ${strings.you}\n\n${quote(text)}`;
 		}
 		case "assistant":

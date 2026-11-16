@@ -80,7 +80,7 @@
 
 ### 4.4 上下文压缩
 
-- **pi `packages/coding-agent/src/core/compaction/compaction.ts`、`docs/compaction.md`**（MIT）：保留最近约 2 万 token，不在工具调用和它的结果之间切；喂给摘要的工具结果截到 2000 字符；服务商报上下文超长时，压缩后重试一次；压缩记录标出保留部分从哪一条开始。 Jig 的切点是任意一条消息或模型的一步的开头（2026-11-16 起；原先只能切在用户消息处，一条消息后连做几百步时切不了），代码在 `src/server/agent/compaction.ts`。
+- **pi `packages/coding-agent/src/core/compaction/compaction.ts`、`docs/compaction.md`**（MIT）：保留最近约 2 万 token，不在工具调用和它的结果之间切；喂给摘要的工具结果截到 2000 字符；服务商报上下文超长时，压缩后重试一次；压缩记录标出保留部分从哪一条开始。 Jig 的切点是任意一条消息或模型的一步的开头（2026-11-16 起；原先只能切在用户消息处，一条消息后连做几百步时切不了），代码在 `src/server/agent/compaction.ts`。切在一轮中间时，被移走部分里用户最近的那条消息原文存进压缩记录，随摘要一起发给模型（摘要会丢掉原话里的约束；用 `scripts/soak.ts` 对真实模型跑长任务时发现的）。
 - **OpenCode `session/compaction.ts`**（只看思路）：离阈值还差一段时，在后台预先生成摘要，到点直接换上，不让用户等。
 - **Goose `crates/goose/src/context_mgmt/mod.rs`**（只看思路）：比例阈值（默认 80%）之外再设 token 上限，先到哪个算哪个。
 - 各家的阈值：Codex 90%，Kimi Code 85% 且另外留出 5 万，Gemini CLI 50%，Goose 80%。DeepSeek V4 Pro 的窗口是 100 万，只按 80% 要到 80 万 token 才压缩，单次请求很贵，所以 Jig 同时设 token 上限（M1 计划第六节）。
