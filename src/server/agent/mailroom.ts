@@ -17,6 +17,7 @@ import { decisionRef, letterRef, letterText, type ScheduleRef } from "../mail/en
 import { BODY_MAX, type PostOffice, reasonText, SUMMARY_MAX } from "../mail/post.ts";
 import type { ModelGateway } from "../model/gateway.ts";
 import { resolveWorkingFolder } from "../paths.ts";
+import { inheritableRules } from "../permissions/engine.ts";
 import { isInside } from "../permissions/paths.ts";
 import type { ScheduleBook } from "../schedules.ts";
 import { type Store, validateSessionName } from "../store.ts";
@@ -560,7 +561,7 @@ export class Mailroom {
 			provider,
 			model,
 			thinking: parent.thinking,
-			rules: parent.rules,
+			rules: inheritableRules(parent.rules),
 			options: { permissionMode: permissionModeOf(parent.options) },
 			parentId: parent.id,
 		});

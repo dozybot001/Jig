@@ -193,7 +193,7 @@ assistant-ui、ai-elements 不整体引入，只按需参考结构，符合「�
   - 技能清单进系统提示，技能内容不被压缩掉。
   - `allowed-tools` 只当提示，不当放行（规范 21.2 不许规则整体放行）。
 - **MCP**：官方 TypeScript SDK v2（`@modelcontextprotocol/client` 2.4.0，Apache-2.0）作依赖，备选 `@earendil-works/pi-mcp`（MIT）。
-- **自带的 MCP 服务**（2026-11-16，不是依赖，运行时用 npx 按确定版本启动，不复制代码）：浏览器用 microsoft/playwright-mcp（`@playwright/mcp`，Apache-2.0）；电脑操控用 domdomegg/computer-use-mcp（MIT）。比较过的：chrome-devtools-mcp（Apache-2.0，偏调试）；mediar-ai/mcp-server-macos-use（MIT，npm 包里带 posthog 等与功能无关的依赖，不用）。版本写在 `src/server/mcp-builtin.ts`，升级前看它们的更新记录。
+- **自带的 MCP 服务**（2026-11-16，不是 Jig 本身的依赖，不复制代码；整棵依赖树锁在 `mcp-builtin/package-lock.json`，第一次使用时用 `npm ci --ignore-scripts` 装进数据目录）：浏览器用 microsoft/playwright-mcp（`@playwright/mcp`，Apache-2.0）；电脑操控用 domdomegg/computer-use-mcp（MIT）。比较过的：chrome-devtools-mcp（Apache-2.0，偏调试）；mediar-ai/mcp-server-macos-use（MIT，npm 包里带 posthog 等与功能无关的依赖，不用）。版本写在 `mcp-builtin/package.json`，升级时重新生成锁文件、看它们的更新记录，并对 `mcp-builtin` 运行 `npm audit`。2026-11-16 的审计：sharp 的高危（libvips 等）用 `overrides` 固定到已修复的 0.35.5；剩下 8 条中危都是 file-type 在解析恶意构造的文件时死循环（GHSA-5v7r-6r5c-r473），经 jimp 被 nut-js 带入。豁免理由：这里处理的只有本机截下的屏幕图像，没有外来文件；上游修复后随版本升级去掉。
   - 只做 stdio 和 Streamable HTTP。
   - stdio 子进程默认只继承 HOME、LOGNAME、PATH、SHELL、TERM、USER，密钥显式传入；关闭时杀整个进程组。
   - OAuth 令牌按 issuer 分开存进钥匙串，回调地址用 `http://127.0.0.1:<端口>/callback`。

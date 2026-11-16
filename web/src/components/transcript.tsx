@@ -381,6 +381,10 @@ export function PermissionCard({ approval, session }: { approval: Approval; sess
 					onKeyDown={(event) => event.key === "Enter" && void action.run("deny")}
 				/>
 			)}
+			{/* What "always allow" covers for a tool that acts with the person's sign-ins. */}
+			{rules && request.warning === "acts-as-you" && (
+				<p className="hint request-warning">{t("alwaysActsAsYou")}</p>
+			)}
 			{/* Allow, always allow (the rule is in the label), decline. */}
 			<div className="request-actions">
 				<Button variant="primary" busy={action.busy} onClick={() => void action.run("allow_once")}>

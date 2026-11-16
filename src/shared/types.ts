@@ -316,6 +316,8 @@ export type ConfirmReason =
 	| "write-credentials"
 	| "admin"
 	| "write-outside"
+	// An action of the computer control tool: a click or keystroke anywhere on the screen.
+	| "computer-control"
 	// manage_jig changes that widen what a session may do (blueprint 6.2, item 10)
 	| "widen-permission"
 	| "change-folder"
@@ -336,6 +338,11 @@ export interface PermissionRequest {
 	rememberRules?: PermissionRule[];
 	/** Why a must-confirm operation asks every time. */
 	reasons?: ConfirmReason[];
+	/**
+	 * Shown with "always allow": the tool acts in the built-in browser with the person's sign-ins, so
+	 * remembering it also covers sending, paying and deleting there.
+	 */
+	warning?: "acts-as-you";
 	/** The same in English words, on requests saved before the reasons had codes. */
 	reason?: string;
 	/** What the call is for, in the session's words, such as a command's purpose or a task's brief. */

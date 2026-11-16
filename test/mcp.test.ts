@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { JigError } from "../src/server/errors.ts";
 import { McpHub, readMcpConfig } from "../src/server/mcp.ts";
-import { BUILTIN_VERSIONS, builtinMcp } from "../src/server/mcp-builtin.ts";
+import { builtinInstaller, builtinMcp, serverEnv } from "../src/server/mcp-builtin.ts";
 import { listMcpEntries, patchMcpEntry, removeMcpEntry } from "../src/server/mcp-config.ts";
-import type { ToolContext } from "../src/server/tools/types.ts";
+import { inheritableRules, PermissionEngine } from "../src/server/permissions/engine.ts";
+import type { ToolContext, ToolDefinition } from "../src/server/tools/types.ts";
 import type { JsonObject } from "../src/shared/messages.ts";
 import type { Session } from "../src/shared/types.ts";
 import { tempDir } from "./helpers/store.ts";
@@ -98,18 +99,178 @@ describe("servers Jig sets up by itself", () => {
 		assert.deepEqual(readMcpConfig(jigHome, {}, builtin).browser, builtin.browser);
 	});
 
-	test("are started at exact versions, with the browser's profile in Jig's data folder", () => {
+	test("are pinned by a lock file that ships with Jig: every package has its hash", () => {
+		const root = fileURLToPath(new URL("../mcp-builtin/", import.meta.url));
+		const wanted = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+			dependencies: Record<string, string>;
+		};
+		for (const version of Object.values(wanted.dependencies))
+			assert.match(version, /^\d+\.\d+\.\d+$/);
+		const lock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8")) as {
+			packages: Record<string, { integrity?: string; version?: string }>;
+		};
+		const packages = Object.entries(lock.packages).filter(([path]) => path !== "");
+		assert.ok(packages.length > 50);
+		for (const [path, entry] of packages) {
+			assert.match(entry.integrity ?? "", /^sha512-/, path);
+			assert.match(entry.version ?? "", /^\d+\.\d+\.\d+/, path);
+		}
+		const pkg = JSON.parse(readFileSync(join(root, "..", "package.json"), "utf8")) as {
+			files: string[];
+		};
+		assert.ok(pkg.files.includes("mcp-builtin"), "the lock file goes out with the package");
+	});
+
+	test("are started with node from Jig's data folder, with their files kept there", () => {
 		const servers = builtinMcp("/data/jig", {});
+		assert.equal(servers.browser?.command, process.execPath);
 		assert.deepEqual(servers.browser?.args, [
-			"-y",
-			BUILTIN_VERSIONS.browser,
+			"/data/jig/mcp-builtin/node_modules/@playwright/mcp/cli.js",
 			"--user-data-dir",
 			"/data/jig/browser",
 			"--output-dir",
 			"/data/jig/tmp/browser",
 		]);
-		for (const spec of Object.values(BUILTIN_VERSIONS)) assert.match(spec, /@\d+\.\d+\.\d+$/);
+		assert.deepEqual(servers.computer?.args, [
+			"/data/jig/mcp-builtin/node_modules/computer-use-mcp/dist/main.js",
+		]);
 		assert.deepEqual(builtinMcp("/data/jig", { JIG_MCP_BUILTIN: "off" }), {});
+	});
+
+	test("are installed once per lock file, and again after a failure or a new lock", async () => {
+		const jigHome = tempDir("jig-home-");
+		const source = tempDir("jig-source-");
+		writeFileSync(join(source, "package.json"), "{}");
+		writeFileSync(join(source, "package-lock.json"), '{"v":1}');
+		const runs: string[] = [];
+		let fail = true;
+		const prepare = builtinInstaller({
+			jigHome,
+			source,
+			env: { PATH: "/bin", OPENAI_API_KEY: "sk-not-passed" },
+			install: async (folder, env) => {
+				runs.push(readFileSync(join(folder, "package-lock.json"), "utf8"));
+				assert.deepEqual(env, { PATH: "/bin" });
+				if (fail) throw new Error("no network");
+			},
+		});
+		await assert.rejects(prepare(), /no network/);
+		fail = false;
+		await Promise.all([prepare(), prepare()]);
+		await prepare();
+		assert.equal(runs.length, 2, "once failed, once done; then nothing");
+		writeFileSync(join(source, "package-lock.json"), '{"v":2}');
+		await prepare();
+		assert.deepEqual(runs.at(-1), '{"v":2}');
+	});
+
+	test("get little of Jig's environment", () => {
+		assert.deepEqual(
+			serverEnv({
+				PATH: "/bin",
+				HOME: "/h",
+				HTTPS_PROXY: "http://p",
+				ANTHROPIC_API_KEY: "x",
+				AWS_SECRET: "y",
+			}),
+			{ PATH: "/bin", HOME: "/h", HTTPS_PROXY: "http://p" },
+		);
+	});
+
+	test("a failed install is the servers' error, and the person's own servers still start", async () => {
+		const jigHome = home({ mine: { command: "node", args: [server] } });
+		const hub = new McpHub({
+			jigHome,
+			version: "0.0.0",
+			log: () => {},
+			builtin: { browser: { command: "node", args: ["nowhere.js"], ownEnv: true } },
+			prepare: async () => {
+				throw new Error("npm ci failed (1): no network");
+			},
+		});
+		try {
+			await hub.refresh();
+			const status = Object.fromEntries(hub.status().map((s) => [s.name, [s.state, s.error]]));
+			assert.deepEqual(status.browser, ["error", "npm ci failed (1): no network"]);
+			assert.equal(status.mine?.[0], "ready");
+		} finally {
+			hub.stop();
+		}
+	});
+});
+
+describe("the browser and computer control", () => {
+	const engine = new PermissionEngine(tempDir("jig-home-"));
+	const session = (rules: Session["rules"], mode: "skip" | "auto" = "skip") =>
+		({ id: "s1", cwd: null, rules, options: { permissionMode: mode } }) as unknown as Session;
+	async function tools(name: string) {
+		const hub = new McpHub({
+			jigHome: home({ [name]: { command: "node", args: [server] } }),
+			version: "0.0.0",
+			log: () => {},
+		});
+		await hub.refresh();
+		const echo = hub.tools().find((tool) => tool.name === `mcp__${name}__echo`);
+		assert.ok(echo);
+		return { hub, echo };
+	}
+	const lookup = {} as Parameters<ToolDefinition["subject"]>[2];
+
+	test("an action of computer control is asked about every time and cannot be remembered", async () => {
+		const { hub, echo } = await tools("computer");
+		try {
+			const allowed = session([{ effect: "allow", tool: "mcp__computer__echo" }]);
+			for (const action of ["left_click", "type", "key", "scroll", "mouse_move", "something_new"]) {
+				const decision = engine.decide(echo.subject({ action }, allowed, lookup), allowed);
+				assert.equal(decision.effect, "ask", action);
+				if (decision.effect !== "ask") continue;
+				assert.equal(decision.request.mustConfirm, true, action);
+				assert.deepEqual(decision.request.reasons, ["computer-control"]);
+				assert.equal(decision.request.rememberRules, undefined);
+			}
+			// Looking can be remembered, and a remembered rule then covers looking only.
+			const fresh = session([]);
+			const look = engine.decide(echo.subject({ action: "get_screenshot" }, fresh, lookup), fresh);
+			assert.ok(look.effect === "ask" && look.request.rememberRules?.length === 1);
+			assert.equal(
+				engine.decide(echo.subject({ action: "get_screenshot" }, allowed, lookup), allowed).effect,
+				"allow",
+			);
+		} finally {
+			hub.stop();
+		}
+	});
+
+	test("an action in the browser can be remembered, with a warning about what that covers", async () => {
+		const { hub, echo } = await tools("browser");
+		try {
+			const fresh = session([]);
+			const decision = engine.decide(echo.subject({}, fresh, lookup), fresh);
+			assert.ok(decision.effect === "ask");
+			assert.equal(decision.request.warning, "acts-as-you");
+			assert.equal(decision.request.rememberRules?.length, 1);
+		} finally {
+			hub.stop();
+		}
+		const other = await tools("files");
+		try {
+			const fresh = session([]);
+			const decision = engine.decide(other.echo.subject({}, fresh, lookup), fresh);
+			assert.ok(decision.effect === "ask" && decision.request.warning === undefined);
+		} finally {
+			other.hub.stop();
+		}
+	});
+
+	test("always-allow for these tools is not taken over by a new session", () => {
+		const rules: Session["rules"] = [
+			{ effect: "allow", tool: "mcp__browser__browser_click" },
+			{ effect: "allow", tool: "mcp__computer__computer" },
+			{ effect: "deny", tool: "mcp__browser__browser_evaluate" },
+			{ effect: "allow", tool: "mcp__files__read" },
+			{ effect: "allow", tool: "shell", pattern: "npm test" },
+		];
+		assert.deepEqual(inheritableRules(rules), rules.slice(2));
 	});
 });
 

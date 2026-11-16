@@ -254,6 +254,9 @@ const zh = {
 	confirm_credentials: "涉及密钥或 Jig 自己的数据",
 	"confirm_write-credentials": "写入密钥所在的位置",
 	confirm_admin: "用管理员权限运行",
+	"confirm_computer-control": "操作整个屏幕（点击、输入或按键），每次都要你确认",
+	alwaysActsAsYou:
+		"选「总是允许」后，本会话内这个工具的所有调用都不再问，包括在自带浏览器里以你的登录身份发送、付款、删除这类操作。",
 	"confirm_write-outside": "改动工作区外的文件",
 	"confirm_widen-permission": "调高会话的授权方式",
 	"confirm_change-folder": "改会话的工作区",
@@ -803,10 +806,10 @@ const zh = {
 	mcpBuiltin: "Jig 自带",
 	mcpBuiltin_browser: "浏览器",
 	mcpBuiltinHelp_browser:
-		"会话可以打开网页、点击和填写。它开一个单独的 Chrome 窗口，在里面登录过的网站会一直保持登录，记录存在 Jig 的数据目录里，和你平时用的 Chrome 分开。由微软的 Playwright MCP 提供，第一次启动时用 npx 从 npm 下载。",
+		"会话可以打开网页、点击和填写。它开一个单独的 Chrome 窗口，在里面登录过的网站会一直保持登录，记录存在 Jig 的数据目录里，和你平时用的 Chrome 分开。由微软的 Playwright MCP 提供，第一次使用时从 npm 安装到 Jig 的数据目录。它的点击、输入可以选「总是允许」，只在当前会话有效。",
 	mcpBuiltin_computer: "电脑操控",
 	mcpBuiltinHelp_computer:
-		"会话可以看屏幕截图、移动鼠标、敲键盘，能操作这台电脑上的任何程序。第一次用时 macOS 会请你给运行 Jig 的程序「屏幕录制」和「辅助功能」权限。由开源的 computer-use-mcp 提供，第一次启动时用 npx 从 npm 下载。",
+		"会话可以看屏幕截图、移动鼠标、敲键盘，能操作这台电脑上的任何程序。第一次用时 macOS 会请你给运行 Jig 的程序「屏幕录制」和「辅助功能」权限。由开源的 computer-use-mcp 提供，第一次使用时从 npm 安装到 Jig 的数据目录。它能越过 Jig 的其他授权规则，所以点击、输入和按键每一次都要你确认，不能选「总是允许」。",
 	mcpAdded: "已添加的服务",
 	mcpNone: "还没有 MCP 服务。",
 	mcpAdd: "添加服务",
@@ -1152,6 +1155,10 @@ const en: Record<MessageKey, string> = {
 	confirm_credentials: "Touch credentials or Jig's own data",
 	"confirm_write-credentials": "Write where credentials live",
 	confirm_admin: "Run as administrator",
+	"confirm_computer-control":
+		"Act on the whole screen (click, type or press keys); asked every time",
+	alwaysActsAsYou:
+		"With Always allow, no call of this tool in this session is asked about again, including sending, paying and deleting in the built-in browser with your sign-ins.",
 	"confirm_write-outside": "Change files outside the working folder",
 	"confirm_widen-permission": "Raise a session's permission mode",
 	"confirm_change-folder": "Change a session's working folder",
@@ -1722,10 +1729,10 @@ const en: Record<MessageKey, string> = {
 	mcpBuiltin: "Set up by Jig",
 	mcpBuiltin_browser: "Browser",
 	mcpBuiltinHelp_browser:
-		"Sessions can open pages, click and fill in forms. It opens a Chrome window of its own; sites you sign in to there stay signed in, kept in Jig's data folder and apart from the Chrome you use. Provided by Microsoft's Playwright MCP, fetched from npm with npx the first time it starts.",
+		"Sessions can open pages, click and fill in forms. It opens a Chrome window of its own; sites you sign in to there stay signed in, kept in Jig's data folder and apart from the Chrome you use. Provided by Microsoft's Playwright MCP, installed from npm into Jig's data folder the first time it is used. Its clicks and typing can be set to Always allow, for the current session only.",
 	mcpBuiltin_computer: "Computer control",
 	mcpBuiltinHelp_computer:
-		"Sessions can take screenshots, move the mouse and type, so they can use any program on this computer. The first time, macOS asks you to give the program that runs Jig the Screen Recording and Accessibility permissions. Provided by the open-source computer-use-mcp, fetched from npm with npx the first time it starts.",
+		"Sessions can take screenshots, move the mouse and type, so they can use any program on this computer. The first time, macOS asks you to give the program that runs Jig the Screen Recording and Accessibility permissions. Provided by the open-source computer-use-mcp, installed from npm into Jig's data folder the first time it is used. It can get past Jig's other permission rules, so every click, keystroke and typed text is confirmed by you; Always allow is not offered.",
 	mcpAdded: "Added servers",
 	mcpNone: "No MCP servers yet.",
 	mcpAdd: "Add server",

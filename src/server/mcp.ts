@@ -2,6 +2,8 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { ImageBlock, JsonObject, TextBlock } from "../shared/messages.ts";
+import type { ConfirmReason } from "../shared/types.ts";
+import { serverEnv } from "./mcp-builtin.ts";
 import { errorResult, type ToolDefinition, type ToolResult, text } from "./tools/types.ts";
 
 /**
@@ -21,6 +23,50 @@ export interface McpServerConfig {
 	headers?: Record<string, string>;
 	/** `"disabled": true` in mcp.json: the server stays in the file and is not started. */
 	disabled?: boolean;
+	/** One of Jig's own servers: it gets a small part of Jig's environment, not all of it. */
+	ownEnv?: boolean;
+}
+
+/** What the computer control tool does without changing anything. */
+const COMPUTER_READS = new Set(["get_screenshot", "get_cursor_position"]);
+/** What the browser's tools do without acting on a page; any other tool of it acts. */
+const BROWSER_READS = new Set([
+	"browser_snapshot",
+	"browser_take_screenshot",
+	"browser_console_messages",
+	"browser_network_requests",
+	"browser_network_request",
+	"browser_tabs",
+	"browser_find",
+	"browser_wait_for",
+	"browser_resize",
+	"browser_emulate_media",
+	"browser_hover",
+	"browser_navigate",
+	"browser_navigate_back",
+	"browser_close",
+]);
+
+/**
+ * What is special about a call to the servers named "browser" and "computer", Jig's own or the
+ * person's replacement of them (security review, 2026-11-16).
+ *
+ * - Computer control acts on the whole screen: it can type into a terminal or click in the person's
+ *   own browser, past every rule Jig has. Each action is asked about, cannot be remembered, and an
+ *   earlier "always allow" does not cover it. Looking (a screenshot, the pointer's place) can be.
+ * - The browser acts only in its own window, so its actions can be remembered, with the scope said.
+ */
+function special(
+	server: string,
+	tool: string,
+	args: JsonObject,
+): { reasons?: ConfirmReason[]; warning?: "acts-as-you" } {
+	if (server === "computer") {
+		const action = typeof args.action === "string" ? args.action : "";
+		return COMPUTER_READS.has(action) ? {} : { reasons: ["computer-control"] };
+	}
+	if (server === "browser" && !BROWSER_READS.has(tool)) return { warning: "acts-as-you" };
+	return {};
 }
 
 export interface McpToolInfo {
@@ -119,7 +165,7 @@ class StdioTransport implements Transport {
 
 	constructor(config: McpServerConfig, env: NodeJS.ProcessEnv) {
 		this.#child = spawn(config.command as string, config.args ?? [], {
-			env: { ...env, ...config.env },
+			env: { ...(config.ownEnv ? serverEnv(env) : env), ...config.env },
 			stdio: ["pipe", "pipe", "pipe"],
 		});
 		this.#child.stdout.setEncoding("utf8");
@@ -359,6 +405,8 @@ export interface McpHubOptions {
 	log?: (line: string) => void;
 	/** Servers Jig sets up by itself, run unless mcp.json replaces or disables them. */
 	builtin?: Record<string, McpServerConfig>;
+	/** Installs Jig's own servers if they are not yet; awaited before one of them is started. */
+	prepare?: () => Promise<void>;
 }
 
 /** The configured servers, connected, and their tools as tools sessions can call. */
@@ -417,7 +465,15 @@ export class McpHub {
 				.map(async ([name, config]) => {
 					const server = new Server(name, config);
 					this.#servers.set(name, server);
-					await server.connect(make, this.#options.version);
+					if (config.ownEnv && !config.disabled && this.#options.prepare) {
+						try {
+							await this.#options.prepare();
+						} catch (error) {
+							server.state = "error";
+							server.error = (error as Error).message;
+						}
+					}
+					if (server.state !== "error") await server.connect(make, this.#options.version);
 					if (server.error) this.#options.log?.(`mcp: ${name}: ${server.error}`);
 					// Removed or replaced while it was connecting: its tools are not offered.
 					if (this.#servers.get(name) === server) offer();
@@ -476,6 +532,7 @@ export class McpHub {
 					tool: name,
 					summary: `${server.name}: ${tool.name} ${shown.length > 300 ? `${shown.slice(0, 300)}…` : shown}`,
 					always: true,
+					...special(server.name, tool.name, args as JsonObject),
 				};
 			},
 			async run(args, ctx): Promise<ToolResult> {

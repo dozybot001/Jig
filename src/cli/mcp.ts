@@ -43,7 +43,7 @@ export function mcpCommand(): Command {
 			}
 			const { jigHome } = await import("../server/paths.ts");
 			const { McpHub } = await import("../server/mcp.ts");
-			const { builtinMcp } = await import("../server/mcp-builtin.ts");
+			const { builtinInstaller, builtinMcp } = await import("../server/mcp-builtin.ts");
 			const home = jigHome(io.env);
 			const hub = new McpHub({
 				jigHome: home,
@@ -51,6 +51,7 @@ export function mcpCommand(): Command {
 				env: io.env as NodeJS.ProcessEnv,
 				log: () => {},
 				builtin: builtinMcp(home, io.env as NodeJS.ProcessEnv),
+				prepare: builtinInstaller({ jigHome: home, env: io.env as NodeJS.ProcessEnv }),
 			});
 			try {
 				await hub.refresh();

@@ -1,0 +1,14 @@
+{
+	"name": "jig-builtin-mcp",
+	"version": "1.0.0",
+	"private": true,
+	"description": "The MCP servers Jig sets up by itself. Jig installs exactly what package-lock.json names, into its data folder, the first time one is used.",
+	"license": "MIT",
+	"dependencies": {
+		"@playwright/mcp": "0.0.85",
+		"computer-use-mcp": "1.8.0"
+	},
+	"overrides": {
+		"sharp": "0.35.5"
+	}
+}

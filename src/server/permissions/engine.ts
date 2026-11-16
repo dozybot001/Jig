@@ -36,6 +36,8 @@ export type Subject =
 			scope?: string;
 			always?: boolean;
 			reasons?: ConfirmReason[];
+			/** Shown with "always allow" (see PermissionRequest.warning). */
+			warning?: "acts-as-you";
 	  };
 
 export type Decision =
@@ -44,6 +46,17 @@ export type Decision =
 	| { effect: "ask"; request: PermissionRequest };
 
 const SAFE_REDIRECT_TARGETS = new Set(["/dev/null", "/dev/stdout", "/dev/stderr", "&1", "&2", "-"]);
+
+/**
+ * The rules a new session takes over from the one it was opened by or copied from. "Always allow"
+ * for the tools of Jig's own browser and computer control was given for one session, with its scope
+ * said at the time (spec 21.2): it does not travel.
+ */
+export function inheritableRules(rules: PermissionRule[]): PermissionRule[] {
+	return rules.filter(
+		(rule) => !(rule.effect === "allow" && /^mcp__(browser|computer)__/.test(rule.tool)),
+	);
+}
 
 function strongest(effects: RuleEffect[]): RuleEffect | null {
 	if (effects.includes("deny")) return "deny";
@@ -298,7 +311,9 @@ export class PermissionEngine {
 				: { effect: "allow", tool: subject.tool },
 		];
 		if (rule === "ask" || subject.always) {
-			return this.#ask(subject.tool, subject.summary, undefined, remember);
+			const decision = this.#ask(subject.tool, subject.summary, undefined, remember);
+			if (subject.warning && decision.effect === "ask") decision.request.warning = subject.warning;
+			return decision;
 		}
 		return this.#byDefault(session, flagged, subject.tool, subject.summary, remember);
 	}

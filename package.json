@@ -30,6 +30,7 @@
 		"bin",
 		"dist",
 		"web/dist",
+		"mcp-builtin",
 		"THIRD-PARTY-NOTICES.md",
 		"CHANGELOG.md"
 	],

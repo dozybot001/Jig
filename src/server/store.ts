@@ -32,6 +32,7 @@ import { conflict, invalid, notFound } from "./errors.ts";
 import type { BusEvent, EventBus } from "./events.ts";
 import { newId } from "./ids.ts";
 import type { CustomProviderConfig } from "./model/gateway.ts";
+import { inheritableRules } from "./permissions/engine.ts";
 
 export interface NewSession {
 	name: string;
@@ -686,7 +687,7 @@ export class Store {
 				provider: source.provider,
 				model: source.model,
 				thinking: source.thinking,
-				rules: source.rules,
+				rules: inheritableRules(source.rules),
 				options: source.options,
 			});
 			const ids = new Map<string, string>();
