@@ -13,11 +13,13 @@ import {
 	createProvider,
 	getSupportedThinkingLevels,
 	isContextOverflow,
+	isRetryableAssistantError,
 	type ThinkingLevel as LibraryThinkingLevel,
 	type Message,
 	type Model,
 	type MutableModels,
 	type Provider,
+	retryDelayMs,
 	type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
@@ -75,6 +77,67 @@ export interface ModelRequest {
 	signal?: AbortSignal;
 	/** Lets providers that support it route and cache by session. */
 	sessionId?: string;
+	/** Called before each wait when a request failed in a way that may pass and is tried again. */
+	onRetry?: (retry: RetryNote) => void;
+}
+
+/** A failed request that will be tried again: which retry of how many, after how long, and why. */
+export interface RetryNote {
+	attempt: number;
+	of: number;
+	delayMs: number;
+	error: string;
+}
+
+/**
+ * How failed requests are tried again. The waits double from `baseDelayMs` up to a minute, so the
+ * default covers about four minutes of a provider being overloaded or the network being away.
+ */
+export interface RetryOptions {
+	maxRetries: number;
+	baseDelayMs: number;
+}
+
+const DEFAULT_RETRY: RetryOptions = { maxRetries: 8, baseDelayMs: 2000 };
+const MAX_RETRY_DELAY_MS = 60_000;
+/** A response that sends nothing for this long is given up and tried again. */
+const DEFAULT_IDLE_MS = 5 * 60 * 1000;
+
+/** What a request that never answered comes back as. */
+function emptyMessage(model: Model<Api>): AssistantMessage {
+	return {
+		role: "assistant",
+		content: [],
+		api: model.api,
+		provider: model.provider,
+		model: model.id,
+		usage: {
+			input: 0,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			totalTokens: 0,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+		},
+		stopReason: "error",
+		timestamp: Date.now(),
+	};
+}
+
+/** Resolves true after `ms`, or false as soon as the signal aborts. */
+function pause(ms: number, signal?: AbortSignal): Promise<boolean> {
+	return new Promise((resolve) => {
+		if (signal?.aborted) return resolve(false);
+		const stop = () => {
+			clearTimeout(timer);
+			resolve(false);
+		};
+		const timer = setTimeout(() => {
+			signal?.removeEventListener("abort", stop);
+			resolve(true);
+		}, ms);
+		signal?.addEventListener("abort", stop, { once: true });
+	});
 }
 
 /** An OpenAI-compatible endpoint the person adds: another vendor, or a model running locally. */
@@ -228,15 +291,21 @@ export interface GatewayOptions {
 	custom?: CustomProviderConfig[];
 	/** Replaces the built-in providers; tests pass the library's faux provider here. */
 	providers?: Provider[];
+	retry?: RetryOptions;
+	idleMs?: number;
 }
 
 export class ModelGateway {
 	readonly #models: MutableModels;
 	readonly #keys: KeyStore;
 	readonly #custom = new Map<string, CustomProviderConfig>();
+	readonly #retry: RetryOptions;
+	readonly #idleMs: number;
 
 	constructor(options: GatewayOptions) {
 		this.#keys = options.keys;
+		this.#retry = options.retry ?? DEFAULT_RETRY;
+		this.#idleMs = options.idleMs ?? DEFAULT_IDLE_MS;
 		this.#models = createModels({
 			credentials: new KeychainCredentials(options.keys),
 			authContext: NO_AMBIENT_AUTH,
@@ -317,6 +386,10 @@ export class ModelGateway {
 	 * Streams one model response. `onDraft` sees the response so far after each update; it is the same
 	 * object every time and keeps changing, so copy it if you keep it. Resolves with the final message,
 	 * whose stopReason is "error" or "aborted" when the request failed or was stopped.
+	 *
+	 * A failure that may pass (the provider is overloaded or limits the rate, the connection dropped,
+	 * the response stalled) is tried again here, so callers only see a failure that stayed. A context
+	 * that does not fit is not tried again: the caller shortens it.
 	 */
 	async stream(
 		request: ModelRequest,
@@ -337,18 +410,91 @@ export class ModelGateway {
 			messages: request.messages,
 			tools: request.tools,
 		};
-		const options: SimpleStreamOptions = { cacheRetention: "short" };
-		if (request.signal) options.signal = request.signal;
+		// One layer of retries, the one below that the person can see: the provider SDKs' own are off.
+		const options: SimpleStreamOptions = { cacheRetention: "short", maxRetries: 0 };
 		if (request.sessionId) options.sessionId = request.sessionId;
 		if (model.reasoning && request.thinking !== "off") {
 			const level = clampThinkingLevel(model, request.thinking);
 			if (level !== "off") options.reasoning = level as LibraryThinkingLevel;
 		}
-		const stream = this.#models.streamSimple(model, context, options);
-		for await (const event of stream) {
-			if (onDraft && "partial" in event) onDraft(event.partial);
+		for (let attempt = 1; ; attempt++) {
+			const message = await this.#once(model, context, options, request.signal, onDraft);
+			if (
+				message.stopReason !== "error" ||
+				attempt > this.#retry.maxRetries ||
+				isContextOverflow(message, model.contextWindow) ||
+				!isRetryableAssistantError(message)
+			) {
+				return message;
+			}
+			const delayMs = retryDelayMs(
+				{ baseDelayMs: this.#retry.baseDelayMs, maxAgentDelayMs: MAX_RETRY_DELAY_MS },
+				attempt,
+			);
+			request.onRetry?.({
+				attempt,
+				of: this.#retry.maxRetries,
+				delayMs,
+				error: message.errorMessage ?? "",
+			});
+			if (!(await pause(delayMs, request.signal))) {
+				const { errorMessage: _errorMessage, ...rest } = message;
+				return { ...rest, stopReason: "aborted" };
+			}
 		}
-		return await stream.result();
+	}
+
+	/** One request. A response that goes quiet for too long ends as a failure that can be tried again. */
+	async #once(
+		model: Model<Api>,
+		context: Context,
+		options: SimpleStreamOptions,
+		signal: AbortSignal | undefined,
+		onDraft?: (draft: AssistantMessage) => void,
+	): Promise<AssistantMessage> {
+		const quiet = new AbortController();
+		let stalled = false;
+		let timer: ReturnType<typeof setTimeout> | null = null;
+		const watch = () => {
+			if (timer) clearTimeout(timer);
+			timer = setTimeout(() => {
+				stalled = true;
+				quiet.abort();
+			}, this.#idleMs);
+		};
+		watch();
+		try {
+			const stream = this.#models.streamSimple(model, context, {
+				...options,
+				signal: signal ? AbortSignal.any([signal, quiet.signal]) : quiet.signal,
+			});
+			const seen: { draft: AssistantMessage | null } = { draft: null };
+			const read = async () => {
+				for await (const event of stream) {
+					watch();
+					if ("partial" in event) seen.draft = event.partial;
+					if (onDraft && "partial" in event) onDraft(event.partial);
+				}
+				return await stream.result();
+			};
+			// Not every transport ends its stream when it is aborted, so the wait ends here either way.
+			const gaveUp = new Promise<null>((resolve) =>
+				quiet.signal.addEventListener("abort", () => resolve(null), { once: true }),
+			);
+			const reading = read();
+			reading.catch(() => {});
+			const message = await Promise.race([reading, gaveUp]);
+			if (message && (!stalled || signal?.aborted)) return message;
+			if (message && message.stopReason !== "aborted" && message.stopReason !== "error")
+				return message;
+			return {
+				...(message ?? seen.draft ?? emptyMessage(model)),
+				stopReason: "error",
+				errorMessage: `The provider sent nothing for ${Math.round(this.#idleMs / 1000)} seconds (timed out).`,
+			};
+		} finally {
+			if (timer) clearTimeout(timer);
+		}
 	}
 
 	/** True when a failed response means the conversation no longer fits the model's context window. */

@@ -1042,7 +1042,11 @@ function EntryView({ entry }: { entry: Entry }) {
 							? t("notice_compact_failed", { text: notice.text ?? "" })
 							: code === "missing-api-key"
 								? t("err_missingKey", { provider: String(data.provider ?? "") })
-								: t("notice_error_internal");
+								: code === "step-limit"
+									? t("notice_step_limit", { n: Number(data.steps ?? 0) })
+									: code === "output-cut"
+										? t("notice_output_cut")
+										: t("notice_error_internal");
 			} else if (notice.kind === "job_finished") {
 				text = t("notice_job_finished", {
 					job: String(data.job ?? ""),

@@ -5,7 +5,7 @@ import type {
 	ToolResultMessage,
 } from "../../shared/messages.ts";
 import { messageText } from "../../shared/messages.ts";
-import type { Entry } from "../../shared/types.ts";
+import type { Entry, UsageTotals } from "../../shared/types.ts";
 
 export const SUMMARY_HEADING =
 	"[Summary of the earlier conversation, written by Jig when it shortened the context]";
@@ -103,4 +103,16 @@ export function transcriptForSummary(entries: Entry[]): string {
 /** Rough token count (four characters per token), used to choose what compaction keeps. */
 export function estimateTokens(entry: Entry): number {
 	return Math.ceil(JSON.stringify(entry).length / 4);
+}
+
+/** What a response used, as Jig adds it up. */
+export function usageTotals(message: AssistantMessage): UsageTotals {
+	const usage = message.usage;
+	return {
+		input: usage.input,
+		output: usage.output,
+		cacheRead: usage.cacheRead,
+		cacheWrite: usage.cacheWrite,
+		cost: usage.cost.total,
+	};
 }

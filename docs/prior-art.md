@@ -41,7 +41,8 @@
   - `beforeToolCall` 返回 `{block, reason}` 时，生成一条出错的工具结果，拒绝理由由此交给模型。
   - 两种排队：steer 的消息在整批工具结果写回后、下一次请求模型前送达；followUp 的消息等循环停下再送。
   - 打断后，已生成的部分留在记录里（stopReason 为 aborted），发新消息就能接着说。
-  - `packages/agent/test/agent-loop.test.ts`（66 KB）可以当测试用例清单。
+  - `packages/agent/test/agent-loop.test.ts`（66 KB）可以当测试用例清单。2026-11-16 对照过一遍，补上一条：回复在输出上限处被截断时，里面的工具调用一律不执行（参数可能被截断却仍能通过校验），给模型一条出错结果让它重发。Jig 的对应测试在 `test/long-run.test.ts`。
+  - pi-ai 的 `isRetryableAssistantError`、`retryDelayMs`（MIT，作依赖调用）：判断一次失败值不值得重试、算退避时间。Jig 在模型层（`src/server/model/gateway.ts`）用它们做唯一一层重试，服务商 SDK 自带的重试关掉；另加空闲超时，流 5 分钟没有数据就放弃这一次并重试。
 - **OpenCode `packages/core/src/session/inbox.ts`**（MIT，照设计重写）：排队的消息存在表里，分「步骤之间送达」和「空闲时送达」两种。转成正式消息和删除排队记录在同一个事务里完成，重启不丢，也不重复。会话忙时，排队的消息可改可撤。
 - 模型接口要求工具结果紧跟在工具调用后面，所以「两次工具调用之间送达」只能落在一整批结果写回之后。
 - pi 的工具可以声明结果未知时能否重放（`replay`）。Jig 不重做，重启后一律标「待核对」。
@@ -79,7 +80,7 @@
 
 ### 4.4 上下文压缩
 
-- **pi `packages/coding-agent/src/core/compaction/compaction.ts`、`docs/compaction.md`**（MIT）：保留最近约 2 万 token，不在工具调用和它的结果之间切；喂给摘要的工具结果截到 2000 字符；服务商报上下文超长时，压缩后重试一次；压缩记录标出保留部分从哪一条开始。
+- **pi `packages/coding-agent/src/core/compaction/compaction.ts`、`docs/compaction.md`**（MIT）：保留最近约 2 万 token，不在工具调用和它的结果之间切；喂给摘要的工具结果截到 2000 字符；服务商报上下文超长时，压缩后重试一次；压缩记录标出保留部分从哪一条开始。 Jig 的切点是任意一条消息或模型的一步的开头（2026-11-16 起；原先只能切在用户消息处，一条消息后连做几百步时切不了），代码在 `src/server/agent/compaction.ts`。
 - **OpenCode `session/compaction.ts`**（只看思路）：离阈值还差一段时，在后台预先生成摘要，到点直接换上，不让用户等。
 - **Goose `crates/goose/src/context_mgmt/mod.rs`**（只看思路）：比例阈值（默认 80%）之外再设 token 上限，先到哪个算哪个。
 - 各家的阈值：Codex 90%，Kimi Code 85% 且另外留出 5 万，Gemini CLI 50%，Goose 80%。DeepSeek V4 Pro 的窗口是 100 万，只按 80% 要到 80 万 token 才压缩，单次请求很贵，所以 Jig 同时设 token 上限（M1 计划第六节）。

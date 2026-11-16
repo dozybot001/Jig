@@ -15,11 +15,25 @@ import { newStore, tempDir } from "./helpers/store.ts";
 
 type Context = { messages: { role: string; content: unknown; toolsAdded?: { name: string }[] }[] };
 
-function setup(options: { cwd?: boolean; key?: boolean } = {}) {
+function setup(
+	options: {
+		cwd?: boolean;
+		key?: boolean;
+		retry?: { maxRetries: number; baseDelayMs: number };
+		idleMs?: number;
+		maxSteps?: number;
+	} = {},
+) {
 	const faux = fauxProvider();
 	const { store } = newStore();
 	const keys = new MemoryKeyStore(options.key === false ? {} : { [faux.provider.id]: "test-key" });
-	const gateway = new ModelGateway({ keys, version: "0.0.0", providers: [faux.provider] });
+	const gateway = new ModelGateway({
+		keys,
+		version: "0.0.0",
+		providers: [faux.provider],
+		...(options.retry ? { retry: options.retry } : {}),
+		...(options.idleMs ? { idleMs: options.idleMs } : {}),
+	});
 	const home = realpathSync(tempDir("jig-home-"));
 	const cwd = options.cwd === false ? null : realpathSync(tempDir("jig-cwd-"));
 	const agents = new Agents({
@@ -30,6 +44,7 @@ function setup(options: { cwd?: boolean; key?: boolean } = {}) {
 		version: "0.0.0",
 		draftIntervalMs: 0,
 		log: () => {},
+		...(options.maxSteps ? { maxSteps: options.maxSteps } : {}),
 	});
 	const session = store.createSession({
 		name: "test",
@@ -464,7 +479,7 @@ describe("agent loop", () => {
 		assert.ok(compaction?.role === "compaction");
 		const messages = contexts[0]?.messages.filter((m) => m.role !== "system") ?? [];
 		assert.match(textOf(messages[0]), new RegExp(SUMMARY_HEADING.slice(1, 20)));
-		assert.match(textOf(messages[1]), /继续/);
+		assert.match(textOf(messages.at(-1)), /继续/);
 		assert.ok(store.getSession(session.id).contextTokens < 10_000);
 	});
 

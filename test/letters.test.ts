@@ -663,7 +663,7 @@ describe("when things go wrong", () => {
 			fauxAssistantMessage("收到最终结果"),
 		]);
 		script({ name: "子会话甲" } as Session, [
-			fauxAssistantMessage([], { stopReason: "error", errorMessage: "429 rate limited" }),
+			fauxAssistantMessage([], { stopReason: "error", errorMessage: "401 invalid api key" }),
 			fauxAssistantMessage("完成：共 7 个 TODO"),
 		]);
 		agents.send(parent.id, "开子会话");
@@ -689,7 +689,7 @@ describe("when things go wrong", () => {
 			toParent.map((l) => `${l.kind}: ${l.summary}`),
 			["notice: 子会话甲 stopped with an error.", "report: 完成：共 7 个 TODO"],
 		);
-		assert.match(toParent[0]?.body ?? "", /429 rate limited/);
+		assert.match(toParent[0]?.body ?? "", /401 invalid api key/);
 		assert.equal(agents.post.mail.getLetter(brief.id).status, "done");
 	});
 

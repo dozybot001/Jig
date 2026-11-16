@@ -23,7 +23,6 @@ import {
 	type Session,
 	type SessionStatus,
 	type ToolCallView,
-	type UsageTotals,
 } from "../../shared/types.ts";
 import {
 	type BudgetMark,
@@ -59,30 +58,19 @@ import {
 	type ToolResult,
 	type WaitResult,
 } from "../tools/types.ts";
-import {
-	estimateTokens,
-	sanitizeInterrupted,
-	toModelMessages,
-	transcriptForSummary,
-} from "./context.ts";
+import { ContextKeeper, notice } from "./compaction.ts";
+import { sanitizeInterrupted, toModelMessages, usageTotals } from "./context.ts";
+import { Held } from "./held.ts";
 import {
 	type ContextSnapshot,
 	type InstructionExtras,
-	loadInstructions,
-	MAIN_ROLE,
 	NAMING_PROMPT,
 	PERMISSION_MODE,
 	type Placement,
-	renderInstructions,
-	type SessionRef,
-	SUMMARY_PROMPT,
 	systemPrompt,
-	type Told,
-	takeSnapshot,
-	today,
 } from "./prompt.ts";
 
-/** What a session is told when the person's main conversation changes. */
+/** Words a reply uses to offer a next step instead of asking outright. */
 const OFFER =
 	/如需|需要的话|要不要|是否需要|告诉我|说一声|let me know|tell me if|shall i|should i|would you like|do you want/i;
 
@@ -102,17 +90,6 @@ export function askedInReply(text: string): string | null {
 	const end = last.replace(/[\s*_`)\]）」』"'”’]+$/u, "");
 	if (!/[?？]$/.test(end) && !OFFER.test(last)) return null;
 	return last.length > 600 ? `…${last.slice(-600)}` : last;
-}
-
-function mainUpdate(session: Session, before: SessionRef | null, now: SessionRef | null): string {
-	if (now?.id === session.id) return `The person made you their main conversation.\n${MAIN_ROLE}`;
-	if (before?.id === session.id) {
-		return `You are no longer the person's main conversation.${now ? ` Their main conversation is now "${now.name}" (id ${now.id}).` : ""}`;
-	}
-	if (now) {
-		return `The person's main conversation is now "${now.name}" (id ${now.id}). When something needs the person's decision, send it a request; it puts the question in the approval center.`;
-	}
-	return "The person has no main conversation now. When something needs the person's decision, ask them with ask_user.";
 }
 
 type Answer = {
@@ -171,17 +148,24 @@ export interface AgentsOptions {
 	schedules?: ScheduleBook;
 	/** The person's home folder, for `~/.claude` skills and instructions; absent, they are not read. */
 	userHome?: string | null;
+	/** The most model requests one turn makes before Jig stops it; tests lower it. */
+	maxSteps?: number;
 }
 
-const KEEP_RECENT_TOKENS = 20_000;
-const MAX_COMPACT_AT = 200_000;
 const MAX_MESSAGE_CHARS = 100_000;
 const MAX_STEPS = 500;
+/** How many times in a row a reply cut off at the model's output limit is continued by itself. */
+const MAX_CUT_REPLIES = 3;
 /** After this many tool calls without a change to a task list that still has open tasks, Jig reminds the model. */
 const TODO_REMINDER_AFTER = 12;
 /** How long a session waits for another one's answer (blueprint 7.1: one wait, no polling). */
 const WAIT_MS = 30 * 60 * 1000;
 /** The result of a call that was running when Jig stopped (blueprint 7.3). */
+
+const CUT_CALL =
+	"Not run: your reply was cut off at the output limit before its tool calls were complete. Make the call again; write long content in parts.";
+const CUT_TOO_OFTEN = "The reply was cut off at the model's output limit several times in a row.";
+
 const RESTARTED =
 	"Jig restarted while this call was running. It may or may not have finished; check the current state before running it again.";
 
@@ -192,17 +176,6 @@ const userEntry = (text: string): EntryBody => ({
 	role: "user",
 	message: { role: "user", content: text, timestamp: Date.now() },
 });
-
-function totals(message: AssistantMessage): UsageTotals {
-	const usage = message.usage;
-	return {
-		input: usage.input,
-		output: usage.output,
-		cacheRead: usage.cacheRead,
-		cacheWrite: usage.cacheWrite,
-		cost: usage.cost.total,
-	};
-}
 
 /** Tokens the next request starts from: everything sent plus what the model just wrote. */
 function contextSize(message: AssistantMessage): number {
@@ -270,11 +243,14 @@ export class Agents {
 	 * had sent by then, so Jig can tell what it asked after reading a request.
 	 */
 	readonly #turns = new Map<string, Turn>();
-	/** Sessions the person stopped: letters wait until the person writes to them or continues them. */
 	readonly #userHome: string | null;
-	readonly #paused = new Set<string>();
-	/** Sessions that stopped at a daily spending limit, with the day: raising the limit that day continues them. */
-	readonly #capped = new Map<string, string>();
+	/**
+	 * Sessions the person stopped (letters wait until the person writes to them or continues them) and
+	 * sessions that stopped at a daily spending limit (raising the limit that day continues them).
+	 */
+	readonly #held: Held;
+	readonly #maxSteps: number;
+	readonly #context: ContextKeeper;
 	readonly #manager: Manager;
 	/** A session's or team's name by id, for what the person reads on permission cards. */
 	readonly #names = (id: string): string | null => {
@@ -303,6 +279,15 @@ export class Agents {
 		this.schedules = options.schedules ?? new ScheduleBook(options.store);
 		this.#waitMs = options.waitMs ?? WAIT_MS;
 		this.#userHome = options.userHome ?? null;
+		this.#held = new Held(options.store);
+		this.#maxSteps = options.maxSteps ?? MAX_STEPS;
+		this.#context = new ContextKeeper({
+			store: this.#store,
+			gateway: this.#gateway,
+			home: this.#home,
+			placement: (session) => this.#placement(session),
+			extras: () => this.#extras(),
+		});
 		// Memory folders and the person's skill folders are read without asking, like the working folder.
 		this.#permissions.readRoots = () => [
 			...this.#store.getSetting<string[]>("memoryDirs", []),
@@ -356,7 +341,7 @@ export class Agents {
 			throw conflict("This session is archived. Restore it first.", undefined, "session-archived");
 		// The person stepped in: a full quota of letters again, and a new chain of hand-offs (blueprint 7.1).
 		this.#dropReplyQuestions(sessionId);
-		this.#paused.delete(sessionId);
+		this.#held.resume(sessionId);
 		this.#store.resetLettersSent(sessionId);
 		this.#store.addIntervention(sessionId);
 		this.post.resetChain(sessionId);
@@ -378,7 +363,7 @@ export class Agents {
 		if (entries.length === 0)
 			throw conflict("There is nothing to continue yet.", undefined, "nothing-to-continue");
 		this.#dropReplyQuestions(sessionId);
-		this.#paused.delete(sessionId);
+		this.#held.resume(sessionId);
 		// Continuing a session that stopped at a spending limit gives it as much room again for today.
 		grantMore(this.#store, session, Date.now());
 		this.#start(sessionId, { resume: true, byPerson: true });
@@ -388,8 +373,8 @@ export class Agents {
 	stop(sessionId: string): void {
 		const live = this.#live.get(sessionId);
 		if (!live) return;
-		this.#paused.add(sessionId);
-		this.#capped.delete(sessionId);
+		this.#held.pause(sessionId);
+		this.#held.uncap(sessionId);
 		live.controller.abort();
 	}
 
@@ -432,7 +417,7 @@ export class Agents {
 		// Compacting does not change where the session stands: one that needs review or failed still does.
 		const keep = session.status === "needs_review" || session.status === "error";
 		const controller = new AbortController();
-		const done = this.#compact(session, model, controller.signal, true).then(() => {});
+		const done = this.#context.compact(session, model, controller.signal, true).then(() => {});
 		this.#live.set(sessionId, { controller, done, waiters: new Map() });
 		try {
 			this.#store.setStatus(sessionId, "working");
@@ -473,7 +458,7 @@ export class Agents {
 			this.#readStates.delete(id);
 			this.#jobs.get(id)?.stopAll();
 			this.#jobs.delete(id);
-			this.#paused.delete(id);
+			this.#held.forget(id);
 		}
 		if (ids.includes(this.#store.getSetting<string | null>("mainSessionId", null) ?? "")) {
 			this.#store.setSetting("mainSessionId", null);
@@ -555,10 +540,21 @@ export class Agents {
 		let capped: string | null = null;
 		try {
 			let retriedOverflow = false;
+			let cutReplies = 0;
 			if (resume) await this.#resumeCalls(sessionId, live);
 			this.#deliver(sessionId);
-			for (let step = 0; step < MAX_STEPS; step++) {
+			for (let step = 0; ; step++) {
 				if (signal.aborted) break;
+				if (step >= this.#maxSteps) {
+					// Not finished: the person decides whether it goes on.
+					endStatus = "error";
+					detail = `Stopped after ${this.#maxSteps} steps in one turn.`;
+					this.#notice(sessionId, "error", detail, {
+						code: "step-limit",
+						steps: this.#maxSteps,
+					});
+					break;
+				}
 				const session = this.#store.getSession(sessionId);
 				const over = reached(this.#store, session, Date.now());
 				if (over) {
@@ -566,8 +562,15 @@ export class Agents {
 					break;
 				}
 				const model = this.#requireModel(session);
-				const snapshot = this.#refreshContext(session);
-				await this.#compactIfNeeded(session, model, signal);
+				const snapshot = this.#context.refresh(session);
+				if ((await this.#context.compactIfNeeded(session, model, signal)) === "failed") {
+					// Going on would ask for a summary again at every step and end in a context that does not fit.
+					if (!signal.aborted) {
+						endStatus = "error";
+						detail = "The context could not be shortened.";
+					}
+					break;
+				}
 				if (signal.aborted) break;
 
 				const final = await this.#ask(this.#store.getSession(sessionId), model, snapshot, signal);
@@ -581,8 +584,13 @@ export class Agents {
 					.join("\n")
 					.trim();
 				if (said) this.#lastText.set(sessionId, said);
-				this.#store.addUsage(sessionId, totals(final), contextSize(final));
-				for (const mark of crossedWarning(this.#store, session, totals(final).cost, Date.now())) {
+				this.#store.addUsage(sessionId, usageTotals(final), contextSize(final));
+				for (const mark of crossedWarning(
+					this.#store,
+					session,
+					usageTotals(final).cost,
+					Date.now(),
+				)) {
 					this.#budgetNotice(sessionId, "budget-warning", mark);
 				}
 
@@ -596,8 +604,14 @@ export class Agents {
 						this.#gateway.isContextOverflow(final, session.provider, session.model)
 					) {
 						retriedOverflow = true;
-						await this.#compact(this.#store.getSession(sessionId), model, signal, true);
-						continue;
+						const shortened = await this.#context.compact(
+							this.#store.getSession(sessionId),
+							model,
+							signal,
+							true,
+						);
+						if (shortened === "done") continue;
+						if (signal.aborted) break;
 					}
 					endStatus = "error";
 					detail = final.errorMessage ?? "The model request failed.";
@@ -608,6 +622,20 @@ export class Agents {
 					(block): block is ToolCallBlock => block.type === "toolCall",
 				);
 				if (calls.length === 0 || !entry) {
+					if (final.stopReason === "length") {
+						// The reply stopped at the model's output limit, not because the model was done.
+						if (cutReplies >= MAX_CUT_REPLIES) {
+							endStatus = "error";
+							detail = CUT_TOO_OFTEN;
+							this.#notice(sessionId, "error", detail, { code: "output-cut" });
+							break;
+						}
+						cutReplies++;
+						this.#note(
+							sessionId,
+							"Your reply was cut off at the output limit. Go on from where it stopped; write long content to a file in parts.",
+						);
+					}
 					// The model is done; anything the person sent meanwhile starts the next round.
 					if (this.#deliver(sessionId)) continue;
 					break;
@@ -621,6 +649,23 @@ export class Agents {
 						args: call.arguments,
 					}),
 				);
+				if (final.stopReason === "length") {
+					// The reply stopped at the output limit in the middle of its calls. Arguments that were
+					// cut short can still read as complete (half a file to write, say), so none of them runs.
+					this.#store.tx(() => {
+						for (const row of rows) this.#finishCall(row, failure(CUT_CALL), "error", Date.now());
+					});
+					if (cutReplies >= MAX_CUT_REPLIES) {
+						endStatus = "error";
+						detail = CUT_TOO_OFTEN;
+						this.#notice(sessionId, "error", detail, { code: "output-cut" });
+						break;
+					}
+					cutReplies++;
+					this.#deliver(sessionId);
+					continue;
+				}
+				cutReplies = 0;
 				await this.#runCalls(sessionId, rows, calls, live);
 				this.#remindTodos(sessionId, calls);
 				if (signal.aborted) {
@@ -648,8 +693,8 @@ export class Agents {
 			if (signal.aborted) endStatus = "idle";
 			this.#store.setStatus(sessionId, endStatus, detail);
 			this.#store.bumpUnread(sessionId);
-			if (capped && !signal.aborted) this.#capped.set(sessionId, localDay(Date.now()));
-			else this.#capped.delete(sessionId);
+			if (capped && !signal.aborted) this.#held.cap(sessionId, localDay(Date.now()));
+			else this.#held.uncap(sessionId);
 			// To the sessions that wait for this one, a stop at a spending limit is a turn that failed.
 			if (capped && !signal.aborted) this.#endTurn(sessionId, "error", capped, false);
 			else this.#endTurn(sessionId, endStatus, detail, signal.aborted);
@@ -697,7 +742,7 @@ export class Agents {
 			signal: new AbortController().signal,
 		});
 		const now = this.#store.getSession(sessionId);
-		this.#store.addUsage(sessionId, totals(reply), now.contextTokens);
+		this.#store.addUsage(sessionId, usageTotals(reply), now.contextTokens);
 		const said = reply.content
 			.map((block) => (block.type === "text" ? block.text : ""))
 			.join("")
@@ -752,6 +797,18 @@ export class Agents {
 					tools: specs(tools),
 					signal,
 					sessionId: session.id,
+					onRetry: (retry) => {
+						this.#log(
+							`session ${session.id}: model request failed (${retry.error}); retry ${retry.attempt} of ${retry.of}`,
+						);
+						this.#store.live(session.id, {
+							type: "retrying",
+							attempt: retry.attempt,
+							of: retry.of,
+							seconds: Math.round(retry.delayMs / 1000),
+							text: clip(retry.error, 300),
+						});
+					},
 				},
 				(draft) => {
 					latest = draft;
@@ -1089,7 +1146,7 @@ export class Agents {
 	 * working gets its letters between tool calls.
 	 */
 	#wake(sessionId: string): void {
-		if (this.isRunning(sessionId) || this.#paused.has(sessionId)) return;
+		if (this.isRunning(sessionId) || this.#held.isPaused(sessionId)) return;
 		let session: Session;
 		try {
 			session = this.#store.getSession(sessionId);
@@ -1114,20 +1171,20 @@ export class Agents {
 	/** Sessions that stopped at a spending limit today go on once the limit was raised or removed. */
 	#continueCapped(): void {
 		const now = Date.now();
-		for (const [id, day] of [...this.#capped]) {
+		for (const [id, day] of this.#held.capped()) {
 			let session: Session;
 			try {
 				session = this.#store.getSession(id);
 			} catch {
-				this.#capped.delete(id);
+				this.#held.uncap(id);
 				continue;
 			}
-			if (day !== localDay(now) || session.archivedAt !== null || this.#paused.has(id)) {
-				this.#capped.delete(id);
+			if (day !== localDay(now) || session.archivedAt !== null || this.#held.isPaused(id)) {
+				this.#held.uncap(id);
 				continue;
 			}
 			if (this.isRunning(id) || reached(this.#store, session, now)) continue;
-			this.#capped.delete(id);
+			this.#held.uncap(id);
 			this.#start(id, { resume: true });
 		}
 	}
@@ -1686,188 +1743,6 @@ export class Agents {
 	}
 
 	#notice(sessionId: string, kind: Notice["kind"], text: string, data?: JsonObject): void {
-		this.#store.appendEntry(sessionId, {
-			role: "notice",
-			notice: data
-				? { kind, text, data, timestamp: Date.now() }
-				: { kind, text, timestamp: Date.now() },
-		});
-	}
-
-	/**
-	 * Keeps the system prompt the same between turns. The environment and instruction files are saved at the
-	 * first turn; when the files, the date, the approval mode or the main conversation change later, an
-	 * update is appended to the transcript instead, and the prompt keeps its saved inputs until the next
-	 * compaction, so the provider's prompt cache stays valid (prior-art 4.5).
-	 */
-	#refreshContext(session: Session): ContextSnapshot {
-		const placement = this.#placement(session);
-		const saved = this.#store.getContextSnapshot<ContextSnapshot>(session.id);
-		if (!saved) {
-			const snapshot = takeSnapshot(session, this.#home, placement, this.#extras());
-			this.#store.setContextSnapshot(session.id, snapshot);
-			return snapshot;
-		}
-		// A session switched between chat and code gets a fresh environment: folder, git status and files.
-		if (saved.cwd !== session.cwd) {
-			const snapshot = takeSnapshot(session, this.#home, placement, this.#extras());
-			this.#store.setContextSnapshot(session.id, snapshot);
-			this.#store.appendEntry(session.id, {
-				role: "system",
-				message: {
-					role: "system",
-					content: session.cwd
-						? `The working folder is now ${session.cwd}. File and shell tools work there.`
-						: "This session no longer has a working folder. It is a chat now, without file or shell tools.",
-					timestamp: Date.now(),
-				},
-			});
-			return snapshot;
-		}
-		const mode = permissionModeOf(session.options);
-		// Snapshots from before a field existed learn it quietly; the prompt reads the same either way.
-		const team = placement.team ?? null;
-		const { told: _told, ...prompt } = {
-			...saved,
-			permissionMode: saved.permissionMode ?? mode,
-			main: saved.main === undefined ? null : saved.main,
-			parent: saved.parent === undefined ? placement.parent : saved.parent,
-			name: saved.name ?? session.name,
-			team: saved.team === undefined ? team : saved.team,
-		};
-		const told: Told = saved.told ?? {
-			date: prompt.date,
-			instructions: prompt.instructions,
-			permissionMode: prompt.permissionMode,
-			main: prompt.main,
-		};
-		const toldName = told.name ?? prompt.name;
-		const toldTeam = told.team === undefined ? prompt.team : told.team;
-		const updates: string[] = [];
-		const date = today();
-		if (date !== told.date) updates.push(`Today's date is now ${date}.`);
-		const current = loadInstructions(session.cwd, this.#home, this.#extras());
-		if (JSON.stringify(current) !== JSON.stringify(told.instructions)) {
-			updates.push(
-				current.length > 0
-					? `The instruction files changed. These are the current versions; they replace the earlier ones.\n\n${renderInstructions(current, session.cwd)}`
-					: "The instruction files were removed.",
-			);
-		}
-		if (told.permissionMode !== mode) {
-			updates.push(`The person changed the permission mode. ${PERMISSION_MODE[mode]}`);
-		}
-		const sameMain = (told.main?.id ?? null) === (placement.main?.id ?? null);
-		if (!sameMain) updates.push(mainUpdate(session, told.main, placement.main));
-		if (session.name !== toldName) updates.push(`Your name is now "${session.name}".`);
-		if (team !== toldTeam) {
-			updates.push(team ? `You now belong to the team "${team}".` : "You are no longer in a team.");
-		}
-		if (updates.length > 0) {
-			this.#store.appendEntry(session.id, {
-				role: "system",
-				message: { role: "system", content: updates.join("\n\n"), timestamp: Date.now() },
-			});
-		}
-		const next: ContextSnapshot = {
-			...prompt,
-			told: {
-				date,
-				instructions: current,
-				permissionMode: mode,
-				main: sameMain ? told.main : placement.main,
-				name: session.name,
-				team,
-			},
-		};
-		if (JSON.stringify(next) !== JSON.stringify(saved)) {
-			this.#store.setContextSnapshot(session.id, next);
-		}
-		return prompt;
-	}
-
-	async #compactIfNeeded(session: Session, model: ModelInfo, signal: AbortSignal): Promise<void> {
-		const threshold =
-			session.options.compactAt ?? Math.min(Math.floor(model.contextWindow * 0.8), MAX_COMPACT_AT);
-		if (session.contextTokens < threshold) return;
-		await this.#compact(session, model, signal, false);
-	}
-
-	/**
-	 * Summarizes older history with the session's own model and keeps roughly the last 20,000 tokens,
-	 * starting at a message from the person so a tool call is never separated from its result
-	 * (prior-art 4.4). The next prompt is built fresh, with a new environment snapshot.
-	 */
-	async #compact(
-		session: Session,
-		model: ModelInfo,
-		signal: AbortSignal,
-		force: boolean,
-	): Promise<boolean> {
-		const entries = this.#store.contextEntries(session.id);
-		let kept = 0;
-		let firstKept: Entry | null = null;
-		for (let i = entries.length - 1; i >= 0; i--) {
-			const entry = entries[i] as Entry;
-			kept += estimateTokens(entry);
-			if (entry.role === "user") {
-				if (kept > KEEP_RECENT_TOKENS && firstKept) break;
-				firstKept = entry;
-			}
-		}
-		if (!firstKept) return false;
-		const older = entries.filter((entry) => entry.seq < (firstKept as Entry).seq);
-		if (older.length === 0 || (!force && older.every((entry) => entry.role === "compaction")))
-			return false;
-
-		this.#store.live(session.id, { type: "draftCleared" });
-		const summary = await this.#gateway.stream({
-			provider: session.provider,
-			model: model.id,
-			thinking: "off",
-			systemPrompt: SUMMARY_PROMPT,
-			messages: [{ role: "user", content: transcriptForSummary(older), timestamp: Date.now() }],
-			tools: [],
-			signal,
-		});
-		this.#store.addUsage(session.id, totals(summary), session.contextTokens);
-		const text = summary.content
-			.filter((block) => block.type === "text")
-			.map((block) => block.text)
-			.join("\n")
-			.trim();
-		if (summary.stopReason !== "stop" || !text) {
-			if (!signal.aborted)
-				this.#notice(session.id, "error", summary.errorMessage ?? "The summary came back empty.", {
-					code: "compact-failed",
-				});
-			return false;
-		}
-		const remaining = entries.filter((entry) => entry.seq >= (firstKept as Entry).seq);
-		this.#store.tx(() => {
-			this.#store.appendEntry(session.id, {
-				role: "compaction",
-				compaction: {
-					summary: text,
-					firstKeptSeq: (firstKept as Entry).seq,
-					tokensBefore: session.contextTokens,
-					timestamp: Date.now(),
-				},
-			});
-			this.#notice(
-				session.id,
-				"compacted",
-				`Earlier history was summarized to save context (${session.contextTokens} tokens before).`,
-			);
-			this.#store.setContextSnapshot(
-				session.id,
-				takeSnapshot(session, this.#home, this.#placement(session), this.#extras()),
-			);
-			this.#store.setContextTokens(
-				session.id,
-				remaining.reduce((sum, entry) => sum + estimateTokens(entry), Math.ceil(text.length / 4)),
-			);
-		});
-		return true;
+		notice(this.#store, sessionId, kind, text, data);
 	}
 }

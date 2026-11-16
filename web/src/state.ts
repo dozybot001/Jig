@@ -165,6 +165,8 @@ export interface TranscriptState {
 	queue: QueuedMessage[];
 	olderCursor: number | null;
 	draft: AssistantMessage | null;
+	/** A model request that failed and is being tried again; gone when the answer starts. */
+	retry: { attempt: number; of: number; seconds: number; text: string } | null;
 	outputs: Record<string, string>;
 }
 

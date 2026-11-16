@@ -45,12 +45,18 @@ export function ProgressLine({
 	const now = useNow(since === null ? 0 : 1000);
 	let text = "";
 	let spoken = "";
+	let hint = "";
 	if (wait) {
 		text =
 			wait.count > 1
 				? t("progressWaitingMany", { n: wait.count })
 				: t(`progressWaiting_${wait.kind}`);
 		spoken = t("progressSince", { time: formatClock(wait.since) });
+	} else if (working && transcript?.retry) {
+		// The request failed in a way that may pass; Jig waits and asks again by itself.
+		const { attempt, of, seconds } = transcript.retry;
+		text = t("progressRetrying", { n: attempt, of, s: seconds });
+		hint = transcript.retry.text;
 	} else if (turn) {
 		text = tallyText(tally(turn.tools)) || t("status_working");
 		if (turn.startedAt !== null)
@@ -61,7 +67,7 @@ export function ProgressLine({
 		<div className="progress-line">
 			{text && <span className={`dot row-dot dot-${shown}`} aria-hidden="true" />}
 			{/* Always in the page, so a screen reader hears the words when they appear. */}
-			<span className="progress-text" role="status">
+			<span className="progress-text" role="status" title={hint || undefined}>
 				{text}
 				{spoken && <span className="visually-hidden"> · {spoken}</span>}
 			</span>

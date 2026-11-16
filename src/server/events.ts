@@ -15,6 +15,8 @@ import type {
 export type LiveEvent =
 	| { type: "draft"; draft: AssistantMessage }
 	| { type: "draftCleared" }
+	/** A model request failed and is tried again after `seconds`; the next draft replaces it. */
+	| { type: "retrying"; attempt: number; of: number; seconds: number; text: string }
 	| { type: "toolOutput"; toolCallId: string; output: string };
 
 /**

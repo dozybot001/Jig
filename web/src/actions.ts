@@ -228,10 +228,15 @@ function connect(sessionId: string | null, after: number | null): void {
 		const event = JSON.parse((message as MessageEvent<string>).data) as
 			| { type: "draft"; draft: AssistantMessage }
 			| { type: "draftCleared" }
+			| { type: "retrying"; attempt: number; of: number; seconds: number; text: string }
 			| { type: "toolOutput"; toolCallId: string; output: string };
 		updateTranscript(sessionId, (t) => {
-			if (event.type === "draft") return { draft: event.draft };
-			if (event.type === "draftCleared") return { draft: null };
+			if (event.type === "draft") return { draft: event.draft, retry: null };
+			if (event.type === "draftCleared") return { draft: null, retry: null };
+			if (event.type === "retrying") {
+				const { type: _type, ...retry } = event;
+				return { draft: null, retry };
+			}
 			return { outputs: { ...t.outputs, [event.toolCallId]: event.output } };
 		});
 	});
@@ -386,6 +391,7 @@ function applySessionEvent(sessionId: string, event: SessionEvent): void {
 				return {
 					entries: upsertEntry(t.entries, event.entry),
 					...(event.entry.role === "assistant" ? { draft: null } : {}),
+					retry: null,
 				};
 			case "toolCall":
 				return { toolCalls: { ...t.toolCalls, [event.toolCall.id]: event.toolCall } };
@@ -424,6 +430,7 @@ async function loadTranscript(sessionId: string): Promise<number> {
 						queue: data.queue,
 						olderCursor: data.olderCursor,
 						draft: null,
+						retry: null,
 						outputs: {},
 					},
 				}
