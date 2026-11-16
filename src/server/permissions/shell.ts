@@ -29,6 +29,21 @@ export interface ParsedCommand {
 
 const OPERATOR_CHARS = new Set(["&", "|", ";", "\n"]);
 
+/**
+ * `$(cat <<'EOF' … EOF)`: a way to write a long literal argument (a commit message, say). With a
+ * quoted delimiter nothing in the text is expanded and `cat` only hands it back, so it is the text.
+ */
+const LITERAL_TEXT =
+	/^\$\(\s*cat\s*<<-?\s*(['"])([A-Za-z_][A-Za-z0-9_]*)\1[ \t]*\n([\s\S]*?)\n[ \t]*\2[ \t]*\n?\s*\)/;
+
+interface HereDocument {
+	delimiter: string;
+	/** `<<-`: leading tabs are removed from every line, the closing one too. */
+	stripTabs: boolean;
+	/** With a quoted delimiter the text is taken as written; otherwise `$…` and backticks in it run. */
+	literal: boolean;
+}
+
 export function parseShell(command: string): ParsedCommand {
 	const segments: Segment[] = [];
 	let segment: Segment = { argv: [], redirects: [], dynamic: false };
@@ -36,6 +51,8 @@ export function parseShell(command: string): ParsedCommand {
 	let inWord = false;
 	let pendingRedirect: string | null = null;
 	let reason: string | undefined;
+	/** Here-documents opened on the current line; their text starts on the next one. */
+	const opened: HereDocument[] = [];
 
 	const fail = (why: string) => {
 		reason ??= why;
@@ -99,6 +116,14 @@ export function parseShell(command: string): ParsedCommand {
 					closed = true;
 					break;
 				}
+				if (d === "$") {
+					const literal = LITERAL_TEXT.exec(command.slice(j));
+					if (literal) {
+						word += literal[3];
+						j += literal[0].length;
+						continue;
+					}
+				}
 				if (d === "$" || d === "`") segment.dynamic = true;
 				word += d;
 				j++;
@@ -110,6 +135,15 @@ export function parseShell(command: string): ParsedCommand {
 			inWord = true;
 			i = j + 1;
 			continue;
+		}
+		if (c === "$") {
+			const literal = LITERAL_TEXT.exec(command.slice(i));
+			if (literal) {
+				word += literal[3];
+				inWord = true;
+				i += literal[0].length;
+				continue;
+			}
 		}
 		if (c === "$" || c === "`") {
 			segment.dynamic = true;
@@ -144,9 +178,29 @@ export function parseShell(command: string): ParsedCommand {
 			continue;
 		}
 		if (c === "<" || c === ">") {
+			if (c === "<" && next === "<" && command[i + 2] === "<") {
+				// A here-string: the next word is the command's input.
+				endWord();
+				pendingRedirect = "<<<";
+				i += 3;
+				continue;
+			}
 			if (c === "<" && next === "<") {
-				fail("a here-document");
+				// A here-document: the lines after this one, up to the delimiter, are the command's input.
+				endWord();
 				i += 2;
+				const stripTabs = command[i] === "-";
+				if (stripTabs) i++;
+				while (command[i] === " " || command[i] === "\t") i++;
+				const start = i;
+				while (i < command.length && !/[\s;&|<>()]/.test(command[i] as string)) i++;
+				const raw = command.slice(start, i);
+				const delimiter = raw.replace(/['"\\]/g, "");
+				if (!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(delimiter)) {
+					fail("a here-document");
+					continue;
+				}
+				opened.push({ delimiter, stripTabs, literal: raw !== delimiter });
 				continue;
 			}
 			if (next === "(") {
@@ -188,6 +242,30 @@ export function parseShell(command: string): ParsedCommand {
 			pendingRedirect = op;
 			continue;
 		}
+		if (c === "\n" && opened.length > 0) {
+			// The text of each here-document is input, not commands: step over it.
+			let at = i + 1;
+			for (const doc of opened) {
+				let closed = false;
+				let text = "";
+				while (at <= command.length) {
+					const end = command.indexOf("\n", at);
+					const line = command.slice(at, end < 0 ? command.length : end);
+					at = end < 0 ? command.length + 1 : end + 1;
+					if ((doc.stripTabs ? line.replace(/^\t+/, "") : line) === doc.delimiter) {
+						closed = true;
+						break;
+					}
+					text += `${line}\n`;
+				}
+				if (!closed) fail("an unclosed here-document");
+				else if (!doc.literal && /[$`]/.test(text)) fail("a here-document that runs commands");
+			}
+			opened.length = 0;
+			endSegment();
+			i = Math.min(at, command.length);
+			continue;
+		}
 		if (OPERATOR_CHARS.has(c)) {
 			endSegment();
 			if ((c === "&" || c === "|") && next === c) i += 2;
@@ -200,6 +278,7 @@ export function parseShell(command: string): ParsedCommand {
 		i++;
 	}
 	endSegment();
+	if (opened.length > 0) fail("an unclosed here-document");
 	return reason ? { segments, understood: false, reason } : { segments, understood: true };
 }
 
@@ -269,6 +348,11 @@ export function unwrap(argv: string[], depth = 0): Unwrapped {
 		return inner.length
 			? unwrap(inner, depth + 1)
 			: { commands: [["echo"]], privileged: false, understood: true };
+	}
+	if (SHELLS.has(name) && !rest.includes("-c") && rest.every((arg) => arg.startsWith("-"))) {
+		// A shell with no script named reads its commands from its input (a pipe, a here-document):
+		// commands Jig has not read.
+		return { commands: [args], privileged: false, understood: false };
 	}
 	if ((SHELLS.has(name) && rest.includes("-c")) || name === "eval") {
 		const script = name === "eval" ? rest.join(" ") : rest[rest.indexOf("-c") + 1];

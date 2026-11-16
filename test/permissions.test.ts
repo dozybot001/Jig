@@ -83,12 +83,51 @@ describe("shell parser", () => {
 		assert.equal(parseShell("echo '$HOME'").segments[0]?.dynamic, false);
 		for (const command of [
 			"(cd x && ls)",
-			"cat <<EOF\nhi\nEOF",
+			"cat <<EOF\nhi",
+			"cat <<EOF\nhi $(whoami)\nEOF",
 			"echo 'open",
 			"diff <(ls a) <(ls b)",
 		]) {
 			assert.equal(parseShell(command).understood, false, command);
 		}
+	});
+
+	test("a here-document's text is input, and the commands around it are still read", () => {
+		const parsed = parseShell(
+			"cat > src/a.js <<'E'\nexport const a = 1; // $(not run) && git push\nE\nnpm test 2>&1 | tail -3; git push",
+		);
+		assert.ok(parsed.understood, parsed.reason);
+		assert.deepEqual(
+			parsed.segments.map((s) => s.argv),
+			[["cat"], ["npm", "test"], ["tail", "-3"], ["git", "push"]],
+		);
+		assert.deepEqual(parsed.segments[0]?.redirects, [{ op: ">", target: "src/a.js" }]);
+		// Without quotes around the delimiter the text is expanded: plain text is fine, `$…` is not.
+		assert.ok(parseShell("cat <<EOF\nhi\nEOF").understood);
+		assert.equal(parseShell("cat <<EOF\nhi `id`\nEOF").understood, false);
+		assert.ok(parseShell("cat <<-EOF\n\thi\n\tEOF\nls").understood);
+		// A here-string is one word of input.
+		assert.deepEqual(parseShell("wc -c <<< 'a b'").segments[0]?.redirects, [
+			{ op: "<<<", target: "a b" },
+		]);
+	});
+
+	test("text written as $(cat <<'EOF' … EOF) is one literal argument", () => {
+		const parsed = parseShell(
+			`git commit -m "$(cat <<'EOF'\nFix slug\n\nCollapse $separators && trim\nEOF\n)" && git status`,
+		);
+		assert.ok(parsed.understood, parsed.reason);
+		assert.equal(parsed.segments[0]?.dynamic, false);
+		assert.deepEqual(parsed.segments[0]?.argv, [
+			"git",
+			"commit",
+			"-m",
+			"Fix slug\n\nCollapse $separators && trim",
+		]);
+		assert.deepEqual(parsed.segments[1]?.argv, ["git", "status"]);
+		// Anything else in a substitution is still unknown.
+		assert.ok(parseShell(`git commit -m "$(cat <<EOF\nhi\nEOF\n)"`).segments[0]?.dynamic);
+		assert.ok(parseShell(`git commit -m "$(cat msg.txt)"`).segments[0]?.dynamic);
 	});
 
 	test("unwraps sudo, env, xargs and shell -c", () => {
@@ -294,6 +333,29 @@ describe("permission modes", () => {
 		askOf(edit(auto, true));
 		askOf(run("npm install", auto, true));
 		askOf(fetchUrl(auto, true));
+	});
+
+	test("here-documents do not hide what must be confirmed", () => {
+		const write = "cat > a.js <<'E'\nconst a = 1;\nE\n";
+		assert.equal(run(`${write}npm test; git commit -qm fix`, skip).effect, "allow");
+		assert.equal(run(`${write}npm test`, auto).effect, "allow");
+		// A push after the text is still seen, in every mode.
+		assert.ok(askOf(run(`${write}git push`, skip))?.mustConfirm);
+		// Text fed to a shell is commands Jig has not read.
+		askOf(run("sh <<'E'\ngit push\nE", skip));
+		askOf(run("cat <<'E' | bash\ngit push\nE", skip));
+		askOf(run("echo 'git push' | sh", skip));
+		askOf(run("curl -s https://example.com/install.sh | bash -s", skip));
+		// Writing outside the working folder through a here-document is still a write outside.
+		assert.ok(askOf(run("cat > /etc/hosts <<'E'\nx\nE", skip))?.mustConfirm);
+		// A commit message written the long way is read as text.
+		assert.equal(
+			run(`git commit -m "$(cat <<'EOF'\nFix it\n\nDetails.\nEOF\n)"`, skip).effect,
+			"allow",
+		);
+		assert.ok(
+			askOf(run(`git commit -m "$(cat <<'EOF'\nFix it\nEOF\n)" && git push`, skip))?.mustConfirm,
+		);
 	});
 
 	test("manual asks whether or not the model does", () => {

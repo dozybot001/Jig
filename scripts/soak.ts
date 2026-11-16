@@ -8,8 +8,12 @@
  * (never from a command argument) and kept in memory only:
  *
  *   JIG_SOAK_KEY_FILE=/path/to/key node scripts/soak.ts anthropic claude-haiku-5-5 [files] [thinking] [compactAt]
+ *
+ * With "code" in place of the number of files, the task is a small coding job instead: a project
+ * with one failing test, to be fixed, checked by running the tests, and committed.
  */
-import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Agents } from "../src/server/agent/runner.ts";
@@ -33,7 +37,8 @@ if (!keyFile) {
 	process.stderr.write("Set JIG_SOAK_KEY_FILE to a file that holds the provider's API key.\n");
 	process.exit(2);
 }
-const files = Number(count);
+const coding = count === "code";
+const files = coding ? 0 : Number(count);
 const home = realpathSync(mkdtempSync(join(tmpdir(), "jig-soak-home-")));
 const cwd = realpathSync(mkdtempSync(join(tmpdir(), "jig-soak-cwd-")));
 const name = (i: number) => `note-${String(i).padStart(3, "0")}.txt`;
@@ -47,6 +52,48 @@ for (let i = 1; i <= files; i++) {
 	);
 	filler.splice(30, 0, `VALUE=${value}`);
 	writeFileSync(join(cwd, name(i)), `${filler.join("\n")}\n`);
+}
+
+const git = (...args: string[]) =>
+	execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+if (coding) {
+	mkdirSync(join(cwd, "src"));
+	mkdirSync(join(cwd, "test"));
+	writeFileSync(
+		join(cwd, "package.json"),
+		`${JSON.stringify({ name: "slug", type: "module", scripts: { test: "node --test" } }, null, 2)}\n`,
+	);
+	writeFileSync(
+		join(cwd, "src/slug.js"),
+		'export function slug(text) {\n\treturn text.toLowerCase().replace(/[^a-z0-9]/g, "-");\n}\n',
+	);
+	writeFileSync(
+		join(cwd, "test/slug.test.js"),
+		[
+			'import assert from "node:assert/strict";',
+			'import { test } from "node:test";',
+			'import { slug } from "../src/slug.js";',
+			"",
+			'test("lowercases", () => assert.equal(slug("Hello"), "hello"));',
+			'test("joins words with one dash", () => assert.equal(slug("Hello,  World"), "hello-world"));',
+			'test("no dash at either end", () => assert.equal(slug(" Hello! "), "hello"));',
+			"",
+		].join("\n"),
+	);
+	git("init", "-q", "-b", "main");
+	git("add", ".");
+	git(
+		"-c",
+		"user.name=soak",
+		"-c",
+		"user.email=soak@example.invalid",
+		"commit",
+		"-q",
+		"-m",
+		"start",
+	);
+	git("config", "user.name", "soak");
+	git("config", "user.email", "soak@example.invalid");
 }
 
 const bus = new EventBus();
@@ -80,15 +127,22 @@ bus.subscribe((event) => {
 });
 
 const started = Date.now();
-agents.send(
-	session.id,
-	`This folder has ${files} files named ${name(1)} to ${name(files)}. Each has one line "VALUE=<number>". Read them one at a time with the read tool, one file per step, in order; do not use the shell or search tools. After every 10 files, write the running total to total.txt. When all are read, reply with exactly "TOTAL=<sum>".`,
-);
+const task = coding
+	? "这个项目的测试有没通过的。找出原因修好，跑测试确认全部通过，然后提交。"
+	: `This folder has ${files} files named ${name(1)} to ${name(files)}. Each has one line "VALUE=<number>". Read them one at a time with the read tool, one file per step, in order; do not use the shell or search tools. After every 10 files, write the running total to total.txt. When all are read, reply with exactly "TOTAL=<sum>".`;
+agents.send(session.id, task);
 const tick = setInterval(() => {
 	const now = store.getSession(session.id);
 	log(
 		`  ${Math.round((Date.now() - started) / 1000)}s status=${now.status} context=${now.contextTokens} cost=$${now.usage.cost.toFixed(4)}`,
 	);
+	// Nobody answers here: a session that waits for the person would wait for ever.
+	if (now.status === "waiting") {
+		for (const approval of store.pendingApprovals(session.id)) {
+			log(`  waiting for the person: ${JSON.stringify(approval.request).slice(0, 600)}`);
+		}
+		agents.stop(session.id);
+	}
 }, 15_000);
 await agents.whenIdle(session.id);
 clearInterval(tick);
@@ -108,6 +162,23 @@ let total: string | null = null;
 try {
 	total = readFileSync(join(cwd, "total.txt"), "utf8").trim();
 } catch {}
+let code: { testsPass: boolean; commits: number; clean: boolean } | null = null;
+if (coding) {
+	let testsPass = true;
+	try {
+		execFileSync("node", ["--test"], { cwd, stdio: "ignore" });
+	} catch {
+		testsPass = false;
+	}
+	code = {
+		testsPass,
+		commits: Number(git("rev-list", "--count", "HEAD")),
+		clean: git("status", "--porcelain") === "",
+	};
+}
+const ok = coding
+	? Boolean(code?.testsPass && code.commits >= 2 && code.clean)
+	: lastReply.includes(`TOTAL=${expected}`);
 process.stdout.write(
 	`${JSON.stringify(
 		{
@@ -117,7 +188,8 @@ process.stdout.write(
 			seconds: Math.round((Date.now() - started) / 1000),
 			status: end.status,
 			statusDetail: end.statusDetail,
-			expected: `TOTAL=${expected}`,
+			expected: coding ? "tests pass, a new commit, a clean tree" : `TOTAL=${expected}`,
+			code,
 			lastReply,
 			totalFile: total,
 			toolCalls: store.toolCallsByStatus(session.id, ["done", "error", "denied"]).length,
@@ -133,4 +205,4 @@ process.stdout.write(
 	)}\n`,
 );
 agents.shutdown();
-process.exit(end.status === "idle" && lastReply.includes(`TOTAL=${expected}`) ? 0 : 1);
+process.exit(end.status === "idle" && ok ? 0 : 1);
