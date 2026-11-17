@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-# Server controller, run as root by deploy/relay/publish.sh. It fetches the exact commit from
-# private Gitee with a read-only deploy key and builds the release only from that checkout.
+# Server controller, run as root by deploy/relay/publish.sh. It fetches the public repository from
+# Gitee over HTTPS without credentials (product standard 15.2.2), checks that main is exactly the
+# commit asked for, and builds the release only from that checkout.
 set -Eeuo pipefail
 # The body is a function so bash reads it completely from the SSH stdin before running, and no
 # child process can consume the rest of the script.
 main() {
 	release="${1:-}"
-	[[ "$release" =~ ^[0-9a-f]{40}$ ]] || { echo 'usage: <commit> <gitee-keys>' >&2; exit 2; }
+	[[ "$release" =~ ^[0-9a-f]{40}$ ]] || { echo 'usage: <commit>' >&2; exit 2; }
 	base=/opt/yew-relay
 	builder="$base/builder"
-	key="$builder/gitee_read_ed25519"
-	hosts="$builder/gitee_known_hosts"
 	source="$builder/source.git"
-	repo=git@gitee.com:dozybot/yew.git
+	repo=https://gitee.com/dozybot/yew.git
 	node_image='docker.m.daocloud.io/library/node@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7'
 	# One-time move of the folder from before the rename (Jig was Yew's name until 2026-11-18;
 	# release.py lists every step). Until then the release lock is in the old folder; a lock belongs
@@ -36,20 +35,8 @@ main() {
 	fi
 	install -d -m 0750 "$base" "$builder"
 
-	# Gitee host keys come from the repository's deploy/relay/known_hosts, never a scan.
-	printf '%s' "${2:-}" | base64 -d > "$hosts.candidate"
-	[[ -s "$hosts.candidate" ]] && ! grep -qv '^gitee\.com ' "$hosts.candidate" || { echo 'Pinned Gitee host keys are missing.' >&2; exit 1; }
-	mv "$hosts.candidate" "$hosts"
-	if [[ ! -f "$key" ]]; then
-		ssh-keygen -q -t ed25519 -N '' -C 'yew-relay-server-gitee-read' -f "$key"
-		chmod 0600 "$key"
-		echo 'Created the server read-only key. Add this public key to Gitee dozybot/yew as a deploy key (pull only), then publish again:' >&2
-		cat "$key.pub" >&2
-		exit 3
-	fi
-	export GIT_SSH_COMMAND="ssh -i $key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$hosts"
 	[[ -d "$source" ]] || git clone -q --bare "$repo" "$source"
-	# A clone made before the repository was renamed still names the old address.
+	# A clone made earlier names the old address (before the rename, and over SSH with a deploy key).
 	git --git-dir="$source" remote set-url origin "$repo"
 	# Bounded retries absorb short outages; a failure stops before production changes.
 	for attempt in 1 2 3 4; do

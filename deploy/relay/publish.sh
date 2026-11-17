@@ -17,8 +17,8 @@ npm run check >/dev/null
 git push origin main || echo 'A push reported an error; checking Gitee.' >&2
 gitee="$(git ls-remote https://gitee.com/dozybot/yew.git refs/heads/main | cut -f1)"
 [[ "$gitee" == "$release" ]] || { echo "Gitee main is ${gitee:-unreadable}, not $release." >&2; exit 1; }
-# Both the server's and Gitee's host keys come from the repository, never a scan.
-gitee_keys="$(grep '^gitee\.com ' deploy/relay/known_hosts | base64 | tr -d '\n')"
+# The server's host key comes from the repository, never a scan. The server fetches the public
+# repository from Gitee over HTTPS, so it holds no key for it.
 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o HostKeyAlias=wesaid-prod \
 	-o UserKnownHostsFile=deploy/relay/known_hosts \
-	wesaid-prod sudo -n bash -s -- "$release" "$gitee_keys" < deploy/relay/release-from-gitee.sh
+	wesaid-prod sudo -n bash -s -- "$release" < deploy/relay/release-from-gitee.sh
