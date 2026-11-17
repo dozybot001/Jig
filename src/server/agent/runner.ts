@@ -374,6 +374,25 @@ export class Agents {
 		return resolved;
 	}
 
+	/**
+	 * Takes the conversation back to a point the person picked (blueprint 6.11, item 42): one of its
+	 * replies, or just before one of the person's messages. Not while it works. A question Jig made of a
+	 * reply goes with the reply. Returns how many entries were taken back.
+	 */
+	rewind(sessionId: string, entryId: string): number {
+		if (this.isRunning(sessionId)) {
+			throw conflict("Stop the session first, then take it back.", undefined, "session-busy");
+		}
+		const count = this.#store.rewindSession(sessionId, this.#store.turnPoint(sessionId, entryId));
+		this.#dropReplyQuestions(sessionId);
+		for (const approval of this.#store.pendingApprovals(sessionId)) {
+			this.#store.cancelApproval(approval.id);
+		}
+		if (this.#store.getSession(sessionId).status !== "idle")
+			this.#store.setStatus(sessionId, "idle");
+		return count;
+	}
+
 	/** Shortens the context now; the session must not be working. */
 	async compactNow(sessionId: string): Promise<void> {
 		if (this.isRunning(sessionId))
@@ -1048,7 +1067,7 @@ export class Agents {
 				return this.#mail.sent(sessionId, this.post.send({ kind: "session", session }, out));
 			},
 			wait: (letter) => this.#mail.awaitReply(sessionId, letter, live.controller.signal, callId),
-			open: (input) => this.#mail.openChild(this.#store.getSession(sessionId), input),
+			open: (input) => this.#mail.openChild(this.#store.getSession(sessionId), input, callId),
 			finish: (outcome) => this.#store.setOutcome(sessionId, outcome),
 			manage: (args) => {
 				const by = this.#store.getSession(sessionId);

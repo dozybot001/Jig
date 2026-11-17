@@ -266,6 +266,8 @@ export interface AppState {
 	 * the sessions map reads its letter lines again when it does.
 	 */
 	letterTick: number;
+	/** Text to put in a session's message box when it opens: a message taken back or forked from. */
+	prefill: Record<string, string>;
 }
 
 /** How many things wait for the person: approvals, questions, cards and held letters. */
@@ -327,6 +329,7 @@ let state: AppState = {
 	artifacts: null,
 	artifactId: null,
 	teamFilter: null,
+	prefill: {},
 	letterTick: 0,
 };
 

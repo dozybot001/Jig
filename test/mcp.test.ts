@@ -7,9 +7,15 @@ import { JigError } from "../src/server/errors.ts";
 import { decisionFromPhone } from "../src/server/http/agents.ts";
 import { McpHub, readMcpConfig, special as specialFor } from "../src/server/mcp.ts";
 import { builtinInstaller, builtinMcp, serverEnv } from "../src/server/mcp-builtin.ts";
-import { listMcpEntries, patchMcpEntry, removeMcpEntry } from "../src/server/mcp-config.ts";
+import {
+	addMcpEntry,
+	listMcpEntries,
+	patchMcpEntry,
+	removeMcpEntry,
+} from "../src/server/mcp-config.ts";
 import { inheritableRules, PermissionEngine } from "../src/server/permissions/engine.ts";
 import type { ToolContext, ToolDefinition } from "../src/server/tools/types.ts";
+import { MCP_PRESETS, presetEntry } from "../src/shared/mcp-presets.ts";
 import type { JsonObject } from "../src/shared/messages.ts";
 import type { Session } from "../src/shared/types.ts";
 import { tempDir } from "./helpers/store.ts";
@@ -43,6 +49,30 @@ describe("MCP configuration", () => {
 			search: { url: "https://mcp.example.com/mcp", headers: { Authorization: "Bearer t0" } },
 		});
 		assert.deepEqual(readMcpConfig(tempDir("jig-home-")), {});
+	});
+});
+
+describe("common official servers", () => {
+	test("each becomes the entry a person would write, and the settings accept it", () => {
+		const jigHome = tempDir("jig-home-");
+		for (const preset of MCP_PRESETS) {
+			const entry = presetEntry(preset, preset.token?.optional ? "" : "  tok-123  ");
+			const shown = addMcpEntry(jigHome, entry);
+			assert.equal(shown.name, preset.id);
+			if ("url" in preset.connect) {
+				assert.equal(shown.url, preset.connect.url);
+				assert.match(shown.url ?? "", /^https:\/\//);
+			} else {
+				// Started with npx at one exact version.
+				assert.equal(shown.command, "npx");
+				assert.match(shown.args.find((arg) => arg.includes("@", 1)) ?? "", /@\d+\.\d+\.\d+$/);
+			}
+		}
+		const config = readMcpConfig(jigHome, {});
+		assert.deepEqual(config.github?.headers, { Authorization: "Bearer tok-123" });
+		assert.deepEqual(config.gitee?.env, { GITEE_ACCESS_TOKEN: "tok-123" });
+		assert.equal(config.context7?.headers, undefined, "an optional token can be left out");
+		assert.equal(new Set(MCP_PRESETS.map((preset) => preset.id)).size, MCP_PRESETS.length);
 	});
 });
 

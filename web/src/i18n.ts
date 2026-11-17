@@ -132,6 +132,18 @@ const zh = {
 	exportMarkdown: "Markdown",
 	exportAs: "导出",
 	duplicate: "创建副本",
+	forkFromHere: "从这里分叉",
+	forkFromHereHint: "新开一个会话，带上到这条回复为止的对话，原会话不受影响",
+	forkBeforeHint:
+		"新开一个会话，带上这条消息之前的对话，这条消息放进新会话的输入框，原会话不受影响",
+	rewindHere: "回溯到这里",
+	rewindBusy: "会话在干活，停下后才能回溯",
+	rewindTitle: "回溯到这里？",
+	rewindBodyMine:
+		"这条消息和之后的对话会撤回：不再显示，也不再发给模型；这条消息放回输入框，可以改了再发。已经改的文件、跑过的命令和发出的信不会撤回，文件要恢复请用 git。",
+	rewindBodyReply:
+		"这条回复之后的对话会撤回：不再显示，也不再发给模型。已经改的文件、跑过的命令和发出的信不会撤回，文件要恢复请用 git。",
+	rewind: "回溯",
 	moveToTeam: "移到团队",
 	newTeamEllipsis: "新建团队…",
 	exporting: "正在导出…",
@@ -811,6 +823,22 @@ const zh = {
 	mcpBuiltinHelp_computer:
 		"会话可以看屏幕截图、移动鼠标、敲键盘，能操作这台电脑上的任何程序。第一次用时 macOS 会请你给运行 Jig 的程序「屏幕录制」和「辅助功能」权限。由开源的 computer-use-mcp 提供，第一次使用时从 npm 安装到 Jig 的数据目录。它能越过 Jig 的其他授权规则，所以点击、输入和按键每一次都要你确认，不能选「总是允许」。",
 	mcpAdded: "已添加的服务",
+	mcpPresets: "常用服务",
+	mcpPresetsInfo:
+		"官方出品、填上令牌就能用的服务，加之前都实际连通过。添加后和手动添加的一样，记在 mcp.json 里。",
+	mcpPresetAddTitle: "添加 {name}",
+	mcpPresetToken: "令牌",
+	mcpPresetTokenOptional: "令牌（可不填，不填时调用次数有限制）",
+	mcpPresetWhere: "在 {publisher} 生成令牌",
+	mcpPresetStored: "保存后写进 Jig 数据目录的 mcp.json，这里不再显示。",
+	mcpPresetRemote:
+		"这是 {publisher} 运行的远程服务（{host}）：会话调用它的工具时，传的内容发给 {publisher}。",
+	mcpPresetLocal: "第一次用时用 npx 从 npm 下载 {pkg}，在这台电脑上运行。",
+	mcpPreset_github: "仓库、议题、拉取请求、Actions 和发行版。",
+	mcpPreset_gitee: "Gitee 上的仓库、议题、拉取请求和发行版。",
+	mcpPreset_context7: "查各种开源库的最新文档和示例代码。",
+	mcpPreset_notion: "读写 Notion 里的页面和数据库。",
+	mcpPreset_sentry: "查 Sentry 里的报错、发行版和项目。",
 	mcpNone: "还没有 MCP 服务。",
 	mcpAdd: "添加服务",
 	mcpName: "名称",
@@ -1035,6 +1063,19 @@ const en: Record<MessageKey, string> = {
 	exportMarkdown: "Markdown",
 	exportAs: "Export",
 	duplicate: "Duplicate",
+	forkFromHere: "Fork from here",
+	forkFromHereHint:
+		"Open a new session with the conversation up to this reply; this one stays as it is",
+	forkBeforeHint:
+		"Open a new session with the conversation before this message, with the message in its box; this one stays as it is",
+	rewindHere: "Go back to here",
+	rewindBusy: "The session is working; stop it first",
+	rewindTitle: "Go back to here?",
+	rewindBodyMine:
+		"This message and what came after are taken back: no longer shown or sent to the model. The message goes back into the box to change and send again. Files changed, commands run and letters sent are not undone; use git to restore files.",
+	rewindBodyReply:
+		"What came after this reply is taken back: no longer shown or sent to the model. Files changed, commands run and letters sent are not undone; use git to restore files.",
+	rewind: "Go back",
 	moveToTeam: "Move to team",
 	newTeamEllipsis: "New team…",
 	exporting: "Exporting…",
@@ -1734,6 +1775,23 @@ const en: Record<MessageKey, string> = {
 	mcpBuiltinHelp_computer:
 		"Sessions can take screenshots, move the mouse and type, so they can use any program on this computer. The first time, macOS asks you to give the program that runs Jig the Screen Recording and Accessibility permissions. Provided by the open-source computer-use-mcp, installed from npm into Jig's data folder the first time it is used. It can get past Jig's other permission rules, so every click, keystroke and typed text is confirmed by you; Always allow is not offered.",
 	mcpAdded: "Added servers",
+	mcpPresets: "Common servers",
+	mcpPresetsInfo:
+		"Official servers that work with a token; each was connected before it went in this list. Once added, it is kept in mcp.json like one you add by hand.",
+	mcpPresetAddTitle: "Add {name}",
+	mcpPresetToken: "Token",
+	mcpPresetTokenOptional: "Token (optional; without one, calls are limited)",
+	mcpPresetWhere: "Make a token at {publisher}",
+	mcpPresetStored: "Saved to mcp.json in Jig's data folder and not shown here again.",
+	mcpPresetRemote:
+		"A remote server run by {publisher} ({host}): what a session passes to its tools goes to {publisher}.",
+	mcpPresetLocal:
+		"The first time it is used, npx downloads {pkg} from npm to run it on this computer.",
+	mcpPreset_github: "Repositories, issues, pull requests, Actions and releases.",
+	mcpPreset_gitee: "Repositories, issues, pull requests and releases on Gitee.",
+	mcpPreset_context7: "Up-to-date documentation and code examples for open-source libraries.",
+	mcpPreset_notion: "Read and write pages and databases in Notion.",
+	mcpPreset_sentry: "Errors, releases and projects in Sentry.",
 	mcpNone: "No MCP servers yet.",
 	mcpAdd: "Add server",
 	mcpName: "Name",

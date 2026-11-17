@@ -400,6 +400,9 @@ function applySessionEvent(sessionId: string, event: SessionEvent): void {
 				return { approvals: { ...t.approvals, [event.approval.id]: event.approval } };
 			case "queue":
 				return { queue: event.queue };
+			case "rewound":
+				// The stream sends this as a reset, which loads the transcript again.
+				return {};
 		}
 	});
 }
@@ -517,6 +520,54 @@ export async function duplicateSession(sessionId: string): Promise<Session> {
 	setState((current) => ({ sessions: { ...current.sessions, [copy.id]: copy } }));
 	await selectSession(copy.id);
 	return copy;
+}
+
+/**
+ * A new session that goes on from a reply of this one, or from just before a message of yours, opened
+ * at once (blueprint 6.11, item 39). Forked from your message, the message waits in its box.
+ */
+export async function forkSession(
+	sessionId: string,
+	entryId: string,
+	prefill?: string,
+): Promise<Session> {
+	const fork = await api<Session>(
+		"POST",
+		`/api/sessions/${sessionId}/fork`,
+		{ entryId },
+		{ idempotent: true },
+	);
+	setState((current) => ({
+		sessions: { ...current.sessions, [fork.id]: fork },
+		prefill: prefill ? { ...current.prefill, [fork.id]: prefill } : current.prefill,
+	}));
+	await selectSession(fork.id);
+	return fork;
+}
+
+/**
+ * Takes the conversation back to a reply, or to just before a message of yours, which then waits in
+ * the message box to be changed and sent again (blueprint 6.11, item 42).
+ */
+export async function rewindSession(
+	sessionId: string,
+	entryId: string,
+	prefill?: string,
+): Promise<void> {
+	await api("POST", `/api/sessions/${sessionId}/rewind`, { entryId });
+	if (prefill) setState((current) => ({ prefill: { ...current.prefill, [sessionId]: prefill } }));
+	await loadTranscript(sessionId);
+}
+
+/** Takes the text waiting for a session's message box, once. */
+export function takePrefill(sessionId: string): string | null {
+	const text = getState().prefill[sessionId];
+	if (text === undefined) return null;
+	setState((current) => {
+		const { [sessionId]: _taken, ...rest } = current.prefill;
+		return { prefill: rest };
+	});
+	return text;
 }
 
 export type SessionPatch = Partial<{

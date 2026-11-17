@@ -561,7 +561,9 @@ export type SessionEvent =
 	| { type: "entry"; entry: Entry }
 	| { type: "toolCall"; toolCall: ToolCallView }
 	| { type: "approval"; approval: Approval }
-	| { type: "queue"; queue: QueuedMessage[] };
+	| { type: "queue"; queue: QueuedMessage[] }
+	/** The conversation was taken back to just after this entry: load it again. */
+	| { type: "rewound"; throughSeq: number };
 
 export interface Transcript {
 	session: Session;

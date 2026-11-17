@@ -1,12 +1,25 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { AssistantMessage } from "../../shared/messages.ts";
+import type { SessionEvent } from "../../shared/types.ts";
 import type { BusEvent, EventBus } from "../events.ts";
 import type { Store } from "../store.ts";
 import type { AppEnv } from "./problem.ts";
 
 const KEEPALIVE_MS = 15_000;
 const MAX_QUEUE = 2000;
+
+/**
+ * A session event as the stream sends it. A conversation taken back changes entries already shown,
+ * so clients load it again: every client, phones included, already does that on "reset".
+ */
+function sessionMessage(
+	seq: number,
+	event: SessionEvent,
+): { event: string; id?: string; data: string } {
+	if (event.type === "rewound") return { event: "reset", id: String(seq), data: "{}" };
+	return { event: "session", id: String(seq), data: JSON.stringify(event) };
+}
 
 /** Remembers each session's in-flight draft, so a client that connects mid-answer sees it at once. */
 export class DraftCache {
@@ -64,7 +77,7 @@ export function eventRoutes(store: Store, bus: EventBus, drafts: DraftCache): Ho
 					if (event.scope === "live") push({ event: "live", data: JSON.stringify(event.event) });
 					else if (event.seq > replayedUpTo) {
 						replayedUpTo = event.seq;
-						push({ event: "session", id: String(event.seq), data: JSON.stringify(event.event) });
+						push(sessionMessage(event.seq, event.event));
 					}
 				}
 			};
@@ -87,7 +100,7 @@ export function eventRoutes(store: Store, bus: EventBus, drafts: DraftCache): Ho
 				} else {
 					for (const { seq, event } of events) {
 						replayedUpTo = seq;
-						push({ event: "session", id: String(seq), data: JSON.stringify(event) });
+						push(sessionMessage(seq, event));
 					}
 				}
 			} else if (sessionId) {

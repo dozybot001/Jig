@@ -46,11 +46,13 @@ import {
 	ShieldAlert,
 	SlidersHorizontal,
 	Smartphone,
+	Split,
 	Square,
 	SquarePen,
 	Stamp,
 	SunMoon,
 	Trash2,
+	Undo2,
 	UserRoundPlus,
 	Users,
 	X,
@@ -157,3 +159,7 @@ export const TrashIcon = () => <Trash2 {...props} />;
 export const PulseIcon = () => <Activity {...props} />;
 /** Try again, or put back the original value. */
 export const RetryIcon = () => <RotateCcw {...props} />;
+/** Fork: a new session that goes on from one reply. */
+export const ForkIcon = () => <Split {...props} />;
+/** Take the conversation back to a point. */
+export const RewindIcon = () => <Undo2 {...props} />;

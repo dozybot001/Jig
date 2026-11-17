@@ -1296,6 +1296,38 @@ body.scroll-locked {
 	gap: 6px;
 	min-width: 0;
 }
+/* A message from the person with its actions underneath, both at the right. */
+.message-mine {
+	display: grid;
+	justify-items: end;
+	gap: 2px;
+}
+/*
+ * Time, copy, go back and fork under a message or a reply: shown on hover or focus so they do not
+ * crowd the conversation; always shown where there is no hover.
+ */
+.message-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	min-height: 28px;
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+.message-actions time {
+	margin-right: 4px;
+	font-size: 12px;
+}
+.message-mine:hover .message-actions,
+.msg-assistant:hover .message-actions,
+.message-actions:focus-within {
+	opacity: 1;
+}
+@media (hover: none) {
+	.message-actions {
+		opacity: 1;
+	}
+}
 .step-group {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr);

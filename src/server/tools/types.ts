@@ -60,6 +60,8 @@ export interface OpenInput {
 	cwd?: string | null;
 	provider?: string;
 	model?: string;
+	/** Give the new session a copy of the opener's conversation so far (blueprint 6.11, item 39). */
+	fork?: boolean;
 }
 
 /** Letters, decision cards and child sessions, as the calling session. */

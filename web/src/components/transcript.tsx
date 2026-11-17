@@ -5,6 +5,7 @@ import {
 	useEffect,
 	useId,
 	useLayoutEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -26,22 +27,44 @@ import {
 	type Question,
 	type QuestionRequest,
 	questionsOf,
+	type Session,
 	type ToolCallView,
 } from "../../../src/shared/types.ts";
-import { answerApproval, loadEarlier, markRead, selectSession, toolCallFor } from "../actions.ts";
-import { formatCost, formatWaited, hasMessage, type MessageKey, t, useLang } from "../i18n.ts";
+import {
+	answerApproval,
+	forkSession,
+	loadEarlier,
+	markRead,
+	rewindSession,
+	selectSession,
+	toolCallFor,
+} from "../actions.ts";
+import {
+	formatAgo,
+	formatCost,
+	formatWaited,
+	getLang,
+	hasMessage,
+	type MessageKey,
+	t,
+	useLang,
+} from "../i18n.ts";
 import { JIG_NOTE, tally } from "../progress.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
 import { ArtifactChip } from "./artifacts.tsx";
 import { Capped, Diff, Markdown, ScrollBlock, useStickToBottom } from "./content.tsx";
+import { ConfirmDialog } from "./dialogs.tsx";
 import {
 	CheckAllIcon,
 	CheckIcon,
 	ChevronIcon,
+	CopyIcon,
 	DecisionIcon,
+	ForkIcon,
 	MailIcon,
 	QuestionIcon,
 	RefuseIcon,
+	RewindIcon,
 	SendIcon,
 	ShieldIcon,
 } from "./icons.tsx";
@@ -734,8 +757,23 @@ type Step =
 /** What the transcript shows, in order: messages, the assistant's text, and runs of steps. */
 type Item =
 	| { kind: "entry"; key: string; entry: Entry }
-	| { kind: "text"; key: string; text: string; live: boolean }
+	| {
+			kind: "text";
+			key: string;
+			text: string;
+			live: boolean;
+			/** The reply this text ends, when a new session can be forked from it. */
+			forkFrom: string | null;
+	  }
 	| { kind: "steps"; key: string; steps: Step[]; live: boolean; alone: boolean };
+
+/** All the text of a reply, as it would be copied. */
+function replyText(entry: Entry): string {
+	if (entry.role !== "assistant") return "";
+	return entry.message.content
+		.flatMap((block) => (block.type === "text" && block.text.trim() ? [block.text] : []))
+		.join("\n\n");
+}
 
 function userText(entry: Extract<Entry, { role: "user" }>): string {
 	const content = entry.message.content;
@@ -768,7 +806,21 @@ function buildItems(transcript: TranscriptState, working: boolean): Item[] {
 			} else if (block.type === "text") {
 				if (!block.text.trim()) return;
 				flush();
-				items.push({ kind: "text", key, text: block.text, live });
+				// A finished reply: the last text of a message that calls no tools.
+				const finished =
+					entryId !== null &&
+					!live &&
+					!message.content.some((other) => other.type === "toolCall") &&
+					!message.content
+						.slice(position + 1)
+						.some((other) => other.type === "text" && other.text.trim());
+				items.push({
+					kind: "text",
+					key,
+					text: block.text,
+					live,
+					forkFrom: finished ? entryId : null,
+				});
 			} else {
 				const view = entryId ? toolCallFor(transcript.toolCalls, entryId, block.id) : undefined;
 				const waiting =
@@ -824,6 +876,87 @@ function summarize(steps: Step[]): string {
 	return (
 		tallyText({ ...counted, others: counted.others + notes }) ||
 		t(thoughts === 1 ? "sum_think_one" : "sum_think", { n: thoughts })
+	);
+}
+
+/**
+ * Under a message from the person and under a finished reply, shown on hover or focus (blueprint
+ * 6.11, item 42): when it was written, copy it, take the conversation back to it, fork from it.
+ * Taken back or forked from the person's message, that message waits in the message box again.
+ */
+function MessageActions({
+	session,
+	entry,
+	text,
+	mine,
+	canRewind,
+}: {
+	session: Session;
+	entry: Entry;
+	text: string;
+	mine: boolean;
+	canRewind: boolean;
+}) {
+	useLang();
+	const now = useNow();
+	const [copied, setCopied] = useState(false);
+	const [confirming, setConfirming] = useState(false);
+	const fork = useAction(() => forkSession(session.id, entry.id, mine ? text : undefined));
+	const rewind = useAction(() => rewindSession(session.id, entry.id, mine ? text : undefined));
+	const copy = async () => {
+		await navigator.clipboard?.writeText(text);
+		setCopied(true);
+		setTimeout(() => setCopied(false), 1500);
+	};
+	const when = new Intl.DateTimeFormat(getLang() === "zh" ? "zh-CN" : "en-US", {
+		dateStyle: "medium",
+		timeStyle: "short",
+	}).format(entry.createdAt);
+	return (
+		<div className={mine ? "message-actions message-actions-mine" : "message-actions"}>
+			<time className="hint" dateTime={new Date(entry.createdAt).toISOString()} title={when}>
+				{formatAgo(entry.createdAt, now)}
+			</time>
+			<Button
+				variant="icon"
+				aria-label={copied ? t("copied") : t("copy")}
+				title={copied ? t("copied") : t("copy")}
+				onClick={() => void copy()}
+			>
+				{copied ? <CheckIcon /> : <CopyIcon />}
+			</Button>
+			{canRewind && (
+				<Button
+					variant="icon"
+					aria-label={t("rewindHere")}
+					title={session.status === "working" ? t("rewindBusy") : t("rewindHere")}
+					disabled={session.status === "working"}
+					busy={rewind.busy}
+					onClick={() => setConfirming(true)}
+				>
+					<RewindIcon />
+				</Button>
+			)}
+			<Button
+				variant="icon"
+				aria-label={t("forkFromHere")}
+				title={t(mine ? "forkBeforeHint" : "forkFromHereHint")}
+				busy={fork.busy}
+				onClick={() => void fork.run()}
+			>
+				<ForkIcon />
+			</Button>
+			<ErrorBox error={fork.error ?? rewind.error} />
+			{confirming && (
+				<ConfirmDialog
+					title={t("rewindTitle")}
+					body={t(mine ? "rewindBodyMine" : "rewindBodyReply")}
+					confirmLabel={t("rewind")}
+					onConfirm={() => rewind.run()}
+					onClose={() => setConfirming(false)}
+				/>
+			)}
+		</div>
 	);
 }
 
@@ -1092,6 +1225,19 @@ function EntryView({ entry }: { entry: Entry }) {
 export function Transcript({ transcript }: { transcript: TranscriptState }) {
 	useLang();
 	const session = useAppState((state) => state.sessions[transcript.sessionId]);
+	const byId = useMemo(
+		() => new Map(transcript.entries.map((entry) => [entry.id, entry])),
+		[transcript.entries],
+	);
+	// The conversation cannot be taken back past the latest summary of earlier history.
+	const summarySeq = useMemo(
+		() =>
+			transcript.entries.reduce(
+				(latest, entry) => (entry.role === "compaction" ? Math.max(latest, entry.seq) : latest),
+				0,
+			),
+		[transcript.entries],
+	);
 	const scroller = useRef<HTMLDivElement>(null);
 	const [behind, setBehind] = useState(false);
 	const onFollow = useCallback((following: boolean) => {
@@ -1164,11 +1310,37 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 					<p className="notice">{t("emptyTranscript")}</p>
 				)}
 				{items.map((item) => {
-					if (item.kind === "entry") return <EntryView key={item.key} entry={item.entry} />;
+					if (item.kind === "entry") {
+						const entry = item.entry;
+						if (session && entry.role === "user" && !entry.letter) {
+							return (
+								<div key={item.key} className="message message-mine">
+									<EntryView entry={entry} />
+									<MessageActions
+										session={session}
+										entry={entry}
+										text={userText(entry)}
+										mine
+										canRewind={entry.seq - 1 >= summarySeq}
+									/>
+								</div>
+							);
+						}
+						return <EntryView key={item.key} entry={entry} />;
+					}
 					if (item.kind === "text") {
 						return (
 							<div key={item.key} className="msg-assistant">
 								<Markdown text={item.text} live={item.live} />
+								{item.forkFrom && session && byId.get(item.forkFrom) && (
+									<MessageActions
+										session={session}
+										entry={byId.get(item.forkFrom) as Entry}
+										text={replyText(byId.get(item.forkFrom) as Entry)}
+										mine={false}
+										canRewind={(byId.get(item.forkFrom) as Entry).seq >= summarySeq}
+									/>
+								)}
 							</div>
 						);
 					}

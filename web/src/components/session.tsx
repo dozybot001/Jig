@@ -16,6 +16,7 @@ import {
 	sendMessage,
 	startSession,
 	stopSession,
+	takePrefill,
 	updateSession,
 	withdrawQueued,
 } from "../actions.ts";
@@ -327,6 +328,13 @@ function QueuedItem({ sessionId, id, text }: { sessionId: string; id: string; te
 function Composer({ session, transcript }: { session: Session; transcript: TranscriptState }) {
 	useLang();
 	const [text, setText] = useState("");
+	// A message taken back or forked from comes back here to be changed and sent again.
+	const waiting = useAppState((state) => state.prefill[session.id]);
+	useEffect(() => {
+		if (waiting === undefined) return;
+		const value = takePrefill(session.id);
+		if (value !== null) setText(value);
+	}, [waiting, session.id]);
 	const ref = useAutoGrow(text);
 	const working = session.status === "working" || session.status === "waiting";
 	const change = useAction((patch: Parameters<typeof updateSession>[1]) =>

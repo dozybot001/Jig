@@ -519,7 +519,12 @@ export class Mailroom {
 	 * Opens a task session for `parent` and sends it the brief as a request (blueprint 6.2, item 8). Its
 	 * permissions are never above the parent's: same mode and rules, the parent's folder or one inside it.
 	 */
-	openChild(parent: Session, input: OpenInput): { session: Session; letter: Letter } {
+	openChild(
+		parent: Session,
+		input: OpenInput,
+		/** The tool call opening it; with `fork`, the conversation is copied up to the step that made it. */
+		callRowId?: string,
+	): { session: Session; letter: Letter } {
 		const brief = input.brief.trim();
 		if (!brief) throw invalid("The brief is empty.", "brief");
 		if ([...brief].length > BODY_MAX) {
@@ -553,17 +558,21 @@ export class Mailroom {
 			provider = input.provider;
 			model = input.model;
 		}
-		const session = this.#store.createSession({
-			name: freeName(this.#store, validateSessionName(input.name)),
-			kind: "task",
-			groupId: parent.groupId,
-			cwd,
-			provider,
-			model,
-			thinking: parent.thinking,
-			rules: inheritableRules(parent.rules),
-			options: { permissionMode: permissionModeOf(parent.options) },
-			parentId: parent.id,
+		const session = this.#store.tx(() => {
+			const child = this.#store.createSession({
+				name: freeName(this.#store, validateSessionName(input.name)),
+				kind: "task",
+				groupId: parent.groupId,
+				cwd,
+				provider,
+				model,
+				thinking: parent.thinking,
+				rules: inheritableRules(parent.rules),
+				options: { permissionMode: permissionModeOf(parent.options) },
+				parentId: parent.id,
+			});
+			if (input.fork) this.#fork(parent, child, callRowId);
+			return child;
 		});
 		const letter = this.sent(
 			parent.id,
@@ -578,5 +587,24 @@ export class Mailroom {
 			),
 		);
 		return { session: this.#store.getSession(session.id), letter };
+	}
+
+	/**
+	 * Gives a new task session the opener's conversation so far: everything before the step that
+	 * opened it, so no half-made step with unanswered calls goes along. A note after it tells the new
+	 * session who it is now; the brief follows as its request.
+	 */
+	#fork(parent: Session, child: Session, callRowId: string | undefined): void {
+		const call = callRowId ? this.#store.getToolCall(callRowId) : null;
+		const through = call ? this.#store.getEntry(call.messageId).seq - 1 : null;
+		if (this.#store.copyHistory(parent.id, child.id, through) === 0) return;
+		this.#store.appendEntry(child.id, {
+			role: "system",
+			message: {
+				role: "system",
+				content: `You were forked from the session "${parent.name}": the conversation above happened there, up to the moment it opened you. You are "${child.name}" now, a task session of your own. Your task is the request below; your replies go back to "${parent.name}".`,
+				timestamp: Date.now(),
+			},
+		});
 	}
 }

@@ -282,4 +282,7 @@ CREATE TABLE artifact_versions (
 	PRIMARY KEY (artifact_id, version)
 ) STRICT, WITHOUT ROWID;
 `,
+	// Taking a conversation back (blueprint 6.11, item 42): entries after the point stay in the
+	// database, marked, and are no longer shown or sent to the model.
+	"ALTER TABLE messages ADD COLUMN rewound INTEGER NOT NULL DEFAULT 0;",
 ];

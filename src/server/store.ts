@@ -663,11 +663,168 @@ export class Store {
 	}
 
 	/**
+	 * Copies a session's history into another, new session: its entries up to and including
+	 * `throughSeq` (all of them when null) with their sequence numbers, and the tool calls those
+	 * entries made. Returns the sequence number of the last entry copied, 0 when there was none.
+	 */
+	copyHistory(fromId: string, toId: string, throughSeq: number | null): number {
+		return this.tx(() => this.#copyHistory(fromId, toId, throughSeq));
+	}
+
+	#copyHistory(fromId: string, toId: string, throughSeq: number | null): number {
+		let last = 0;
+		const ids = new Map<string, string>();
+		const rows = this.#q(
+			"SELECT * FROM messages WHERE session_id = ? AND seq <= ? AND rewound = 0 ORDER BY seq",
+		).all(fromId, throughSeq ?? Number.MAX_SAFE_INTEGER) as unknown as EntryRow[];
+		for (const row of rows) {
+			const entryId = newId();
+			ids.set(row.id, entryId);
+			last = row.seq;
+			this.#q(
+				"INSERT INTO messages (id, session_id, seq, role, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+			).run(entryId, toId, row.seq, row.role, row.body, row.created_at);
+			const text = searchableText(JSON.parse(row.body) as EntryBody);
+			if (text) {
+				this.#q("INSERT INTO message_search (text, session_id, message_id) VALUES (?, ?, ?)").run(
+					text,
+					toId,
+					entryId,
+				);
+			}
+		}
+		const calls = this.#q("SELECT * FROM tool_calls WHERE session_id = ? ORDER BY id").all(
+			fromId,
+		) as unknown as ToolCallRow[];
+		for (const call of calls) {
+			const messageId = ids.get(call.message_id);
+			if (!messageId) continue;
+			this.#q(
+				`INSERT INTO tool_calls (id, session_id, message_id, call_id, tool, args, status, detail,
+					result_message_id, started_at, finished_at, created_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			).run(
+				newId(),
+				toId,
+				messageId,
+				call.call_id,
+				call.tool,
+				call.args,
+				// A call that never ran is pending in the copy, one cut off while running needs review:
+				// the copy's next message closes both, as it would in the original.
+				call.status === "waiting"
+					? "pending"
+					: call.status === "running"
+						? "needs_review"
+						: call.status,
+				call.detail,
+				call.result_message_id ? (ids.get(call.result_message_id) ?? null) : null,
+				call.started_at,
+				call.finished_at,
+				call.created_at,
+			);
+		}
+		this.#q("UPDATE sessions SET message_seq = ? WHERE id = ?").run(last, toId);
+		return last;
+	}
+
+	/**
 	 * A copy of a session to take another way from here: the same settings, team, workspace, task list
 	 * and conversation (with its tool calls), under a new name. Usage starts at zero; letters, approvals
 	 * and the main-conversation role stay with the original. Not while the original is working, since its
 	 * last calls would have no results.
 	 */
+	/**
+	 * A new session that goes on from one point of another (blueprint 6.11, item 39): the same
+	 * settings, and the conversation up to that point: through a finished reply, or up to just before
+	 * a message from the person. The original goes on as it is, working or not. The new one starts with
+	 * a fresh view of its folder and instruction files.
+	 */
+	forkSession(id: string, entryId: string, name: string): Session {
+		return this.tx(() => {
+			const source = this.getSession(id);
+			const through = this.turnPoint(id, entryId);
+			const copy = this.createSession({
+				name,
+				kind: source.kind,
+				groupId: source.groupId,
+				responsibility: source.responsibility,
+				cwd: source.cwd,
+				provider: source.provider,
+				model: source.model,
+				thinking: source.thinking,
+				rules: inheritableRules(source.rules),
+				options: source.options,
+			});
+			this.#copyHistory(id, copy.id, through);
+			return this.#emitSession(copy.id);
+		});
+	}
+
+	/**
+	 * The last entry a fork or a rewind keeps for a point the person picked: a finished reply itself
+	 * (text, no tool calls), or everything before a message from the person. Nothing else is a point
+	 * where the conversation can stop.
+	 */
+	turnPoint(sessionId: string, entryId: string): number {
+		const entry = this.getEntry(entryId);
+		const row = this.#q("SELECT rewound FROM messages WHERE id = ?").get(entryId) as {
+			rewound: number;
+		};
+		if (entry.sessionId === sessionId && row.rewound === 0) {
+			if (entry.role === "user") return entry.seq - 1;
+			const finished =
+				entry.role === "assistant" &&
+				entry.message.content.some((block) => block.type === "text" && block.text.trim()) &&
+				!entry.message.content.some((block) => block.type === "toolCall");
+			if (finished) return entry.seq;
+		}
+		throw invalid("Pick one of the session's replies or one of your messages in it.", "entryId");
+	}
+
+	/**
+	 * Takes the conversation back to just after `throughSeq` (blueprint 6.11, item 42). The entries after
+	 * it stay in the database, marked, and are no longer shown, searched or sent to the model. Files
+	 * changed, commands run and letters sent meanwhile stay as they are. It cannot go back past the
+	 * latest summary of earlier history. Returns how many entries were taken back.
+	 */
+	rewindSession(id: string, throughSeq: number): number {
+		return this.tx(() => {
+			this.getSession(id);
+			const summary = this.#q(
+				"SELECT seq FROM messages WHERE session_id = ? AND role = 'compaction' AND rewound = 0 ORDER BY seq DESC LIMIT 1",
+			).get(id) as { seq: number } | undefined;
+			if (summary && throughSeq < summary.seq) {
+				throw conflict(
+					"The conversation cannot go back past the point where its earlier history was summarized.",
+					undefined,
+					"before-summary",
+				);
+			}
+			const gone = this.#q(
+				"SELECT id FROM messages WHERE session_id = ? AND seq > ? AND rewound = 0",
+			).all(id, throughSeq) as { id: string }[];
+			if (gone.length === 0) return 0;
+			this.#q(
+				"UPDATE messages SET rewound = 1 WHERE session_id = ? AND seq > ? AND rewound = 0",
+			).run(id, throughSeq);
+			for (const row of gone) {
+				this.#q("DELETE FROM message_search WHERE message_id = ?").run(row.id);
+			}
+			// Calls taken back before they finished are closed, so nothing picks them up later.
+			this.#q(
+				`UPDATE tool_calls SET status = 'error', finished_at = ?
+				WHERE session_id = ? AND status IN ('pending', 'waiting', 'running', 'needs_review')
+				AND message_id IN (SELECT id FROM messages WHERE session_id = ? AND rewound = 1)`,
+			).run(Date.now(), id, id);
+			// A fresh look at the folder and instruction files next turn; the context is measured again.
+			this.#q("UPDATE sessions SET context = NULL, context_tokens = 0 WHERE id = ?").run(id);
+			this.appendEvent(id, { type: "rewound", throughSeq });
+			this.#emitSession(id);
+			return gone.length;
+		});
+	}
+
 	duplicateSession(id: string, name: string): Session {
 		return this.tx(() => {
 			const source = this.getSession(id);
@@ -690,56 +847,7 @@ export class Store {
 				rules: inheritableRules(source.rules),
 				options: source.options,
 			});
-			const ids = new Map<string, string>();
-			const rows = this.#q("SELECT * FROM messages WHERE session_id = ? ORDER BY seq").all(
-				id,
-			) as unknown as EntryRow[];
-			for (const row of rows) {
-				const entryId = newId();
-				ids.set(row.id, entryId);
-				this.#q(
-					"INSERT INTO messages (id, session_id, seq, role, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-				).run(entryId, copy.id, row.seq, row.role, row.body, row.created_at);
-				const text = searchableText(JSON.parse(row.body) as EntryBody);
-				if (text) {
-					this.#q("INSERT INTO message_search (text, session_id, message_id) VALUES (?, ?, ?)").run(
-						text,
-						copy.id,
-						entryId,
-					);
-				}
-			}
-			const calls = this.#q("SELECT * FROM tool_calls WHERE session_id = ? ORDER BY id").all(
-				id,
-			) as unknown as ToolCallRow[];
-			for (const call of calls) {
-				const messageId = ids.get(call.message_id);
-				if (!messageId) continue;
-				this.#q(
-					`INSERT INTO tool_calls (id, session_id, message_id, call_id, tool, args, status, detail,
-						result_message_id, started_at, finished_at, created_at)
-					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				).run(
-					newId(),
-					copy.id,
-					messageId,
-					call.call_id,
-					call.tool,
-					call.args,
-					// A call that never ran is pending in the copy, one cut off while running needs review:
-					// the copy's next message closes both, as it would in the original.
-					call.status === "waiting"
-						? "pending"
-						: call.status === "running"
-							? "needs_review"
-							: call.status,
-					call.detail,
-					call.result_message_id ? (ids.get(call.result_message_id) ?? null) : null,
-					call.started_at,
-					call.finished_at,
-					call.created_at,
-				);
-			}
+			this.copyHistory(id, copy.id, null);
 			const context = this.#q("SELECT context, message_seq FROM sessions WHERE id = ?").get(id) as {
 				context: string | null;
 				message_seq: number;
@@ -1040,7 +1148,7 @@ export class Store {
 		options: { before?: number | null; limit: number },
 	): { entries: Entry[]; olderCursor: number | null } {
 		const rows = this.#q(
-			"SELECT * FROM messages WHERE session_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?",
+			"SELECT * FROM messages WHERE session_id = ? AND seq < ? AND rewound = 0 ORDER BY seq DESC LIMIT ?",
 		).all(
 			sessionId,
 			options.before ?? Number.MAX_SAFE_INTEGER,
@@ -1054,27 +1162,27 @@ export class Store {
 	/** Every entry, oldest first; the Markdown export needs the whole transcript, not one page. */
 	allEntries(sessionId: string): Entry[] {
 		this.getSession(sessionId);
-		const rows = this.#q("SELECT * FROM messages WHERE session_id = ? ORDER BY seq").all(
-			sessionId,
-		) as unknown as EntryRow[];
+		const rows = this.#q(
+			"SELECT * FROM messages WHERE session_id = ? AND rewound = 0 ORDER BY seq",
+		).all(sessionId) as unknown as EntryRow[];
 		return rows.map(toEntry);
 	}
 
 	/** Entries the model sees: everything since the latest compaction, plus that compaction's summary. */
 	contextEntries(sessionId: string): Entry[] {
 		const latest = this.#q(
-			"SELECT * FROM messages WHERE session_id = ? AND role = 'compaction' ORDER BY seq DESC LIMIT 1",
+			"SELECT * FROM messages WHERE session_id = ? AND role = 'compaction' AND rewound = 0 ORDER BY seq DESC LIMIT 1",
 		).get(sessionId) as EntryRow | undefined;
 		if (!latest) {
 			const rows = this.#q(
-				`SELECT * FROM messages WHERE session_id = ? AND role IN ${MODEL_ROLES} ORDER BY seq`,
+				`SELECT * FROM messages WHERE session_id = ? AND role IN ${MODEL_ROLES} AND rewound = 0 ORDER BY seq`,
 			).all(sessionId) as unknown as EntryRow[];
 			return rows.map(toEntry);
 		}
 		const compaction = toEntry(latest);
 		const firstKept = compaction.role === "compaction" ? compaction.compaction.firstKeptSeq : 0;
 		const rows = this.#q(
-			`SELECT * FROM messages WHERE session_id = ? AND role IN ${MODEL_ROLES} AND seq >= ? ORDER BY seq`,
+			`SELECT * FROM messages WHERE session_id = ? AND role IN ${MODEL_ROLES} AND seq >= ? AND rewound = 0 ORDER BY seq`,
 		).all(sessionId, firstKept) as unknown as EntryRow[];
 		return [compaction, ...rows.map(toEntry)];
 	}

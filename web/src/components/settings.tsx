@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
+import { MCP_PRESETS, type McpPreset, presetEntry } from "../../../src/shared/mcp-presets.ts";
 import { POLICY_VERSION } from "../../../src/shared/policy.ts";
 import {
 	DEFAULT_RELAY_URL,
@@ -46,6 +47,7 @@ import {
 	formatClock,
 	formatCost,
 	hasMessage,
+	type MessageKey,
 	t,
 	useLang,
 } from "../i18n.ts";
@@ -1476,6 +1478,88 @@ const pairsToRecord = (pairs: Pair[]): Record<string, string> =>
 	);
 
 /** Adding an MCP server: a command Jig starts on this computer, or a URL it connects to. */
+/**
+ * An official server from the list (blueprint 6.11, item 40): what it is, where its token comes from,
+ * where the token goes and what will run, then the same entry a person would write in mcp.json.
+ */
+function McpPresetDialog({
+	preset,
+	onClose,
+	onAdded,
+}: {
+	preset: McpPreset;
+	onClose: () => void;
+	onAdded: () => Promise<unknown>;
+}) {
+	useLang();
+	const [token, setToken] = useState("");
+	const tokenId = useId();
+	const add = useAction(async () => {
+		await addMcpServer(presetEntry(preset, token));
+		await onAdded();
+		onClose();
+	});
+	const remote = "url" in preset.connect;
+	const where = remote
+		? t("mcpPresetRemote", {
+				publisher: preset.publisher,
+				host: new URL((preset.connect as { url: string }).url).host,
+			})
+		: t("mcpPresetLocal", {
+				pkg: (preset.connect as { args: string[] }).args.find((arg) => arg.includes("@")) ?? "",
+			});
+	return (
+		<Dialog
+			title={t("mcpPresetAddTitle", { name: preset.name })}
+			size="m"
+			onClose={onClose}
+			footer={
+				<>
+					<Button onClick={onClose}>{t("cancel")}</Button>
+					<Button
+						variant="primary"
+						busy={add.busy}
+						disabled={Boolean(preset.token && !preset.token.optional && !token.trim())}
+						onClick={() => void add.run()}
+					>
+						<PlusIcon />
+						{t("mcpAdd")}
+					</Button>
+				</>
+			}
+		>
+			<p>{t(`mcpPreset_${preset.id}` as MessageKey)}</p>
+			<p className="hint">{where}</p>
+			{preset.token && (
+				<Field
+					label={preset.token.optional ? t("mcpPresetTokenOptional") : t("mcpPresetToken")}
+					htmlFor={tokenId}
+				>
+					{/* A token is not a sign-in password, so it is not marked as one (spec 18.5). */}
+					<input
+						id={tokenId}
+						className="input secret-input"
+						type="text"
+						autoComplete="off"
+						spellCheck={false}
+						data-1p-ignore="true"
+						value={token}
+						onChange={(event) => setToken(event.target.value)}
+					/>
+					<span className="hint">
+						<a href={preset.token.where} target="_blank" rel="noopener noreferrer">
+							{t("mcpPresetWhere", { publisher: preset.publisher })}
+						</a>
+						{t("hintSeparator")}
+						{t("mcpPresetStored")}
+					</span>
+				</Field>
+			)}
+			<ErrorBox error={add.error} />
+		</Dialog>
+	);
+}
+
 function McpAddDialog({
 	onClose,
 	onAdded,
@@ -1796,6 +1880,7 @@ function McpDialog({ onClose }: { onClose: () => void }) {
 	const [servers, setServers] = useState<McpServerView[] | null>(null);
 	const [error, setError] = useState<unknown>(null);
 	const [adding, setAdding] = useState(false);
+	const [preset, setPreset] = useState<McpPreset | null>(null);
 	const [removing, setRemoving] = useState<string | null>(null);
 	const reload = useCallback(
 		() =>
@@ -1855,8 +1940,35 @@ function McpDialog({ onClose }: { onClose: () => void }) {
 					{t("mcpAdd")}
 				</Button>
 			</div>
+			{servers && (
+				<SettingGroup title={t("mcpPresets")} info={t("mcpPresetsInfo")}>
+					{MCP_PRESETS.filter((preset) => !servers.some((server) => server.name === preset.id)).map(
+						(preset) => (
+							<div key={preset.id} className="setting-row">
+								<div className="setting-text">
+									<span className="setting-label">{preset.name}</span>
+									<span className="hint">
+										{preset.publisher}
+										{t("hintSeparator")}
+										{t(`mcpPreset_${preset.id}` as MessageKey)}
+									</span>
+								</div>
+								<div className="setting-control">
+									<Button onClick={() => setPreset(preset)}>
+										<PlusIcon />
+										{t("mcpAdd")}
+									</Button>
+								</div>
+							</div>
+						),
+					)}
+				</SettingGroup>
+			)}
 			<ErrorBox error={error} />
 			{adding && <McpAddDialog onClose={() => setAdding(false)} onAdded={reload} />}
+			{preset && (
+				<McpPresetDialog preset={preset} onClose={() => setPreset(null)} onAdded={reload} />
+			)}
 			{removing && (
 				<ConfirmDialog
 					title={t("mcpRemoveTitle", { name: removing })}

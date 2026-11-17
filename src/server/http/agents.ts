@@ -68,6 +68,13 @@ export function agentRoutes(
 		return c.json(store.getSession(id), 202);
 	});
 
+	// The conversation goes back to a reply, or to just before one of the person's messages.
+	app.post("/sessions/:id/rewind", async (c) => {
+		const id = c.req.param("id");
+		const withdrawn = agents.rewind(id, reqString(await readJson(c), "entryId", 100));
+		return c.json({ withdrawn, session: store.getSession(id) });
+	});
+
 	app.post("/sessions/:id/compact", (c) => {
 		const id = c.req.param("id");
 		store.getSession(id);

@@ -221,6 +221,17 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		return c.json(store.duplicateSession(source.id, name), 201);
 	});
 
+	// A new session that goes on from one reply of this one ("名称 分叉", "名称 分叉 2"…).
+	app.post("/sessions/:id/fork", once, async (c) => {
+		const source = store.getSession(c.req.param("id"));
+		const entryId = reqString(await readJson(c), "entryId", 100);
+		const english = readSettings(store).language === "en";
+		const base = `${[...source.name].slice(0, 52).join("")}${english ? " fork" : " 分叉"}`;
+		let name = base;
+		for (let n = 2; store.findSessionByName(name); n++) name = `${base} ${n}`;
+		return c.json(store.forkSession(source.id, entryId, name), 201);
+	});
+
 	app.patch("/sessions/:id", async (c) => {
 		const id = c.req.param("id");
 		const fields = await readJson(c);

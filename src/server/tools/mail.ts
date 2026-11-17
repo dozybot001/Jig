@@ -281,6 +281,11 @@ export const openSessionTool: ToolDefinition = {
 			},
 			model: { type: "string", description: '"provider/model" to use instead of yours.' },
 			wait: { type: "boolean", description: "Wait for its first reply." },
+			fork: {
+				type: "boolean",
+				description:
+					"Give it a copy of this conversation so far, so it knows what you know and the brief can be short. Its first request carries all of that.",
+			},
 			confirm: CONFIRM_ARGUMENT,
 		},
 		required: ["name", "brief"],
@@ -314,6 +319,7 @@ export const openSessionTool: ToolDefinition = {
 				brief: str(args, "brief", true),
 				...(folder === undefined ? {} : { cwd: folder === "none" ? null : folder }),
 				...(provider && modelId ? { provider, model: modelId } : {}),
+				...(bool(args, "fork") ? { fork: true } : {}),
 			}),
 		);
 		const detail = {
@@ -329,7 +335,7 @@ export const openSessionTool: ToolDefinition = {
 		return {
 			content: [
 				text(
-					`Opened the task session "${opened.session.name}" (id ${opened.session.id}). It starts on the brief now; its report comes back to you as a letter.`,
+					`Opened the task session "${opened.session.name}" (id ${opened.session.id})${bool(args, "fork") ? " with a copy of this conversation so far" : ""}. It starts on the brief now; its report comes back to you as a letter.`,
 				),
 			],
 			detail,
