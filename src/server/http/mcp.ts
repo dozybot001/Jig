@@ -1,10 +1,11 @@
 import { Hono } from "hono";
-import { invalid } from "../errors.ts";
+import { conflict, invalid } from "../errors.ts";
 import type { McpHub, McpStatus } from "../mcp.ts";
 import {
 	addMcpEntry,
 	listMcpEntries,
 	type McpEntryView,
+	type NewMcpServer,
 	patchMcpEntry,
 	removeMcpEntry,
 } from "../mcp-config.ts";
@@ -33,6 +34,8 @@ export interface McpServerView extends McpEntryView {
 	state: McpStatus["state"];
 	error: string | null;
 	tools: string[];
+	/** Jig holds a sign-in for it. */
+	signedIn: boolean;
 }
 
 /** Names with text values (null allowed where a value can be removed); anything else is refused. */
@@ -69,6 +72,7 @@ export function mcpRoutes(store: Store, options: McpRoutesOptions): Hono<AppEnv>
 			state: entry.disabled ? "disabled" : (status?.state ?? "connecting"),
 			error: entry.disabled ? null : (status?.error ?? null),
 			tools: entry.disabled ? [] : (status?.tools ?? []),
+			signedIn: status?.signedIn ?? false,
 		};
 	};
 	const reload = () => {
@@ -89,6 +93,7 @@ export function mcpRoutes(store: Store, options: McpRoutesOptions): Hono<AppEnv>
 		const url = optString(fields, "url", 2000);
 		const env = values<string>(fields, "env", false);
 		const headers = values<string>(fields, "headers", false);
+		const oauth = optObject(fields, "oauth") as NewMcpServer["oauth"] | undefined;
 		const entry = addMcpEntry(home, {
 			name: reqString(fields, "name", 100),
 			...(command !== undefined ? { command } : {}),
@@ -96,6 +101,7 @@ export function mcpRoutes(store: Store, options: McpRoutesOptions): Hono<AppEnv>
 			...(env ? { env } : {}),
 			...(url !== undefined ? { url } : {}),
 			...(headers ? { headers } : {}),
+			...(oauth ? { oauth } : {}),
 		});
 		reload();
 		return c.json(shown(entry), 201);
@@ -120,11 +126,76 @@ export function mcpRoutes(store: Store, options: McpRoutesOptions): Hono<AppEnv>
 		return c.json(shown(entry));
 	});
 
+	// Signing in to a server in the browser (blueprint 6.11, item 40): the page opens the address.
+	app.post("/mcp/:name/sign-in", async (c) => {
+		try {
+			return c.json({ url: await hub.signInUrl(c.req.param("name")) });
+		} catch (error) {
+			throw conflict((error as Error).message, undefined, "mcp-sign-in");
+		}
+	});
+
+	// The same from a link on Jig's page, which opens the sign-in in a new tab: no pop-up to block.
+	app.get("/mcp/:name/sign-in", async (c) => {
+		try {
+			return c.redirect(await hub.signInUrl(c.req.param("name")), 302);
+		} catch (error) {
+			const text = (error as Error).message.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+			return c.html(
+				`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>没有登录 · Not signed in</title><body><h1>没有登录 · Not signed in</h1><p>${text}</p></body></html>`,
+				409,
+			);
+		}
+	});
+
+	app.post("/mcp/:name/sign-out", async (c) => {
+		await hub.signOut(c.req.param("name"));
+		return c.body(null, 204);
+	});
+
 	app.delete("/mcp/:name", (c) => {
 		removeMcpEntry(home, c.req.param("name"), hub.builtin);
 		reload();
 		return c.body(null, 204);
 	});
 
+	return app;
+}
+
+/**
+ * Where the browser comes back after signing in to an MCP server. It is a plain page outside /api: the
+ * provider's redirect is a navigation from another site, which carries neither Jig's cookie nor its
+ * origin, so the one-time `state` Jig made when the sign-in started is what proves it.
+ */
+export function oauthCallbackRoute(hub: McpHub, log?: (line: string) => void): Hono<AppEnv> {
+	const app = new Hono<AppEnv>();
+	const page = (title: string, text: string) =>
+		`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${title}</title><body><h1>${title}</h1><p>${text}</p></body></html>`;
+	const html = (text: string) => text.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+	app.get("/oauth/callback", async (c) => {
+		const state = c.req.query("state") ?? "";
+		try {
+			const name = await hub.completeSignIn(
+				state,
+				c.req.query("code") ?? null,
+				c.req.query("error") ?? null,
+			);
+			return c.html(
+				page(
+					"已登录 · Signed in",
+					`已登录 ${html(name)}，可以关掉这个页面回到 Jig。<br>Signed in to ${html(name)}. You can close this page and go back to Jig.`,
+				),
+			);
+		} catch (error) {
+			log?.(`mcp: sign-in did not finish: ${(error as Error).message}`);
+			return c.html(
+				page(
+					"没有登录 · Not signed in",
+					`${html((error as Error).message)}<br>回到 Jig 的「MCP 服务」再试一次。Go back to MCP servers in Jig and try again.`,
+				),
+				400,
+			);
+		}
+	});
 	return app;
 }

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { ImageBlock, JsonObject, TextBlock } from "../shared/messages.ts";
 import type { ConfirmReason } from "../shared/types.ts";
 import { serverEnv } from "./mcp-builtin.ts";
+import { type McpAuth, type OAuthSettings, SignInRequired } from "./mcp-oauth.ts";
 import { errorResult, type ToolDefinition, type ToolResult, text } from "./tools/types.ts";
 
 /**
@@ -25,6 +26,8 @@ export interface McpServerConfig {
 	disabled?: boolean;
 	/** One of Jig's own servers: it gets a small part of Jig's environment, not all of it. */
 	ownEnv?: boolean;
+	/** Signing in to an HTTP server in the browser: a client the person made, scopes to ask for. */
+	oauth?: OAuthSettings;
 }
 
 /** What the computer control tool does without changing anything. */
@@ -80,9 +83,12 @@ export interface McpToolInfo {
 export interface McpStatus {
 	name: string;
 	kind: "stdio" | "http";
-	state: "connecting" | "ready" | "error" | "disabled";
+	/** "sign-in": the server wants the person to sign in to it in the browser. */
+	state: "connecting" | "ready" | "error" | "disabled" | "sign-in";
 	error: string | null;
 	tools: string[];
+	/** Jig holds a sign-in for it. */
+	signedIn: boolean;
 }
 
 const PROTOCOL = "2025-06-18";
@@ -101,6 +107,24 @@ const expand = (value: string, env: NodeJS.ProcessEnv) =>
  * file replaces a built-in one of the same name; one that only says `"disabled": true` turns the
  * built-in one off.
  */
+/** The "oauth" part of an HTTP server's entry: a client the person made and the scopes to ask for. */
+function oauthOf(value: unknown, env: NodeJS.ProcessEnv): OAuthSettings | undefined {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+	const raw = value as Record<string, unknown>;
+	const text = (key: string) =>
+		typeof raw[key] === "string" && raw[key] ? expand(raw[key] as string, env) : undefined;
+	const clientId = text("clientId");
+	const clientSecret = text("clientSecret");
+	const scopes = Array.isArray(raw.scopes)
+		? raw.scopes.filter((scope): scope is string => typeof scope === "string")
+		: undefined;
+	return {
+		...(clientId ? { clientId } : {}),
+		...(clientSecret ? { clientSecret } : {}),
+		...(scopes?.length ? { scopes } : {}),
+	};
+}
+
 export function readMcpConfig(
 	jigHome: string,
 	env: NodeJS.ProcessEnv = process.env,
@@ -130,7 +154,13 @@ export function readMcpConfig(
 		const off = entry.disabled === true ? { disabled: true } : {};
 		if (typeof entry.url === "string" && /^https?:\/\//.test(entry.url)) {
 			const headers = strings(entry.headers);
-			configs[name] = { url: expand(entry.url, env), ...(headers ? { headers } : {}), ...off };
+			const oauth = oauthOf(entry.oauth, env);
+			configs[name] = {
+				url: expand(entry.url, env),
+				...(headers ? { headers } : {}),
+				...(oauth ? { oauth } : {}),
+				...off,
+			};
 		} else if (typeof entry.command === "string" && entry.command) {
 			const envs = strings(entry.env);
 			configs[name] = {
@@ -263,17 +293,30 @@ class HttpTransport implements Transport {
 	#session: string | null = null;
 	#next = 1;
 
-	constructor(config: McpServerConfig, version: string, fetcher: typeof fetch) {
+	readonly #bearer: (() => Promise<string | null>) | null;
+
+	constructor(
+		config: McpServerConfig,
+		version: string,
+		fetcher: typeof fetch,
+		bearer: (() => Promise<string | null>) | null = null,
+	) {
 		this.#config = config;
 		this.#version = version;
 		this.#fetch = fetcher;
+		this.#bearer = bearer;
 	}
 
 	async #post(body: JsonObject, signal?: AbortSignal): Promise<Response> {
+		const configured = Object.keys(this.#config.headers ?? {}).some(
+			(name) => name.toLowerCase() === "authorization",
+		);
+		const token = configured || !this.#bearer ? null : await this.#bearer();
 		const response = await this.#fetch(this.#config.url as string, {
 			method: "POST",
 			headers: {
 				...this.#config.headers,
+				...(token ? { Authorization: `Bearer ${token}` } : {}),
 				"Content-Type": "application/json",
 				Accept: "application/json, text/event-stream",
 				"User-Agent": `jig/${this.#version}`,
@@ -292,6 +335,14 @@ class HttpTransport implements Transport {
 	async request(method: string, params: JsonObject, signal?: AbortSignal): Promise<unknown> {
 		const id = this.#next++;
 		const response = await this.#post({ jsonrpc: "2.0", id, method, params }, signal);
+		const challenge = response.headers.get("WWW-Authenticate");
+		if (
+			response.status === 401 ||
+			(response.status === 403 && challenge?.includes("insufficient_scope"))
+		) {
+			// Wants a signed-in request: the person signs in from the settings (blueprint 6.11, item 40).
+			throw new SignInRequired(challenge);
+		}
 		if (!response.ok) throw new Error(`the server answered HTTP ${response.status}`);
 		const type = response.headers.get("Content-Type") ?? "";
 		const messages: { id?: unknown; result?: unknown; error?: { message?: unknown } }[] = [];
@@ -337,6 +388,9 @@ class Server {
 	state: McpStatus["state"] = "connecting";
 	error: string | null = null;
 	tools: McpToolInfo[] = [];
+	/** The server's WWW-Authenticate challenge from its last refusal, for signing in. */
+	challenge: string | null = null;
+	signedIn = false;
 	#transport: Transport | null = null;
 
 	constructor(name: string, config: McpServerConfig) {
@@ -381,15 +435,30 @@ class Server {
 			this.state = "ready";
 			this.error = null;
 		} catch (error) {
-			this.state = "error";
-			this.error = (error as Error).message;
+			if (error instanceof SignInRequired) {
+				this.state = "sign-in";
+				this.challenge = error.challenge;
+				this.error = null;
+			} else {
+				this.state = "error";
+				this.error = (error as Error).message;
+			}
 			this.close();
 		}
 	}
 
 	async call(tool: string, args: JsonObject, signal: AbortSignal): Promise<unknown> {
 		if (!this.#transport) throw new Error("the server is not connected");
-		return this.#transport.request("tools/call", { name: tool, arguments: args }, signal);
+		try {
+			return await this.#transport.request("tools/call", { name: tool, arguments: args }, signal);
+		} catch (error) {
+			if (!(error instanceof SignInRequired)) throw error;
+			this.state = "sign-in";
+			this.challenge = error.challenge;
+			throw new Error(
+				"the server asks the person to sign in again. They can do that under Settings, MCP servers.",
+			);
+		}
 	}
 
 	close(): void {
@@ -408,6 +477,8 @@ export interface McpHubOptions {
 	builtin?: Record<string, McpServerConfig>;
 	/** Installs Jig's own servers if they are not yet; awaited before one of them is started. */
 	prepare?: () => Promise<void>;
+	/** Signing in to HTTP servers in the browser; without it, a refusal is just an error. */
+	auth?: McpAuth;
 }
 
 /** The configured servers, connected, and their tools as tools sessions can call. */
@@ -449,9 +520,15 @@ export class McpHub {
 			this.#servers.delete(name);
 		}
 		const env = this.#options.env ?? process.env;
-		const make = (config: McpServerConfig): Transport =>
+		const auth = this.#options.auth;
+		const make = (name: string, config: McpServerConfig): Transport =>
 			config.url
-				? new HttpTransport(config, this.#options.version, this.#options.fetch ?? fetch)
+				? new HttpTransport(
+						config,
+						this.#options.version,
+						this.#options.fetch ?? fetch,
+						auth ? () => auth.bearer(name, config.url as string) : null,
+					)
 				: new StdioTransport(config, env);
 		const offer = () => {
 			this.#definitions = [...this.#servers.values()].flatMap((server) =>
@@ -474,7 +551,10 @@ export class McpHub {
 							server.error = (error as Error).message;
 						}
 					}
-					if (server.state !== "error") await server.connect(make, this.#options.version);
+					if (server.state !== "error") {
+						await server.connect((c) => make(name, c), this.#options.version);
+						if (auth && config.url) server.signedIn = await auth.signedIn(name, config.url);
+					}
 					if (server.error) this.#options.log?.(`mcp: ${name}: ${server.error}`);
 					// Removed or replaced while it was connecting: its tools are not offered.
 					if (this.#servers.get(name) === server) offer();
@@ -502,12 +582,43 @@ export class McpHub {
 			state: server.state,
 			error: server.error,
 			tools: server.tools.map((tool) => tool.name),
+			signedIn: server.signedIn,
 		}));
 	}
 
 	/** The tools of the connected servers, named `mcp__<server>__<tool>`. */
 	tools(): ToolDefinition[] {
 		return this.#definitions;
+	}
+
+	/** The address the person's browser opens to sign in to a server (blueprint 6.11, item 40). */
+	async signInUrl(name: string): Promise<string> {
+		const server = this.#servers.get(name);
+		const auth = this.#options.auth;
+		if (!server?.config.url || !auth) throw new Error(`${name} is not a server one signs in to.`);
+		return auth.begin(name, server.config.url, server.config.oauth, server.challenge);
+	}
+
+	/** The browser came back from signing in: keep the tokens and connect the server again. */
+	async completeSignIn(state: string, code: string | null, error: string | null): Promise<string> {
+		const auth = this.#options.auth;
+		if (!auth) throw new Error("Signing in is not available.");
+		const name = await auth.complete(state, code, error);
+		await this.reconnect(name);
+		return name;
+	}
+
+	async signOut(name: string): Promise<void> {
+		await this.#options.auth?.forget(name);
+		await this.reconnect(name);
+	}
+
+	/** Connects one server again, as it is configured now. */
+	reconnect(name: string): Promise<void> {
+		this.#servers.get(name)?.close();
+		this.#servers.delete(name);
+		this.#configAt = -1;
+		return this.refresh();
 	}
 
 	stop(): void {

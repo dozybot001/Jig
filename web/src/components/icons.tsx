@@ -24,6 +24,8 @@ import {
 	KeyRound,
 	Languages,
 	ListTodo,
+	LogIn,
+	LogOut,
 	Mail,
 	Menu,
 	MessageCircle,
@@ -163,3 +165,6 @@ export const RetryIcon = () => <RotateCcw {...props} />;
 export const ForkIcon = () => <Split {...props} />;
 /** Take the conversation back to a point. */
 export const RewindIcon = () => <Undo2 {...props} />;
+/** Sign in to a service in the browser, and sign out of it. */
+export const SignInIcon = () => <LogIn {...props} />;
+export const SignOutIcon = () => <LogOut {...props} />;

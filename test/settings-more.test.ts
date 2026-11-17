@@ -230,9 +230,11 @@ describe("settings: MCP servers", () => {
 					envNames: ["GREETING"],
 					url: null,
 					headerNames: [],
+					oauthClient: false,
 					state: "ready",
 					error: null,
 					tools: ["echo", "env"],
+					signedIn: false,
 				},
 			]);
 			assert.doesNotMatch(listed.text, /s3cret-greeting/);
@@ -327,9 +329,11 @@ describe("settings: MCP servers", () => {
 					envNames: [],
 					url: "https://mcp.example.com/mcp",
 					headerNames: ["Authorization"],
+					oauthClient: false,
 					state: "disabled",
 					error: null,
 					tools: [],
+					signedIn: false,
 				},
 			]);
 			assert.doesNotMatch(listed.text, /h-1/);

@@ -19,7 +19,7 @@ import { type DataRoutesOptions, dataRoutes } from "./data.ts";
 import { deviceRoutes } from "./devices.ts";
 import { DraftCache, eventRoutes } from "./events.ts";
 import { mailRoutes } from "./mail.ts";
-import { type McpRoutesOptions, mcpRoutes } from "./mcp.ts";
+import { type McpRoutesOptions, mcpRoutes, oauthCallbackRoute } from "./mcp.ts";
 import { type NoteStreams, noteRoutes } from "./notes.ts";
 import { type AppEnv, errorHandler, problemResponse, requestId, titleFor } from "./problem.ts";
 import { providerRoutes } from "./providers.ts";
@@ -120,7 +120,10 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 	if (bus) app.route("/api", eventRoutes(store, bus, new DraftCache(bus)));
 	if (options.scheduler) app.route("/api", scheduleRoutes(store, options.scheduler));
 	if (options.notes) app.route("/api", noteRoutes(options.notes));
-	if (options.mcp) app.route("/api", mcpRoutes(store, { log, ...options.mcp }));
+	if (options.mcp) {
+		app.route("/api", mcpRoutes(store, { log, ...options.mcp }));
+		app.route("/", oauthCallbackRoute(options.mcp.hub, log));
+	}
 	if (options.skills) app.route("/api", skillRoutes(store, options.skills));
 	if (options.data) {
 		// A session's output files are left alone while one of its commands may still write to them.

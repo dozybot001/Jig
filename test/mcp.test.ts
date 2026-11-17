@@ -74,6 +74,26 @@ describe("common official servers", () => {
 		assert.equal(config.context7?.headers, undefined, "an optional token can be left out");
 		assert.equal(new Set(MCP_PRESETS.map((preset) => preset.id)).size, MCP_PRESETS.length);
 	});
+
+	test("a server one signs in to with a client of one's own keeps the client and scopes in its entry", () => {
+		const jigHome = tempDir("jig-home-");
+		const gmail = MCP_PRESETS.find((preset) => preset.id === "gmail");
+		assert.ok(gmail?.signIn?.ownClient);
+		const shown = addMcpEntry(jigHome, presetEntry(gmail, "", { id: " cid ", secret: " shh " }));
+		assert.equal(shown.oauthClient, true);
+		assert.deepEqual(readMcpConfig(jigHome, {}).gmail?.oauth, {
+			clientId: "cid",
+			clientSecret: "shh",
+			scopes: gmail.signIn.ownClient.scopes,
+		});
+		// One that registers itself needs nothing in its entry.
+		const linear = MCP_PRESETS.find((preset) => preset.id === "linear");
+		assert.ok(linear);
+		assert.deepEqual(presetEntry(linear, ""), {
+			name: "linear",
+			url: "https://mcp.linear.app/mcp",
+		});
+	});
 });
 
 describe("servers Jig sets up by itself", () => {
@@ -350,6 +370,7 @@ describe("MCP servers", () => {
 					state: "ready",
 					error: null,
 					tools: ["echo", "env"],
+					signedIn: false,
 				},
 			);
 			// A server that cannot start is reported and does not stand in the others' way.

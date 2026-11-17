@@ -115,6 +115,8 @@ export function serveCommand(): Command {
 			const search = new SearchAccess(runtime.keys);
 			// MCP servers from mcp.json in the data folder; their tools ask before the first use.
 			const { McpHub } = await import("../server/mcp.ts");
+			const { McpAuth } = await import("../server/mcp-oauth.ts");
+			const { systemKeys } = await import("../server/keys.ts");
 			const { builtinInstaller, builtinMcp } = await import("../server/mcp-builtin.ts");
 			const mcp = new McpHub({
 				jigHome: home,
@@ -122,6 +124,12 @@ export function serveCommand(): Command {
 				log,
 				builtin: builtinMcp(home, io.env as NodeJS.ProcessEnv),
 				prepare: builtinInstaller({ jigHome: home, env: io.env as NodeJS.ProcessEnv, log }),
+				// Sign-ins to MCP servers: tokens in the keychain; the browser comes back to this port.
+				auth: new McpAuth({
+					keys: systemKeys("mcp", io.env as NodeJS.ProcessEnv),
+					redirectUri: `http://127.0.0.1:${port}/oauth/callback`,
+					version: VERSION,
+				}),
 			});
 			const { skillTool } = await import("../server/skills.ts");
 			const { homedir } = await import("node:os");
@@ -143,7 +151,6 @@ export function serveCommand(): Command {
 				userHome: homedir(),
 			});
 			const { RemoteAccess } = await import("../remote/access.ts");
-			const { systemKeys } = await import("../server/keys.ts");
 			// A paired phone's requests run in-process against the same app, as that device.
 			let handle: ((request: Request, device: string) => Promise<Response>) | null = null;
 			const remote = new RemoteAccess(store, systemKeys("remote"), {

@@ -32,6 +32,8 @@ export interface McpEntryView {
 	url: string | null;
 	/** Names of the HTTP headers sent to the server; their values are never sent. */
 	headerNames: string[];
+	/** Its entry names a client to sign in with (the client's secret is never sent). */
+	oauthClient: boolean;
 }
 
 export interface NewMcpServer {
@@ -41,6 +43,8 @@ export interface NewMcpServer {
 	env?: Record<string, string>;
 	url?: string;
 	headers?: Record<string, string>;
+	/** For signing in to an HTTP server with a client the person made (blueprint 6.11, item 40). */
+	oauth?: { clientId?: string; clientSecret?: string; scopes?: string[] };
 }
 
 export interface McpServerPatch {
@@ -120,6 +124,7 @@ function view(name: string, entry: Raw): McpEntryView | null {
 			envNames: [],
 			url: entry.url,
 			headerNames: names(entry.headers),
+			oauthClient: isObject(entry.oauth) && typeof entry.oauth.clientId === "string",
 		};
 	}
 	if (typeof entry.command === "string" && entry.command) {
@@ -133,6 +138,7 @@ function view(name: string, entry: Raw): McpEntryView | null {
 			envNames: names(entry.env),
 			url: null,
 			headerNames: [],
+			oauthClient: false,
 		};
 	}
 	return null;
@@ -153,6 +159,7 @@ function builtinView(name: string, builtin: BuiltinServers, off: boolean): McpEn
 		envNames: [],
 		url: null,
 		headerNames: [],
+		oauthClient: false,
 	};
 }
 
@@ -189,6 +196,28 @@ function checkValues(
 	}
 }
 
+/** A client to sign in with and scopes to ask for: one-line text values, at most 20 scopes. */
+function checkOAuth(oauth: NewMcpServer["oauth"]): Raw | null {
+	if (!oauth) return null;
+	const line = (value: unknown, field: string) => {
+		if (value === undefined) return undefined;
+		if (typeof value !== "string" || value.length > MAX_VALUE || /[\r\n\0]/.test(value)) {
+			throw invalid(`${field} must be one line of text.`, "oauth");
+		}
+		return value.trim() || undefined;
+	};
+	const clientId = line(oauth.clientId, "The client ID");
+	const clientSecret = line(oauth.clientSecret, "The client secret");
+	const scopes = oauth.scopes ?? [];
+	if (!Array.isArray(scopes) || scopes.length > 20) throw invalid("At most 20 scopes.", "oauth");
+	for (const scope of scopes) line(scope, "A scope");
+	return {
+		...(clientId ? { clientId } : {}),
+		...(clientSecret ? { clientSecret } : {}),
+		...(scopes.length > 0 ? { scopes } : {}),
+	};
+}
+
 export function addMcpEntry(jigHome: string, input: NewMcpServer): McpEntryView {
 	if (!MCP_NAME.test(input.name)) {
 		throw invalid("The name uses letters, digits, dashes and underscores, up to 32.", "server");
@@ -221,7 +250,12 @@ export function addMcpEntry(jigHome: string, input: NewMcpServer): McpEntryView 
 		}
 		const headers = input.headers ?? {};
 		checkValues(headers, HEADER_NAME, "headers");
-		entry = { url, ...(Object.keys(headers).length > 0 ? { headers } : {}) };
+		const oauth = checkOAuth(input.oauth);
+		entry = {
+			url,
+			...(Object.keys(headers).length > 0 ? { headers } : {}),
+			...(oauth ? { oauth } : {}),
+		};
 	} else {
 		const args = input.args ?? [];
 		if (args.length > MAX_ARGS || args.some((arg) => arg.length > MAX_VALUE || /\0/.test(arg))) {

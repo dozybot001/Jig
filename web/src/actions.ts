@@ -971,7 +971,12 @@ export interface NewMcpServer {
 	env?: Record<string, string>;
 	url?: string;
 	headers?: Record<string, string>;
+	oauth?: { clientId?: string; clientSecret?: string; scopes?: string[] };
 }
+
+/** Forgets the sign-in to an MCP server; it then waits to be signed in to again. */
+export const signOutMcpServer = (name: string) =>
+	api("POST", `/api/mcp/${encodeURIComponent(name)}/sign-out`);
 
 export const addMcpServer = (server: NewMcpServer) =>
 	api<McpServerView>("POST", "/api/mcp", server, { idempotent: true });

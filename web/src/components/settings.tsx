@@ -38,6 +38,7 @@ import {
 	saveSystem,
 	setDevicePush,
 	setPhoneAccess,
+	signOutMcpServer,
 	spentToday,
 	testProvider,
 } from "../actions.ts";
@@ -86,6 +87,8 @@ import {
 	PulseIcon,
 	RenameIcon,
 	RetryIcon,
+	SignInIcon,
+	SignOutIcon,
 	SkillsIcon,
 	SlidersIcon,
 	ThemeIcon,
@@ -1493,9 +1496,15 @@ function McpPresetDialog({
 }) {
 	useLang();
 	const [token, setToken] = useState("");
+	const [client, setClient] = useState({ id: "", secret: "" });
 	const tokenId = useId();
+	const clientIdId = useId();
+	const clientSecretId = useId();
+	const own = preset.signIn?.ownClient;
+	// Where the browser comes back to after signing in: this Jig, on this port.
+	const redirect = `http://127.0.0.1:${window.location.port}/oauth/callback`;
 	const add = useAction(async () => {
-		await addMcpServer(presetEntry(preset, token));
+		await addMcpServer(presetEntry(preset, token, client));
 		await onAdded();
 		onClose();
 	});
@@ -1519,7 +1528,11 @@ function McpPresetDialog({
 					<Button
 						variant="primary"
 						busy={add.busy}
-						disabled={Boolean(preset.token && !preset.token.optional && !token.trim())}
+						disabled={
+							own
+								? !client.id.trim() || !client.secret.trim()
+								: Boolean(preset.token && !preset.token.optional && !token.trim())
+						}
 						onClick={() => void add.run()}
 					>
 						<PlusIcon />
@@ -1530,6 +1543,61 @@ function McpPresetDialog({
 		>
 			<p>{t(`mcpPreset_${preset.id}` as MessageKey)}</p>
 			<p className="hint">{where}</p>
+			{preset.signIn && !own && (
+				<p className="hint">{t("mcpPresetSignIn", { publisher: preset.publisher })}</p>
+			)}
+			{own && (
+				<>
+					<ol className="preset-steps">
+						<li>{t("mcpGoogleStep1")}</li>
+						<li>{t("mcpGoogleStep2", { apis: own.apis.join(t("listSeparator")) })}</li>
+						<li>
+							{t("mcpGoogleStep3")}
+							{own.scopes.map((scope) => (
+								<code key={scope} className="mcp-code preset-redirect">
+									{scope}
+								</code>
+							))}
+						</li>
+						<li>
+							{t("mcpGoogleStep4")}
+							<code className="mcp-code preset-redirect">{redirect}</code>
+						</li>
+						<li>{t("mcpGoogleStep5")}</li>
+					</ol>
+					<p className="hint">
+						<a href={own.guide} target="_blank" rel="noopener noreferrer">
+							{t("mcpGoogleGuide")}
+						</a>
+						{t("hintSeparator")}
+						{t("mcpGoogleShared")}
+					</p>
+					<Field label={t("mcpClientId")} htmlFor={clientIdId}>
+						<input
+							id={clientIdId}
+							className="input mono-input"
+							autoComplete="off"
+							spellCheck={false}
+							data-1p-ignore="true"
+							value={client.id}
+							onChange={(event) => setClient({ ...client, id: event.target.value })}
+						/>
+					</Field>
+					<Field label={t("mcpClientSecret")} htmlFor={clientSecretId}>
+						<input
+							id={clientSecretId}
+							className="input secret-input"
+							type="text"
+							autoComplete="off"
+							spellCheck={false}
+							data-1p-ignore="true"
+							value={client.secret}
+							onChange={(event) => setClient({ ...client, secret: event.target.value })}
+						/>
+						<span className="hint">{t("mcpClientStored")}</span>
+					</Field>
+				</>
+			)}
 			{preset.token && (
 				<Field
 					label={preset.token.optional ? t("mcpPresetTokenOptional") : t("mcpPresetToken")}
@@ -1771,6 +1839,10 @@ function McpServerRow({
 		await patchMcpServer(server.name, { disabled: !enabled });
 		await onChanged();
 	});
+	const signOut = useAction(async () => {
+		await signOutMcpServer(server.name);
+		await onChanged();
+	});
 	const state =
 		server.state === "ready"
 			? t("mcpState_ready", { n: server.tools.length })
@@ -1795,6 +1867,24 @@ function McpServerRow({
 					</span>
 				</div>
 				<div className="setting-control">
+					{/* A link, so the browser opens the sign-in in a new tab without a pop-up to block. */}
+					{server.state === "sign-in" && !server.disabled && (
+						<a
+							className="btn btn-primary"
+							href={`/api/mcp/${encodeURIComponent(server.name)}/sign-in`}
+							target="_blank"
+							rel="noopener noreferrer"
+						>
+							<SignInIcon />
+							{t("mcpSignIn")}
+						</a>
+					)}
+					{server.signedIn && (
+						<Button busy={signOut.busy} onClick={() => void signOut.run()}>
+							<SignOutIcon />
+							{t("mcpSignOut")}
+						</Button>
+					)}
 					<Button
 						variant="ghost"
 						aria-expanded={open}

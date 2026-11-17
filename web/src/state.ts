@@ -58,9 +58,13 @@ export interface McpServerView {
 	envNames: string[];
 	url: string | null;
 	headerNames: string[];
-	state: "connecting" | "ready" | "error" | "disabled";
+	state: "connecting" | "ready" | "error" | "disabled" | "sign-in";
 	error: string | null;
 	tools: string[];
+	/** Jig holds a sign-in for it (blueprint 6.11, item 40). */
+	signedIn: boolean;
+	/** Its entry names a client of the person's to sign in with. */
+	oauthClient: boolean;
 }
 
 /** Where a skill comes from: the global folders, or a saved workspace's. */
