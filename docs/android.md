@@ -309,7 +309,7 @@ English:
 | 公钥 | `android/release/signing-public-key.txt`（模数的十六进制，指数 65537） |
 
 - 密钥库在仓库外的 `~/.tenon-keys/android/yew/yew-release.p12`，目录 0700、文件 0600；口令由脚本随机生成，直接存进登录钥匙串（服务 `tenon-android-signing`，账户 `yew`）。
-- **还没备份**：发布任何用它签的安装包之前，要创始人在终端里跑一次 `backup-signing-key.sh`（7.3），这台 Mac 之外至少一份，做完告诉安全组。
+- 备份已做（2026-11-18）：创始人在自己的终端里跑 `backup-signing-key.sh`，口令他自己输。映像 `yew-android-signing-key-20261118.dmg`（SHA-256 `283e622a80cec266ec3698ddd092ffb7a692f525333dbda153e260a84521753b`，AES-256）放了两处，一处在这台 Mac 上，一处在 iCloud 云盘；具体位置和口令保管不写在公开仓库里。恢复演练通过，安全组核对过。第一个正式包出来时，安全组再用 apksigner 对照一次证书指纹。
 - App 备案要填的包名、证书 MD5 指纹和公钥都变了，报备案时用这一组。
 
 **Jig 的密钥**（2026-11-15，1.2.0 及以前的安装包用它签）：留着不删，不再用来发布。下面是它当时的记录。
