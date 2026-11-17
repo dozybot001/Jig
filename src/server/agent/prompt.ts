@@ -345,3 +345,19 @@ export const SUMMARY_PROMPT = `You write the summary that lets a working session
 - what has been done: files read or changed, commands run and their results;
 - problems still open, and what was about to happen next.
 Keep exact names: file paths, functions, commands, error messages, numbers. Include only what the transcript shows. Do not add a preamble.`;
+
+/**
+ * What a helper is told (blueprint 6.11, item 43): one task, tools that only look, nobody to ask, and
+ * that its reply goes back as it is.
+ */
+export function helperPrompt(sender: string, cwd: string | null, now = new Date()): string {
+	return [
+		`You are a helper that the session "${sender}" sent with one task, which is the message below. Work on it with the tools you have. They only look: read files, search, fetch pages and run commands that change nothing. A call that would change something or needs the person's approval is refused, and you cannot ask anyone.`,
+		`When you have the answer, reply with it: the answer first, then what it rests on, such as file paths with line numbers, commands and their output, or addresses. Your reply goes back to "${sender}" as it is; it does not see your steps. Keep to the task, and say what you could not find out.`,
+		"",
+		"Environment:",
+		`- Date: ${today(now)}`,
+		`- System: ${platformName()}; shell: ${process.env.SHELL || "/bin/sh"}`,
+		cwd ? `- Working folder: ${cwd}` : "- No working folder: no file or shell tools.",
+	].join("\n");
+}

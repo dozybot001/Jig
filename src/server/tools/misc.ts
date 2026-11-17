@@ -8,7 +8,7 @@ import {
 	type Todo,
 } from "../../shared/types.ts";
 import { invalid } from "../errors.ts";
-import { type ToolDefinition, ToolInputError, type ToolResult, text } from "./types.ts";
+import { str, type ToolDefinition, ToolInputError, type ToolResult, text } from "./types.ts";
 
 const STATUSES = ["pending", "in_progress", "done"] as const;
 
@@ -240,6 +240,44 @@ export const askUserTool: ToolDefinition = {
 						: `The person answered:\n${answer}`,
 				),
 			],
+		};
+	},
+};
+
+/** Hands a task to a helper and returns its answer (blueprint 6.11, item 43). */
+export const delegateTool: ToolDefinition = {
+	name: "delegate",
+	description:
+		"Give a self-contained task to a helper that works in a context of its own and returns only its answer. It can read files, search, fetch pages and run commands that change nothing; it cannot change anything or ask the person. Several delegate calls in one step run at the same time. Use it for searches and investigations whose details you do not need to keep, so your own context stays short.",
+	parameters: {
+		type: "object",
+		properties: {
+			task: {
+				type: "string",
+				description:
+					"What to find out and what to report. The helper sees nothing of this conversation, so include what it needs to know.",
+			},
+		},
+		required: ["task"],
+		additionalProperties: false,
+	},
+	// It only looks, so several run at once; each of its own calls is checked as it goes.
+	readOnly: true,
+	needsFolder: false,
+	subject: () => ({ kind: "none" }),
+	async run(args, ctx): Promise<ToolResult> {
+		const task = str(args, "task", true).trim();
+		if (!task) throw new ToolInputError("The task is empty.");
+		const result = await ctx.helper(task);
+		const note = result.stopped
+			? `[The helper stopped before it finished: ${result.stopped}. Above is what it had.]`
+			: "";
+		const answer =
+			[result.text, note].filter(Boolean).join("\n\n") || "(The helper gave no answer.)";
+		return {
+			content: [{ type: "text", text: answer }],
+			detail: { calls: result.calls, ...(result.stopped ? { stopped: result.stopped } : {}) },
+			...(result.stopped && !result.text ? { isError: true } : {}),
 		};
 	},
 };

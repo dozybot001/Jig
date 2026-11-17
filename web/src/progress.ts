@@ -16,6 +16,7 @@ export const SUMMARY_KINDS = [
 	"letter",
 	"session",
 	"card",
+	"helper",
 ] as const;
 export type SummaryKind = (typeof SUMMARY_KINDS)[number];
 
@@ -27,6 +28,7 @@ export function summaryKind(tool: string): SummaryKind | null {
 	if (tool === "send_letter") return "letter";
 	if (tool === "open_session") return "session";
 	if (tool === "post_card" || tool === "update_card" || tool === "withdraw_card") return "card";
+	if (tool === "delegate") return "helper";
 	return null;
 }
 

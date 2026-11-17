@@ -104,7 +104,7 @@ function callSummary(call: ToolCallBlock, recipient: string | null): string {
 			? t("moreQuestions", { q: asked.question, n: asked.count - 1 })
 			: asked.question;
 	}
-	const value = args.command ?? args.path ?? args.pattern ?? args.url ?? args.job;
+	const value = args.command ?? args.path ?? args.pattern ?? args.url ?? args.job ?? args.task;
 	if (typeof value === "string") return value;
 	return JSON.stringify(args);
 }
@@ -130,6 +130,7 @@ const TOOL_VERBS = [
 	"withdraw_card",
 	"list_cards",
 	"manage_jig",
+	"delegate",
 ] as const;
 
 function isToolVerb(name: string): name is (typeof TOOL_VERBS)[number] {

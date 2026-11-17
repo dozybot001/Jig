@@ -37,6 +37,8 @@ export interface ToolContext {
 	/** Puts questions to the person and waits; resolves with the answer as the session reads it. */
 	ask(request: QuestionRequest): Promise<string>;
 	mail: MailContext;
+	/** Sends a helper with a task and waits for its answer (blueprint 6.11, item 43). */
+	helper(task: string): Promise<{ text: string; calls: number; stopped?: string }>;
 }
 
 /** How waiting for another session ended (send_letter and open_session with `wait`). */

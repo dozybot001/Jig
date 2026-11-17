@@ -53,9 +53,11 @@ import {
 import { ContextKeeper, notice } from "./compaction.ts";
 import { JIG_NOTE, sanitizeInterrupted, toModelMessages, usageTotals } from "./context.ts";
 import { Held } from "./held.ts";
+import { runHelper } from "./helper.ts";
 import { freeName, Mailroom } from "./mailroom.ts";
 import {
 	type ContextSnapshot,
+	helperPrompt,
 	type InstructionExtras,
 	NAMING_PROMPT,
 	type Placement,
@@ -1016,7 +1018,7 @@ export class Agents {
 		const model = this.#gateway.model(session.provider, session.model);
 		let tail = "";
 		let timer: ReturnType<typeof setTimeout> | null = null;
-		return {
+		const context: ToolContext = {
 			session,
 			signal: live.controller.signal,
 			readState: this.#readState(sessionId),
@@ -1053,7 +1055,34 @@ export class Agents {
 				return answer.answer;
 			},
 			mail: this.#mailContext(sessionId, live, row.id),
+			helper: (task) => {
+				const parent = this.#store.getSession(sessionId);
+				return runHelper({
+					gateway: this.#gateway,
+					permissions: this.#permissions,
+					session: this.#mail.withRunMode(parent),
+					tools: toolsFor(parent, this.#allTools(), this.#roles(parent)),
+					lookup: this.#lookup(parent),
+					// Its own reads, so they do not count as the session's before an edit; no questions.
+					context: {
+						...context,
+						readState: new ReadState(),
+						output: () => {},
+						setTodos: () => {},
+						ask: async () => {
+							throw new ToolInputError("A helper cannot ask the person.");
+						},
+					},
+					systemPrompt: helperPrompt(parent.name, parent.cwd),
+					task,
+					signal: live.controller.signal,
+					onStep: (line) => context.output(`${line}\n`),
+					onUsage: (usage) =>
+						this.#store.addUsage(sessionId, usage, this.#store.getSession(sessionId).contextTokens),
+				});
+			},
 		};
+		return context;
 	}
 
 	// --- letters (blueprint section 7) ---

@@ -600,6 +600,8 @@ describe("agent loop", () => {
 		assert.deepEqual(tools, [
 			"ask_user",
 			"check_decision",
+			// A chat's helpers can still look things up on the web.
+			"delegate",
 			"finish_task",
 			"list_sessions",
 			"open_session",
