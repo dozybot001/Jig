@@ -29,6 +29,12 @@ export interface McpPreset {
 		/** Where to make one. */
 		where: string;
 	};
+	/**
+	 * Tools of this server that send something out although their names do not say so, asked about
+	 * every time like the ones whose names do (security review, 2026-11-18): creating or changing a
+	 * calendar event invites its attendees.
+	 */
+	asksEveryTime?: string[];
 	/** Signed in to in the browser instead of a token. */
 	signIn?: {
 		/**
@@ -105,6 +111,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 	},
 	{
 		id: "google-calendar",
+		asksEveryTime: ["create_event", "update_event", "respond_to_event"],
 		name: "Google Calendar",
 		publisher: "Google",
 		docs: "https://developers.google.com/workspace/calendar/api/guides/configure-mcp-server",

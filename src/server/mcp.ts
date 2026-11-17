@@ -1,6 +1,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { MCP_PRESETS } from "../shared/mcp-presets.ts";
 import type { ImageBlock, JsonObject, TextBlock } from "../shared/messages.ts";
 import type { ConfirmReason } from "../shared/types.ts";
 import { presetMcp, serverEnv } from "./mcp-builtin.ts";
@@ -75,6 +76,8 @@ const OUTWARD = new Set([
 	"pay",
 	"transfer",
 	"refund",
+	"permission",
+	"permissions",
 ]);
 /** First words that say a tool only looks, whatever else its name holds (get_merge_request). */
 const LOOKING = new Set([
@@ -108,8 +111,9 @@ export function outward(tool: string): boolean {
  *   earlier "always allow" does not cover it. Looking (a screenshot, the pointer's place) can be.
  * - The browser acts only in its own window, so its actions can be remembered, with the scope said.
  * - Any other server's tool that sends, publishes or deletes something in its service (spec 21.2) is
- *   asked about every time: one its name says does, or one its server marks as destructive. A
- *   server's word that a tool only reads is not taken.
+ *   asked about every time: one its name says does, one its server marks as destructive, and the
+ *   ones a common server's preset names (a calendar event invites its attendees). A server's word
+ *   that a tool only reads is not taken.
  */
 export function special(
 	server: string,
@@ -122,7 +126,8 @@ export function special(
 		return COMPUTER_READS.has(action) ? {} : { reasons: ["computer-control"] };
 	}
 	if (server === "browser") return BROWSER_READS.has(tool) ? {} : { warning: "acts-as-you" };
-	return destructive || outward(tool) ? { reasons: ["service-action"] } : {};
+	const named = MCP_PRESETS.find((preset) => preset.id === server)?.asksEveryTime?.includes(tool);
+	return destructive || named || outward(tool) ? { reasons: ["service-action"] } : {};
 }
 
 export interface McpToolInfo {

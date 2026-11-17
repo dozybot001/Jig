@@ -425,6 +425,7 @@ describe("the browser and computer control", () => {
 			"share_file",
 			"merge_pull_request",
 			"push_files",
+			"create_permission",
 		]) {
 			assert.equal(outward(name), true, name);
 		}
@@ -434,6 +435,7 @@ describe("the browser and computer control", () => {
 			"get_merge_request",
 			"list_deleted_files",
 			"update_issue",
+			"get_file_permissions",
 		]) {
 			assert.equal(outward(name), false, name);
 		}
@@ -463,6 +465,12 @@ describe("the browser and computer control", () => {
 				allowed,
 			);
 			assert.ok(named.effect === "ask" && named.request.mustConfirm, "its name says it sends");
+			// Google's calendar server: these invite the event's attendees, which their names do not say.
+			assert.deepEqual(specialFor("google-calendar", "create_event"), {
+				reasons: ["service-action"],
+			});
+			assert.deepEqual(specialFor("google-calendar", "list_events"), {});
+			assert.deepEqual(specialFor("gmail", "create_draft"), {});
 			const plain = engine.decide(echo.subject({ text: "hi" }, allowed, lookup), allowed);
 			assert.equal(plain.effect, "allow");
 		} finally {
