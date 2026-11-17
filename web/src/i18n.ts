@@ -838,7 +838,8 @@ const zh = {
 	mcpPresetStored: "保存后写进 Jig 数据目录的 mcp.json，这里不再显示。",
 	mcpPresetRemote:
 		"这是 {publisher} 运行的远程服务（{host}）：会话调用它的工具时，传的内容发给 {publisher}。",
-	mcpPresetLocal: "第一次用时用 npx 从 npm 下载 {pkg}，在这台电脑上运行。",
+	mcpPresetLocal:
+		"第一次用时，Jig 按随 Jig 发布的锁文件从 npm 把 {pkg} 装到数据目录（不运行安装脚本），在这台电脑上运行。",
 	mcpPreset_github: "仓库、议题、拉取请求、Actions 和发行版。",
 	mcpPreset_gitee: "Gitee 上的仓库、议题、拉取请求和发行版。",
 	mcpPreset_context7: "查各种开源库的最新文档和示例代码。",
@@ -877,6 +878,7 @@ const zh = {
 	mcpKind_http: "连接一个网址",
 	mcpKind_http_hint: "服务已经在别处运行，经 HTTP 连接",
 	mcpCommand: "命令",
+	mcpPackage: "npm 包",
 	mcpArgs: "参数",
 	mcpArgsHint: "每行一个",
 	mcpEnv: "环境变量",
@@ -1820,7 +1822,7 @@ const en: Record<MessageKey, string> = {
 	mcpPresetRemote:
 		"A remote server run by {publisher} ({host}): what a session passes to its tools goes to {publisher}.",
 	mcpPresetLocal:
-		"The first time it is used, npx downloads {pkg} from npm to run it on this computer.",
+		"The first time it is used, Jig installs {pkg} from npm into its data folder as the lock file that ships with Jig says (without install scripts), and runs it on this computer.",
 	mcpPreset_github: "Repositories, issues, pull requests, Actions and releases.",
 	mcpPreset_gitee: "Repositories, issues, pull requests and releases on Gitee.",
 	mcpPreset_context7: "Up-to-date documentation and code examples for open-source libraries.",
@@ -1862,6 +1864,7 @@ const en: Record<MessageKey, string> = {
 	mcpKind_http: "Connect to a URL",
 	mcpKind_http_hint: "The server already runs elsewhere and is reached over HTTP",
 	mcpCommand: "Command",
+	mcpPackage: "npm package",
 	mcpArgs: "Arguments",
 	mcpArgsHint: "One per line",
 	mcpEnv: "Environment variables",

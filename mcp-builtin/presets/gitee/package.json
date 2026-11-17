@@ -1,0 +1,10 @@
+{
+	"name": "jig-mcp-preset-gitee",
+	"version": "1.0.0",
+	"private": true,
+	"description": "One of the MCP servers Jig adds for you. Jig installs exactly what package-lock.json names, into its data folder, the first time the server is used.",
+	"license": "MIT",
+	"dependencies": {
+		"@gitee/mcp-gitee": "1.0.0"
+	}
+}

@@ -966,6 +966,8 @@ export const loadMcpServers = () => all<McpServerView>("/api/mcp");
 
 export interface NewMcpServer {
 	name: string;
+	/** One of the presets Jig installs and runs, by its id. */
+	preset?: string;
 	command?: string;
 	args?: string[];
 	env?: Record<string, string>;

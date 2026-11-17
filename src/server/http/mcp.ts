@@ -93,12 +93,14 @@ export function mcpRoutes(store: Store, options: McpRoutesOptions): Hono<AppEnv>
 			throw invalid("args is a list of text values.", "args");
 		}
 		const command = optString(fields, "command", 4096);
+		const preset = optString(fields, "preset", 100);
 		const url = optString(fields, "url", 2000);
 		const env = values<string>(fields, "env", false);
 		const headers = values<string>(fields, "headers", false);
 		const oauth = optObject(fields, "oauth") as NewMcpServer["oauth"] | undefined;
 		const entry = addMcpEntry(home, {
 			name: reqString(fields, "name", 100),
+			...(preset !== undefined ? { preset } : {}),
 			...(command !== undefined ? { command } : {}),
 			...(args ? { args: args as string[] } : {}),
 			...(env ? { env } : {}),

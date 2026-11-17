@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { presetPackage } from "../shared/mcp-presets.ts";
 import { conflict, invalid, notFound } from "./errors.ts";
 
 /**
@@ -34,10 +35,14 @@ export interface McpEntryView {
 	headerNames: string[];
 	/** Its entry names a client to sign in with (the client's secret is never sent). */
 	oauthClient: boolean;
+	/** One of the presets Jig installs: the npm package and version it runs. */
+	package?: string;
 }
 
 export interface NewMcpServer {
 	name: string;
+	/** One of the presets Jig installs and runs (blueprint 6.11, item 40), by its id. */
+	preset?: string;
 	command?: string;
 	args?: string[];
 	env?: Record<string, string>;
@@ -125,6 +130,22 @@ function view(name: string, entry: Raw): McpEntryView | null {
 			url: entry.url,
 			headerNames: names(entry.headers),
 			oauthClient: isObject(entry.oauth) && typeof entry.oauth.clientId === "string",
+		};
+	}
+	const pkg = typeof entry.preset === "string" ? presetPackage(entry.preset) : null;
+	if (pkg) {
+		return {
+			name,
+			kind: "stdio",
+			builtin: false,
+			disabled,
+			command: null,
+			args: [],
+			envNames: names(entry.env),
+			url: null,
+			headerNames: [],
+			oauthClient: false,
+			package: pkg,
 		};
 	}
 	if (typeof entry.command === "string" && entry.command) {
@@ -231,11 +252,20 @@ export function addMcpEntry(jigHome: string, input: NewMcpServer): McpEntryView 
 	}
 	const url = input.url?.trim();
 	const command = input.command?.trim();
-	if (Boolean(url) === Boolean(command)) {
+	const preset = input.preset?.trim();
+	if (preset && (url || command)) {
+		throw invalid("A preset takes neither a command nor a URL.", "preset");
+	}
+	if (!preset && Boolean(url) === Boolean(command)) {
 		throw invalid("Give either a command or a URL.", url ? "url" : "command");
 	}
 	let entry: Raw;
-	if (url) {
+	if (preset) {
+		if (!presetPackage(preset)) throw invalid(`Jig has no preset named ${preset}.`, "preset");
+		const env = input.env ?? {};
+		checkValues(env, ENV_NAME, "env");
+		entry = { preset, ...(Object.keys(env).length > 0 ? { env } : {}) };
+	} else if (url) {
 		let parsed: URL | null = null;
 		try {
 			parsed = new URL(url);

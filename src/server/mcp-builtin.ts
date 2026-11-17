@@ -29,6 +29,34 @@ const FILES = ["package.json", "package-lock.json"] as const;
 /** Where the servers are installed. */
 const installDir = (jigHome: string) => join(jigHome, "mcp-builtin");
 
+/**
+ * The common servers Jig adds that run on this computer (Gitee, Notion, Sentry; blueprint 6.11, item
+ * 40) are installed the same way, each from its own lock file in `mcp-builtin/presets/<id>`, into
+ * `<data folder>/mcp-presets/<id>`, the first time it is used. This is where each one's program is in
+ * its package.
+ */
+const PRESET_PROGRAMS: Record<string, string> = {
+	gitee: "@gitee/mcp-gitee/bin/index.js",
+	notion: "@notionhq/notion-mcp-server/bin/cli.mjs",
+	sentry: "@sentry/mcp-server/dist/sentry-mcp.cjs",
+};
+export const INSTALLED_PRESETS = Object.keys(PRESET_PROGRAMS);
+
+/**
+ * How the preset `id` is started: with node from Jig's data folder, with a small part of Jig's
+ * environment and the entry's own variables (its token). Null for a preset Jig does not install.
+ */
+export function presetMcp(jigHome: string, id: string): McpServerConfig | null {
+	const program = Object.hasOwn(PRESET_PROGRAMS, id) ? PRESET_PROGRAMS[id] : undefined;
+	if (!program) return null;
+	return {
+		command: process.execPath,
+		args: [join(jigHome, "mcp-presets", id, "node_modules", ...program.split("/"))],
+		ownEnv: true,
+		preset: id,
+	};
+}
+
 export function builtinMcp(
 	jigHome: string,
 	env: NodeJS.ProcessEnv = process.env,
@@ -81,20 +109,26 @@ export interface InstallOptions {
 	jigHome: string;
 	env?: NodeJS.ProcessEnv;
 	log?: (line: string) => void;
-	/** Where package.json and package-lock.json are read from; tests give their own. */
+	/**
+	 * The folder package.json and package-lock.json are read from, with the presets' in its
+	 * `presets` folder; tests give their own.
+	 */
 	source?: string;
 	/** Installs what the lock file in the folder names; tests replace it. */
 	install?: (folder: string, env: NodeJS.ProcessEnv) => Promise<void>;
 }
 
 /**
- * Makes sure the servers are installed as the lock file that ships with this Jig says. Done once per
- * lock file: a marker holds its hash, so an update of Jig that changes the lock installs again and
- * anything else returns at once. A failed install leaves no marker and is tried again next time.
+ * Makes sure what a lock file names is installed in a folder. Done once per lock file: a marker holds
+ * its hash, so an update of Jig that changes the lock installs again and anything else returns at
+ * once. A failed install leaves no marker and is tried again next time.
  */
-export function builtinInstaller(options: InstallOptions): () => Promise<void> {
-	const source = options.source ?? SOURCE;
-	const folder = installDir(options.jigHome);
+function lockedInstaller(
+	options: InstallOptions,
+	source: string,
+	folder: string,
+	what: string,
+): () => Promise<void> {
 	const marker = join(folder, ".installed");
 	const install = options.install ?? npmCi;
 	let running: Promise<void> | null = null;
@@ -103,7 +137,7 @@ export function builtinInstaller(options: InstallOptions): () => Promise<void> {
 			.update(readFileSync(join(source, "package-lock.json")))
 			.digest("hex");
 		if (existsSync(marker) && readFileSync(marker, "utf8").trim() === wanted) return;
-		options.log?.("mcp: installing Jig's own servers (browser, computer control) from npm");
+		options.log?.(`mcp: installing ${what} from npm`);
 		mkdirSync(folder, { recursive: true });
 		for (const file of FILES) copyFileSync(join(source, file), join(folder, file));
 		await install(folder, serverEnv(options.env ?? process.env));
@@ -114,6 +148,40 @@ export function builtinInstaller(options: InstallOptions): () => Promise<void> {
 			running = null;
 		});
 		return running;
+	};
+}
+
+/** Makes sure Jig's own two servers are installed as the lock file that ships with this Jig says. */
+export function builtinInstaller(options: InstallOptions): () => Promise<void> {
+	return lockedInstaller(
+		options,
+		options.source ?? SOURCE,
+		installDir(options.jigHome),
+		"Jig's own servers (browser, computer control)",
+	);
+}
+
+/**
+ * What the hub calls before it starts a server Jig runs from its data folder: installs Jig's own
+ * servers, or the preset the server is.
+ */
+export function mcpInstaller(options: InstallOptions): (config: McpServerConfig) => Promise<void> {
+	const builtin = builtinInstaller(options);
+	const presets = new Map<string, () => Promise<void>>();
+	return (config) => {
+		const id = config.preset;
+		if (!id) return builtin();
+		let install = presets.get(id);
+		if (!install) {
+			install = lockedInstaller(
+				options,
+				join(options.source ?? SOURCE, "presets", id),
+				join(options.jigHome, "mcp-presets", id),
+				`the ${id} server`,
+			);
+			presets.set(id, install);
+		}
+		return install();
 	};
 }
 

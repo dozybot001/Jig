@@ -1514,9 +1514,7 @@ function McpPresetDialog({
 				publisher: preset.publisher,
 				host: new URL((preset.connect as { url: string }).url).host,
 			})
-		: t("mcpPresetLocal", {
-				pkg: (preset.connect as { args: string[] }).args.find((arg) => arg.includes("@")) ?? "",
-			});
+		: t("mcpPresetLocal", { pkg: (preset.connect as { package: string }).package });
 	return (
 		<Dialog
 			title={t("mcpPresetAddTitle", { name: preset.name })}
@@ -1915,9 +1913,16 @@ function McpServerRow({
 			{open && (
 				<div className="mcp-detail" id={detailId}>
 					<div className="mcp-line">
-						<span>{server.kind === "stdio" ? t("mcpCommand") : t("mcpUrl")}</span>
+						<span>
+							{server.package
+								? t("mcpPackage")
+								: server.kind === "stdio"
+									? t("mcpCommand")
+									: t("mcpUrl")}
+						</span>
 						<code className="mcp-code">
-							{server.kind === "stdio" ? [server.command, ...server.args].join(" ") : server.url}
+							{server.package ??
+								(server.kind === "stdio" ? [server.command, ...server.args].join(" ") : server.url)}
 						</code>
 					</div>
 					<div className="mcp-line">

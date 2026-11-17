@@ -67,6 +67,8 @@ export interface McpServerView {
 	signInAt?: string;
 	/** Its entry names a client of the person's to sign in with. */
 	oauthClient: boolean;
+	/** One of the presets Jig installs: the npm package and version it runs. */
+	package?: string;
 }
 
 /** Where a skill comes from: the global folders, or a saved workspace's. */

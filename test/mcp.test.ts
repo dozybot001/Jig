@@ -1,12 +1,18 @@
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { JigError } from "../src/server/errors.ts";
 import { decisionFromPhone } from "../src/server/http/agents.ts";
 import { McpHub, outward, readMcpConfig, special as specialFor } from "../src/server/mcp.ts";
-import { builtinInstaller, builtinMcp, serverEnv } from "../src/server/mcp-builtin.ts";
+import {
+	builtinInstaller,
+	builtinMcp,
+	INSTALLED_PRESETS,
+	mcpInstaller,
+	serverEnv,
+} from "../src/server/mcp-builtin.ts";
 import {
 	addMcpEntry,
 	listMcpEntries,
@@ -63,16 +69,90 @@ describe("common official servers", () => {
 				assert.equal(shown.url, preset.connect.url);
 				assert.match(shown.url ?? "", /^https:\/\//);
 			} else {
-				// Started with npx at one exact version.
-				assert.equal(shown.command, "npx");
-				assert.match(shown.args.find((arg) => arg.includes("@", 1)) ?? "", /@\d+\.\d+\.\d+$/);
+				// Installed by Jig at one exact version.
+				assert.equal(shown.package, preset.connect.package);
+				assert.match(preset.connect.package, /.@\d+\.\d+\.\d+$/);
 			}
 		}
 		const config = readMcpConfig(jigHome, {});
 		assert.deepEqual(config.github?.headers, { Authorization: "Bearer tok-123" });
 		assert.deepEqual(config.gitee?.env, { GITEE_ACCESS_TOKEN: "tok-123" });
+		// Run with node from the data folder, with little of Jig's environment.
+		assert.equal(config.notion?.command, process.execPath);
+		assert.deepEqual(config.notion?.args, [
+			join(
+				jigHome,
+				"mcp-presets",
+				"notion",
+				"node_modules",
+				"@notionhq",
+				"notion-mcp-server",
+				"bin",
+				"cli.mjs",
+			),
+		]);
+		assert.equal(config.notion?.ownEnv, true);
+		assert.equal(config.notion?.preset, "notion");
 		assert.equal(config.context7?.headers, undefined, "an optional token can be left out");
 		assert.equal(new Set(MCP_PRESETS.map((preset) => preset.id)).size, MCP_PRESETS.length);
+	});
+
+	test("the ones that run on this computer are pinned by lock files that ship with Jig", () => {
+		const root = fileURLToPath(new URL("../mcp-builtin/presets/", import.meta.url));
+		const local = MCP_PRESETS.filter((preset) => "package" in preset.connect);
+		assert.deepEqual(local.map((preset) => preset.id).sort(), [...INSTALLED_PRESETS].sort());
+		for (const preset of local) {
+			const spec = (preset.connect as { package: string }).package;
+			const at = spec.lastIndexOf("@");
+			const wanted = JSON.parse(readFileSync(join(root, preset.id, "package.json"), "utf8")) as {
+				dependencies: Record<string, string>;
+			};
+			assert.deepEqual(wanted.dependencies, { [spec.slice(0, at)]: spec.slice(at + 1) });
+			const lock = JSON.parse(readFileSync(join(root, preset.id, "package-lock.json"), "utf8")) as {
+				packages: Record<string, { integrity?: string; version?: string }>;
+			};
+			const packages = Object.entries(lock.packages).filter(([path]) => path !== "");
+			assert.ok(packages.length > 0, preset.id);
+			for (const [path, entry] of packages) {
+				assert.match(entry.integrity ?? "", /^sha512-/, `${preset.id}: ${path}`);
+			}
+		}
+	});
+
+	test("a preset is installed into its own folder the first time it starts; Jig's own servers apart", async () => {
+		const jigHome = tempDir("jig-home-");
+		const source = tempDir("jig-source-");
+		for (const folder of [source, join(source, "presets", "notion")]) {
+			mkdirSync(folder, { recursive: true });
+			writeFileSync(join(folder, "package.json"), "{}");
+			writeFileSync(join(folder, "package-lock.json"), `{"in":"${folder}"}`);
+		}
+		const runs: string[] = [];
+		const prepare = mcpInstaller({
+			jigHome,
+			source,
+			install: async (folder) => {
+				runs.push(folder);
+			},
+		});
+		await prepare({ command: "node", preset: "notion", ownEnv: true });
+		await prepare({ command: "node", preset: "notion", ownEnv: true });
+		await prepare({ command: "node", ownEnv: true });
+		assert.deepEqual(runs, [join(jigHome, "mcp-presets", "notion"), join(jigHome, "mcp-builtin")]);
+	});
+
+	test("a preset Jig does not know, or one with a command or URL, is refused", () => {
+		const jigHome = tempDir("jig-home-");
+		assert.throws(() => addMcpEntry(jigHome, { name: "x", preset: "nothing" }), /no preset named/);
+		assert.throws(
+			() => addMcpEntry(jigHome, { name: "x", preset: "notion", command: "npx" }),
+			/neither a command nor a URL/,
+		);
+		writeFileSync(
+			join(jigHome, "mcp.json"),
+			JSON.stringify({ mcpServers: { odd: { preset: "nothing" } } }),
+		);
+		assert.deepEqual(readMcpConfig(jigHome, {}), {}, "an unknown preset is not started");
 	});
 
 	test("a server one signs in to with a client of one's own keeps the client and scopes in its entry", () => {

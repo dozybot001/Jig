@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { ImageBlock, JsonObject, TextBlock } from "../shared/messages.ts";
 import type { ConfirmReason } from "../shared/types.ts";
-import { serverEnv } from "./mcp-builtin.ts";
+import { presetMcp, serverEnv } from "./mcp-builtin.ts";
 import { type McpAuth, type OAuthSettings, SignInRequired } from "./mcp-oauth.ts";
 import { errorResult, type ToolDefinition, type ToolResult, text } from "./tools/types.ts";
 
@@ -24,8 +24,13 @@ export interface McpServerConfig {
 	headers?: Record<string, string>;
 	/** `"disabled": true` in mcp.json: the server stays in the file and is not started. */
 	disabled?: boolean;
-	/** One of Jig's own servers: it gets a small part of Jig's environment, not all of it. */
+	/**
+	 * Run from Jig's data folder (its own servers and the presets it installs): it gets a small part of
+	 * Jig's environment, not all of it, and is installed before it starts.
+	 */
 	ownEnv?: boolean;
+	/** One of the presets Jig installs (`"preset": "<id>"` in mcp.json). */
+	preset?: string;
 	/** Signing in to an HTTP server in the browser: a client the person made, scopes to ask for. */
 	oauth?: OAuthSettings;
 }
@@ -210,6 +215,13 @@ export function readMcpConfig(
 				url: expand(entry.url, env),
 				...(headers ? { headers } : {}),
 				...(oauth ? { oauth } : {}),
+				...off,
+			};
+		} else if (typeof entry.preset === "string" && presetMcp(jigHome, entry.preset)) {
+			const envs = strings(entry.env);
+			configs[name] = {
+				...(presetMcp(jigHome, entry.preset) as McpServerConfig),
+				...(envs ? { env: envs } : {}),
 				...off,
 			};
 		} else if (typeof entry.command === "string" && entry.command) {
@@ -535,8 +547,11 @@ export interface McpHubOptions {
 	log?: (line: string) => void;
 	/** Servers Jig sets up by itself, run unless mcp.json replaces or disables them. */
 	builtin?: Record<string, McpServerConfig>;
-	/** Installs Jig's own servers if they are not yet; awaited before one of them is started. */
-	prepare?: () => Promise<void>;
+	/**
+	 * Installs a server Jig runs from its data folder (its own, or a preset) if it is not yet; awaited
+	 * before the server is started.
+	 */
+	prepare?: (config: McpServerConfig) => Promise<void>;
 	/** Signing in to HTTP servers in the browser; without it, a refusal is just an error. */
 	auth?: McpAuth;
 }
@@ -605,7 +620,7 @@ export class McpHub {
 					this.#servers.set(name, server);
 					if (config.ownEnv && !config.disabled && this.#options.prepare) {
 						try {
-							await this.#options.prepare();
+							await this.#options.prepare(config);
 						} catch (error) {
 							server.state = "error";
 							server.error = (error as Error).message;

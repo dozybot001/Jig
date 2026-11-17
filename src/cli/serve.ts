@@ -117,13 +117,13 @@ export function serveCommand(): Command {
 			const { McpHub } = await import("../server/mcp.ts");
 			const { McpAuth } = await import("../server/mcp-oauth.ts");
 			const { systemKeys } = await import("../server/keys.ts");
-			const { builtinInstaller, builtinMcp } = await import("../server/mcp-builtin.ts");
+			const { builtinMcp, mcpInstaller } = await import("../server/mcp-builtin.ts");
 			const mcp = new McpHub({
 				jigHome: home,
 				version: VERSION,
 				log,
 				builtin: builtinMcp(home, io.env as NodeJS.ProcessEnv),
-				prepare: builtinInstaller({ jigHome: home, env: io.env as NodeJS.ProcessEnv, log }),
+				prepare: mcpInstaller({ jigHome: home, env: io.env as NodeJS.ProcessEnv, log }),
 				// Sign-ins to MCP servers: tokens in the keychain; the browser comes back to this port.
 				auth: new McpAuth({
 					keys: systemKeys("mcp", io.env as NodeJS.ProcessEnv),
