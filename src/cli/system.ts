@@ -19,7 +19,7 @@ import {
 } from "./service.ts";
 
 export interface SystemControlOptions {
-	/** Jig's data folder. */
+	/** Yew's data folder. */
 	home: string;
 	env: Record<string, string | undefined>;
 	service?: ServiceHost;
@@ -27,8 +27,8 @@ export interface SystemControlOptions {
 }
 
 /**
- * The settings' two switches, on the functions behind `jig service` and `jig app`. Unlike the
- * commands, the start-at-login switch does not start or stop Jig now: the Jig that serves the
+ * The settings' two switches, on the functions behind `yew service` and `yew app`. Unlike the
+ * commands, the start-at-login switch does not start or stop Yew now: the Yew that serves the
  * settings keeps running as it was started, and only the next login changes.
  */
 export function systemControl(options: SystemControlOptions): SystemControl {

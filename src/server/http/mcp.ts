@@ -23,7 +23,7 @@ import {
 import type { AppEnv } from "./problem.ts";
 
 export interface McpRoutesOptions {
-	/** Jig's data folder, where mcp.json is. */
+	/** Yew's data folder, where mcp.json is. */
 	home: string;
 	hub: McpHub;
 	log?: (line: string) => void;
@@ -34,9 +34,9 @@ export interface McpServerView extends McpEntryView {
 	state: McpStatus["state"];
 	error: string | null;
 	tools: string[];
-	/** Jig holds a sign-in for it. */
+	/** Yew holds a sign-in for it. */
 	signedIn: boolean;
-	/** The site the browser goes to to sign in, once Jig has found it. */
+	/** The site the browser goes to to sign in, once Yew has found it. */
 	signInAt?: string;
 }
 
@@ -140,7 +140,7 @@ export function mcpRoutes(store: Store, options: McpRoutesOptions): Hono<AppEnv>
 		}
 	});
 
-	// The same from a link on Jig's page, which opens the sign-in in a new tab: no pop-up to block.
+	// The same from a link on Yew's page, which opens the sign-in in a new tab: no pop-up to block.
 	app.get("/mcp/:name/sign-in", async (c) => {
 		try {
 			return c.redirect(await hub.signInUrl(c.req.param("name")), 302);
@@ -169,8 +169,8 @@ export function mcpRoutes(store: Store, options: McpRoutesOptions): Hono<AppEnv>
 
 /**
  * Where the browser comes back after signing in to an MCP server. It is a plain page outside /api: the
- * provider's redirect is a navigation from another site, which carries neither Jig's cookie nor its
- * origin, so the one-time `state` Jig made when the sign-in started is what proves it.
+ * provider's redirect is a navigation from another site, which carries neither Yew's cookie nor its
+ * origin, so the one-time `state` Yew made when the sign-in started is what proves it.
  */
 export function oauthCallbackRoute(hub: McpHub, log?: (line: string) => void): Hono<AppEnv> {
 	const app = new Hono<AppEnv>();
@@ -191,7 +191,7 @@ export function oauthCallbackRoute(hub: McpHub, log?: (line: string) => void): H
 			return c.html(
 				page(
 					"已登录 · Signed in",
-					`已登录 ${html(name)}，可以关掉这个页面回到 Jig。<br>Signed in to ${html(name)}. You can close this page and go back to Jig.`,
+					`已登录 ${html(name)}，可以关掉这个页面回到 Yew。<br>Signed in to ${html(name)}. You can close this page and go back to Yew.`,
 				),
 			);
 		} catch (error) {
@@ -199,7 +199,7 @@ export function oauthCallbackRoute(hub: McpHub, log?: (line: string) => void): H
 			return c.html(
 				page(
 					"没有登录 · Not signed in",
-					`${html((error as Error).message)}<br>回到 Jig 的「MCP 服务」再试一次。Go back to MCP servers in Jig and try again.`,
+					`${html((error as Error).message)}<br>回到 Yew 的「MCP 服务」再试一次。Go back to MCP servers in Yew and try again.`,
 				),
 				400,
 			);

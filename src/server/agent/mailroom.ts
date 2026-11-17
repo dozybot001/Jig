@@ -1,6 +1,6 @@
 /**
  * A session's letters over one turn (blueprint section 7): what it sent and read, the call that waits
- * for another session's answer, the scheduled run a turn may be, and what Jig sends on the session's
+ * for another session's answer, the scheduled run a turn may be, and what Yew sends on the session's
  * behalf when the turn ends. The loop in runner.ts asks this module; it does not keep letter state.
  */
 import { isAbsolute, join } from "node:path";
@@ -45,7 +45,7 @@ export interface ScheduledRun {
 	mode: PermissionMode | null;
 	/** Nobody is there to approve or answer, until the person writes to the session. */
 	unattended: boolean;
-	/** What Jig refused for want of the person, for the report. */
+	/** What Yew refused for want of the person, for the report. */
 	refused: string[];
 }
 
@@ -92,7 +92,7 @@ export class Mailroom {
 	>();
 	/**
 	 * Each working session's current turn: the letters it sent, and for each letter it read, how many it
-	 * had sent by then, so Jig can tell what it asked after reading a request.
+	 * had sent by then, so Yew can tell what it asked after reading a request.
 	 */
 	readonly #turns = new Map<string, Turn>();
 	/** Letters handed to a waiting tool call, by the call's id, until the call's result is stored. */
@@ -151,7 +151,7 @@ export class Mailroom {
 		}
 	}
 
-	/** Notes a letter the session sent in this turn, for what Jig sends on its behalf at the end. */
+	/** Notes a letter the session sent in this turn, for what Yew sends on its behalf at the end. */
 	sent(sessionId: string, letter: Letter): Letter {
 		this.#turns.get(sessionId)?.sent.push(letter);
 		return letter;
@@ -184,7 +184,7 @@ export class Mailroom {
 
 	/**
 	 * Moves queued letters into the transcript; the model reads them, the interface shows letters. A
-	 * scheduled task's letter starts a turn of its own: only a turn that Jig started for waiting letters
+	 * scheduled task's letter starts a turn of its own: only a turn that Yew started for waiting letters
 	 * takes it, as its first delivery, and one per turn. Its own permission mode and the rule that nobody
 	 * is watching then hold for that turn alone.
 	 */
@@ -248,10 +248,10 @@ export class Mailroom {
 		return schedule ? { id: schedule.id, name: schedule.name } : null;
 	}
 
-	/** What Jig tells a session about the scheduled run it is starting. */
+	/** What Yew tells a session about the scheduled run it is starting. */
 	#runNote(session: Session, run: ScheduledRun): string {
 		const lines = [
-			"This is a scheduled run and nobody is watching: Jig refuses calls that need the person's approval, and questions for them.",
+			"This is a scheduled run and nobody is watching: Yew refuses calls that need the person's approval, and questions for them.",
 		];
 		if (run.mode && run.mode !== permissionModeOf(session.options)) {
 			lines.push(`For this run: ${PERMISSION_MODE[run.mode]}`);
@@ -260,7 +260,7 @@ export class Mailroom {
 		const mainName = main && main !== session.id ? this.#post.sessionName(main) : null;
 		lines.push(
 			mainName
-				? `When you finish, Jig sends your last reply to the main conversation (${mainName}) as the report.`
+				? `When you finish, Yew sends your last reply to the main conversation (${mainName}) as the report.`
 				: "Your last reply is the report.",
 		);
 		return lines.join(" ");
@@ -280,7 +280,7 @@ export class Mailroom {
 	 * request is done; after an error, a stop, or while it waits for answers of its own, a notice says so
 	 * and the request stays open, so the real result still follows. A task session's opener hears about
 	 * every turn (M2 plan, section 6). What is owed is read from the database, so a restart in the middle
-	 * loses nothing. Jig's letters never ask for more letters, so this cannot loop.
+	 * loses nothing. Yew's letters never ask for more letters, so this cannot loop.
 	 */
 	endTurn(
 		sessionId: string,
@@ -446,7 +446,7 @@ export class Mailroom {
 		return true;
 	}
 
-	/** A letter Jig sends on a session's behalf at the end of its turn. */
+	/** A letter Yew sends on a session's behalf at the end of its turn. */
 	#autoLetter(
 		session: Session,
 		to: string,

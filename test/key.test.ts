@@ -20,7 +20,7 @@ function setup(initial: Record<string, string> = {}) {
 	};
 }
 
-describe("jig key", () => {
+describe("yew key", () => {
 	test("set reads the key from piped stdin, never from arguments", async () => {
 		const { keys, exec } = setup();
 		const { io, stdout } = fakeIo({ stdin: ["sk-test-123\n"] });
@@ -47,7 +47,7 @@ describe("jig key", () => {
 		]) {
 			const { io, stderr } = fakeIo();
 			assert.equal(await exec(argv, io), 2, argv.join(" "));
-			assert.match(stderr.text(), /^jig: /);
+			assert.match(stderr.text(), /^yew: /);
 		}
 	});
 

@@ -12,6 +12,7 @@ import { useAppState } from "../state.ts";
 import { Markdown } from "./content.tsx";
 import { ConfirmDialog } from "./dialogs.tsx";
 import { TrashIcon } from "./icons.tsx";
+import { Mascot } from "./mascot.tsx";
 import { SidebarToggle } from "./session.tsx";
 import { Button, ErrorBox, Select, useAction } from "./ui.tsx";
 
@@ -313,7 +314,10 @@ export function ArtifactsPage() {
 					{!list ? (
 						<p className="hint">{t("loading")}</p>
 					) : list.length === 0 ? (
-						<p className="empty-box">{t("artifactsEmpty")}</p>
+						<div className="empty-state">
+							<Mascot pose="writing" height={96} />
+							<p className="empty-box">{t("artifactsEmpty")}</p>
+						</div>
 					) : (
 						<ul className="artifact-list">
 							{list.map((artifact) => (

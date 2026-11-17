@@ -1,4 +1,6 @@
-# Jig 安卓版
+# Yew 安卓版
+
+**改名（2026-11-18）**：产品改名 Yew（蓝图 1.15、1.16）。安卓版跟着改：包名 `cn.tenonai.apps.yew`（调试版 `.yew.debug`），源码在 `cn/tenonai/apps/yew/`；用一把新的签名密钥（7.2 第一张表），旧的 Jig 密钥留着不删，1.2.0 及以前的安装包是它签的；安装包叫 `Yew-<版本>.apk`；配对链接是 `yew://pair?…`，也认旧的 `jig://pair?…`；调试参数改成 `yew.pair`、`yew.demo`、`yew.tab`。新包名在手机上是另一个应用，装过 Jig 的要另装 Yew、重新配对。下面的交接和验证记录写在改名之前，里面的 Jig、`jig` 照当时的名字留着。
 
 状态（2026-11-15）：功能写完（含 1.0.0 加的「产物」入口），能构建，单元测试通过，在 Android 17 和 Android 8.0 两台模拟器上走查过（第 6 节）。签名密钥 11-15 02:07 已生成，02:27 做了备份和恢复演练（7.2）。1.0.1 已于 11-15 放到 GitHub 和 Gitee 的 Releases（7.5）。还没做：真机、扫码的实测、发布。安卓版不卡 v1 的验收（蓝图第十三节）。
 
@@ -61,19 +63,19 @@
 - 通知：有事要你处理、会话出错、任务做完时通知，点开进对应的会话或审批；电脑上处理掉的，通知跟着撤下。
 - 中英双语（跟随系统，Android 13 起可以在系统设置里单独给 Jig 选语言），深浅色跟随系统。
 
-技术选择：Kotlin 加 Jetpack Compose，包名 `cn.tenonai.apps.jig`（调试版加 `.debug`），最低 Android 8.0（API 26），目标 API 37，只做手机、竖屏。版本号在构建时从仓库根的 `package.json` 读，关于页的构建号是构建时的短提交号。
+技术选择：Kotlin 加 Jetpack Compose，包名 `cn.tenonai.apps.yew`（调试版加 `.debug`），最低 Android 8.0（API 26），目标 API 37，只做手机、竖屏。版本号在构建时从仓库根的 `package.json` 读，关于页的构建号是构建时的短提交号。
 
 ## 2. 工程结构
 
-`android/app/src/main/kotlin/cn/tenonai/apps/jig/`：
+`android/app/src/main/kotlin/cn/tenonai/apps/yew/`：
 
 | 位置 | 内容 |
 | --- | --- |
 | `remote/Noise.kt` | Noise IK（`Noise_IK_25519_ChaChaPoly_SHA256`）手机一侧、分块的帧，对照 `src/remote/noise.ts` |
 | `remote/RelayChannel.kt` | 经中继的加密通道：握手、请求、事件流、掉线后下次请求时重连 |
-| `remote/Pairing.kt` | 读 `jig://pair?…` 配对链接 |
+| `remote/Pairing.kt` | 读 `yew://pair?…` 配对链接（也认旧的 `jig://pair?…`） |
 | `remote/PushCrypto.kt` | 打开为这台手机加密的通知（`src/remote/push.ts` 的格式）。安卓现在不走这条路，见第 4 节 |
-| `api/` | 电脑端接口的模型和解析（`JigApi.kt`）、请求和事件流（`JigClient.kt`）、演示数据（`Demo.kt`） |
+| `api/` | 电脑端接口的模型和解析（`YewApi.kt`）、请求和事件流（`YewClient.kt`）、演示数据（`Demo.kt`） |
 | `data/Vault.kt` | 手机私钥和配对信息的存放 |
 | `notify/` | 通知的文字和显示（`Notifier.kt`）、保持连接的前台服务和开机后恢复（`LinkService.kt`） |
 | `AppModel.kt` | 应用的状态和操作，界面和前台服务共用一份 |
@@ -106,7 +108,7 @@
 
 升级依赖：改 `gradle/libs.versions.toml`，跑 `./gradlew --write-locks --write-verification-metadata sha256 :app:assembleDebug :app:assembleRelease :app:testDebugUnitTest :app:lintDebug`，再跑 `dependencies.ts` 和 `check-vulnerabilities.ts`，把这几个文件的改动一起提交。
 
-调试版才有的启动参数（模拟器上用，正式构建里没有）：`--es jig.pair '<配对链接>'` 像扫码一样配对，`--ez jig.demo true` 打开演示，`--es jig.tab approvals|letters|artifacts` 选入口。调试版允许连本网络里 `ws://` 的测试中继，正式构建只连 `wss://`。
+调试版才有的启动参数（模拟器上用，正式构建里没有）：`--es yew.pair '<配对链接>'` 像扫码一样配对，`--ez yew.demo true` 打开演示，`--es yew.tab approvals|letters|artifacts` 选入口。调试版允许连本网络里 `ws://` 的测试中继，正式构建只连 `wss://`。
 
 连本机的测试电脑：
 
@@ -114,7 +116,7 @@
 node android/scripts/test-computer.ts /tmp/jig-android    # 配对链接写在 /tmp/jig-android/link.txt
 emulator -avd jig37 -port 5570 &                            # Jig 自己的模拟器，固定端口，序列号 emulator-5570
 adb -s emulator-5570 reverse tcp:8791 tcp:8791
-adb -s emulator-5570 shell am start -n cn.tenonai.apps.jig.debug/cn.tenonai.apps.jig.MainActivity --es jig.pair "'$(cat /tmp/jig-android/link.txt)'"
+adb -s emulator-5570 shell am start -n cn.tenonai.apps.yew.debug/cn.tenonai.apps.yew.MainActivity --es yew.pair "'$(cat /tmp/jig-android/link.txt)'"
 echo "ask git push origin main" > /tmp/jig-android/cmd      # 电脑端出现一个待授权的操作，手机收到通知
 echo settle > /tmp/jig-android/cmd                          # 电脑端处理掉，手机上的通知撤下
 ```
@@ -294,6 +296,24 @@ English:
 
 ### 7.2 签名密钥
 
+**Yew 的密钥**（2026-11-18，创始人：「签名也改」）：用 `android/scripts/create-signing-key.sh` 生成，从 Yew 的第一个版本起用它签名。
+
+| | |
+| --- | --- |
+| 包名 | `cn.tenonai.apps.yew` |
+| 证书主体 | `CN=Yew, O="Changsha Tenon Artificial Intelligence Technology Co., Ltd.", L=Changsha, C=CN` |
+| 密钥 | RSA 4096，有效期 30 年，PKCS12，别名 `yew` |
+| SHA-256 | `9FF56EEAA83CDC01BA66D879239CDE5A2A69C3AED2605CD8E1B9348DBF2861B2` |
+| SHA-1 | `A164290B572A258D0551A5560969FDBC36211930` |
+| MD5 | `C6878B5B6BDB7F644EF42EE15A10973A` |
+| 公钥 | `android/release/signing-public-key.txt`（模数的十六进制，指数 65537） |
+
+- 密钥库在仓库外的 `~/.tenon-keys/android/yew/yew-release.p12`，目录 0700、文件 0600；口令由脚本随机生成，直接存进登录钥匙串（服务 `tenon-android-signing`，账户 `yew`）。
+- **还没备份**：发布任何用它签的安装包之前，要创始人在终端里跑一次 `backup-signing-key.sh`（7.3），这台 Mac 之外至少一份，做完告诉安全组。
+- App 备案要填的包名、证书 MD5 指纹和公钥都变了，报备案时用这一组。
+
+**Jig 的密钥**（2026-11-15，1.2.0 及以前的安装包用它签）：留着不删，不再用来发布。下面是它当时的记录。
+
 创始人 2026-11-15 在本会话确认（「确认」）后，02:07 用 `android/scripts/create-signing-key.sh` 生成，照产品规范 15.6。
 
 | | |
@@ -334,7 +354,7 @@ English:
 2. 查 OSV，有已知漏洞或查不了就停；再跑单元测试、lint 和正式构建。
 3. 用 `apksigner` 签名，只用 v2 和 v3。口令从钥匙串读进环境变量，不经过 Gradle。找不到正式密钥就停，不会改用别的密钥。
 4. 核对，全部通过才得到正式的文件名，中途退出就删掉没核对完的文件：签名验证通过、证书 SHA-256 和登记的一致、签名者只有一个、没有 v1 签名；包名和版本号对、不可调试、关掉了明文连接和系统备份；申请和声明的权限恰好是 4.7 的名单。
-5. 产物在 `android/build/release/`：`Jig-<版本>.apk` 和 `SHA256SUMS`。
+5. 产物在 `android/build/release/`：`Yew-<版本>.apk` 和 `SHA256SUMS`（改名前是 `Jig-<版本>.apk`）。
 
 2026-11-15 用一次性的测试密钥在临时目录里演练过，测试密钥、它的钥匙串条目和签出来的包都已删：
 

@@ -15,7 +15,7 @@ export interface Runtime {
 	close(): void;
 }
 
-/** Opens Jig's data directory, database, keychain and model catalog. Used by `jig serve` and the CLI. */
+/** Opens Yew's data directory, database, keychain and model catalog. Used by `yew serve` and the CLI. */
 export function openRuntime(
 	options: { env?: Record<string, string | undefined>; keys?: KeyStore } = {},
 ): Runtime {

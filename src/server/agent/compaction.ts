@@ -6,7 +6,7 @@ import { type JsonObject, messageText, type Notice } from "../../shared/messages
 import { type Entry, permissionModeOf, type Session } from "../../shared/types.ts";
 import type { ModelGateway, ModelInfo } from "../model/gateway.ts";
 import type { Store } from "../store.ts";
-import { estimateTokens, JIG_NOTE, transcriptForSummary, usageTotals } from "./context.ts";
+import { estimateTokens, isOwnNote, transcriptForSummary, usageTotals } from "./context.ts";
 import {
 	type ContextSnapshot,
 	type InstructionExtras,
@@ -37,14 +37,14 @@ function compactAt(session: Session, model: ModelInfo): number {
 	);
 }
 
-/** A message from the person or a letter, not one of Jig's own notes to the model. */
+/** A message from the person or a letter, not one of Yew's own notes to the model. */
 function isRequest(entry: Entry): boolean {
-	return entry.role === "user" && !messageText(entry.message).startsWith(JIG_NOTE);
+	return entry.role === "user" && !isOwnNote(messageText(entry.message));
 }
 
 function clipRequest(text: string): string {
 	return text.length > MAX_REQUEST_CHARS
-		? `${text.slice(0, MAX_REQUEST_CHARS)}\n[cut by Jig: the message was longer]`
+		? `${text.slice(0, MAX_REQUEST_CHARS)}\n[cut by Yew: the message was longer]`
 		: text;
 }
 

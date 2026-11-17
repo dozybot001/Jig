@@ -216,7 +216,7 @@ actor RelayChannel {
 
 /// Why the relay closed the connection, when it says (src/remote/protocol.ts, relay/relay.ts).
 enum RelayError: LocalizedError, Equatable {
-	/// The Mac is not connected to the relay: asleep, Jig not running, or phone access off.
+	/// The Mac is not connected to the relay: asleep, Yew not running, or phone access off.
 	case macOffline
 	/// The Mac closed the channel during the handshake: it no longer knows this phone.
 	case refused

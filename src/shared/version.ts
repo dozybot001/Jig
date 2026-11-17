@@ -6,7 +6,7 @@ const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.ur
 	version: string;
 };
 
-export const NAME = "jig";
+export const NAME = "yew";
 export const VERSION: string = pkg.version;
 export const PUBLISHER = "Tenon AI";
 export const WEBSITE = "https://tenonai.cn/";

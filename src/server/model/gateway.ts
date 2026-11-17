@@ -29,7 +29,7 @@ import type { ThinkingLevel } from "../../shared/types.ts";
 import { invalid, JigError } from "../errors.ts";
 import type { KeyStore } from "../keys.ts";
 
-// Compile-time guarantees that Jig's stored message shapes and the library's stay interchangeable.
+// Compile-time guarantees that Yew's stored message shapes and the library's stay interchangeable.
 type Assert<T extends true> = T;
 export type _MessagesFitLibrary = Assert<ModelMessage extends Message ? true : false>;
 export type _LibraryResultFitsJig = Assert<
@@ -170,8 +170,8 @@ const CN_PROVIDERS = new Set([
 ]);
 
 /**
- * Built-in providers Jig does not offer: they sign in through an account or a cloud SDK instead of an
- * API key, or need extra account configuration. Jig only uses API keys (docs/prior-art.md, section 3).
+ * Built-in providers Yew does not offer: they sign in through an account or a cloud SDK instead of an
+ * API key, or need extra account configuration. Yew only uses API keys (docs/prior-art.md, section 3).
  */
 const HIDDEN_PROVIDERS = new Set([
 	"amazon-bedrock",
@@ -286,7 +286,7 @@ function toInfo(model: Model<Api>): ModelInfo {
 
 export interface GatewayOptions {
 	keys: KeyStore;
-	/** Jig's version, sent as `User-Agent: jig/<version>`. */
+	/** Yew's version, sent as `User-Agent: yew/<version>`. */
 	version: string;
 	custom?: CustomProviderConfig[];
 	/** Replaces the built-in providers; tests pass the library's faux provider here. */
@@ -345,7 +345,7 @@ export class ModelGateway {
 			credentials: new KeychainCredentials(options.keys),
 			authContext: NO_AMBIENT_AUTH,
 			// No attribution headers, and our own User-Agent (AGENTS.md "数据在本机").
-			identity: { userAgent: { custom: `jig/${options.version}` }, attribution: null },
+			identity: { userAgent: { custom: `yew/${options.version}` }, attribution: null },
 		});
 		const providers = options.providers ?? builtinProviders();
 		for (const provider of providers) {
@@ -436,7 +436,7 @@ export class ModelGateway {
 			throw new JigError(
 				"missing-api-key",
 				400,
-				`There is no API key for ${request.provider}. Add one in Settings, or run: jig key set ${request.provider}`,
+				`There is no API key for ${request.provider}. Add one in Settings, or run: yew key set ${request.provider}`,
 				{ provider: request.provider },
 			);
 		}

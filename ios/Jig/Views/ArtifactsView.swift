@@ -100,7 +100,13 @@ struct ArtifactView: View {
 	}
 
 	private var unreadable: some View {
-		ContentUnavailableView("This artifact cannot be shown", systemImage: "doc.questionmark")
+		ContentUnavailableView {
+			Label {
+				Text("This artifact cannot be shown")
+			} icon: {
+				Mascot(pose: .sorry)
+			}
+		}
 	}
 
 	/// Markdown as the system draws it, line breaks kept; plain text when it does not parse.
@@ -178,7 +184,7 @@ struct ChartView: View {
 						.position(by: .value("Series", point.series))
 				}
 			}
-			// Black, white and gray, as the rest of Jig: series differ by shade.
+			// Black, white and gray, as the rest of Yew: series differ by shade.
 			.chartForegroundStyleScale(range: [0.9, 0.5, 0.3, 0.7, 0.4, 0.6, 0.2, 0.8].map { Color.primary.opacity($0) })
 			.chartLegend(chart.series.count > 1 ? .visible : .hidden)
 			.frame(height: 260)
@@ -187,7 +193,7 @@ struct ChartView: View {
 }
 
 /// An HTML artifact, shut in: no address of its own, and a policy that stops every request, so its
-/// scripts can run but cannot reach Jig, the Mac or the network (blueprint 6.6, item 19).
+/// scripts can run but cannot reach Yew, the Mac or the network (blueprint 6.6, item 19).
 struct SealedPage: UIViewRepresentable {
 	let html: String
 

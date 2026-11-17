@@ -10,7 +10,7 @@ import { readSettings } from "./settings.ts";
 import type { Store } from "./store.ts";
 
 /**
- * Everything Jig keeps, as files a person can read without Jig (blueprint, principle 5; M4 plan,
+ * Everything Yew keeps, as files a person can read without Yew (blueprint, principle 5; M4 plan,
  * section 2): each session as Markdown, and letters, cards, scheduled tasks and settings as JSON.
  * Left out: API keys (they are in the keychain), paired phones and their tokens, sign-in tokens.
  */

@@ -4,10 +4,10 @@ import { type CliIo, EXIT_ERROR, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
 import { serviceRunning } from "./serve.ts";
 
-const HELP = `Usage: jig schedule <list|run> [options] [<task>]
+const HELP = `Usage: yew schedule <list|run> [options] [<task>]
 
 Scheduled tasks send a standing session a letter at set times; the session's
-last reply goes to the main conversation as the report. Set them up in Jig's
+last reply goes to the main conversation as the report. Set them up in Yew's
 web interface, or ask the main conversation.
 
 Commands:
@@ -55,8 +55,8 @@ export function scheduleCommand(): Command {
 			if (action === "list" ? positionals.length !== 1 : action !== "run" || !ref) {
 				throw new UsageError(
 					action === "run" && !ref
-						? "jig schedule run needs a task's name or id"
-						: "jig schedule needs list or run",
+						? "yew schedule run needs a task's name or id"
+						: "yew schedule needs list or run",
 				);
 			}
 			if (positionals.length > 2) throw new UsageError("too many arguments");
@@ -102,7 +102,7 @@ export function scheduleCommand(): Command {
 				}
 				const schedule = book.find(ref as string);
 				if (!schedule) {
-					io.stderr.write(`jig: there is no scheduled task with the name or id ${ref}\n`);
+					io.stderr.write(`yew: there is no scheduled task with the name or id ${ref}\n`);
 					return EXIT_ERROR;
 				}
 				const scheduler = new Scheduler(store, new PostOffice(store), book, () => {});
@@ -110,8 +110,8 @@ export function scheduleCommand(): Command {
 				if ("skipped" in result) {
 					io.stderr.write(
 						result.skipped === "busy"
-							? `jig: the last run of ${schedule.name} is not finished yet\n`
-							: `jig: ${sessionName(schedule.sessionId)} is archived\n`,
+							? `yew: the last run of ${schedule.name} is not finished yet\n`
+							: `yew: ${sessionName(schedule.sessionId)} is archived\n`,
 					);
 					return EXIT_ERROR;
 				}
@@ -125,7 +125,7 @@ export function scheduleCommand(): Command {
 					);
 				}
 				if (!serviceRunning(home)) {
-					io.stderr.write("Jig is not running; the letter is delivered when it starts.\n");
+					io.stderr.write("Yew is not running; the letter is delivered when it starts.\n");
 				}
 				return EXIT_OK;
 			} finally {

@@ -224,7 +224,7 @@ CREATE TABLE devices (
 	last_seen_at INTEGER
 ) STRICT;
 `,
-	// Scheduled tasks (M3 plan, section 9): letters Jig sends a standing session at set times.
+	// Scheduled tasks (M3 plan, section 9): letters Yew sends a standing session at set times.
 	`
 CREATE TABLE schedules (
 	id TEXT PRIMARY KEY,

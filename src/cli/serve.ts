@@ -9,14 +9,14 @@ import type { Command } from "./run.ts";
 
 export const DEFAULT_PORT = 4777;
 const EVENT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
-/** How often the service looks for letters from `jig send`, which writes to the database directly. */
+/** How often the service looks for letters from `yew send`, which writes to the database directly. */
 const LETTER_SWEEP_MS = 2000;
 /** How often the service checks whether phone access was turned on or off. */
 const REMOTE_SYNC_MS = 5000;
 
-const SERVE_HELP = `Usage: jig serve [options]
+const SERVE_HELP = `Usage: yew serve [options]
 
-Start Jig's local service. It listens on 127.0.0.1 only, keeps running while
+Start Yew's local service. It listens on 127.0.0.1 only, keeps running while
 the browser is closed, and prints a one-time link to open the web interface.
 
 Options:
@@ -25,9 +25,9 @@ Options:
   -h, --help      Show this help
 `;
 
-const OPEN_HELP = `Usage: jig open [options]
+const OPEN_HELP = `Usage: yew open [options]
 
-Open the web interface of the running Jig service with a new one-time link.
+Open the web interface of the running Yew service with a new one-time link.
 
 Options:
       --print  Print the link instead of opening a browser
@@ -42,7 +42,7 @@ interface ServeFile {
 
 const serveFile = (home: string) => join(home, "serve.json");
 
-/** The short commit of a source checkout; null when Jig does not run from a git checkout. */
+/** The short commit of a source checkout; null when Yew does not run from a git checkout. */
 function shortCommit(): string | null {
 	try {
 		return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
@@ -68,7 +68,7 @@ export function openBrowser(url: string): void {
 export function serveCommand(): Command {
 	return {
 		name: "serve",
-		summary: "Start Jig's local service",
+		summary: "Start Yew's local service",
 		async run(args: string[], io: CliIo): Promise<number> {
 			const { values } = parseArgs({
 				args,
@@ -102,7 +102,7 @@ export function serveCommand(): Command {
 			const stuck = store.recoverAfterRestart();
 			if (stuck.length > 0) {
 				io.stderr.write(
-					`${stuck.length} session(s) were working when Jig last stopped. They are marked for review; nothing was redone.\n`,
+					`${stuck.length} session(s) were working when Yew last stopped. They are marked for review; nothing was redone.\n`,
 				);
 			}
 			store.pruneEvents(Date.now() - EVENT_RETENTION_MS);
@@ -157,7 +157,7 @@ export function serveCommand(): Command {
 				version: VERSION,
 				log,
 				handle: async (request, device) => {
-					if (!handle) throw new Error("Jig is still starting.");
+					if (!handle) throw new Error("Yew is still starting.");
 					return handle(request, device.id);
 				},
 			});
@@ -204,8 +204,8 @@ export function serveCommand(): Command {
 				server.once("error", (error: NodeJS.ErrnoException) => {
 					io.stderr.write(
 						error.code === "EADDRINUSE"
-							? `jig: port ${port} is in use. Is Jig already running? Try 'jig open', or pick another port with --port.\n`
-							: `jig: could not start: ${error.message}\n`,
+							? `yew: port ${port} is in use. Is Yew already running? Try 'yew open', or pick another port with --port.\n`
+							: `yew: could not start: ${error.message}\n`,
 					);
 					resolve(false);
 				});
@@ -214,16 +214,16 @@ export function serveCommand(): Command {
 				runtime.close();
 				return EXIT_ERROR;
 			}
-			// Letters that were waiting when Jig stopped, and letters from `jig send`, start their sessions.
+			// Letters that were waiting when Yew stopped, and letters from `yew send`, start their sessions.
 			agents.wakeQueued();
 			const sweep = setInterval(() => agents.wakeQueued(), LETTER_SWEEP_MS);
-			// Runs missed while Jig was not running are run or skipped now, as each task says.
+			// Runs missed while Yew was not running are run or skipped now, as each task says.
 			scheduler.start();
 			notifier.start();
-			// Phone access follows the settings, which `jig remote` may change while Jig runs.
+			// Phone access follows the settings, which `yew remote` may change while Yew runs.
 			const syncRemote = () => {
 				void remote.sync().catch((error: Error) => log(`remote access: ${error.message}`));
-				// A search key saved with `jig key set` while Jig runs is picked up here.
+				// A search key saved with `yew key set` while Yew runs is picked up here.
 				void search.refresh().catch(() => {});
 				// A changed mcp.json is read again: new servers start, removed ones stop.
 				void mcp.refresh().catch((error: Error) => log(`mcp: ${error.message}`));
@@ -235,13 +235,13 @@ export function serveCommand(): Command {
 
 			const url = `http://127.0.0.1:${port}/#t=${issueLoginToken(store)}`;
 			io.stdout.write(
-				`Jig ${VERSION} is running at http://127.0.0.1:${port}/\nSign in with this link (works once, within 10 minutes):\n${url}\nStop with Ctrl-C. For a new link later, run: jig open\n`,
+				`Yew ${VERSION} is running at http://127.0.0.1:${port}/\nSign in with this link (works once, within 10 minutes):\n${url}\nStop with Ctrl-C. For a new link later, run: yew open\n`,
 			);
 			if (values.open) openBrowser(url);
 
 			return await new Promise<number>((resolve) => {
 				const stop = () => {
-					io.stderr.write("Stopping Jig…\n");
+					io.stderr.write("Stopping Yew…\n");
 					clearInterval(sweep);
 					clearInterval(remoteSweep);
 					scheduler.stop();
@@ -263,7 +263,7 @@ export function serveCommand(): Command {
 	};
 }
 
-/** True when a Jig service is running for this data directory. */
+/** True when a Yew service is running for this data directory. */
 export function serviceRunning(home: string): boolean {
 	try {
 		const info = JSON.parse(readFileSync(serveFile(home), "utf8")) as ServeFile;
@@ -295,7 +295,7 @@ export function openCommand(): Command {
 				info = JSON.parse(readFileSync(serveFile(home), "utf8")) as ServeFile;
 				process.kill(info.pid, 0);
 			} catch {
-				io.stderr.write("jig: Jig is not running. Start it with: jig serve\n");
+				io.stderr.write("yew: Yew is not running. Start it with: yew serve\n");
 				return EXIT_ERROR;
 			}
 			const { openDatabase } = await import("../server/db/database.ts");
@@ -310,7 +310,7 @@ export function openCommand(): Command {
 					io.stdout.write(`${url}\n`);
 				} else {
 					openBrowser(url);
-					io.stdout.write(`Opened Jig in the browser (http://127.0.0.1:${info.port}/).\n`);
+					io.stdout.write(`Opened Yew in the browser (http://127.0.0.1:${info.port}/).\n`);
 				}
 				return EXIT_OK;
 			} finally {

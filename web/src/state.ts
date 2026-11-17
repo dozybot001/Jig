@@ -50,7 +50,7 @@ export type SettingsPatch = Partial<Omit<Settings, "notify" | "remote">> & {
 export interface McpServerView {
 	name: string;
 	kind: "stdio" | "http";
-	/** Set up by Jig itself: it can be turned off, not removed. */
+	/** Set up by Yew itself: it can be turned off, not removed. */
 	builtin: boolean;
 	disabled: boolean;
 	command: string | null;
@@ -61,20 +61,20 @@ export interface McpServerView {
 	state: "connecting" | "ready" | "error" | "disabled" | "sign-in";
 	error: string | null;
 	tools: string[];
-	/** Jig holds a sign-in for it (blueprint 6.11, item 40). */
+	/** Yew holds a sign-in for it (blueprint 6.11, item 40). */
 	signedIn: boolean;
-	/** The site the browser goes to to sign in, once Jig has found it. */
+	/** The site the browser goes to to sign in, once Yew has found it. */
 	signInAt?: string;
 	/** Its entry names a client of the person's to sign in with. */
 	oauthClient: boolean;
-	/** One of the presets Jig installs: the npm package and version it runs. */
+	/** One of the presets Yew installs: the npm package and version it runs. */
 	package?: string;
 }
 
 /** Where a skill comes from: the global folders, or a saved workspace's. */
 export type SkillSource = { kind: "global" } | { kind: "workspace"; name: string; path: string };
 
-/** A skill folder Jig found; `problem` says why one could not be read, and such a row has no switch. */
+/** A skill folder Yew found; `problem` says why one could not be read, and such a row has no switch. */
 export interface SkillView {
 	/** The folder's real path. */
 	id: string;
@@ -90,7 +90,7 @@ export interface SkillList {
 	items: SkillView[];
 	/** The folders read, in the order the list is grouped. */
 	folders: { source: SkillSource; paths: string[] }[];
-	/** Which file manager can show a folder on this computer; null when Jig knows none. */
+	/** Which file manager can show a folder on this computer; null when Yew knows none. */
 	reveal: "finder" | "files" | null;
 }
 
@@ -189,7 +189,7 @@ export interface TranscriptState {
 	outputs: Record<string, string>;
 }
 
-/** What Jig's data folder takes, by kind; `reveal` names the file manager, null where there is none. */
+/** What Yew's data folder takes, by kind; `reveal` names the file manager, null where there is none. */
 export type DataPartId = "database" | "artifacts" | "logs" | "temp" | "other";
 export interface DataOverview {
 	folder: string;
@@ -201,7 +201,7 @@ export interface DataOverview {
 	readAt: number;
 }
 
-/** What an export wrote, as `jig export --json` prints it. */
+/** What an export wrote, as `yew export --json` prints it. */
 export interface DataExport {
 	folder: string;
 	sessions: number;

@@ -22,8 +22,8 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
 		if let badge = note.badge { content.badge = NSNumber(value: badge) }
 		// What the app needs when the notification is tapped or taken away; never the sealed text.
 		var info: [AnyHashable: Any] = [:]
-		if let id = note.id { info["jig.id"] = id }
-		if let session = note.session { info["jig.session"] = session }
+		if let id = note.id { info["yew.id"] = id }
+		if let session = note.session { info["yew.session"] = session }
 		content.userInfo = info
 		content.threadIdentifier = note.session ?? "center"
 		contentHandler(content)
@@ -64,7 +64,7 @@ struct PushText {
 		default: label = String(localized: "push.fallback")
 		}
 		let name = note.title ?? ""
-		title = name.isEmpty ? "Jig" : name
+		title = name.isEmpty ? "Yew" : name
 		body = detail.isEmpty ? label : label + String(localized: "push.separator") + detail
 	}
 }

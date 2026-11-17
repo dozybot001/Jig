@@ -4,30 +4,30 @@ plugins {
 }
 
 // The version has one source: package.json at the repository root (AGENTS.md, "版本与更新记录").
-val jigVersion: String = Regex(""""version"\s*:\s*"(\d+)\.(\d+)\.(\d+)"""")
+val yewVersion: String = Regex(""""version"\s*:\s*"(\d+)\.(\d+)\.(\d+)"""")
     .find(rootProject.file("../package.json").readText())
     ?.groupValues?.drop(1)?.joinToString(".")
     ?: error("package.json has no version")
-val jigVersionCode: Int = jigVersion.split(".").map(String::toInt).let { (major, minor, patch) ->
+val yewVersionCode: Int = yewVersion.split(".").map(String::toInt).let { (major, minor, patch) ->
     major * 10000 + minor * 100 + patch
 }
 
 // The About page's build number is the short commit the package was built from (AGENTS.md).
-val jigBuild: String = providers.exec { commandLine("git", "rev-parse", "--short", "HEAD") }
+val yewBuild: String = providers.exec { commandLine("git", "rev-parse", "--short", "HEAD") }
     .standardOutput.asText.map { it.trim() }.getOrElse("dev")
 
 android {
-    namespace = "cn.tenonai.apps.jig"
+    namespace = "cn.tenonai.apps.yew"
     compileSdk = 37
     buildToolsVersion = "37.0.0"
 
     defaultConfig {
-        applicationId = "cn.tenonai.apps.jig"
+        applicationId = "cn.tenonai.apps.yew"
         minSdk = 26
         targetSdk = 37
-        versionCode = jigVersionCode
-        versionName = jigVersion
-        buildConfigField("String", "BUILD", "\"$jigBuild\"")
+        versionCode = yewVersionCode
+        versionName = yewVersion
+        buildConfigField("String", "BUILD", "\"$yewBuild\"")
     }
 
     androidResources {
@@ -66,7 +66,7 @@ android {
     testOptions {
         unitTests.all {
             // The policy text is read where it is, so the test fails when the app's copy falls behind.
-            it.systemProperty("jig.root", rootProject.file("..").path)
+            it.systemProperty("yew.root", rootProject.file("..").path)
         }
     }
 }

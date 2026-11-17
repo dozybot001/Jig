@@ -9,7 +9,7 @@ export const runProgram: RunCommand = (command, args) =>
 		execFile(command, args, { timeout: 15_000 }, (error) => (error ? reject(error) : resolve()));
 	});
 
-/** What the interface calls the file manager on this system, or null where Jig knows none. */
+/** What the interface calls the file manager on this system, or null where Yew knows none. */
 export type RevealKind = "finder" | "files" | null;
 
 export function revealKind(platform: string = process.platform): RevealKind {
@@ -17,7 +17,7 @@ export function revealKind(platform: string = process.platform): RevealKind {
 }
 
 /**
- * The program that shows a folder in the system's file manager, or null where Jig knows none.
+ * The program that shows a folder in the system's file manager, or null where Yew knows none.
  * `inside` opens the folder itself; otherwise Finder opens the folder that holds it, with it selected.
  */
 export function revealCommand(
@@ -33,7 +33,7 @@ export function revealCommand(
 /**
  * Shows a folder in the file manager. The caller decides which folder: it is never a path taken from
  * a request. `field` names the request field in the problem when this system has no file manager
- * Jig knows.
+ * Yew knows.
  */
 export async function showInFileManager(
 	dir: string,

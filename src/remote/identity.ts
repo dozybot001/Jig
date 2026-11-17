@@ -69,7 +69,7 @@ const sha256 = (value: string) => createHash("sha256").update(value).digest();
 
 /**
  * A new pairing: the QR code's content, valid five minutes and once. Only the secret's hash is kept,
- * in the database, so `jig remote pair` and the running service share it.
+ * in the database, so `yew remote pair` and the running service share it.
  */
 export function createPairing(
 	store: Store,

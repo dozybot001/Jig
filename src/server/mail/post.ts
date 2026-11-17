@@ -85,8 +85,8 @@ export function reasonText(reason: string | null): string {
 }
 
 /**
- * Who a letter is from: a session, the command line (`jig send`), the person (a decision), or a
- * scheduled task the person set up, which Jig sends in its name.
+ * Who a letter is from: a session, the command line (`yew send`), the person (a decision), or a
+ * scheduled task the person set up, which Yew sends in its name.
  */
 export type Sender =
 	| { kind: "session"; session: Session }
@@ -101,7 +101,7 @@ export interface Outgoing {
 	summary: string;
 	body?: string;
 	replyTo?: string | null;
-	/** Jig sends the session's final reply on its behalf. */
+	/** Yew sends the session's final reply on its behalf. */
 	auto?: boolean;
 	/** A decision letter: the number of the decision it carries. */
 	decision?: number | null;
@@ -199,7 +199,7 @@ export class PostOffice {
 	}
 
 	/** The main conversation, if one is set and still there. */
-	/** Jig's settings, for what list_sessions shows. */
+	/** Yew's settings, for what list_sessions shows. */
 	settings(): Settings {
 		return readSettings(this.#store);
 	}
@@ -276,7 +276,7 @@ export class PostOffice {
 		if (out.kind === "decision") this.#checkRelay(sender, out.decision);
 		let threadId: string | null = null;
 		let repliedTo: Letter | null = null;
-		// A report to a session whose request is open with the sender answers it: Jig links them, so the
+		// A report to a session whose request is open with the sender answers it: Yew links them, so the
 		// session need not carry letter ids (blueprint principle 8).
 		const answering =
 			!out.replyTo && out.kind === "report" && from !== null
@@ -312,7 +312,7 @@ export class PostOffice {
 					: sender.kind === "schedule"
 						? sender.schedule.name
 						: sender.kind === "cli"
-							? "jig send"
+							? "yew send"
 							: "person",
 			toSession: to.id,
 			kind: out.kind,
@@ -324,7 +324,7 @@ export class PostOffice {
 			scheduleId: sender.kind === "schedule" ? sender.schedule.id : (out.schedule ?? null),
 		};
 
-		// Jig's automatic letters answer one request each, so they skip the limits (and cannot loop).
+		// Yew's automatic letters answer one request each, so they skip the limits (and cannot loop).
 		if (sender.kind === "session" && !out.auto) {
 			const current = this.#store.getSession(sender.session.id);
 			const stop = this.#limits(current, to, path, summary, body, repliedTo?.id ?? null);
@@ -456,7 +456,7 @@ export class PostOffice {
 
 	/**
 	 * The recipient's receive policy, and the hold for letters from sessions with fewer permissions. Both
-	 * are for letters the recipient did not ask for: Jig's automatic letters and the first answer to a
+	 * are for letters the recipient did not ask for: Yew's automatic letters and the first answer to a
 	 * request it is still waiting on go straight through.
 	 */
 	#policy(
@@ -590,7 +590,7 @@ export class PostOffice {
 					`Chosen: ${chosen ?? "(note only)"}`,
 					...(card.note ? [`Note: ${oneLine(card.note)}`] : []),
 					...(requester ? [`Requested by: ${requester}`] : []),
-					"Decided by the person in Jig",
+					"Decided by the person in Yew",
 				]
 			: [
 					stamp,
@@ -599,7 +599,7 @@ export class PostOffice {
 					`选择：${chosen ?? "（只写了备注）"}`,
 					...(card.note ? [`备注：${oneLine(card.note)}`] : []),
 					...(requester ? [`提出：${requester}`] : []),
-					"本人在 Jig 里决定",
+					"本人在 Yew 里决定",
 				];
 		try {
 			const header = existsSync(path) ? "" : english ? "# Approval log\n\n" : "# 审批记录\n\n";

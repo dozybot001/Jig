@@ -525,7 +525,7 @@ export function QuestionCard({ approval, session }: { approval: Approval; sessio
 					session
 						? [
 								session,
-								// A question Jig took from the end of a reply, not one asked with ask_user.
+								// A question Yew took from the end of a reply, not one asked with ask_user.
 								(approval.request as QuestionRequest).fromReply && t("askedInReply"),
 								formatWaited(approval.createdAt, now),
 							]
@@ -749,7 +749,7 @@ const ToolCard = memo(function ToolCard({
 	);
 });
 
-/** One step of a turn's work: a thought, a tool call, or a note Jig added to the context. */
+/** One step of a turn's work: a thought, a tool call, or a note Yew added to the context. */
 type Step =
 	| { kind: "thinking"; key: string; text: string; live: boolean }
 	| { kind: "tool"; key: string; block: ToolCallBlock; entryId: string | null }
@@ -844,7 +844,7 @@ function buildItems(transcript: TranscriptState, working: boolean): Item[] {
 		else if (entry.role === "system" || entry.role === "compaction") {
 			run.push({ kind: "note", key: entry.id, entry });
 		} else if (entry.role === "user" && userText(entry).startsWith(JIG_NOTE)) {
-			// Jig's own notes to the model are not shown and do not split a run.
+			// Yew's own notes to the model are not shown and do not split a run.
 		} else if (entry.role !== "toolResult") {
 			flush();
 			items.push({ kind: "entry", key: entry.id, entry });
@@ -1044,7 +1044,7 @@ function StepGroup({
 	);
 }
 
-/** Jig's notes in the context: changed instruction files, or the summary of compacted history. */
+/** Yew's notes in the context: changed instruction files, or the summary of compacted history. */
 function NoteStep({ entry }: { entry: Entry }) {
 	useLang();
 	if (entry.role === "system") {
@@ -1077,7 +1077,7 @@ function NoteStep({ entry }: { entry: Entry }) {
 }
 
 /**
- * A letter from another session, a script or Jig, shown as a letter, not as words of the person. The
+ * A letter from another session, a script or Yew, shown as a letter, not as words of the person. The
  * person's own decisions carry the "by you" mark (blueprint 7.2).
  */
 function LetterEntry({ letter }: { letter: LetterRef }) {
@@ -1156,7 +1156,7 @@ function LetterEntry({ letter }: { letter: LetterRef }) {
 	);
 }
 
-/** A message from the person, a letter, or a notice from Jig. */
+/** A message from the person, a letter, or a notice from Yew. */
 function EntryView({ entry }: { entry: Entry }) {
 	switch (entry.role) {
 		case "user":

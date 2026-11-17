@@ -20,12 +20,12 @@ function freePort(): Promise<number> {
 	});
 }
 
-describe("jig serve", () => {
+describe("yew serve", () => {
 	test("starts on 127.0.0.1, signs in with the printed link, and stops cleanly", async () => {
-		const home = tempDir("jig-serve-");
+		const home = tempDir("yew-serve-");
 		const port = await freePort();
 		const child = spawn(process.execPath, [main, "serve", "--port", String(port)], {
-			// The servers Jig sets up by itself are fetched with npx: not in a test.
+			// The servers Yew sets up by itself are fetched with npx: not in a test.
 			env: { ...process.env, JIG_HOME: home, NO_COLOR: "1", JIG_MCP_BUILTIN: "off" },
 			stdio: ["ignore", "pipe", "pipe"],
 		});

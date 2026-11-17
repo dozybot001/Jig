@@ -49,8 +49,8 @@ export function tally(tools: string[]): Tally {
 	return { counts, others };
 }
 
-/** Jig's own notes to the model start with this; they are not the person's words and start no turn. */
-export const JIG_NOTE = "[From Jig, not from the person]";
+/** Yew's own notes to the model start with this; they are not the person's words and start no turn. */
+export const JIG_NOTE = "[From Yew, not from the person]";
 
 function startsTurn(entry: Entry): boolean {
 	if (entry.role === "notice") {

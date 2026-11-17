@@ -22,6 +22,7 @@ import {
 	RefuseIcon,
 	SendIcon,
 } from "./icons.tsx";
+import { Mascot } from "./mascot.tsx";
 import { SidebarToggle } from "./session.tsx";
 import { PermissionCard, QuestionCard } from "./transcript.tsx";
 import { Button, CardHead, ErrorBox, useAction, useNow } from "./ui.tsx";
@@ -369,7 +370,10 @@ function CenterList() {
 	return (
 		<>
 			{approvals.length + cards.length + held.length === 0 && (
-				<p className="empty-box">{t("centerEmpty")}</p>
+				<div className="empty-state">
+					<Mascot pose="happy" height={96} />
+					<p className="empty-box">{t("centerEmpty")}</p>
+				</div>
 			)}
 			{permissions.length > 0 && (
 				<section className="center-section" aria-label={t("waitingApprovals")}>

@@ -7,7 +7,7 @@
  * This calls a real model and costs money; it is not part of `npm test`. The key is read from a file
  * (never from a command argument) and kept in memory only:
  *
- *   JIG_SOAK_KEY_FILE=/path/to/key node scripts/soak.ts anthropic claude-haiku-5-5 [files] [thinking] [compactAt]
+ *   YEW_SOAK_KEY_FILE=/path/to/key node scripts/soak.ts anthropic claude-haiku-5-5 [files] [thinking] [compactAt]
  *
  * With "code" in place of the number of files, the task is a small coding job instead: a project
  * with one failing test, to be fixed, checked by running the tests, and committed.
@@ -32,15 +32,15 @@ const [
 	thinking = "low",
 	compactAt = "20000",
 ] = process.argv.slice(2);
-const keyFile = process.env.JIG_SOAK_KEY_FILE;
+const keyFile = process.env.YEW_SOAK_KEY_FILE;
 if (!keyFile) {
-	process.stderr.write("Set JIG_SOAK_KEY_FILE to a file that holds the provider's API key.\n");
+	process.stderr.write("Set YEW_SOAK_KEY_FILE to a file that holds the provider's API key.\n");
 	process.exit(2);
 }
 const coding = count === "code";
 const files = coding ? 0 : Number(count);
-const home = realpathSync(mkdtempSync(join(tmpdir(), "jig-soak-home-")));
-const cwd = realpathSync(mkdtempSync(join(tmpdir(), "jig-soak-cwd-")));
+const home = realpathSync(mkdtempSync(join(tmpdir(), "yew-soak-home-")));
+const cwd = realpathSync(mkdtempSync(join(tmpdir(), "yew-soak-cwd-")));
 const name = (i: number) => `note-${String(i).padStart(3, "0")}.txt`;
 let expected = 0;
 for (let i = 1; i <= files; i++) {

@@ -6,22 +6,23 @@ import { fileURLToPath } from "node:url";
 import type { McpServerConfig } from "./mcp.ts";
 
 /**
- * The MCP servers Jig sets up by itself (blueprint 6.10, item 38): a browser and control of this
- * computer. Jig does not build these in; it runs two open-source servers.
+ * The MCP servers Yew sets up by itself (blueprint 6.10, item 38): a browser and control of this
+ * computer. Yew does not build these in; it runs two open-source servers.
  *
  * - browser: Playwright MCP by Microsoft (Apache-2.0). It opens its own Chrome window with a
- *   profile kept in Jig's data folder, so sign-ins made there stay, apart from the person's Chrome.
+ *   profile kept in Yew's data folder, so sign-ins made there stay, apart from the person's Chrome.
  * - computer: computer-use-mcp by Adam Jones (MIT). Screenshots, mouse and keyboard for the whole
- *   screen; macOS asks once for Screen Recording and Accessibility for the program that runs Jig.
+ *   screen; macOS asks once for Screen Recording and Accessibility for the program that runs Yew.
  *
- * What runs is fixed by `mcp-builtin/package-lock.json`, which ships with Jig: every package of
- * both dependency trees at one version with its hash. The first time a server is needed Jig installs
+ * What runs is fixed by `mcp-builtin/package-lock.json`, which ships with Yew: every package of
+ * both dependency trees at one version with its hash. The first time a server is needed Yew installs
  * exactly that into its data folder (`npm ci`, without install scripts) and from then on starts the
- * servers with node from there. Nothing is resolved at run time, so what runs changes only when Jig
+ * servers with node from there. Nothing is resolved at run time, so what runs changes only when Yew
  * is updated.
  *
  * An entry of the same name in mcp.json replaces one of these; `{"disabled": true}` turns it off.
- * `JIG_MCP_BUILTIN=off` leaves them out, for a throwaway Jig that should start nothing.
+ * `YEW_MCP_BUILTIN=off` (or `JIG_MCP_BUILTIN=off`, from before the rename) leaves them out, for a
+ * throwaway Yew that should start nothing.
  */
 const SOURCE = fileURLToPath(new URL("../../mcp-builtin/", import.meta.url));
 const FILES = ["package.json", "package-lock.json"] as const;
@@ -30,7 +31,7 @@ const FILES = ["package.json", "package-lock.json"] as const;
 const installDir = (jigHome: string) => join(jigHome, "mcp-builtin");
 
 /**
- * The common servers Jig adds that run on this computer (Gitee, Notion, Sentry; blueprint 6.11, item
+ * The common servers Yew adds that run on this computer (Gitee, Notion, Sentry; blueprint 6.11, item
  * 40) are installed the same way, each from its own lock file in `mcp-builtin/presets/<id>`, into
  * `<data folder>/mcp-presets/<id>`, the first time it is used. This is where each one's program is in
  * its package.
@@ -43,8 +44,8 @@ const PRESET_PROGRAMS: Record<string, string> = {
 export const INSTALLED_PRESETS = Object.keys(PRESET_PROGRAMS);
 
 /**
- * How the preset `id` is started: with node from Jig's data folder, with a small part of Jig's
- * environment and the entry's own variables (its token). Null for a preset Jig does not install.
+ * How the preset `id` is started: with node from Yew's data folder, with a small part of Yew's
+ * environment and the entry's own variables (its token). Null for a preset Yew does not install.
  */
 export function presetMcp(jigHome: string, id: string): McpServerConfig | null {
 	const program = Object.hasOwn(PRESET_PROGRAMS, id) ? PRESET_PROGRAMS[id] : undefined;
@@ -61,7 +62,7 @@ export function builtinMcp(
 	jigHome: string,
 	env: NodeJS.ProcessEnv = process.env,
 ): Record<string, McpServerConfig> {
-	if (env.JIG_MCP_BUILTIN === "off") return {};
+	if ((env.YEW_MCP_BUILTIN ?? env.JIG_MCP_BUILTIN) === "off") return {};
 	const modules = join(installDir(jigHome), "node_modules");
 	return {
 		browser: {
@@ -70,7 +71,7 @@ export function builtinMcp(
 				join(modules, "@playwright", "mcp", "cli.js"),
 				"--user-data-dir",
 				join(jigHome, "browser"),
-				// Page snapshots and screenshots it saves; otherwise they land in the folder Jig was started in.
+				// Page snapshots and screenshots it saves; otherwise they land in the folder Yew was started in.
 				"--output-dir",
 				join(jigHome, "tmp", "browser"),
 			],
@@ -120,7 +121,7 @@ export interface InstallOptions {
 
 /**
  * Makes sure what a lock file names is installed in a folder. Done once per lock file: a marker holds
- * its hash, so an update of Jig that changes the lock installs again and anything else returns at
+ * its hash, so an update of Yew that changes the lock installs again and anything else returns at
  * once. A failed install leaves no marker and is tried again next time.
  */
 function lockedInstaller(
@@ -151,18 +152,18 @@ function lockedInstaller(
 	};
 }
 
-/** Makes sure Jig's own two servers are installed as the lock file that ships with this Jig says. */
+/** Makes sure Yew's own two servers are installed as the lock file that ships with this Yew says. */
 export function builtinInstaller(options: InstallOptions): () => Promise<void> {
 	return lockedInstaller(
 		options,
 		options.source ?? SOURCE,
 		installDir(options.jigHome),
-		"Jig's own servers (browser, computer control)",
+		"Yew's own servers (browser, computer control)",
 	);
 }
 
 /**
- * What the hub calls before it starts a server Jig runs from its data folder: installs Jig's own
+ * What the hub calls before it starts a server Yew runs from its data folder: installs Yew's own
  * servers, or the preset the server is.
  */
 export function mcpInstaller(options: InstallOptions): (config: McpServerConfig) => Promise<void> {
@@ -186,7 +187,7 @@ export function mcpInstaller(options: InstallOptions): (config: McpServerConfig)
 }
 
 /**
- * What a server Jig sets up by itself is given of Jig's environment: where programs and the home
+ * What a server Yew sets up by itself is given of Yew's environment: where programs and the home
  * folder are, the language, and proxy settings. Not the rest, which in a person's shell often
  * holds keys for other services.
  */

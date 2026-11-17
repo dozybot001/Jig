@@ -5,14 +5,14 @@ import { type CliIo, EXIT_ERROR, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
 import { serviceRunning } from "./serve.ts";
 
-const HELP = `Usage: jig send [options] <session> <message>
+const HELP = `Usage: yew send [options] <session> <message>
 
 Send a letter to a session, from a script, CI or a git hook. <session> is the
 session's id or name. Use - as the message to read it from standard input; the
 first line is the summary. The letter is marked as coming from the command
 line, not from you; run inside a session's shell, it comes from that session
-and counts against its letters. A running Jig delivers it within a few
-seconds; otherwise it waits until Jig starts.
+and counts against its letters. A running Yew delivers it within a few
+seconds; otherwise it waits until Yew starts.
 
 Options:
   -k, --kind <kind>  notice, request or report (default: notice)
@@ -42,7 +42,7 @@ export function sendCommand(): Command {
 				return EXIT_OK;
 			}
 			if (positionals.length !== 2) {
-				throw new UsageError("jig send needs a session and a message");
+				throw new UsageError("yew send needs a session and a message");
 			}
 			const kind = (values.kind ?? "notice") as LetterKind;
 			if (!(KINDS as readonly string[]).includes(kind)) {
@@ -72,18 +72,18 @@ export function sendCommand(): Command {
 					try {
 						session = store.getSession(target);
 					} catch {
-						io.stderr.write(`jig: there is no session with the name or id ${target}\n`);
+						io.stderr.write(`yew: there is no session with the name or id ${target}\n`);
 						return EXIT_ERROR;
 					}
 				}
 				// Inside a session's shell the letter is that session's, with its quota, limits and hold.
-				const fromId = io.env.JIG_SESSION?.trim();
+				const fromId = (io.env.YEW_SESSION ?? io.env.JIG_SESSION)?.trim();
 				let sender: Sender = { kind: "cli" };
 				if (fromId) {
 					try {
 						sender = { kind: "session", session: store.getSession(fromId) };
 					} catch {
-						io.stderr.write(`jig: JIG_SESSION names no session (${fromId})\n`);
+						io.stderr.write(`yew: YEW_SESSION names no session (${fromId})\n`);
 						return EXIT_ERROR;
 					}
 				}
@@ -99,12 +99,12 @@ export function sendCommand(): Command {
 					letter = new PostOffice(store).send(sender, { to: session.id, kind, summary, body });
 				} catch (error) {
 					if (!(error instanceof JigError)) throw error;
-					io.stderr.write(`jig: ${error.message}\n`);
+					io.stderr.write(`yew: ${error.message}\n`);
 					return EXIT_ERROR;
 				}
 				if (letter.status === "refused" || letter.status === "dropped") {
 					io.stderr.write(
-						`jig: ${session.name} did not take the letter: ${reasonText(letter.statusReason)}\n`,
+						`yew: ${session.name} did not take the letter: ${reasonText(letter.statusReason)}\n`,
 					);
 					return EXIT_ERROR;
 				}
@@ -116,9 +116,9 @@ export function sendCommand(): Command {
 					io.stdout.write(`Sent letter ${letter.id} to ${session.name}.\n`);
 				}
 				if (letter.status === "held") {
-					io.stderr.write("It is held until you release it in Jig's approval center.\n");
+					io.stderr.write("It is held until you release it in Yew's approval center.\n");
 				} else if (!serviceRunning(home)) {
-					io.stderr.write("Jig is not running; the letter is delivered when it starts.\n");
+					io.stderr.write("Yew is not running; the letter is delivered when it starts.\n");
 				}
 				return EXIT_OK;
 			} finally {

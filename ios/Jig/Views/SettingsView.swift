@@ -45,7 +45,7 @@ struct SettingsView: View {
 						}
 					} footer: {
 						Text(
-							"Jig notifies this iPhone when something needs you (a permission, a question, a decision or a held letter), when a session stops with an error, and when a task finishes. What a notification says is encrypted for this iPhone; the relay and Apple cannot read it."
+							"Yew notifies this iPhone when something needs you (a permission, a question, a decision or a held letter), when a session stops with an error, and when a task finishes. What a notification says is encrypted for this iPhone; the relay and Apple cannot read it."
 						)
 					}
 				}
@@ -58,7 +58,7 @@ struct SettingsView: View {
 					}
 				}
 				Section {
-					NavigationLink("About Jig", value: "about")
+					NavigationLink("About Yew", value: "about")
 				}
 			}
 			.navigationDestination(for: String.self) { _ in AboutView() }
@@ -76,7 +76,7 @@ struct SettingsView: View {
 					Task { await model.unpair() }
 				}
 			} message: {
-				Text("The Mac removes this iPhone from its list. To use Jig here again, show a new QR code on the Mac and scan it.")
+				Text("The Mac removes this iPhone from its list. To use Yew here again, show a new QR code on the Mac and scan it.")
 			}
 		}
 		#if DEBUG
@@ -107,7 +107,7 @@ enum LinkText {
 	}
 }
 
-/// "About Jig" (spec 2.2–2.3): the lockup, version and build, what Jig is, the publisher and website,
+/// "About Yew" (spec 2.2–2.3): the lockup, version and build, what Yew is, the publisher and website,
 /// then the privacy policy, terms and feedback.
 struct AboutView: View {
 	private var version: String {
@@ -121,6 +121,7 @@ struct AboutView: View {
 		List {
 			Section {
 				VStack(spacing: 10) {
+					Mascot(pose: .gift, height: 100)
 					Lockup()
 					Text(version)
 						.font(.footnote.monospacedDigit())
@@ -130,8 +131,8 @@ struct AboutView: View {
 				.padding(.vertical, 8)
 			}
 			Section {
-				Text("An AI-native multi-agent workbench. Jig organizes agent sessions the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center. The sessions run in Jig on your Mac.")
-				Text("Jig on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions' questions and decide on cards, and you can follow and reply to sessions.")
+				Text("An AI-native multi-agent workbench. Yew organizes agent sessions the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center. The sessions run in Yew on your Mac.")
+				Text("Yew on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions' questions and decide on cards, and you can follow and reply to sessions.")
 			}
 			Section {
 				LabeledContent("Publisher") {
@@ -156,12 +157,12 @@ struct AboutView: View {
 			}
 		}
 		.tint(.primary)
-		.navigationTitle("About Jig")
+		.navigationTitle("About Yew")
 		.navigationBarTitleDisplayMode(.inline)
 	}
 }
 
-/// The privacy policy or the terms: the same text as Jig on the Mac (src/shared/policy.ts).
+/// The privacy policy or the terms: the same text as Yew on the Mac (src/shared/policy.ts).
 struct PolicyView: View {
 	enum Kind { case privacy, terms }
 	let kind: Kind
@@ -186,21 +187,30 @@ struct PolicyView: View {
 	}
 }
 
-/// Jig's full lockup for the About page (spec 1.6, 2.2): the mark, the wordmark and the Tenon mark.
+/// Yew's full lockup for the first screen and the About page (spec 1.6, 2.2): the mark, the wordmark
+/// ("Yew" outlined from Young Serif, in the ink colour) and the Tenon mark, all sized from the wordmark's
+/// size S (spec 1.4–1.5).
 struct Lockup: View {
+	var size: CGFloat = 36
+
 	var body: some View {
-		HStack(alignment: .top, spacing: 8) {
-			JigMark()
-				.frame(width: 44, height: 44)
-			Text("Jig")
-				.font(.system(size: 40, weight: .semibold))
-			Image("TenonMark")
-				.resizable()
-				.frame(width: 14, height: 14)
-				.padding(.top, 6)
+		HStack(spacing: size * 0.3) {
+			YewMark()
+				.frame(width: size, height: size)
+			HStack(alignment: .top, spacing: max(4, size * 0.18)) {
+				// The wordmark's box is one em of the font, as wide as its viewBox says.
+				Image("YewWordmark")
+					.resizable()
+					.frame(width: size * 2.091, height: size)
+					.foregroundStyle(Color.yewInk)
+				Image("TenonMark")
+					.resizable()
+					.frame(width: max(14, size * 0.58), height: max(14, size * 0.58))
+					.offset(y: -size * 0.04)
+			}
 		}
 		.accessibilityElement(children: .ignore)
-		.accessibilityLabel("Jig, by Tenon AI")
+		.accessibilityLabel("Yew, by Tenon AI")
 	}
 }
 
@@ -244,7 +254,7 @@ private struct Banner: View {
 			switch model.link {
 			case .macOffline:
 				line(
-					"The Mac is offline. Keep Jig running there with phone access on.",
+					"The Mac is offline. Keep Yew running there with phone access on.",
 					action: ("Retry", { Task { await model.refreshAll() } })
 				)
 			case .refused:
@@ -254,7 +264,7 @@ private struct Banner: View {
 				)
 			case .unreachable:
 				line(
-					"Can't connect. Check the network; Jig keeps trying.",
+					"Can't connect. Check the network; Yew keeps trying.",
 					action: ("Retry", { Task { await model.refreshAll() } })
 				)
 			case .connecting, .online:

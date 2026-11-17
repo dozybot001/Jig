@@ -3,17 +3,17 @@ import { conflict } from "../errors.ts";
 import { optBoolean, readJson } from "./input.ts";
 import type { AppEnv } from "./problem.ts";
 
-/** Starting Jig at login and the launcher icon, as the settings show them (blueprint 6.10, item 33). */
+/** Starting Yew at login and the launcher icon, as the settings show them (blueprint 6.10, item 33). */
 export interface SystemStatus {
 	startAtLogin: {
-		/** False where `jig service` does not work (it needs macOS or Linux). */
+		/** False where `yew service` does not work (it needs macOS or Linux). */
 		supported: boolean;
 		on: boolean;
 		/** The LaunchAgent or systemd unit; null where it is not supported. */
 		file: string | null;
 	};
 	launcher: {
-		/** False where `jig app` does not work (it needs macOS). */
+		/** False where `yew app` does not work (it needs macOS). */
 		supported: boolean;
 		on: boolean;
 		/** Where the launcher is or would be; null where it is not supported. */
@@ -23,7 +23,7 @@ export interface SystemStatus {
 
 /**
  * What the routes change on the system. The real one is built from the functions behind
- * `jig service` and `jig app` (`src/cli/system.ts`); tests give it stand-in hosts.
+ * `yew service` and `yew app` (`src/cli/system.ts`); tests give it stand-in hosts.
  */
 export interface SystemControl {
 	status(): SystemStatus;

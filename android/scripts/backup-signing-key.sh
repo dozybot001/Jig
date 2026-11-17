@@ -1,5 +1,5 @@
 #!/bin/bash
-# Backs up the signing key of Jig for Android and proves the backup can be restored. Run before
+# Backs up the signing key of Yew for Android and proves the backup can be restored. Run before
 # anything signed with the key is released or given to anyone else to install (product standard 15.6.3).
 #
 # Usage: backup-signing-key.sh <folder> [<another folder> ...]
@@ -28,7 +28,7 @@ for place in "$@"; do
     done
     PLACES+=("$real")
 done
-IMAGE_NAME="jig-android-signing-key-$(date +%Y%m%d).dmg"
+IMAGE_NAME="yew-android-signing-key-$(date +%Y%m%d).dmg"
 # Checked before anything is made, so a run never stops with one place written and another refused.
 OFF_THIS_DISK=""
 for place in "${PLACES[@]}"; do
@@ -68,7 +68,7 @@ cleanup() {
 trap cleanup EXIT
 
 # 1. An empty encrypted image, then the three files written into it while it is mounted.
-printf '%s' "$BACKUP_PASS" | hdiutil create -size 16m -fs APFS -volname JigSigningKey -encryption AES-256 -stdinpass "$IMAGE" >/dev/null
+printf '%s' "$BACKUP_PASS" | hdiutil create -size 16m -fs APFS -volname YewSigningKey -encryption AES-256 -stdinpass "$IMAGE" >/dev/null
 printf '%s' "$BACKUP_PASS" | hdiutil attach "$IMAGE" -stdinpass -nobrowse -mountpoint "$MOUNT" >/dev/null
 
 load_keystore_password
@@ -80,9 +80,9 @@ NOTE_SHA1="$(printf '%s\n' "$CERT" | fingerprint sha1)"
 NOTE_MD5="$(printf '%s\n' "$CERT" | fingerprint md5)"
 [ "$NOTE_SHA256" = "$EXPECTED" ] || fail "这台 Mac 上的密钥库和登记的指纹对不上：${NOTE_SHA256}。不要备份它，先弄清楚。"
 cp "$KEYSTORE" "$MOUNT/$KEYSTORE_NAME"
-printf '%s\n' "$JIG_KS_PASS" >"$MOUNT/keystore-password.txt"
+printf '%s\n' "$YEW_KS_PASS" >"$MOUNT/keystore-password.txt"
 cat >"$MOUNT/README.txt" <<NOTE
-Jig 安卓版的应用签名密钥。备份于 ${NOTE_TIME}。
+Yew 安卓版的应用签名密钥。备份于 ${NOTE_TIME}。
 
 ${KEYSTORE_NAME}        PKCS12 密钥库，别名 ${KEY_ALIAS}
 keystore-password.txt   密钥库的口令
@@ -92,11 +92,11 @@ SHA-256  ${NOTE_SHA256}
 SHA-1    ${NOTE_SHA1}
 MD5      ${NOTE_MD5}
 
-恢复：把 ${KEYSTORE_NAME} 放回 ~/.tenon-keys/android/jig/（目录 0700，文件 0600），
+恢复：把 ${KEYSTORE_NAME} 放回 ~/.tenon-keys/android/yew/（目录 0700，文件 0600），
 把口令存进登录钥匙串（服务 ${KEYCHAIN_SERVICE}，账户 ${KEYCHAIN_ACCOUNT}），
 再用 keytool -list -v 核对 SHA-256 指纹和上面一致。
 NOTE
-unset JIG_KS_PASS
+unset YEW_KS_PASS
 hdiutil detach "$MOUNT" >/dev/null
 chmod 600 "$IMAGE"
 
@@ -104,12 +104,12 @@ chmod 600 "$IMAGE"
 #    and the private key. Reading the certificate alone would pass with a damaged private key.
 printf '%s' "$BACKUP_PASS" | hdiutil attach "$IMAGE" -stdinpass -nobrowse -readonly -mountpoint "$DRILL" >/dev/null
 unset BACKUP_PASS
-JIG_KS_PASS="$(tr -d '\n' <"$DRILL/keystore-password.txt")"
-export JIG_KS_PASS
+YEW_KS_PASS="$(tr -d '\n' <"$DRILL/keystore-password.txt")"
+export YEW_KS_PASS
 RESTORED_CERT="$(certificate_of "$DRILL/$KEYSTORE_NAME")"
 # The private key signs a certificate request.
-REQUEST="$("$KEYTOOL" -certreq -keystore "$DRILL/$KEYSTORE_NAME" -storetype PKCS12 -alias "$KEY_ALIAS" -storepass:env JIG_KS_PASS)"
-unset JIG_KS_PASS
+REQUEST="$("$KEYTOOL" -certreq -keystore "$DRILL/$KEYSTORE_NAME" -storetype PKCS12 -alias "$KEY_ALIAS" -storepass:env YEW_KS_PASS)"
+unset YEW_KS_PASS
 hdiutil detach "$DRILL" >/dev/null
 
 RESTORED="$(printf '%s\n' "$RESTORED_CERT" | fingerprint sha256)"

@@ -1,7 +1,7 @@
 /**
  * Signing in to MCP servers in the browser (blueprint 6.11, item 40). A local server plays both the
  * MCP server that wants a token and its authorization server; the browser's part is played by the
- * test, which takes the address Jig would open and hands back a code.
+ * test, which takes the address Yew would open and hands back a code.
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -141,7 +141,7 @@ async function provider(options: { register?: boolean; iss?: boolean; moveToken?
 }
 
 function setup(entry: Record<string, unknown>, now = () => Date.now()) {
-	const jigHome = tempDir("jig-home-");
+	const jigHome = tempDir("yew-home-");
 	writeFileSync(join(jigHome, "mcp.json"), JSON.stringify({ mcpServers: { demo: entry } }));
 	const keys = new MemoryKeyStore();
 	const auth = new McpAuth({ keys, redirectUri: REDIRECT, version: "0.0.0", now });
@@ -153,7 +153,7 @@ function setup(entry: Record<string, unknown>, now = () => Date.now()) {
 const ctx = { signal: new AbortController().signal, acceptsImages: false } as ToolContext;
 
 describe("signing in to an MCP server", () => {
-	test("Jig finds where to sign in, registers itself, and keeps the tokens in the keychain", async () => {
+	test("Yew finds where to sign in, registers itself, and keeps the tokens in the keychain", async () => {
 		const server = await provider();
 		const { jigHome, keys, hub, status } = setup({ url: `${server.base}/mcp` });
 		try {
@@ -169,7 +169,7 @@ describe("signing in to an MCP server", () => {
 			assert.equal(params.resource, `${server.base}/mcp`);
 			assert.equal(params.scope, "read", "the scope the server named");
 			assert.deepEqual(server.seen.registrations[0], {
-				client_name: "Jig",
+				client_name: "Yew",
 				redirect_uris: [REDIRECT],
 				grant_types: ["authorization_code", "refresh_token"],
 				response_types: ["code"],
@@ -236,7 +236,7 @@ describe("signing in to an MCP server", () => {
 		}
 	});
 
-	test("with a client the person made, Jig registers nothing and asks for the scopes given", async () => {
+	test("with a client the person made, Yew registers nothing and asks for the scopes given", async () => {
 		const server = await provider({ register: false });
 		const { hub } = setup({
 			url: `${server.base}/mcp`,
@@ -271,7 +271,7 @@ describe("signing in to an MCP server", () => {
 		}
 	});
 
-	test("the page the browser comes back to finishes the sign-in, and only with a state Jig made", async () => {
+	test("the page the browser comes back to finishes the sign-in, and only with a state Yew made", async () => {
 		const server = await provider();
 		const { hub, status } = setup({ url: `${server.base}/mcp` });
 		const page = oauthCallbackRoute(hub);
@@ -331,7 +331,7 @@ describe("signing in to an MCP server", () => {
 			server.expect(url);
 			await assert.rejects(
 				hub.completeSignIn(url.searchParams.get("state") as string, "code-1", null),
-				/did not give Jig a token/,
+				/did not give Yew a token/,
 			);
 			assert.deepEqual(server.seen.moved, []);
 			assert.equal(status()?.state, "sign-in");

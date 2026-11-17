@@ -18,7 +18,7 @@
 
     <!-- Nothing of the app goes into backups or device transfers: the pairing belongs to this phone. -->
     <application
-        android:name=".JigApp"
+        android:name=".YewApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
@@ -26,7 +26,7 @@
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Jig"
+        android:theme="@style/Theme.Yew"
         android:usesCleartextTraffic="false"
         tools:targetApi="37">
 
@@ -48,7 +48,7 @@
             android:exported="false"
             android:foregroundServiceType="remoteMessaging" />
 
-        <!-- Off unless the person chose to keep receiving after Jig is closed (AppModel.applyKeep). -->
+        <!-- Off unless the person chose to keep receiving after Yew is closed (AppModel.applyKeep). -->
         <receiver
             android:name=".notify.StartReceiver"
             android:enabled="false"

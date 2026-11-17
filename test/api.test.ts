@@ -70,7 +70,7 @@ describe("api: sessions", () => {
 	test("a session switches between chat and code by setting or clearing its folder", async () => {
 		const { call } = setup();
 		const session = await (await call("POST", "/api/sessions", { name: "改代码" })).json();
-		const folder = realpathSync(tempDir("jig-cwd-"));
+		const folder = realpathSync(tempDir("yew-cwd-"));
 		const code = await (await call("PATCH", `/api/sessions/${session.id}`, { cwd: folder })).json();
 		assert.equal(code.cwd, folder);
 		const chat = await (await call("PATCH", `/api/sessions/${session.id}`, { cwd: null })).json();
@@ -156,12 +156,12 @@ describe("api: sessions", () => {
 describe("api: groups, settings, search", () => {
 	test("workspaces are saved folders: checked when added, kept when their folder goes away", async () => {
 		const { call } = setup();
-		const folder = realpathSync(tempDir("jig-ws-"));
+		const folder = realpathSync(tempDir("yew-ws-"));
 		const saved = await call("PATCH", "/api/settings", {
-			workspaces: [{ id: "w1", name: "Jig", path: folder }],
+			workspaces: [{ id: "w1", name: "Yew", path: folder }],
 		});
 		assert.equal(saved.status, 200);
-		assert.deepEqual((await saved.json()).workspaces, [{ id: "w1", name: "Jig", path: folder }]);
+		assert.deepEqual((await saved.json()).workspaces, [{ id: "w1", name: "Yew", path: folder }]);
 
 		const missing = await call("PATCH", "/api/settings", {
 			workspaces: [{ id: "w2", name: "Nope", path: "/no/such/folder" }],
@@ -170,18 +170,18 @@ describe("api: groups, settings, search", () => {
 		assert.equal((await missing.json()).field, "workspaces");
 		const twice = await call("PATCH", "/api/settings", {
 			workspaces: [
-				{ id: "w1", name: "Jig", path: folder },
-				{ id: "w3", name: "Jig again", path: folder },
+				{ id: "w1", name: "Yew", path: folder },
+				{ id: "w3", name: "Yew again", path: folder },
 			],
 		});
 		assert.equal(twice.status, 400);
 
 		rmSync(folder, { recursive: true });
 		const renamed = await call("PATCH", "/api/settings", {
-			workspaces: [{ id: "w1", name: "Jig 旧目录", path: folder }],
+			workspaces: [{ id: "w1", name: "Yew 旧目录", path: folder }],
 		});
 		assert.equal(renamed.status, 200);
-		assert.equal((await renamed.json()).workspaces[0].name, "Jig 旧目录");
+		assert.equal((await renamed.json()).workspaces[0].name, "Yew 旧目录");
 	});
 
 	test("the folder picker returns the chosen folder, null on cancel, and refuses off macOS", async () => {
@@ -303,7 +303,7 @@ describe("api: providers and keys", () => {
 describe("api: approval center and letters", () => {
 	async function twoSessions(call: ReturnType<typeof setup>["call"]) {
 		const main = await (await call("POST", "/api/sessions", { name: "总办" })).json();
-		const product = await (await call("POST", "/api/sessions", { name: "Jig · 开发" })).json();
+		const product = await (await call("POST", "/api/sessions", { name: "Yew · 开发" })).json();
 		return { main, product };
 	}
 
@@ -356,7 +356,7 @@ describe("api: approval center and letters", () => {
 		}
 	});
 
-	test("a session from the home page is named by Jig once; a name the person picks stays", async () => {
+	test("a session from the home page is named by Yew once; a name the person picks stays", async () => {
 		const { call } = setup();
 		const started = await (
 			await call("POST", "/api/sessions", { name: "帮我看看这个仓库…", autoName: true })
@@ -389,7 +389,7 @@ describe("api: approval center and letters", () => {
 			recommended: 0,
 			undoable: false,
 			reversible: "标签推送后不改写",
-			after: "Jig · 开发打标签并推送",
+			after: "Yew · 开发打标签并推送",
 			requestedBy: product.id,
 		});
 		const first = post.send(

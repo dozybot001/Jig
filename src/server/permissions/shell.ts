@@ -351,7 +351,7 @@ export function unwrap(argv: string[], depth = 0): Unwrapped {
 	}
 	if (SHELLS.has(name) && !rest.includes("-c") && rest.every((arg) => arg.startsWith("-"))) {
 		// A shell with no script named reads its commands from its input (a pipe, a here-document):
-		// commands Jig has not read.
+		// commands Yew has not read.
 		return { commands: [args], privileged: false, understood: false };
 	}
 	if ((SHELLS.has(name) && rest.includes("-c")) || name === "eval") {
@@ -391,8 +391,8 @@ export function mustConfirmReason(argv: string[]): ConfirmReason | null {
 		args.some((arg) => prefixes.some((prefix) => arg.startsWith(prefix)));
 
 	if (["rm", "rmdir", "unlink", "shred", "srm", "trash"].includes(name)) return "delete-files";
-	// Jig's own command line sends letters and manages keys and the service; sessions use their tools.
-	if (name === "jig") {
+	// Yew's own command line sends letters and manages keys and the service; sessions use their tools.
+	if (name === "yew" || name === "jig") {
 		const informational =
 			has("--help", "-h") || args.every((arg) => ["--version", "-v", "--json"].includes(arg));
 		if (!informational) return "jig-cli";

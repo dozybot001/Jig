@@ -1,5 +1,5 @@
 {
-	"name": "@tenonai/jig",
+	"name": "@tenonai/yew",
 	"version": "1.2.0",
 	"description": "An AI-native multi-agent workbench",
 	"keywords": [
@@ -11,19 +11,20 @@
 	],
 	"license": "MIT",
 	"author": "Tenon AI (https://tenonai.cn/)",
-	"homepage": "https://tenonai.cn/products/jig/",
+	"homepage": "https://tenonai.cn/products/yew/",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/dozybot001/Jig.git"
+		"url": "git+https://github.com/dozybot001/Yew.git"
 	},
 	"bugs": {
-		"url": "https://github.com/dozybot001/Jig/issues"
+		"url": "https://github.com/dozybot001/Yew/issues"
 	},
 	"type": "module",
 	"engines": {
 		"node": ">=24"
 	},
 	"bin": {
+		"yew": "bin/yew.js",
 		"jig": "bin/jig.js"
 	},
 	"files": [

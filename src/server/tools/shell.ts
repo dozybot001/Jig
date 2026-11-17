@@ -25,7 +25,7 @@ export const shellTool: ToolDefinition = {
 			description: {
 				type: "string",
 				description:
-					"What the command is for, in a few words in the language the person writes in. Jig shows it to the person when it asks for their permission.",
+					"What the command is for, in a few words in the language the person writes in. Yew shows it to the person when it asks for their permission.",
 			},
 			timeout_seconds: { type: "integer", minimum: 1, maximum: MAX_TIMEOUT },
 			background: { type: "boolean", description: "Start the command and return at once." },
@@ -55,7 +55,7 @@ export const shellTool: ToolDefinition = {
 			return {
 				content: [
 					text(
-						`Started in the background as ${job.id}. Use shell_job to read its output or stop it; Jig will tell you when it ends.`,
+						`Started in the background as ${job.id}. Use shell_job to read its output or stop it; Yew will tell you when it ends.`,
 					),
 				],
 				detail: { job: job.id },

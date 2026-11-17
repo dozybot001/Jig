@@ -68,7 +68,7 @@ describe("web_search", () => {
 		assert.equal(call?.url, "https://api.bochaai.com/v1/web-search");
 		const headers = call?.init.headers as Record<string, string>;
 		assert.equal(headers.Authorization, "Bearer bocha-test");
-		assert.equal(headers["User-Agent"], "jig/9.9.9");
+		assert.equal(headers["User-Agent"], "yew/9.9.9");
 		assert.deepEqual(JSON.parse(call?.init.body as string), {
 			query: "Node.js 24",
 			count: 3,
@@ -108,7 +108,7 @@ describe("web_search", () => {
 		await refused.access.refresh();
 		const { text, result } = await refused.textOf({ query: "x" });
 		assert.equal(result.isError, true);
-		assert.match(text, /refused the key \(HTTP 401\).*jig key set search-bocha/);
+		assert.match(text, /refused the key \(HTTP 401\).*yew key set search-bocha/);
 		assert.equal(text.includes("key bad"), false);
 	});
 

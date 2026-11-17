@@ -151,7 +151,7 @@ export interface LetterRef {
 	from: { kind: "session" | "person" | "cli" | "jig"; sessionId: string | null; name: string };
 	summary: string;
 	body: string;
-	/** Jig sent the session's final reply on its behalf. */
+	/** Yew sent the session's final reply on its behalf. */
 	auto?: boolean;
 	decision?: DecisionRef;
 	/** The scheduled task whose run the letter starts or reports on. */
@@ -182,7 +182,7 @@ export function plainLine(text: string): string {
 		.trim();
 }
 
-/** A letter's body without a first line that only repeats the summary, as Jig's reports do. */
+/** A letter's body without a first line that only repeats the summary, as Yew's reports do. */
 export function bodyAfterSummary(body: string, summary: string): string {
 	const [first = "", ...rest] = body.trim().split("\n");
 	return plainLine(first) === plainLine(summary) ? rest.join("\n").trim() : body;

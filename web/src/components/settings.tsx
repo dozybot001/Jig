@@ -77,7 +77,6 @@ import {
 	FolderIcon,
 	GearIcon,
 	InfoIcon,
-	JigMark,
 	KeyIcon,
 	LanguageIcon,
 	MailIcon,
@@ -94,7 +93,10 @@ import {
 	ThemeIcon,
 	ToolsIcon,
 	TrashIcon,
+	YewMark,
+	YewWordmark,
 } from "./icons.tsx";
+import { Mascot } from "./mascot.tsx";
 import { ModelPicker } from "./session.tsx";
 import {
 	Button,
@@ -291,7 +293,7 @@ function ProviderRow({ provider }: { provider: ProviderSummary }) {
 	);
 }
 
-/** A search service's name in the interface language; the server's own name when Jig has none. */
+/** A search service's name in the interface language; the server's own name when Yew has none. */
 function searchName(service: SearchServiceView): string {
 	const key = `searchName_${service.id.replace(/^search-/, "")}`;
 	return hasMessage(key) ? t(key) : service.name;
@@ -691,10 +693,11 @@ function About() {
 			{/* In the order of spec 2.2: lockup, version, the text, publisher, website; then 2.3. */}
 			<div className="about-head">
 				{/* Full lockup on the About page (spec 1.6), with a name that includes Tenon (1.7). */}
+				<Mascot pose="gift" height={112} className="about-mascot" />
 				<div className="lockup" role="img" aria-label={t("lockupName")}>
-					<JigMark className="lockup-mark" size={22} />
+					<YewMark className="lockup-mark" size={22} />
 					<span className="lockup-word">
-						<span className="wordmark">Jig</span>
+						<YewWordmark className="wordmark" />
 						<img
 							className="lockup-tenon"
 							src="/icons/tenon-mark.svg"
@@ -876,7 +879,7 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 
 /**
  * Data (blueprint 6.10, item 36): what the data folder takes and where it is, exporting everything
- * as `jig export` does, deleting the over-long command output, and deleting archived sessions. The
+ * as `yew export` does, deleting the over-long command output, and deleting archived sessions. The
  * sizes are read when the dialog opens and after each action; nothing here runs by itself.
  */
 function DataDialog({ onClose }: { onClose: () => void }) {
@@ -1333,7 +1336,7 @@ function PhonesDialog({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * The relay address (blueprint 6.10, item 31): your own relay in place of the one Jig comes with.
+ * The relay address (blueprint 6.10, item 31): your own relay in place of the one Yew comes with.
  * A phone keeps the address it was paired with, so after a change it has to pair again.
  */
 function RelayDialog({
@@ -1351,7 +1354,7 @@ function RelayDialog({
 	const noteId = useId();
 	const save = useAction(async () => {
 		const value = url.trim();
-		// The default is sent as null, so the saved setting follows Jig's own default.
+		// The default is sent as null, so the saved setting follows Yew's own default.
 		await saveSettings({ remote: { relayUrl: value === DEFAULT_RELAY_URL ? null : value } });
 		await loadPhones();
 		onClose();
@@ -1480,7 +1483,7 @@ const pairsToRecord = (pairs: Pair[]): Record<string, string> =>
 		pairs.filter((pair) => pair.name.trim()).map((pair) => [pair.name.trim(), pair.value]),
 	);
 
-/** Adding an MCP server: a command Jig starts on this computer, or a URL it connects to. */
+/** Adding an MCP server: a command Yew starts on this computer, or a URL it connects to. */
 /**
  * An official server from the list (blueprint 6.11, item 40): what it is, where its token comes from,
  * where the token goes and what will run, then the same entry a person would write in mcp.json.
@@ -1501,7 +1504,7 @@ function McpPresetDialog({
 	const clientIdId = useId();
 	const clientSecretId = useId();
 	const own = preset.signIn?.ownClient;
-	// Where the browser comes back to after signing in: this Jig, on this port.
+	// Where the browser comes back to after signing in: this Yew, on this port.
 	const redirect = `http://127.0.0.1:${window.location.port}/oauth/callback`;
 	const add = useAction(async () => {
 		await addMcpServer(presetEntry(preset, token, client));
@@ -1848,7 +1851,7 @@ function McpServerRow({
 				? `${t("mcpState_error")}${t("hintSeparator")}${server.error}`
 				: t(`mcpState_${server.state}`);
 	const values = server.kind === "stdio" ? server.envNames : server.headerNames;
-	// What a server Jig sets up by itself is for, in the interface language.
+	// What a server Yew sets up by itself is for, in the interface language.
 	const titleKey = `mcpBuiltin_${server.name}`;
 	const helpKey = `mcpBuiltinHelp_${server.name}`;
 	return (
@@ -1972,7 +1975,7 @@ function McpServerRow({
 
 /**
  * MCP servers (blueprint 6.10, item 29): the servers in mcp.json, whether each is connected and the
- * tools it offers; add one, turn one off, remove one. Changes apply to the running Jig at once.
+ * tools it offers; add one, turn one off, remove one. Changes apply to the running Yew at once.
  */
 function McpDialog({ onClose }: { onClose: () => void }) {
 	useLang();
@@ -2149,7 +2152,7 @@ function SkillRow({
 }
 
 /**
- * Skills (blueprint 6.10, item 35): what Jig read from the global folders and the saved workspaces,
+ * Skills (blueprint 6.10, item 35): what Yew read from the global folders and the saved workspaces,
  * a switch for each, and its folder in the file manager. Folders that could not be read are listed
  * with the reason. A skill's content is edited in its folder, not here.
  */
@@ -2221,8 +2224,8 @@ function SkillsDialog({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * Starting at login and the launcher icon (blueprint 6.10, item 33): the same as `jig service` and
- * `jig app`, as two switches. Where the system does not support one, its row says so.
+ * Starting at login and the launcher icon (blueprint 6.10, item 33): the same as `yew service` and
+ * `yew app`, as two switches. Where the system does not support one, its row says so.
  */
 function SystemDialog({ onClose }: { onClose: () => void }) {
 	useLang();

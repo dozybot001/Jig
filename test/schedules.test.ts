@@ -161,7 +161,7 @@ describe("scheduled tasks", () => {
 			{ name: "补跑", cron: "0 9 * * *", session: target.id, message: "b" },
 			at(2026, 11, 9, 8),
 		);
-		// Jig was not running from 8:30 to 11:00: two days' runs are one run, or none.
+		// Yew was not running from 8:30 to 11:00: two days' runs are one run, or none.
 		scheduler.tick(at(2026, 11, 10, 11));
 		assert.equal(schedules.get(skip.id).lastStatus, "skipped");
 		assert.equal(schedules.get(skip.id).lastDetail, "missed");
@@ -198,8 +198,8 @@ function harness() {
 		version: "0.0.0",
 		providers: [faux.provider],
 	});
-	const home = realpathSync(tempDir("jig-home-"));
-	const folder = realpathSync(tempDir("jig-cwd-"));
+	const home = realpathSync(tempDir("yew-home-"));
+	const folder = realpathSync(tempDir("yew-cwd-"));
 	const agents = new Agents({
 		store,
 		gateway,
@@ -279,7 +279,7 @@ describe("scheduled runs", () => {
 			textOf(letter),
 			/from=\\"the scheduled task '每周周报' \(set up by the person\)\\"/,
 		);
-		assert.match(textOf(letter), /\[Jig\] This is a scheduled run and nobody is watching/);
+		assert.match(textOf(letter), /\[Yew\] This is a scheduled run and nobody is watching/);
 		assert.match(textOf(letter), /to the main conversation \(总办\) as the report/);
 		// The push needs the person: refused at once, nothing left waiting.
 		const [call] = store.toolCallsByStatus(weekly.id, ["denied"]);
@@ -466,8 +466,8 @@ describe("scheduled tasks over the API and the command line", () => {
 		assert.equal(post.mail.listLetters({ limit: 5 }).items[0]?.scheduleId, null);
 	});
 
-	test("jig schedule list and run", async () => {
-		const dir = tempDir("jig-schedule-");
+	test("yew schedule list and run", async () => {
+		const dir = tempDir("yew-schedule-");
 		const db = openDatabase(dbPath(dir));
 		const store = new Store(db, new EventBus());
 		store.createSession(sessionInput("周报"));
@@ -494,7 +494,7 @@ describe("scheduled tasks over the API and the command line", () => {
 		const ran = await cli(["run", "每周周报"]);
 		assert.equal(ran.code, 0);
 		assert.match(ran.out, /^Sent 每周周报 to 周报 \(letter /);
-		assert.match(ran.err, /Jig is not running/);
+		assert.match(ran.err, /Yew is not running/);
 		const busy = await cli(["run", "每周周报"]);
 		assert.equal(busy.code, 1);
 		assert.match(busy.err, /not finished yet/);

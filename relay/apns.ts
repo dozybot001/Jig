@@ -26,7 +26,7 @@ export function apnsConfigFromEnv(env: Record<string, string | undefined>): Apns
 		key: readFileSync(APNS_KEY_FILE, "utf8"),
 		keyId: APNS_KEY_ID,
 		teamId: APNS_TEAM_ID,
-		topic: env.APNS_TOPIC ?? "cn.tenonai.apps.jig",
+		topic: env.APNS_TOPIC ?? "cn.tenonai.apps.yew",
 	};
 }
 

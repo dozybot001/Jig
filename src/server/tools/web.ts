@@ -54,7 +54,7 @@ export function isPrivateAddress(address: string): boolean {
 }
 
 /**
- * Resolves through DNS and refuses private addresses at connection time, so a page cannot reach Jig's
+ * Resolves through DNS and refuses private addresses at connection time, so a page cannot reach Yew's
  * own interface or other local services, not even by changing its DNS answer between checks.
  */
 function guardedLookup(
@@ -68,7 +68,7 @@ function guardedLookup(
 		if (blocked) {
 			return callback(
 				new Error(
-					`${hostname} resolves to a private address (${blocked.address}); Jig only fetches public addresses.`,
+					`${hostname} resolves to a private address (${blocked.address}); Yew only fetches public addresses.`,
 				),
 				"",
 			);
@@ -93,7 +93,7 @@ function fetchOnce(url: URL, signal: AbortSignal, version: string): Promise<Fetc
 	return new Promise((resolve, reject) => {
 		const host = url.hostname.replace(/^\[|\]$/g, "");
 		if (isIP(host) && isPrivateAddress(host)) {
-			reject(new Error(`${host} is a private address; Jig only fetches public addresses.`));
+			reject(new Error(`${host} is a private address; Yew only fetches public addresses.`));
 			return;
 		}
 		const lib = url.protocol === "https:" ? https : http;
@@ -102,7 +102,7 @@ function fetchOnce(url: URL, signal: AbortSignal, version: string): Promise<Fetc
 			{
 				method: "GET",
 				headers: {
-					"User-Agent": `jig/${version}`,
+					"User-Agent": `yew/${version}`,
 					Accept: "text/html, text/markdown, text/plain, application/json;q=0.9, */*;q=0.1",
 					"Accept-Encoding": "identity",
 				},

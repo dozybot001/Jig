@@ -15,7 +15,7 @@ export interface SearchHit {
 }
 
 export interface SearchService {
-	/** The name its key is saved under: `jig key set search-bocha`. */
+	/** The name its key is saved under: `yew key set search-bocha`. */
 	id: string;
 	name: string;
 	region: "cn" | "global";
@@ -196,7 +196,7 @@ export function webSearchTool(
 			const key = service ? await access.key(service) : null;
 			if (!service || !key) {
 				return errorResult(
-					"No search service is set up. The person can save a key with: jig key set search-bocha",
+					"No search service is set up. The person can save a key with: yew key set search-bocha",
 				);
 			}
 			const { url, init } = service.request(query, count, key);
@@ -207,7 +207,7 @@ export function webSearchTool(
 					...init,
 					headers: {
 						...(init.headers as Record<string, string>),
-						"User-Agent": `jig/${options.version}`,
+						"User-Agent": `yew/${options.version}`,
 					},
 					signal: AbortSignal.any([ctx.signal, timeout]),
 				});
@@ -219,7 +219,7 @@ export function webSearchTool(
 				// The body may repeat the key or the account; only the status goes to the model.
 				return errorResult(
 					response.status === 401 || response.status === 403
-						? `${service.name} refused the key (HTTP ${response.status}). The person can replace it with: jig key set ${service.id}`
+						? `${service.name} refused the key (HTTP ${response.status}). The person can replace it with: yew key set ${service.id}`
 						: `${service.name} answered HTTP ${response.status}.`,
 				);
 			}

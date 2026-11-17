@@ -34,7 +34,7 @@ export function mailRoutes(post: PostOffice): Hono<AppEnv> {
 		);
 	});
 
-	// The person decides: an option, a note, or both. Only the person can reach this, from Jig's page.
+	// The person decides: an option, a note, or both. Only the person can reach this, from Yew's page.
 	app.post("/cards/:id/decide", once, async (c) => {
 		const fields = await readJson(c);
 		const choice = fields.choice;

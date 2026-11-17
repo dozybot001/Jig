@@ -53,7 +53,7 @@ export interface AppOptions {
 	remote?: RemoteAccess;
 	/** Scheduled tasks (M3 plan, section 9). */
 	scheduler?: Scheduler;
-	/** Told when Jig's page on the Mac is in front and in use, so notifications wait (section 8). */
+	/** Told when Yew's page on the Mac is in front and in use, so notifications wait (section 8). */
 	onPresence?: () => void;
 	/** Notifications for phones that keep their own connection (the Android app). */
 	notes?: NoteStreams;
@@ -71,10 +71,10 @@ export interface AppOptions {
 	system?: SystemControl;
 }
 
-const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Jig</title>
+const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Yew</title>
 <meta name="color-scheme" content="light dark"></head><body>
-<p>网页界面还没有构建。在 Jig 的目录运行 npm run build:web，然后刷新这个页面。</p>
-<p lang="en">The web interface has not been built yet. In the Jig folder, run npm run build:web, then reload this page.</p>
+<p>网页界面还没有构建。在 Yew 的目录运行 npm run build:web，然后刷新这个页面。</p>
+<p lang="en">The web interface has not been built yet. In the Yew folder, run npm run build:web, then reload this page.</p>
 </body></html>`;
 
 export function createApp(options: AppOptions): Hono<AppEnv> {

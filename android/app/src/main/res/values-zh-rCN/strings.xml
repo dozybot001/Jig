@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="tagline">AI 原生的多 Agent 工作台</string>
-    <string name="lockup_label">Jig，榫卯 Tenon AI 出品</string>
+    <string name="lockup_label">Yew，榫卯 Tenon AI 出品</string>
 
     <string name="tab_sessions">会话</string>
     <string name="tab_approvals">审批</string>
     <string name="tab_letters">信件</string>
     <string name="tab_artifacts">产物</string>
     <string name="settings">设置</string>
-    <string name="about">关于 Jig</string>
+    <string name="about">关于 Yew</string>
     <string name="back">返回</string>
     <string name="ok">好</string>
     <string name="cancel">取消</string>
@@ -16,17 +16,17 @@
     <string name="problem_title">没有办成</string>
 
     <string name="connect_scan">扫描电脑上的二维码</string>
-    <string name="connect_scan_help">在电脑上的 Jig 里打开 设置 → 手机访问，点「添加手机」，再扫描出现的二维码。</string>
+    <string name="connect_scan_help">在电脑上的 Yew 里打开 设置 → 手机访问，点「添加手机」，再扫描出现的二维码。</string>
     <string name="connect_paste_title">或者粘贴配对链接</string>
     <string name="pair">配对</string>
     <string name="demo_try">看演示</string>
     <string name="demo_help">用示例数据看看，不需要电脑。</string>
     <string name="scan_title">扫描二维码</string>
-    <string name="scan_hint">把相机对准电脑上 Jig 显示的二维码。</string>
-    <string name="camera_denied">Jig 只用相机扫描配对二维码。请在系统设置里允许使用相机，或者改用粘贴配对链接。</string>
+    <string name="scan_hint">把相机对准电脑上 Yew 显示的二维码。</string>
+    <string name="camera_denied">Yew 只用相机扫描配对二维码。请在系统设置里允许使用相机，或者改用粘贴配对链接。</string>
     <string name="open_system_settings">去系统设置打开</string>
-    <string name="not_pairing_link">这不是 Jig 的配对链接。</string>
-    <string name="pair_offline">电脑不在线。请让电脑上的 Jig 保持运行并打开手机访问，再扫一次。</string>
+    <string name="not_pairing_link">这不是 Yew 的配对链接。</string>
+    <string name="pair_offline">电脑不在线。请让电脑上的 Yew 保持运行并打开手机访问，再扫一次。</string>
     <string name="pair_failed">配对没有成功。请在电脑上重新显示二维码，再扫一次。</string>
 
     <string name="sessions_empty">还没有会话</string>
@@ -120,9 +120,9 @@
     <string name="artifact_unreadable">这个产物显示不出来</string>
 
     <string name="banner_demo">示例数据，不会发到电脑。</string>
-    <string name="banner_offline">电脑不在线。请让电脑上的 Jig 保持运行，并打开手机访问。</string>
+    <string name="banner_offline">电脑不在线。请让电脑上的 Yew 保持运行，并打开手机访问。</string>
     <string name="banner_refused">电脑已经不认这台手机，重新配对后才能继续用。</string>
-    <string name="banner_unreachable">连不上。请检查网络，Jig 会一直重试。</string>
+    <string name="banner_unreachable">连不上。请检查网络，Yew 会一直重试。</string>
     <string name="leave">退出</string>
     <string name="pair_again">重新配对</string>
 
@@ -140,7 +140,7 @@
     <string name="leave_demo">退出演示</string>
     <string name="unpair">断开配对</string>
     <string name="unpair_title">断开这台手机的配对？</string>
-    <string name="unpair_message">电脑会把这台手机从列表里移除。之后要在这里用 Jig，需要在电脑上重新显示二维码再扫描。</string>
+    <string name="unpair_message">电脑会把这台手机从列表里移除。之后要在这里用 Yew，需要在电脑上重新显示二维码再扫描。</string>
 
     <string name="notifications">通知</string>
     <string name="notifications_on">已打开</string>
@@ -148,29 +148,29 @@
     <string name="notifications_off">还没打开</string>
     <string name="notifications_turn_on">打开通知</string>
     <string name="notifications_turn_off">关闭通知</string>
-    <string name="after_close">关掉 Jig 之后</string>
+    <string name="after_close">关掉 Yew 之后</string>
     <string name="after_close_stop">断开连接</string>
     <string name="after_close_keep">继续接收通知</string>
-    <string name="after_close_turn_on">关掉 Jig 后继续接收通知</string>
-    <string name="after_close_turn_off">关掉 Jig 时断开连接</string>
+    <string name="after_close_turn_on">关掉 Yew 后继续接收通知</string>
+    <string name="after_close_turn_off">关掉 Yew 时断开连接</string>
     <string name="background">后台运行</string>
     <string name="background_allowed">已允许</string>
     <string name="background_limited">受电池优化限制</string>
-    <string name="background_allow">允许 Jig 在后台运行</string>
-    <string name="notifications_note">有事要你处理（授权、提问、决定、待放行的信）、会话出错停下、任务做完时，Jig 通知这台手机。通知经加密通道送到，中继读不到内容。</string>
-    <string name="background_note">Jig 不用推送服务。打开通知后，Jig 开着的时候（包括切到后台）保持一条到中继的连接，系统会为它显示一条常驻通知。关掉 Jig（在最近任务里划掉）连接就断开，再次打开 Jig 后才收得到通知，那时还在等你的事在「审批」里看得到。打开「关掉 Jig 后继续接收通知」，关掉以后、开机和更新以后也保持连接：不用打开 Jig 就收得到通知，常驻通知也会一直在。两种情况下系统都可能为了省电停掉 Jig；要减少这种情况，请允许 Jig 不受电池优化限制，部分手机还要在系统设置里允许 Jig 自启动和后台运行。</string>
+    <string name="background_allow">允许 Yew 在后台运行</string>
+    <string name="notifications_note">有事要你处理（授权、提问、决定、待放行的信）、会话出错停下、任务做完时，Yew 通知这台手机。通知经加密通道送到，中继读不到内容。</string>
+    <string name="background_note">Yew 不用推送服务。打开通知后，Yew 开着的时候（包括切到后台）保持一条到中继的连接，系统会为它显示一条常驻通知。关掉 Yew（在最近任务里划掉）连接就断开，再次打开 Yew 后才收得到通知，那时还在等你的事在「审批」里看得到。打开「关掉 Yew 后继续接收通知」，关掉以后、开机和更新以后也保持连接：不用打开 Yew 就收得到通知，常驻通知也会一直在。两种情况下系统都可能为了省电停掉 Yew；要减少这种情况，请允许 Yew 不受电池优化限制，部分手机还要在系统设置里允许 Yew 自启动和后台运行。</string>
     <string name="channel_needs">等你处理的事</string>
     <string name="channel_link">和电脑的连接</string>
-    <string name="service_title">Jig 正在接收通知</string>
+    <string name="service_title">Yew 正在接收通知</string>
     <string name="service_online">已连接到「%s」。</string>
-    <string name="service_waiting">现在连不上「%s」，Jig 会一直重试。</string>
+    <string name="service_waiting">现在连不上「%s」，Yew 会一直重试。</string>
 
     <string name="push_permission">要你授权</string>
     <string name="push_question">问你</string>
     <string name="push_card">等你决定</string>
     <string name="push_letter">有一封信等你放行</string>
     <string name="push_error">出错停下了</string>
-    <string name="push_review">Jig 重启时它在干活，等你核对</string>
+    <string name="push_review">Yew 重启时它在干活，等你核对</string>
     <string name="push_task_done">任务做完了</string>
     <string name="push_task_failed">任务失败了</string>
     <string name="push_task_given_up">任务放弃了</string>
@@ -181,12 +181,12 @@
     <plurals name="push_many">
         <item quantity="other">有 %d 件事等你</item>
     </plurals>
-    <string name="push_fallback">Jig 里有事等你。</string>
+    <string name="push_fallback">Yew 里有事等你。</string>
     <string name="push_separator">：</string>
 
     <string name="about_version">版本 %1$s · 构建 %2$s</string>
-    <string name="about_what">AI 原生的多 Agent 工作台。Jig 按 Session Engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。会话跑在你电脑上的 Jig 里。</string>
-    <string name="about_phone">安卓上的 Jig 经中继连接你的电脑，两端之间端到端加密。离开电脑时，你在这里处理要你做的事：授权操作、回答会话的提问、处理决定卡，也能看会话的进展并回复。</string>
+    <string name="about_what">AI 原生的多 Agent 工作台。Yew 按 Session Engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。会话跑在你电脑上的 Yew 里。</string>
+    <string name="about_phone">安卓上的 Yew 经中继连接你的电脑，两端之间端到端加密。离开电脑时，你在这里处理要你做的事：授权操作、回答会话的提问、处理决定卡，也能看会话的进展并回复。</string>
     <string name="publisher">出品方</string>
     <string name="tenon">榫卯 Tenon AI</string>
     <string name="website">官网</string>

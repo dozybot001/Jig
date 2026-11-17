@@ -10,7 +10,7 @@ import { readJson, reqString } from "./input.ts";
 import type { AppEnv } from "./problem.ts";
 
 export interface DataRoutesOptions {
-	/** Jig's data folder. */
+	/** Yew's data folder. */
 	home: string;
 	/** Whether a session has a command that may still be writing its output files. */
 	inUse?: InUse;
@@ -21,7 +21,7 @@ export interface DataRoutesOptions {
 
 /**
  * Data in the settings (blueprint 6.10, item 36): what the data folder takes, exporting everything
- * as `jig export` does, and deleting the over-long command output. Computer-only: these are this
+ * as `yew export` does, and deleting the over-long command output. Computer-only: these are this
  * computer's folders. The only folders shown in the file manager are the data folder and the one
  * this process last exported to; a request never supplies a path to show.
  */
@@ -46,7 +46,7 @@ export function dataRoutes(store: Store, options: DataRoutesOptions): Hono<AppEn
 			if (error instanceof JigError) throw invalid(error.message, "folder");
 			throw error;
 		}
-		// The same call as `jig export`: it refuses a folder that is not empty.
+		// The same call as `yew export`: it refuses a folder that is not empty.
 		const counts = exportAll(store, folder, Date.now(), options.home);
 		exported = folder;
 		return c.json({ folder, ...counts }, 201);
@@ -61,7 +61,7 @@ export function dataRoutes(store: Store, options: DataRoutesOptions): Hono<AppEn
 		}
 		const dir = target === "home" ? options.home : exported;
 		if (dir === null) {
-			throw conflict("Nothing was exported since Jig started.", { field: "target" }, "no-export");
+			throw conflict("Nothing was exported since Yew started.", { field: "target" }, "no-export");
 		}
 		// The folder itself is opened, so its contents are what the person sees.
 		await showInFileManager(dir, { platform, run: options.run, inside: true, field: "target" });

@@ -34,7 +34,7 @@ export function wantsColor(stream: OutStream, env: CliIo["env"]): boolean {
 
 /**
  * Reads a secret. On a terminal it prompts on stderr and reads without echo; otherwise it reads all of
- * standard input, so `pbpaste | jig key set deepseek` works. Never takes the secret from arguments.
+ * standard input, so `pbpaste | yew key set deepseek` works. Never takes the secret from arguments.
  */
 export async function readSecret(io: CliIo, prompt: string): Promise<string> {
 	const stdin = io.stdin;

@@ -43,7 +43,7 @@ function generalError(error: unknown, fields: string[]): unknown {
 
 /**
  * What "always allow" on an approval card remembered for this session, one line each, each removable.
- * Rules are no longer written by hand (founder, 2026-11-09): the approval mode decides how much Jig
+ * Rules are no longer written by hand (founder, 2026-11-09): the approval mode decides how much Yew
  * asks, and this list holds the exceptions the person granted. Operations that must be confirmed never
  * get here.
  */

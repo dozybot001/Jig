@@ -336,7 +336,7 @@ export function validateSessionName(name: unknown): string {
 }
 
 /**
- * All reads and writes of Jig's data. Every change to a session's transcript appends a durable event
+ * All reads and writes of Yew's data. Every change to a session's transcript appends a durable event
  * with the session's next sequence number; events are published on the bus only after the transaction
  * that wrote them commits.
  */
@@ -1624,7 +1624,7 @@ export class Store {
 	 */
 	recoverAfterRestart(): string[] {
 		return this.tx(() => {
-			// A question Jig took from a reply has no call behind it: it still waits for the person.
+			// A question Yew took from a reply has no call behind it: it still waits for the person.
 			const affected = this.#q(
 				`SELECT id FROM sessions WHERE status = 'working' OR (status = 'waiting' AND id NOT IN
 					(SELECT session_id FROM approvals WHERE status = 'pending' AND tool_call_id IS NULL))`,
@@ -1645,12 +1645,12 @@ export class Store {
 			for (const session of affected) {
 				this.#q(
 					"UPDATE sessions SET status = 'needs_review', status_detail = ?, updated_at = ? WHERE id = ?",
-				).run("Jig restarted while this session was working.", now, session.id);
+				).run("Yew restarted while this session was working.", now, session.id);
 				this.appendEntry(session.id, {
 					role: "notice",
 					notice: {
 						kind: "restarted",
-						text: "Jig restarted while this session was working.",
+						text: "Yew restarted while this session was working.",
 						timestamp: now,
 					},
 				});

@@ -34,8 +34,8 @@ function setup(
 		...(options.retry ? { retry: options.retry } : {}),
 		...(options.idleMs ? { idleMs: options.idleMs } : {}),
 	});
-	const home = realpathSync(tempDir("jig-home-"));
-	const cwd = options.cwd === false ? null : realpathSync(tempDir("jig-cwd-"));
+	const home = realpathSync(tempDir("yew-home-"));
+	const cwd = options.cwd === false ? null : realpathSync(tempDir("yew-cwd-"));
 	const agents = new Agents({
 		store,
 		gateway,
@@ -175,13 +175,13 @@ describe("agent loop", () => {
 				encoding: "utf8",
 				stdio: ["ignore", "pipe", "pipe"],
 			}).trim();
-		const remote = realpathSync(tempDir("jig-remote-"));
+		const remote = realpathSync(tempDir("yew-remote-"));
 		execFileSync("git", ["init", "-q", "--bare", remote]);
 		git("init", "-q", "-b", "main");
 		git("remote", "add", "origin", remote);
 		writeFileSync(join(cwd, "a.txt"), "a\n");
 		const commit =
-			'git add -A && git -c user.name=Jig -c user.email=jig@example.com -c commit.gpgsign=false commit -qm "加 a.txt"';
+			'git add -A && git -c user.name=Yew -c user.email=yew@example.com -c commit.gpgsign=false commit -qm "加 a.txt"';
 		faux.setResponses([
 			toolUse(fauxToolCall("shell", { command: commit }, { id: "c1" })),
 			toolUse(fauxToolCall("shell", { command: "git push -q origin main" }, { id: "c2" })),
@@ -354,7 +354,7 @@ describe("agent loop", () => {
 		assert.match(textOf(contexts[0]?.messages.at(-1)), /The person answered: 先停一下/);
 	});
 
-	test("Jig finds the question a reply ends with, outside code and closing marks", () => {
+	test("Yew finds the question a reply ends with, outside code and closing marks", () => {
 		assert.equal(askedInReply("做完了。\n\n要我顺便更新文档吗？"), "要我顺便更新文档吗？");
 		assert.equal(askedInReply("Done.\n\n**Shall I push it?**"), "**Shall I push it?**");
 		assert.equal(askedInReply("没有推送；需要的话说一声。"), "没有推送；需要的话说一声。");
@@ -507,7 +507,7 @@ describe("agent loop", () => {
 		faux.setResponses([capture(fauxAssistantMessage("I will check first."))]);
 		agents.continue(session.id);
 		await agents.whenIdle(session.id);
-		assert.match(textOf(contexts[0]?.messages.at(-1)), /Jig restarted while this call was running/);
+		assert.match(textOf(contexts[0]?.messages.at(-1)), /Yew restarted while this call was running/);
 		assert.equal(store.getSession(session.id).status, "idle");
 	});
 
@@ -517,7 +517,7 @@ describe("agent loop", () => {
 		await agents.whenIdle(session.id);
 		const after = store.getSession(session.id);
 		assert.equal(after.status, "error");
-		assert.match(after.statusDetail ?? "", /jig key set/);
+		assert.match(after.statusDetail ?? "", /yew key set/);
 	});
 
 	test("instruction files go into the prompt once; later changes arrive as an update", async () => {
@@ -616,7 +616,7 @@ describe("agent loop", () => {
 		faux.setResponses([capture(fauxAssistantMessage("hi")), capture(fauxAssistantMessage("ok"))]);
 		agents.send(session.id, "hi");
 		await agents.whenIdle(session.id);
-		const folder = realpathSync(tempDir("jig-cwd-"));
+		const folder = realpathSync(tempDir("yew-cwd-"));
 		store.updateSession(session.id, { cwd: folder });
 		agents.send(session.id, "now with files");
 		await agents.whenIdle(session.id);
@@ -642,7 +642,7 @@ describe("system prompt", () => {
 		instructions: [],
 		permissionMode: "auto" as const,
 	});
-	const base = { name: "产品", responsibility: "负责 Jig 的产品设计。", cwd: "/tmp/demo" };
+	const base = { name: "产品", responsibility: "负责 Yew 的产品设计。", cwd: "/tmp/demo" };
 
 	test("a standing session learns its role, its team and to keep lasting facts in files", () => {
 		const text = systemPrompt(
@@ -652,10 +652,10 @@ describe("system prompt", () => {
 		);
 		assert.match(
 			text,
-			/^You are "产品", one of the agent sessions that make up the person's organization in Jig\./,
+			/^You are "产品", one of the agent sessions that make up the person's organization in Yew\./,
 		);
 		assert.match(text, /You belong to the team "Tenon"\./);
-		assert.match(text, /负责 Jig 的产品设计。/);
+		assert.match(text, /负责 Yew 的产品设计。/);
 		assert.match(text, /standing session: this role is yours for the long term/);
 		assert.match(text, /in files in your working folder/);
 		assert.match(text, /Stop for the person only for what only they can decide or do/);
@@ -684,12 +684,12 @@ describe("system prompt", () => {
 		const alone = systemPrompt(session, { ...snapshot("/tmp/demo"), permissionMode: "skip" });
 		assert.match(alone, /only they can decide or do: ask with ask_user\./);
 		assert.match(alone, /take it instead of offering it; for example, commit/);
-		assert.match(alone, /When the work calls for one, make the call: Jig asks the person/);
+		assert.match(alone, /When the work calls for one, make the call: Yew asks the person/);
 		assert.match(alone, /Permission mode: full access\. Your other calls run without asking;/);
 		assert.doesNotMatch(alone, /Take extra care/);
 		assert.match(alone, /how you checked it, and what is left\./);
 		assert.doesNotMatch(alone, /what the person needs to do/);
-		// Jig catches questions left in replies, so the prompt carries no rule about them (principle 8).
+		// Yew catches questions left in replies, so the prompt carries no rule about them (principle 8).
 		assert.doesNotMatch(alone, /Never end a turn/);
 		const main = { id: "m1", name: "总办" };
 		const withMain = systemPrompt(session, { ...snapshot("/tmp/demo"), main });

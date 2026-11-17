@@ -20,7 +20,7 @@ function setup() {
 	const { store } = newStore();
 	const keys = new MemoryKeyStore({ [faux.provider.id]: "test-key" });
 	const gateway = new ModelGateway({ keys, version: "0.0.0", providers: [faux.provider] });
-	const home = realpathSync(tempDir("jig-home-"));
+	const home = realpathSync(tempDir("yew-home-"));
 	const agents = new Agents({
 		store,
 		gateway,

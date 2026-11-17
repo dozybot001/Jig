@@ -58,7 +58,7 @@ describe("database", () => {
 		const db = openDatabase(path);
 		db.exec(`PRAGMA user_version = ${migrations.length + 1}`);
 		db.close();
-		assert.throws(() => openDatabase(path), /newer version of Jig/);
+		assert.throws(() => openDatabase(path), /newer version of Yew/);
 	});
 });
 

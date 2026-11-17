@@ -1,15 +1,15 @@
 /**
  * Signing in to MCP servers in the browser (blueprint 6.11, item 40), as the MCP authorization spec
- * describes it with OAuth 2.1. Jig finds the server's authorization server (RFC 9728 and RFC 8414),
+ * describes it with OAuth 2.1. Yew finds the server's authorization server (RFC 9728 and RFC 8414),
  * registers itself as a client where the server allows that (RFC 7591), or uses the client the person
  * made for it (Google's servers), and sends the person's browser to sign in with PKCE and a state.
- * The browser comes back to http://127.0.0.1:<port>/oauth/callback with a code, which Jig trades for
+ * The browser comes back to http://127.0.0.1:<port>/oauth/callback with a code, which Yew trades for
  * tokens. Tokens and registered clients are secrets: they are kept in the system keychain, never in
  * mcp.json, the database or logs.
  *
  * What a server says about where to sign in is checked before it is used (security review,
  * 2026-11-18): every address is https; the details are for this server and from the sign-in server
- * Jig asked; PKCE with S256 is supported; a sign-in server that names itself in the browser's return
+ * Yew asked; PKCE with S256 is supported; a sign-in server that names itself in the browser's return
  * is the one the browser went to (RFC 9207). Requests that carry a code, a secret or a token do not
  * follow redirects. Signing out asks the server to void the tokens where it says how (RFC 7009).
  */
@@ -18,7 +18,7 @@ import type { KeyStore } from "./keys.ts";
 
 /** What mcp.json may say about signing in to an HTTP server. */
 export interface OAuthSettings {
-	/** A client the person made, for servers that do not let Jig register one (Google's). */
+	/** A client the person made, for servers that do not let Yew register one (Google's). */
 	clientId?: string;
 	clientSecret?: string;
 	/** Scopes to ask for; otherwise the server's own default. */
@@ -33,7 +33,7 @@ interface Endpoints {
 	registration?: string;
 	/** Where to void tokens when the person signs out (RFC 7009). */
 	revocation?: string;
-	/** It names itself in the browser's return to Jig (RFC 9207). */
+	/** It names itself in the browser's return to Yew (RFC 9207). */
 	namesItself?: boolean;
 }
 
@@ -79,7 +79,7 @@ export interface McpAuthOptions {
 
 /** How long a started sign-in waits for the browser to come back. */
 const PENDING_MS = 10 * 60 * 1000;
-/** How long what Jig found out about where to sign in is used again. */
+/** How long what Yew found out about where to sign in is used again. */
 const FOUND_MS = 10 * 60 * 1000;
 const REQUEST_MS = 20_000;
 /** Voiding tokens on sign-out is a courtesy to the server: it does not hold up signing out for long. */
@@ -88,8 +88,8 @@ const REVOKE_MS = 5_000;
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
 
 /**
- * Whether Jig uses an address it was told about while signing in: https only, so a sign-in page, a
- * code or a token never goes in the clear and a server cannot point Jig at other machines on the
+ * Whether Yew uses an address it was told about while signing in: https only, so a sign-in page, a
+ * code or a token never goes in the clear and a server cannot point Yew at other machines on the
  * network. A server on this computer may use http on this computer.
  */
 function usable(url: unknown, local: boolean): url is string {
@@ -163,7 +163,7 @@ export class McpAuth {
 		await this.#keys.set(server, JSON.stringify(saved));
 	}
 
-	/** Whether Jig holds a sign-in for this server at this address. */
+	/** Whether Yew holds a sign-in for this server at this address. */
 	async signedIn(server: string, resource: string): Promise<boolean> {
 		const saved = await this.#load(server);
 		return Boolean(saved?.tokens && saved.resource === resource);
@@ -293,13 +293,13 @@ export class McpAuth {
 		const pending = this.#pending.get(state);
 		this.#pending.delete(state);
 		if (!pending || this.#now() - pending.createdAt > PENDING_MS) {
-			throw new Error("This sign-in is not valid any more. Start it again from Jig.");
+			throw new Error("This sign-in is not valid any more. Start it again from Yew.");
 		}
 		const { saved } = pending;
 		// RFC 9207: a return that names a sign-in server, or that should and does not, comes from the
 		// one the browser was sent to, or it is not used.
 		if (iss !== null ? !same(iss, saved.endpoints.issuer) : saved.endpoints.namesItself) {
-			throw new Error("The sign-in came back from another server than the one Jig sent you to.");
+			throw new Error("The sign-in came back from another server than the one Yew sent you to.");
 		}
 		if (error || !code) throw new Error(`The sign-in was not completed (${error ?? "no code"}).`);
 		const body = new URLSearchParams({
@@ -313,7 +313,7 @@ export class McpAuth {
 		if (saved.client.secret) body.set("client_secret", saved.client.secret);
 		const answer = await this.#post(saved.endpoints.token, body);
 		if (!answer || typeof answer.access_token !== "string") {
-			throw new Error("The server did not give Jig a token.");
+			throw new Error("The server did not give Yew a token.");
 		}
 		await this.#save(pending.server, { ...saved, tokens: tokensFrom(answer, this.#now()) });
 		return pending.server;
@@ -321,7 +321,7 @@ export class McpAuth {
 
 	/**
 	 * Signs out: asks the server to void the tokens where it says how (RFC 7009), then forgets them and
-	 * the registered client. Whether the server voids them or not, Jig keeps nothing.
+	 * the registered client. Whether the server voids them or not, Yew keeps nothing.
 	 */
 	async forget(server: string): Promise<void> {
 		const saved = await this.#load(server);
@@ -345,11 +345,11 @@ export class McpAuth {
 		await this.#keys.delete(server);
 	}
 
-	/** A GET for details; it may follow a redirect, but only to an address Jig would use. */
+	/** A GET for details; it may follow a redirect, but only to an address Yew would use. */
 	async #json(url: string, local: boolean): Promise<Record<string, unknown> | null> {
 		try {
 			const response = await this.#fetch(url, {
-				headers: { Accept: "application/json", "User-Agent": `jig/${this.#version}` },
+				headers: { Accept: "application/json", "User-Agent": `yew/${this.#version}` },
 				signal: AbortSignal.timeout(REQUEST_MS),
 			});
 			if (!response.ok || !usable(response.url || url, local)) return null;
@@ -376,7 +376,7 @@ export class McpAuth {
 					"Content-Type":
 						typeof body === "string" ? "application/json" : "application/x-www-form-urlencoded",
 					Accept: "application/json",
-					"User-Agent": `jig/${this.#version}`,
+					"User-Agent": `yew/${this.#version}`,
 				},
 				body,
 				signal: AbortSignal.timeout(ms),
@@ -410,7 +410,7 @@ export class McpAuth {
 		const at = new URL(resource);
 		const local = at.protocol === "http:" && LOOPBACK.has(at.hostname);
 		if (!usable(resource, local)) {
-			throw new Error("Jig signs in only to servers at https addresses.");
+			throw new Error("Yew signs in only to servers at https addresses.");
 		}
 		const named = param(challenge, "resource_metadata");
 		if (named !== null && !usable(named, local)) {
@@ -458,7 +458,7 @@ export class McpAuth {
 			) {
 				continue;
 			}
-			// RFC 8414, 3.3: the details are those of the sign-in server Jig asked about.
+			// RFC 8414, 3.3: the details are those of the sign-in server Yew asked about.
 			if (typeof found.issuer !== "string" || !same(found.issuer, issuer)) {
 				problem = `The sign-in server's details are for another server (${String(found.issuer)}).`;
 				continue;
@@ -502,7 +502,7 @@ export class McpAuth {
 		throw new Error(problem);
 	}
 
-	/** Registers Jig as a public client of the authorization server (RFC 7591). */
+	/** Registers Yew as a public client of the authorization server (RFC 7591). */
 	async #register(endpoints: Endpoints): Promise<Saved["client"]> {
 		if (!endpoints.registration) {
 			throw new Error(
@@ -512,7 +512,7 @@ export class McpAuth {
 		const answer = await this.#post(
 			endpoints.registration,
 			JSON.stringify({
-				client_name: "Jig",
+				client_name: "Yew",
 				redirect_uris: [this.#redirect],
 				grant_types: ["authorization_code", "refresh_token"],
 				response_types: ["code"],
@@ -521,7 +521,7 @@ export class McpAuth {
 			}),
 		);
 		if (!answer || typeof answer.client_id !== "string") {
-			throw new Error("The server did not let Jig register to sign in.");
+			throw new Error("The server did not let Yew register to sign in.");
 		}
 		return {
 			id: answer.client_id,

@@ -1,7 +1,7 @@
 import SwiftUI
 import VisionKit
 
-/// The camera, looking for Jig's pairing QR code; reports the first one it sees.
+/// The camera, looking for Yew's pairing QR code; reports the first one it sees.
 struct ScannerView: UIViewControllerRepresentable {
 	let onCode: (String) -> Void
 
@@ -39,7 +39,7 @@ struct ScannerView: UIViewControllerRepresentable {
 		func dataScanner(_ scanner: DataScannerViewController, didAdd items: [RecognizedItem], allItems: [RecognizedItem]) {
 			guard !done else { return }
 			for item in items {
-				if case .barcode(let code) = item, let value = code.payloadStringValue, value.hasPrefix("jig://pair?") {
+				if case .barcode(let code) = item, let value = code.payloadStringValue, PairingLink.looksLikeOne(value) {
 					done = true
 					scanner.stopScanning()
 					onCode(value)

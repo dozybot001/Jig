@@ -27,9 +27,9 @@ const body = (name: string, description: string) =>
 
 /** A global folder and one workspace, each with skills that read and folders that do not. */
 function folders() {
-	const jigHome = real("jig-home-");
-	const userHome = real("jig-user-");
-	const cwd = real("jig-cwd-");
+	const jigHome = real("yew-home-");
+	const userHome = real("yew-user-");
+	const cwd = real("yew-cwd-");
 	const global = join(userHome, ".claude", "skills");
 	const project = join(cwd, ".claude", "skills");
 	const ids = {
@@ -72,7 +72,7 @@ describe("skills: what the settings list", () => {
 			},
 			{
 				source: workspace,
-				paths: [".agents", ".claude", ".jig"].map((local) => join(cwd, local, "skills")),
+				paths: [".agents", ".claude", ".yew", ".jig"].map((local) => join(cwd, local, "skills")),
 			},
 		]);
 	});
@@ -90,9 +90,9 @@ describe("skills: what the settings list", () => {
 		);
 	});
 
-	test("without the person's home folder only Jig's own folder is listed", () => {
+	test("without the person's home folder only Yew's own folder is listed", () => {
 		const { jigHome, workspaces } = folders();
-		skill(join(jigHome, "skills"), "own", body("own", "Jig's"));
+		skill(join(jigHome, "skills"), "own", body("own", "Yew's"));
 		assert.deepEqual(
 			listSkills([], jigHome, null).items.map((item) => item.name),
 			["own"],

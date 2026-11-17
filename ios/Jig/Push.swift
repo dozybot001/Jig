@@ -40,7 +40,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 	nonisolated func userNotificationCenter(
 		_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
 	) async {
-		let session = response.notification.request.content.userInfo["jig.session"] as? String
+		let session = response.notification.request.content.userInfo["yew.session"] as? String
 		await MainActor.run { PushCenter.shared.opened = .some(session) }
 	}
 }
@@ -99,7 +99,7 @@ final class PushCenter {
 		let delivered = await center.deliveredNotifications()
 		let gone = delivered.filter { shown in
 			ids.contains(shown.request.identifier)
-				|| (shown.request.content.userInfo["jig.id"] as? String).map(ids.contains) == true
+				|| (shown.request.content.userInfo["yew.id"] as? String).map(ids.contains) == true
 		}
 		center.removeDeliveredNotifications(withIdentifiers: gone.map(\.request.identifier))
 		if let badge { try? await center.setBadgeCount(badge) }

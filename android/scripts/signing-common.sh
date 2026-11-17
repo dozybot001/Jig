@@ -2,12 +2,12 @@
 # Neither script prints the keystore password or passes it as a command argument: it goes from the
 # login keychain into an environment variable of the one tool that needs it.
 
-KEY_DIR="$HOME/.tenon-keys/android/jig"
-KEYSTORE_NAME="jig-release.p12"
+KEY_DIR="$HOME/.tenon-keys/android/yew"
+KEYSTORE_NAME="yew-release.p12"
 KEYSTORE="$KEY_DIR/$KEYSTORE_NAME"
-KEY_ALIAS="jig"
+KEY_ALIAS="yew"
 KEYCHAIN_SERVICE="tenon-android-signing"
-KEYCHAIN_ACCOUNT="jig"
+KEYCHAIN_ACCOUNT="yew"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ANDROID_DIR="$(dirname "$SCRIPT_DIR")"
@@ -25,16 +25,16 @@ fail() {
     exit 1
 }
 
-# Puts the keystore password into JIG_KS_PASS for the commands that follow in this shell.
+# Puts the keystore password into YEW_KS_PASS for the commands that follow in this shell.
 load_keystore_password() {
-    JIG_KS_PASS="$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w 2>/dev/null)" ||
+    YEW_KS_PASS="$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w 2>/dev/null)" ||
         fail "钥匙串里没有签名密钥的口令（服务 ${KEYCHAIN_SERVICE}，账户 ${KEYCHAIN_ACCOUNT}）"
-    export JIG_KS_PASS
+    export YEW_KS_PASS
 }
 
-# Prints the certificate in a keystore, as PEM. Needs JIG_KS_PASS.
+# Prints the certificate in a keystore, as PEM. Needs YEW_KS_PASS.
 certificate_of() { # <keystore>
-    "$KEYTOOL" -exportcert -rfc -keystore "$1" -storetype PKCS12 -alias "$KEY_ALIAS" -storepass:env JIG_KS_PASS
+    "$KEYTOOL" -exportcert -rfc -keystore "$1" -storetype PKCS12 -alias "$KEY_ALIAS" -storepass:env YEW_KS_PASS
 }
 
 # Reads a PEM certificate on standard input and prints one fingerprint, upper-case hex without colons.

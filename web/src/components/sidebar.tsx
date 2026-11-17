@@ -41,7 +41,6 @@ import {
 	ExpandIcon,
 	ExportIcon,
 	FolderIcon,
-	JigMark,
 	MainIcon,
 	MapIcon,
 	MenuPinIcon,
@@ -54,6 +53,8 @@ import {
 	SlidersIcon,
 	TeamIcon,
 	UsageIcon,
+	YewMark,
+	YewWordmark,
 } from "./icons.tsx";
 import { SettingsMenu } from "./settings.tsx";
 import { Button, describeError, ErrorBox, Menu, type MenuEntry, useAction, useNow } from "./ui.tsx";
@@ -866,7 +867,7 @@ function Search() {
 }
 
 /**
- * The folded sidebar on wide screens, as in ChatGPT: Jig's graphic on top (it turns into the
+ * The folded sidebar on wide screens, as in ChatGPT: Yew's graphic on top (it turns into the
  * open button under the pointer), then the main actions as icons, settings at the bottom (spec 1.6:
  * a collapsed navigation shows the product graphic only).
  */
@@ -891,7 +892,7 @@ export function SidebarRail() {
 				onClick={() => setSidebarCollapsed(false)}
 			>
 				<span className="rail-mark">
-					<JigMark size={22} />
+					<YewMark size={22} />
 				</span>
 				<span className="rail-open">
 					<ExpandIcon />
@@ -1066,9 +1067,9 @@ export function Sidebar() {
 						void selectSession(null);
 					}}
 				>
-					<JigMark className="lockup-mark" size={22} />
+					<YewMark className="lockup-mark" size={22} />
 					<span className="lockup-word">
-						<span className="wordmark">Jig</span>
+						<YewWordmark className="wordmark" />
 						<img
 							className="lockup-tenon"
 							src="/icons/tenon-mark.svg"

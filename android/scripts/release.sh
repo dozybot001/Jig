@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds Jig for Android and signs it with the app signing key. It publishes nothing.
+# Builds Yew for Android and signs it with the app signing key. It publishes nothing.
 # Product standard 15.6.4 and 15.6.7.
 #
 # Signing happens here and not in Gradle, so the password never reaches the Gradle daemon or a build
@@ -7,7 +7,7 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/signing-common.sh"
 
-PACKAGE="cn.tenonai.apps.jig"
+PACKAGE="cn.tenonai.apps.yew"
 [ -f "$KEYSTORE" ] || fail "找不到正式签名密钥：${KEYSTORE}。没有它不出正式包。"
 [ -f "$FINGERPRINT_FILE" ] || fail "找不到登记的证书指纹：${FINGERPRINT_FILE}"
 EXPECTED="$(tr -d '[:space:]' <"$FINGERPRINT_FILE")"
@@ -32,7 +32,7 @@ UNSIGNED="app/build/outputs/apk/release/app-release-unsigned.apk"
 OUT_DIR="$ANDROID_DIR/build/release"
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
-APK="$OUT_DIR/Jig-$VERSION.apk"
+APK="$OUT_DIR/Yew-$VERSION.apk"
 # The package carries its real name only after every check has passed. Until then it is this file,
 # which is removed however the script ends.
 PENDING="$OUT_DIR/unverified.apk"
@@ -41,11 +41,11 @@ trap 'rm -f "$PENDING"' EXIT
 # Signature schemes v2 and v3 only: the app needs Android 8.0, which does not use v1.
 load_keystore_password
 "$BUILD_TOOLS/apksigner" sign \
-    --ks "$KEYSTORE" --ks-type PKCS12 --ks-key-alias "$KEY_ALIAS" --ks-pass env:JIG_KS_PASS \
+    --ks "$KEYSTORE" --ks-type PKCS12 --ks-key-alias "$KEY_ALIAS" --ks-pass env:YEW_KS_PASS \
     --min-sdk-version 26 \
     --v1-signing-enabled false --v2-signing-enabled true --v3-signing-enabled true --v4-signing-enabled false \
     --out "$PENDING" "$UNSIGNED"
-unset JIG_KS_PASS
+unset YEW_KS_PASS
 
 # 1. The signature verifies and the certificate is the registered one.
 VERIFY="$("$BUILD_TOOLS/apksigner" verify --verbose --print-certs --min-sdk-version 26 "$PENDING")" || fail "签名验证没有通过"

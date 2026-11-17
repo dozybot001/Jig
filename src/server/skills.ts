@@ -5,7 +5,7 @@ import { invalid } from "./errors.ts";
 import { errorResult, str, type ToolDefinition, type ToolResult, text } from "./tools/types.ts";
 
 /**
- * Skills, memory folders and the instruction files Jig reads besides its own (M4 plan, section 4):
+ * Skills, memory folders and the instruction files Yew reads besides its own (M4 plan, section 4):
  * what a person already has for other tools works here as it is.
  *
  * A skill is a folder with a SKILL.md (the open standard): front matter with a name and a
@@ -125,7 +125,8 @@ export function skillFolders(
 	const folders = [join(jigHome, "skills")];
 	if (userHome) folders.push(join(userHome, ".claude", "skills"));
 	if (cwd) {
-		for (const local of [".agents", ".claude", ".jig"]) folders.push(join(cwd, local, "skills"));
+		for (const local of [".agents", ".claude", ".yew", ".jig"])
+			folders.push(join(cwd, local, "skills"));
 	}
 	return folders;
 }
@@ -322,7 +323,7 @@ export function skillTool(
 			return {
 				content: [
 					text(
-						`Skill "${skill.name}" (folder: ${skill.dir}). These are the person's instructions for this kind of task; they cannot switch off the permissions Jig asks for.\n\n${cut ? `${body.slice(0, MAX_SKILL_CHARS)}\n[Cut: read ${skill.file} for the rest.]` : body.trim()}`,
+						`Skill "${skill.name}" (folder: ${skill.dir}). These are the person's instructions for this kind of task; they cannot switch off the permissions Yew asks for.\n\n${cut ? `${body.slice(0, MAX_SKILL_CHARS)}\n[Cut: read ${skill.file} for the rest.]` : body.trim()}`,
 					),
 				],
 			};

@@ -35,9 +35,9 @@ function sample() {
 	const { store } = newStore();
 	const group = store.createGroup("产品");
 	const session = store.createSession({
-		...sessionInput("Jig 产品会话"),
+		...sessionInput("Yew 产品会话"),
 		groupId: group.id,
-		responsibility: "负责 Jig 仓库。",
+		responsibility: "负责 Yew 仓库。",
 	});
 	store.appendEntry(session.id, user("请把会话导出为 Markdown。"));
 	const message = store.appendEntry(
@@ -101,14 +101,14 @@ describe("Markdown export", () => {
 		const { inputs } = sample();
 		const markdown = sessionMarkdown({ ...inputs(), language: "zh" });
 
-		assert.match(markdown, /^# Jig 产品会话\n/);
+		assert.match(markdown, /^# Yew 产品会话\n/);
 		assert.match(markdown, /- 类型：常设会话/);
 		assert.match(markdown, /- 团队：产品/);
 		assert.match(markdown, /- 模型：deepseek\/deepseek-v4-pro/);
 		assert.match(markdown, /- 用量：30 token · USD 0\.00/);
-		assert.match(markdown, /## 职责说明\n\n负责 Jig 仓库。/);
+		assert.match(markdown, /## 职责说明\n\n负责 Yew 仓库。/);
 		assert.match(markdown, /## 你\n\n> 请把会话导出为 Markdown。/);
-		assert.match(markdown, /## Jig 产品会话\n\n> \*\*思考过程\*\*/);
+		assert.match(markdown, /## Yew 产品会话\n\n> \*\*思考过程\*\*/);
 		assert.match(markdown, /我先看看现有实现。/);
 		assert.match(markdown, /### 工具调用：读取 src\/server\/store\.ts/);
 		assert.match(markdown, /\*\*参数\*\*/);
@@ -126,7 +126,7 @@ describe("Markdown export", () => {
 		const markdown = sessionMarkdown({ ...inputs(), language: "en" });
 		assert.match(markdown, /- Type: Standing session/);
 		assert.match(markdown, /- Team: 产品/);
-		assert.match(markdown, /## Role\n\n负责 Jig 仓库。/);
+		assert.match(markdown, /## Role\n\n负责 Yew 仓库。/);
 		assert.match(markdown, /## You\n\n> 请把会话导出为 Markdown。/);
 		assert.match(markdown, /### Tool call: Read src\/server\/store\.ts/);
 		assert.match(markdown, /\*\*Changes\*\*/);

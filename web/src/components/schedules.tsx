@@ -18,6 +18,7 @@ import { formatWhen, type MessageKey, t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
 import { ConfirmDialog } from "./dialogs.tsx";
 import { CheckIcon, PlayIcon, PlusIcon, RenameIcon, TrashIcon } from "./icons.tsx";
+import { Mascot } from "./mascot.tsx";
 import { SidebarToggle } from "./session.tsx";
 import {
 	Button,
@@ -197,7 +198,10 @@ export function SchedulesPage() {
 					{!schedules ? (
 						<p className="hint">{t("loading")}</p>
 					) : schedules.length === 0 ? (
-						<p className="empty-box">{t("schedulesEmpty")}</p>
+						<div className="empty-state">
+							<Mascot pose="sleepy" height={96} />
+							<p className="empty-box">{t("schedulesEmpty")}</p>
+						</div>
 					) : (
 						<ul className="schedule-list">
 							{schedules.map((schedule) => (

@@ -8,18 +8,18 @@ import { VERSION } from "../shared/version.ts";
 import { type CliIo, EXIT_ERROR, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
 
-const HELP = `Usage: jig app <install|uninstall|status> [options]
+const HELP = `Usage: yew app <install|uninstall|status> [options]
 
-Put a Jig icon in your Applications folder (macOS). Clicking it starts Jig in
+Put a Yew icon in your Applications folder (macOS). Clicking it starts Yew in
 the background if it is not running, then opens the web interface, signed in.
 
-The icon is a small launcher for this installation of Jig: it runs the same
-jig you run in a terminal, with the Node.js found now. Run install again after
-you move or update Node.js or Jig.
+The icon is a small launcher for this installation of Yew: it runs the same
+yew you run in a terminal, with the Node.js found now. Run install again after
+you move or update Node.js or Yew.
 
 Commands:
-  install    Create ~/Applications/Jig.app
-  uninstall  Remove it; Jig itself and your data stay
+  install    Create ~/Applications/Yew.app
+  uninstall  Remove it; Yew itself and your data stay
   status     Show whether it is there
 
 Options:
@@ -65,13 +65,13 @@ export function infoPlist(): string {
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>Jig</string>
+	<string>Yew</string>
 	<key>CFBundleDisplayName</key>
-	<string>Jig</string>
+	<string>Yew</string>
 	<key>CFBundleIdentifier</key>
-	<string>cn.tenonai.apps.jig.launcher</string>
+	<string>cn.tenonai.apps.yew.launcher</string>
 	<key>CFBundleExecutable</key>
-	<string>jig-launcher</string>
+	<string>yew-launcher</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>
@@ -90,26 +90,26 @@ export function infoPlist(): string {
 }
 
 /**
- * The launcher: open Jig's interface; when Jig is not running, start it in the background first
+ * The launcher: open Yew's interface; when Yew is not running, start it in the background first
  * and wait until it answers. Its log goes where the login service's does.
  */
 export function launcherScript(host: AppHost, env: Record<string, string>, log: string): string {
-	const jig = `${quoted(host.node)} ${quoted(host.entry)}`;
+	const yew = `${quoted(host.node)} ${quoted(host.entry)}`;
 	return `#!/bin/sh
-# Jig's launcher, written by 'jig app install'. Run that again after moving Node.js or Jig.
+# Yew's launcher, written by 'yew app install'. Run that again after moving Node.js or Yew.
 ${Object.entries(env)
 	.map(([key, value]) => `export ${key}=${quoted(value)}`)
 	.join("\n")}
-if ${jig} open >/dev/null 2>&1; then exit 0; fi
+if ${yew} open >/dev/null 2>&1; then exit 0; fi
 mkdir -p ${quoted(join(log, ".."))}
-nohup ${jig} serve >> ${quoted(log)} 2>&1 &
+nohup ${yew} serve >> ${quoted(log)} 2>&1 &
 tries=0
 while [ "$tries" -lt 60 ]; do
 	sleep 0.25
-	if ${jig} open >/dev/null 2>&1; then exit 0; fi
+	if ${yew} open >/dev/null 2>&1; then exit 0; fi
 	tries=$((tries + 1))
 done
-osascript -e 'display alert "Jig did not start" message "Run jig serve in a terminal to see why."' >/dev/null 2>&1
+osascript -e 'display alert "Yew did not start" message "Run yew serve in a terminal to see why."' >/dev/null 2>&1
 exit 1
 `;
 }
@@ -117,34 +117,46 @@ exit 1
 const SIZES = [16, 32, 128, 256, 512] as const;
 
 /** Where the launcher goes: the person's own Applications folder. */
-export const appPath = (host: AppHost) => join(host.homeDir, "Applications", "Jig.app");
+export const appPath = (host: AppHost) => join(host.homeDir, "Applications", "Yew.app");
+
+/**
+ * Jig's launcher, from before Jig was renamed Yew: taken away when Yew's is made or removed. Only when
+ * it is the one Jig made, by the executable it has.
+ */
+function removeJigApp(host: AppHost): void {
+	const old = join(host.homeDir, "Applications", "Jig.app");
+	if (existsSync(join(old, "Contents", "MacOS", "jig-launcher"))) {
+		rmSync(old, { recursive: true, force: true });
+	}
+}
 
 export const appInstalled = (host: AppHost) =>
-	existsSync(join(appPath(host), "Contents", "MacOS", "jig-launcher"));
+	existsSync(join(appPath(host), "Contents", "MacOS", "yew-launcher"));
 
-/** Makes Jig.app; returns whether its icon could be made (the app works without it). */
+/** Makes Yew.app; returns whether its icon could be made (the app works without it). */
 export function installApp(
 	host: AppHost,
 	home: string,
 	env: Record<string, string | undefined>,
 ): { app: string; icon: boolean } {
 	const app = appPath(host);
+	removeJigApp(host);
 	// Sessions' commands need your PATH; an app starts with a bare one.
 	const vars: Record<string, string> = { PATH: env.PATH ?? "/usr/bin:/bin" };
-	if (env.JIG_HOME) vars.JIG_HOME = home;
+	if (env.YEW_HOME || env.JIG_HOME) vars.YEW_HOME = home;
 	rmSync(app, { recursive: true, force: true });
 	const contents = join(app, "Contents");
 	mkdirSync(join(contents, "MacOS"), { recursive: true });
 	mkdirSync(join(contents, "Resources"), { recursive: true });
 	writeFileSync(join(contents, "Info.plist"), infoPlist());
-	const launcher = join(contents, "MacOS", "jig-launcher");
+	const launcher = join(contents, "MacOS", "yew-launcher");
 	writeFileSync(launcher, launcherScript(host, vars, join(home, "logs", "serve.log")));
 	chmodSync(launcher, 0o755);
 
 	// The icon: macOS's own tools make the sizes and the .icns. Without it the app still works.
 	let icon = false;
 	if (host.icon) {
-		const work = mkdtempSync(join(tmpdir(), "jig-icon-"));
+		const work = mkdtempSync(join(tmpdir(), "yew-icon-"));
 		const set = join(work, "AppIcon.iconset");
 		mkdirSync(set);
 		const made = SIZES.every((size) =>
@@ -178,12 +190,13 @@ export function installApp(
 
 export function uninstallApp(host: AppHost): void {
 	rmSync(appPath(host), { recursive: true, force: true });
+	removeJigApp(host);
 }
 
 export function appCommand(host: AppHost = realAppHost()): Command {
 	return {
 		name: "app",
-		summary: "Put a Jig icon in Applications (macOS)",
+		summary: "Put a Yew icon in Applications (macOS)",
 		async run(args: string[], io: CliIo): Promise<number> {
 			const { values, positionals } = parseArgs({
 				args,
@@ -197,21 +210,21 @@ export function appCommand(host: AppHost = realAppHost()): Command {
 			}
 			const action = positionals[0];
 			if (positionals.length !== 1 || !["install", "uninstall", "status"].includes(action ?? "")) {
-				throw new UsageError("jig app needs one of install, uninstall or status");
+				throw new UsageError("yew app needs one of install, uninstall or status");
 			}
-			if (host.platform !== "darwin") throw new Error("jig app works on macOS.");
+			if (host.platform !== "darwin") throw new Error("yew app works on macOS.");
 			const app = appPath(host);
 			const installed = appInstalled(host);
 
 			if (action === "status") {
 				if (values.json) io.stdout.write(`${JSON.stringify({ installed, app })}\n`);
-				else io.stdout.write(`Jig icon: ${installed ? app : "not installed"}\n`);
+				else io.stdout.write(`Yew icon: ${installed ? app : "not installed"}\n`);
 				return EXIT_OK;
 			}
 			if (action === "uninstall") {
 				uninstallApp(host);
 				if (values.json) io.stdout.write(`${JSON.stringify({ installed: false, app })}\n`);
-				else io.stdout.write(installed ? `Removed ${app}.\n` : "The Jig icon was not installed.\n");
+				else io.stdout.write(installed ? `Removed ${app}.\n` : "The Yew icon was not installed.\n");
 				return EXIT_OK;
 			}
 
@@ -220,9 +233,9 @@ export function appCommand(host: AppHost = realAppHost()): Command {
 			if (values.json) io.stdout.write(`${JSON.stringify({ installed: true, app, icon })}\n`);
 			else {
 				io.stdout.write(
-					`Jig is in your Applications folder: ${app}\nOpen it from Launchpad or Spotlight, or drag it to the Dock.\n`,
+					`Yew is in your Applications folder: ${app}\nOpen it from Launchpad or Spotlight, or drag it to the Dock.\n`,
 				);
-				if (!icon) io.stderr.write("jig: the icon could not be made; the app has a plain one.\n");
+				if (!icon) io.stderr.write("yew: the icon could not be made; the app has a plain one.\n");
 			}
 			return icon || !host.icon ? EXIT_OK : EXIT_ERROR;
 		},

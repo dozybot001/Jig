@@ -5,7 +5,7 @@ import { type Card, type Letter, permissionModeOf, type Session } from "../../sh
 const attr = (value: string) => value.replace(/["\n\r<>]/g, " ");
 
 /**
- * Text written by a session or a script cannot open or close Jig's own tags: `<letter`, `</letter`,
+ * Text written by a session or a script cannot open or close Yew's own tags: `<letter`, `</letter`,
  * `<decision` and `</decision` are written with `&lt;`, so a letter cannot carry a fake decision of the
  * person. Only what the model reads changes; the interface shows the text as written.
  */
@@ -14,7 +14,7 @@ export function neutralize(text: string): string {
 }
 
 function senderLabel(letter: Letter): string {
-	if (letter.fromKind === "cli") return "the command line (jig send)";
+	if (letter.fromKind === "cli") return "the command line (yew send)";
 	if (letter.fromKind === "person") return "the person";
 	if (letter.fromKind === "jig")
 		return `the scheduled task '${letter.fromName}' (set up by the person)`;
@@ -24,7 +24,7 @@ function senderLabel(letter: Letter): string {
 /** The scheduled task a letter belongs to, by id and name. */
 export type ScheduleRef = { id: string; name: string };
 
-/** The decision as Jig recorded it, for a session to rely on. */
+/** The decision as Yew recorded it, for a session to rely on. */
 export function decisionRef(card: Card): DecisionRef {
 	return {
 		number: card.number,
@@ -66,7 +66,7 @@ function decisionLines(decision: DecisionRef): string[] {
 /**
  * What the model reads for a delivered letter. The closing tag repeats the letter's id, which the sender
  * could not know while writing, so text inside a letter cannot pass itself off as the end of it. `note`
- * is Jig's own line about the letter, such as how a scheduled run works.
+ * is Yew's own line about the letter, such as how a scheduled run works.
  */
 export function letterText(
 	letter: Letter,
@@ -76,7 +76,7 @@ export function letterText(
 ): string {
 	if (letter.fromKind === "person" && decision) {
 		return [
-			`<decision number="${decision.number}" from="the person" recorded-by="Jig">`,
+			`<decision number="${decision.number}" from="the person" recorded-by="Yew">`,
 			...decisionLines(decision),
 			`</decision number="${decision.number}">`,
 		].join("\n");
@@ -96,11 +96,11 @@ export function letterText(
 	if (decision) {
 		lines.push(
 			"",
-			`[Jig checked decision #${decision.number}: the person decided it in Jig.]`,
+			`[Yew checked decision #${decision.number}: the person decided it in Yew.]`,
 			...decisionLines(decision),
 		);
 	}
-	if (note) lines.push("", `[Jig] ${note}`);
+	if (note) lines.push("", `[Yew] ${note}`);
 	lines.push(`</letter id="${letter.id}">`);
 	return lines.join("\n");
 }
@@ -113,7 +113,7 @@ export function decisionReport(card: Card, names: (id: string) => string | null)
 		lines.push(`#${card.number} was withdrawn: ${neutralize(card.withdrawnReason ?? "")}`);
 	else {
 		const when = new Date(card.decidedAt ?? card.updatedAt).toISOString();
-		lines.push(`#${card.number} was decided by the person in Jig (${when}).`);
+		lines.push(`#${card.number} was decided by the person in Yew (${when}).`);
 	}
 	lines.push(`Question: ${neutralize(card.title)}`);
 	if (card.options.length > 0) {
@@ -157,7 +157,7 @@ export function directoryLine(
 	if (options.letterQuota) parts.push(`letter quota: ${options.letterQuota}`);
 	if (options.dailyBudget) parts.push(`daily budget: $${options.dailyBudget}`);
 	if (options.canPostCards) parts.push("can post cards");
-	if (options.canOrganize) parts.push("can manage Jig");
+	if (options.canOrganize) parts.push("can manage Yew");
 	if (session.pinned) parts.push("pinned");
 	if (marks.main) parts.push("the main conversation");
 	if (marks.you) parts.push("you");

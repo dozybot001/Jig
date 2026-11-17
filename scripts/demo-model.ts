@@ -1,11 +1,11 @@
 /**
  * A scripted stand-in for a model provider, for demos and App Review recordings: it speaks the
  * OpenAI chat API on 127.0.0.1 and answers a few requests the same way every time, so a recorded
- * walk-through can be repeated. Add it to a throwaway Jig as a custom provider with the base URL
+ * walk-through can be repeated. Add it to a throwaway Yew as a custom provider with the base URL
  * http://127.0.0.1:<port>/v1 and no key. It never calls a real model.
  *
  * What it does, by the last message it is sent:
- * - a request to clean up the drafts folder: runs `rm drafts/old-home.html` (Jig asks first);
+ * - a request to clean up the drafts folder: runs `rm drafts/old-home.html` (Yew asks first);
  * - a request for release notes: asks which version they are for, then saves them as an artifact;
  * - a request to run the tests: runs `npm test` and reports how many passed;
  * - anything else: a short acknowledgement.

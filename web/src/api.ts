@@ -1,4 +1,4 @@
-/** Thin client for Jig's local API. Errors arrive as RFC 9457 problems with a request ID. */
+/** Thin client for Yew's local API. Errors arrive as RFC 9457 problems with a request ID. */
 
 export class ApiError extends Error {
 	readonly status: number;

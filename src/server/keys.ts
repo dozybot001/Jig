@@ -8,7 +8,9 @@ export interface KeyStore {
 	delete(provider: string): Promise<boolean>;
 }
 
-export const KEYCHAIN_SERVICE = "asia.tenon.jig";
+export const KEYCHAIN_SERVICE = "asia.tenon.yew";
+/** Where Jig kept them before it was renamed Yew; a key found there moves over when first read. */
+const JIG_SERVICE = "asia.tenon.jig";
 
 /** The operating system keychain (macOS Keychain, Windows Credential Manager, Secret Service). */
 export class KeychainStore implements KeyStore {
@@ -19,31 +21,49 @@ export class KeychainStore implements KeyStore {
 		this.#prefix = prefix;
 	}
 
-	#entry(name: string): AsyncEntry {
-		return new AsyncEntry(KEYCHAIN_SERVICE, `${this.#prefix}:${name}`);
+	#entry(name: string, service = KEYCHAIN_SERVICE): AsyncEntry {
+		return new AsyncEntry(service, `${this.#prefix}:${name}`);
 	}
 
-	get(provider: string): Promise<string | null> {
-		return this.#entry(provider).getPassword();
+	async get(provider: string): Promise<string | null> {
+		const key = await this.#entry(provider).getPassword();
+		if (key !== null && key !== undefined) return key;
+		const old = this.#entry(provider, JIG_SERVICE);
+		const kept = await old.getPassword().catch(() => null);
+		if (kept === null || kept === undefined) return null;
+		await this.#entry(provider).setPassword(kept);
+		await old.deleteCredential().catch(() => false);
+		return kept;
 	}
 
-	set(provider: string, key: string): Promise<void> {
-		return this.#entry(provider).setPassword(key);
+	async set(provider: string, key: string): Promise<void> {
+		await this.#entry(provider).setPassword(key);
+		await this.#entry(provider, JIG_SERVICE)
+			.deleteCredential()
+			.catch(() => false);
 	}
 
-	delete(provider: string): Promise<boolean> {
-		return this.#entry(provider).deleteCredential();
+	async delete(provider: string): Promise<boolean> {
+		const had = await this.#entry(provider)
+			.deleteCredential()
+			.catch(() => false);
+		const hadOld = await this.#entry(provider, JIG_SERVICE)
+			.deleteCredential()
+			.catch(() => false);
+		return had || hadOld;
 	}
 }
 
 /**
- * The key store Jig runs with: the system keychain, or one in memory when `JIG_KEYCHAIN=off`.
- * The keychain is shared by every data folder on this computer, so a Jig started on a scratch
- * `JIG_HOME` to try something out would otherwise hold the real API keys and could call a model
+ * The key store Yew runs with: the system keychain, or one in memory when `YEW_KEYCHAIN=off` (or
+ * `JIG_KEYCHAIN=off`, its name before the rename).
+ * The keychain is shared by every data folder on this computer, so a Yew started on a scratch
+ * `YEW_HOME` to try something out would otherwise hold the real API keys and could call a model
  * with them. With the switch off it starts with no keys and forgets what is saved when it stops.
  */
 export function systemKeys(prefix = "provider", env: NodeJS.ProcessEnv = process.env): KeyStore {
-	return env.JIG_KEYCHAIN === "off" ? new MemoryKeyStore() : new KeychainStore(prefix);
+	const off = (env.YEW_KEYCHAIN ?? env.JIG_KEYCHAIN) === "off";
+	return off ? new MemoryKeyStore() : new KeychainStore(prefix);
 }
 
 /** For tests: keeps keys in memory. */

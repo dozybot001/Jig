@@ -24,7 +24,7 @@ import { readSettings, resolveLogFile, type Workspace } from "./settings.ts";
 import { type SessionPatch, type Store, validateSessionName } from "./store.ts";
 
 /**
- * How far a manage_jig call reaches (blueprint 6.2, item 10). Jig decides, not the model: organizing
+ * How far a manage_jig call reaches (blueprint 6.2, item 10). Yew decides, not the model: organizing
  * follows the session's permission mode, configuring asks every time unless always allowed, and
  * widening what a session may do must be confirmed every time.
  */
@@ -443,7 +443,7 @@ export class Manager {
 				else options.canOrganize = on;
 				note(
 					{ action: "set_right", session: target.name, right, on },
-					`${on ? "Gave" : "Took from"} "${target.name}" the right to ${right === "cards" ? "post cards" : "manage Jig"}.`,
+					`${on ? "Gave" : "Took from"} "${target.name}" the right to ${right === "cards" ? "post cards" : "manage Yew"}.`,
 				);
 			}
 			if (archived !== undefined && archived !== (target.archivedAt !== null)) {
@@ -580,7 +580,7 @@ export class Manager {
 						{ action: "set_main", from, to: target?.name ?? null },
 						target
 							? `Made "${target.name}" the main conversation.`
-							: "Left Jig without a main conversation.",
+							: "Left Yew without a main conversation.",
 					);
 				}
 			}

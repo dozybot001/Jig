@@ -70,8 +70,8 @@ const OFFER =
 
 /**
  * The question a reply ends with, if it ends with one: its last paragraph (outside code) when that asks
- * something or offers a next step. A session that asks the person this way goes idle, so Jig puts the
- * question in the approval center for it (blueprint principle 8: Jig carries this, not a prompt rule).
+ * something or offers a next step. A session that asks the person this way goes idle, so Yew puts the
+ * question in the approval center for it (blueprint principle 8: Yew carries this, not a prompt rule).
  */
 export function askedInReply(text: string): string | null {
 	const prose = text.replace(/```[\s\S]*?(```|$)/g, "").trim();
@@ -118,7 +118,7 @@ export interface AgentsOptions {
 	schedules?: ScheduleBook;
 	/** The person's home folder, for `~/.claude` skills and instructions; absent, they are not read. */
 	userHome?: string | null;
-	/** The most model requests one turn makes before Jig stops it; tests lower it. */
+	/** The most model requests one turn makes before Yew stops it; tests lower it. */
 	maxSteps?: number;
 }
 
@@ -126,18 +126,18 @@ const MAX_MESSAGE_CHARS = 100_000;
 const MAX_STEPS = 500;
 /** How many times in a row a reply cut off at the model's output limit is continued by itself. */
 const MAX_CUT_REPLIES = 3;
-/** After this many tool calls without a change to a task list that still has open tasks, Jig reminds the model. */
+/** After this many tool calls without a change to a task list that still has open tasks, Yew reminds the model. */
 const TODO_REMINDER_AFTER = 12;
 /** How long a session waits for another one's answer (blueprint 7.1: one wait, no polling). */
 const WAIT_MS = 30 * 60 * 1000;
-/** The result of a call that was running when Jig stopped (blueprint 7.3). */
+/** The result of a call that was running when Yew stopped (blueprint 7.3). */
 
 const CUT_CALL =
 	"Not run: your reply was cut off at the output limit before its tool calls were complete. Make the call again; write long content in parts.";
 const CUT_TOO_OFTEN = "The reply was cut off at the model's output limit several times in a row.";
 
 const RESTARTED =
-	"Jig restarted while this call was running. It may or may not have finished; check the current state before running it again.";
+	"Yew restarted while this call was running. It may or may not have finished; check the current state before running it again.";
 
 const clip = (text: string, max: number) =>
 	[...text].length > max ? `${[...text].slice(0, max - 1).join("")}…` : text;
@@ -192,7 +192,7 @@ export class Agents {
 	readonly #live = new Map<string, Live>();
 	readonly #readStates = new Map<string, ReadState>();
 	readonly #jobs = new Map<string, Jobs>();
-	/** Messages from Jig itself (such as "a background job ended") waiting to reach the model. */
+	/** Messages from Yew itself (such as "a background job ended") waiting to reach the model. */
 	readonly #notes = new Map<string, string[]>();
 	/** Tool calls since each session last changed its task list. */
 	readonly #sinceTodo = new Map<string, number>();
@@ -271,7 +271,7 @@ export class Agents {
 		});
 	}
 
-	/** What tools may look up while Jig checks a call of `session`. */
+	/** What tools may look up while Yew checks a call of `session`. */
 	#lookup(session: Session): Lookup {
 		return { name: this.#names, plan: (args) => this.#manager.plan(session, args) };
 	}
@@ -378,7 +378,7 @@ export class Agents {
 
 	/**
 	 * Takes the conversation back to a point the person picked (blueprint 6.11, item 42): one of its
-	 * replies, or just before one of the person's messages. Not while it works. A question Jig made of a
+	 * replies, or just before one of the person's messages. Not while it works. A question Yew made of a
 	 * reply goes with the reply. Returns how many entries were taken back.
 	 */
 	rewind(sessionId: string, entryId: string): number {
@@ -483,7 +483,7 @@ export class Agents {
 
 	/**
 	 * The conversation moves on: calls left over from an interrupted run will not be run later. Calls that
-	 * were running when Jig stopped may have finished, so they say that rather than "not run".
+	 * were running when Yew stopped may have finished, so they say that rather than "not run".
 	 */
 	#dropLeftovers(sessionId: string, reason: string): void {
 		this.#store.tx(() => {
@@ -656,7 +656,7 @@ export class Agents {
 			detail =
 				error instanceof JigError
 					? error.message
-					: `Jig hit an internal error: ${(error as Error).message}`;
+					: `Yew hit an internal error: ${(error as Error).message}`;
 			if (!(error instanceof JigError))
 				this.#log(`session ${sessionId}: ${(error as Error).stack ?? error}`);
 			// The code lets the interface explain the problem in the person's language.
@@ -865,7 +865,7 @@ export class Agents {
 			}
 			if (decision.effect === "deny") {
 				results.set(row.id, {
-					result: failure(`Refused by Jig: ${decision.reason}`),
+					result: failure(`Refused by Yew: ${decision.reason}`),
 					status: "denied",
 					started,
 				});
@@ -878,7 +878,7 @@ export class Agents {
 				results.set(row.id, {
 					result: {
 						...failure(
-							`Refused: this turn runs for the scheduled task "${run.name}" and nobody is watching, so nobody can approve it. Do what you can without it; Jig lists what was refused in the report.`,
+							`Refused: this turn runs for the scheduled task "${run.name}" and nobody is watching, so nobody can approve it. Do what you can without it; Yew lists what was refused in the report.`,
 						),
 						detail: { code: "unattended" },
 					},
@@ -1102,7 +1102,7 @@ export class Agents {
 				const by = this.#store.getSession(sessionId);
 				if (!this.post.canOrganize(by)) {
 					throw conflict(
-						"Only the main conversation, or a session the person allowed, can manage Jig.",
+						"Only the main conversation, or a session the person allowed, can manage Yew.",
 						undefined,
 						"not-allowed",
 					);
@@ -1134,7 +1134,7 @@ export class Agents {
 		this.#start(sessionId);
 	}
 
-	/** Starts every free session with letters waiting: after a restart, and for letters from `jig send`. */
+	/** Starts every free session with letters waiting: after a restart, and for letters from `yew send`. */
 	wakeQueued(): void {
 		this.#continueCapped();
 		for (const id of this.post.mail.sessionsWithQueued()) this.#wake(id);
@@ -1264,7 +1264,7 @@ export class Agents {
 
 	/**
 	 * Models tend to write a task list once and then forget it, so the list the person sees falls behind.
-	 * After many calls without a change while tasks are still open, Jig reminds the model to update it.
+	 * After many calls without a change while tasks are still open, Yew reminds the model to update it.
 	 */
 	#remindTodos(sessionId: string, calls: ToolCallBlock[]): void {
 		if (calls.some((call) => call.name === "todo")) {
@@ -1284,7 +1284,7 @@ export class Agents {
 		);
 	}
 
-	/** Moves Jig's notes, letters and the person's queued messages into the transcript; true if anything arrived. */
+	/** Moves Yew's notes, letters and the person's queued messages into the transcript; true if anything arrived. */
 	#deliver(sessionId: string): boolean {
 		const notes = this.#notes.get(sessionId) ?? [];
 		this.#notes.delete(sessionId);

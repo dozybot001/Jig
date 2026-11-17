@@ -20,7 +20,7 @@ import type { Store } from "./store.ts";
  *   session that stopped with an error or is marked for review; a task session or a scheduled task
  *   that finished; spending that passed 80% of a daily limit or reached it.
  * - When: at once for the first, then at most one notification per window, which sums up what came
- *   in meanwhile. While you are at the Mac (Jig's page in front, used in the last two minutes), items
+ *   in meanwhile. While you are at the Mac (Yew's page in front, used in the last two minutes), items
  *   that need you wait and go out when you have left and they are still open; the rest is not sent.
  * - Afterwards: when an item is handled, its notification is taken off the phone, and the app's badge
  *   is the number of items waiting in the approval center.
@@ -168,7 +168,7 @@ export class Notifier {
 		this.#interval = null;
 	}
 
-	/** Jig's page on the Mac is in front and in use. */
+	/** Yew's page on the Mac is in front and in use. */
 	seen(): void {
 		this.#seenAt = this.#options.now();
 	}

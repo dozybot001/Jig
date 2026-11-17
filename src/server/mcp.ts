@@ -9,9 +9,9 @@ import { errorResult, type ToolDefinition, type ToolResult, text } from "./tools
 
 /**
  * A small MCP client (M4 plan, section 5): JSON-RPC 2.0 over a child process's standard streams or
- * over HTTP, enough to list a server's tools and call them. Written for Jig; no SDK.
+ * over HTTP, enough to list a server's tools and call them. Written for Yew; no SDK.
  *
- * Servers come from `mcp.json` in Jig's data folder, in the `mcpServers` shape other tools use, so
+ * Servers come from `mcp.json` in Yew's data folder, in the `mcpServers` shape other tools use, so
  * an existing configuration can be copied over. A project's own `.mcp.json` is not read: it could
  * start programs a repository brought with it, without the person having chosen them.
  */
@@ -25,11 +25,11 @@ export interface McpServerConfig {
 	/** `"disabled": true` in mcp.json: the server stays in the file and is not started. */
 	disabled?: boolean;
 	/**
-	 * Run from Jig's data folder (its own servers and the presets it installs): it gets a small part of
-	 * Jig's environment, not all of it, and is installed before it starts.
+	 * Run from Yew's data folder (its own servers and the presets it installs): it gets a small part of
+	 * Yew's environment, not all of it, and is installed before it starts.
 	 */
 	ownEnv?: boolean;
-	/** One of the presets Jig installs (`"preset": "<id>"` in mcp.json). */
+	/** One of the presets Yew installs (`"preset": "<id>"` in mcp.json). */
 	preset?: string;
 	/** Signing in to an HTTP server in the browser: a client the person made, scopes to ask for. */
 	oauth?: OAuthSettings;
@@ -104,7 +104,7 @@ export function outward(tool: string): boolean {
  * What is special about a call to an MCP tool (security reviews, 2026-11-16 and 2026-11-18).
  *
  * - Computer control acts on the whole screen: it can type into a terminal or click in the person's
- *   own browser, past every rule Jig has. Each action is asked about, cannot be remembered, and an
+ *   own browser, past every rule Yew has. Each action is asked about, cannot be remembered, and an
  *   earlier "always allow" does not cover it. Looking (a screenshot, the pointer's place) can be.
  * - The browser acts only in its own window, so its actions can be remembered, with the scope said.
  * - Any other server's tool that sends, publishes or deletes something in its service (spec 21.2) is
@@ -133,7 +133,7 @@ export interface McpToolInfo {
 	destructive?: boolean;
 }
 
-/** One server as `jig mcp list` and the settings show it. */
+/** One server as `yew mcp list` and the settings show it. */
 export interface McpStatus {
 	name: string;
 	kind: "stdio" | "http";
@@ -141,9 +141,9 @@ export interface McpStatus {
 	state: "connecting" | "ready" | "error" | "disabled" | "sign-in";
 	error: string | null;
 	tools: string[];
-	/** Jig holds a sign-in for it. */
+	/** Yew holds a sign-in for it. */
 	signedIn: boolean;
-	/** The site the browser goes to to sign in, once Jig has found it. */
+	/** The site the browser goes to to sign in, once Yew has found it. */
 	signInAt?: string;
 }
 
@@ -159,7 +159,7 @@ const expand = (value: string, env: NodeJS.ProcessEnv) =>
 	value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, name: string) => env[name] ?? "");
 
 /**
- * The servers to run: the ones Jig sets up by itself (`builtin`), then mcp.json. An entry in the
+ * The servers to run: the ones Yew sets up by itself (`builtin`), then mcp.json. An entry in the
  * file replaces a built-in one of the same name; one that only says `"disabled": true` turns the
  * built-in one off.
  */
@@ -382,7 +382,7 @@ class HttpTransport implements Transport {
 				...(token ? { Authorization: `Bearer ${token}` } : {}),
 				"Content-Type": "application/json",
 				Accept: "application/json, text/event-stream",
-				"User-Agent": `jig/${this.#version}`,
+				"User-Agent": `yew/${this.#version}`,
 				"MCP-Protocol-Version": PROTOCOL,
 				...(this.#session ? { "Mcp-Session-Id": this.#session } : {}),
 			},
@@ -477,7 +477,7 @@ class Server {
 				{
 					protocolVersion: PROTOCOL,
 					capabilities: {},
-					clientInfo: { name: "jig", version },
+					clientInfo: { name: "yew", version },
 				},
 				limit,
 			);
@@ -545,10 +545,10 @@ export interface McpHubOptions {
 	env?: NodeJS.ProcessEnv;
 	fetch?: typeof fetch;
 	log?: (line: string) => void;
-	/** Servers Jig sets up by itself, run unless mcp.json replaces or disables them. */
+	/** Servers Yew sets up by itself, run unless mcp.json replaces or disables them. */
 	builtin?: Record<string, McpServerConfig>;
 	/**
-	 * Installs a server Jig runs from its data folder (its own, or a preset) if it is not yet; awaited
+	 * Installs a server Yew runs from its data folder (its own, or a preset) if it is not yet; awaited
 	 * before the server is started.
 	 */
 	prepare?: (config: McpServerConfig) => Promise<void>;
@@ -569,7 +569,7 @@ export class McpHub {
 		this.#options = options;
 	}
 
-	/** The servers Jig sets up by itself. */
+	/** The servers Yew sets up by itself. */
 	get builtin(): Record<string, McpServerConfig> {
 		return this.#options.builtin ?? {};
 	}

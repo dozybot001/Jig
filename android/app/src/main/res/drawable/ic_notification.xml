@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Jig's mark for the status bar, where Android tints it. -->
+<!-- Yew's mark for the status bar, where Android tints it: the berry and the leaf in one colour, as in the themed launcher icon. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp" android:viewportWidth="64" android:viewportHeight="64">
-        <path android:pathData="M54,8V34A22,22 0,0 1,10 34" android:strokeColor="#FFFFFF" android:strokeWidth="5" android:strokeLineCap="round" />
-        <path android:pathData="M45,8V34A13,13 0,0 1,19 34" android:strokeColor="#FFFFFF" android:strokeWidth="5" android:strokeLineCap="round" />
-        <path android:pathData="M36,8V34A4,4 0,0 1,28 34" android:strokeColor="#FFFFFF" android:strokeWidth="5" android:strokeLineCap="round" />
+    <path android:pathData="M35.4,50.2C36.6,37.6 42.6,22.6 60,12.6C58.6,24.4 55.2,32.4 49.4,38.6C45,43.3 39.4,46.4 35.4,50.2Z" android:fillColor="#FFFFFF" />
+    <path android:pathData="M3.9,35.4A15.9,15.4 0,1 0,35.7 35.4A15.9,15.4 0,1 0,3.9 35.4Z" android:fillColor="#FFFFFF" />
 </vector>

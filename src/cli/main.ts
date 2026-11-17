@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { moveJigHome } from "../server/paths.ts";
 import { appCommand } from "./app.ts";
 import { exportCommand } from "./export.ts";
 import { keyCommand } from "./key.ts";
@@ -26,7 +27,7 @@ const commands = [
 		const { SEARCH_SERVICES } = await import("../server/tools/web-search.ts");
 		return {
 			keys: runtime.keys,
-			// Search services keep their keys the same way: jig key set search-bocha.
+			// Search services keep their keys the same way: yew key set search-bocha.
 			providers: [
 				...runtime.gateway.providers(),
 				...SEARCH_SERVICES.map((service) => ({
@@ -42,6 +43,22 @@ const commands = [
 		};
 	}),
 ];
+
+// Jig is now Yew: its data folder moves the first time Yew runs (blueprint, section 12).
+try {
+	const move = moveJigHome(process.env);
+	if (move && "moved" in move) {
+		process.stderr.write(
+			`yew: Jig is now Yew. Moved its data folder ${move.moved} to ${move.to} and left a link in its place.\n`,
+		);
+	} else if (move && "busy" in move) {
+		process.stderr.write(
+			`yew: Jig is still running from ${move.folder} (process ${move.busy}). Stop it, then start Yew again to move its data; until then Yew uses ${move.folder}.\n`,
+		);
+	}
+} catch (error) {
+	process.stderr.write(`yew: could not move Jig's data folder: ${(error as Error).message}\n`);
+}
 
 process.exitCode = await run(
 	process.argv.slice(2),

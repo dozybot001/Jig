@@ -9,7 +9,7 @@ import { tempDir } from "./helpers/store.ts";
 /** A stand-in for the Mac: records the commands; sips and iconutil "succeed" by writing files. */
 function fakeHost(options: { platform?: NodeJS.Platform; icon?: boolean; fail?: boolean } = {}) {
 	const calls: string[] = [];
-	const homeDir = tempDir("jig-user-");
+	const homeDir = tempDir("yew-user-");
 	const host: AppHost = {
 		platform: options.platform ?? "darwin",
 		homeDir,
@@ -23,7 +23,7 @@ function fakeHost(options: { platform?: NodeJS.Platform; icon?: boolean; fail?: 
 			return 0;
 		},
 	};
-	return { host, calls, app: join(homeDir, "Applications", "Jig.app") };
+	return { host, calls, app: join(homeDir, "Applications", "Yew.app") };
 }
 
 const run = (host: AppHost, args: string[], env: Record<string, string> = {}) => {
@@ -33,10 +33,10 @@ const run = (host: AppHost, args: string[], env: Record<string, string> = {}) =>
 		.then((code) => ({ code, out: stdout.text(), err: stderr.text() }));
 };
 
-describe("jig app", () => {
-	test("install makes an app that opens Jig, starting it first when it is not running", async () => {
+describe("yew app", () => {
+	test("install makes an app that opens Yew, starting it first when it is not running", async () => {
 		const { host, calls, app } = fakeHost();
-		const home = tempDir("jig-home-");
+		const home = tempDir("yew-home-");
 		assert.deepEqual(JSON.parse((await run(host, ["status", "--json"])).out), {
 			installed: false,
 			app,
@@ -49,17 +49,17 @@ describe("jig app", () => {
 		assert.match(result.out, /Applications folder/);
 
 		const plist = readFileSync(join(app, "Contents", "Info.plist"), "utf8");
-		assert.match(plist, /<key>CFBundleExecutable<\/key>\s*<string>jig-launcher<\/string>/);
+		assert.match(plist, /<key>CFBundleExecutable<\/key>\s*<string>yew-launcher<\/string>/);
 		assert.match(plist, /<key>CFBundleIconFile<\/key>\s*<string>AppIcon<\/string>/);
-		const launcher = join(app, "Contents", "MacOS", "jig-launcher");
+		const launcher = join(app, "Contents", "MacOS", "yew-launcher");
 		assert.equal(statSync(launcher).mode & 0o111, 0o111);
 		const script = readFileSync(launcher, "utf8");
 		// Paths with spaces and quotes are quoted for the shell.
-		const jig = `'/opt/node 24/bin/node' '/Users/me/it'\\''s here/dist/cli/main.js'`;
-		assert.ok(script.includes(`if ${jig} open >/dev/null 2>&1; then exit 0; fi`));
-		assert.ok(script.includes(`nohup ${jig} serve >> '${join(home, "logs", "serve.log")}' 2>&1 &`));
+		const yew = `'/opt/node 24/bin/node' '/Users/me/it'\\''s here/dist/cli/main.js'`;
+		assert.ok(script.includes(`if ${yew} open >/dev/null 2>&1; then exit 0; fi`));
+		assert.ok(script.includes(`nohup ${yew} serve >> '${join(home, "logs", "serve.log")}' 2>&1 &`));
 		assert.ok(script.includes("export PATH='/opt/homebrew/bin:/usr/bin'"));
-		assert.ok(script.includes(`export JIG_HOME='${home}'`));
+		assert.ok(script.includes(`export YEW_HOME='${home}'`));
 
 		// Ten icon sizes from the one picture, then the .icns.
 		assert.equal(calls.filter((call) => call.startsWith("sips -z ")).length, 10);
@@ -76,7 +76,7 @@ describe("jig app", () => {
 	test("without an icon the app is still made; a failed icon is reported", async () => {
 		const plain = fakeHost({ icon: false });
 		assert.equal((await run(plain.host, ["install"])).code, 0);
-		assert.ok(existsSync(join(plain.app, "Contents", "MacOS", "jig-launcher")));
+		assert.ok(existsSync(join(plain.app, "Contents", "MacOS", "yew-launcher")));
 		assert.equal(
 			plain.calls.some((call) => call.startsWith("sips")),
 			false,
@@ -86,12 +86,12 @@ describe("jig app", () => {
 		const result = await run(failing.host, ["install"]);
 		assert.equal(result.code, 1);
 		assert.match(result.err, /icon could not be made/);
-		assert.ok(existsSync(join(failing.app, "Contents", "MacOS", "jig-launcher")));
+		assert.ok(existsSync(join(failing.app, "Contents", "MacOS", "yew-launcher")));
 	});
 
 	test("other systems and bad arguments are refused", async () => {
 		await assert.rejects(run(fakeHost({ platform: "linux" }).host, ["install"]), /works on macOS/);
 		await assert.rejects(run(fakeHost().host, ["open"]), /install, uninstall or status/);
-		assert.match((await run(fakeHost().host, ["--help"])).out, /Usage: jig app/);
+		assert.match((await run(fakeHost().host, ["--help"])).out, /Usage: yew app/);
 	});
 });

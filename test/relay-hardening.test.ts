@@ -51,7 +51,7 @@ function clientFrame(opcode: number, payload: Buffer): Buffer {
 const closed = (socket: WebSocket) =>
 	new Promise<number>((resolve) => socket.once("close", (code) => resolve(code)));
 
-/** A Mac that proves who it is to the relay, without Jig behind it. */
+/** A Mac that proves who it is to the relay, without Yew behind it. */
 async function fakeDesktop(url: string) {
 	const identity = await loadIdentity(new MemoryKeyStore());
 	const socket = new WebSocket(`${url}/desktop`);

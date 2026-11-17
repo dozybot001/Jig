@@ -30,7 +30,7 @@ const server = fileURLToPath(new URL("./helpers/mcp-server.mjs", import.meta.url
 const ctx = { signal: new AbortController().signal, acceptsImages: false } as ToolContext;
 
 function home(servers: unknown) {
-	const jigHome = tempDir("jig-home-");
+	const jigHome = tempDir("yew-home-");
 	writeFileSync(join(jigHome, "mcp.json"), JSON.stringify({ mcpServers: servers }));
 	return jigHome;
 }
@@ -54,13 +54,13 @@ describe("MCP configuration", () => {
 			files: { command: "node", args: ["server.js", "/data"], env: { TOKEN: "t0" } },
 			search: { url: "https://mcp.example.com/mcp", headers: { Authorization: "Bearer t0" } },
 		});
-		assert.deepEqual(readMcpConfig(tempDir("jig-home-")), {});
+		assert.deepEqual(readMcpConfig(tempDir("yew-home-")), {});
 	});
 });
 
 describe("common official servers", () => {
 	test("each becomes the entry a person would write, and the settings accept it", () => {
-		const jigHome = tempDir("jig-home-");
+		const jigHome = tempDir("yew-home-");
 		for (const preset of MCP_PRESETS) {
 			const entry = presetEntry(preset, preset.token?.optional ? "" : "  tok-123  ");
 			const shown = addMcpEntry(jigHome, entry);
@@ -69,7 +69,7 @@ describe("common official servers", () => {
 				assert.equal(shown.url, preset.connect.url);
 				assert.match(shown.url ?? "", /^https:\/\//);
 			} else {
-				// Installed by Jig at one exact version.
+				// Installed by Yew at one exact version.
 				assert.equal(shown.package, preset.connect.package);
 				assert.match(preset.connect.package, /.@\d+\.\d+\.\d+$/);
 			}
@@ -77,7 +77,7 @@ describe("common official servers", () => {
 		const config = readMcpConfig(jigHome, {});
 		assert.deepEqual(config.github?.headers, { Authorization: "Bearer tok-123" });
 		assert.deepEqual(config.gitee?.env, { GITEE_ACCESS_TOKEN: "tok-123" });
-		// Run with node from the data folder, with little of Jig's environment.
+		// Run with node from the data folder, with little of Yew's environment.
 		assert.equal(config.notion?.command, process.execPath);
 		assert.deepEqual(config.notion?.args, [
 			join(
@@ -97,7 +97,7 @@ describe("common official servers", () => {
 		assert.equal(new Set(MCP_PRESETS.map((preset) => preset.id)).size, MCP_PRESETS.length);
 	});
 
-	test("the ones that run on this computer are pinned by lock files that ship with Jig", () => {
+	test("the ones that run on this computer are pinned by lock files that ship with Yew", () => {
 		const root = fileURLToPath(new URL("../mcp-builtin/presets/", import.meta.url));
 		const local = MCP_PRESETS.filter((preset) => "package" in preset.connect);
 		assert.deepEqual(local.map((preset) => preset.id).sort(), [...INSTALLED_PRESETS].sort());
@@ -119,9 +119,9 @@ describe("common official servers", () => {
 		}
 	});
 
-	test("a preset is installed into its own folder the first time it starts; Jig's own servers apart", async () => {
-		const jigHome = tempDir("jig-home-");
-		const source = tempDir("jig-source-");
+	test("a preset is installed into its own folder the first time it starts; Yew's own servers apart", async () => {
+		const jigHome = tempDir("yew-home-");
+		const source = tempDir("yew-source-");
 		for (const folder of [source, join(source, "presets", "notion")]) {
 			mkdirSync(folder, { recursive: true });
 			writeFileSync(join(folder, "package.json"), "{}");
@@ -141,8 +141,8 @@ describe("common official servers", () => {
 		assert.deepEqual(runs, [join(jigHome, "mcp-presets", "notion"), join(jigHome, "mcp-builtin")]);
 	});
 
-	test("a preset Jig does not know, or one with a command or URL, is refused", () => {
-		const jigHome = tempDir("jig-home-");
+	test("a preset Yew does not know, or one with a command or URL, is refused", () => {
+		const jigHome = tempDir("yew-home-");
 		assert.throws(() => addMcpEntry(jigHome, { name: "x", preset: "nothing" }), /no preset named/);
 		assert.throws(
 			() => addMcpEntry(jigHome, { name: "x", preset: "notion", command: "npx" }),
@@ -156,7 +156,7 @@ describe("common official servers", () => {
 	});
 
 	test("a server one signs in to with a client of one's own keeps the client and scopes in its entry", () => {
-		const jigHome = tempDir("jig-home-");
+		const jigHome = tempDir("yew-home-");
 		const gmail = MCP_PRESETS.find((preset) => preset.id === "gmail");
 		assert.ok(gmail?.signIn?.ownClient);
 		const shown = addMcpEntry(jigHome, presetEntry(gmail, "", { id: " cid ", secret: " shh " }));
@@ -176,14 +176,14 @@ describe("common official servers", () => {
 	});
 });
 
-describe("servers Jig sets up by itself", () => {
+describe("servers Yew sets up by itself", () => {
 	const builtin = {
 		browser: { command: "npx", args: ["-y", "a-browser@1.0.0"] },
 		computer: { command: "npx", args: ["-y", "a-computer@1.0.0"] },
 	};
 
 	test("run without anything in mcp.json, beside the person's own", () => {
-		assert.deepEqual(readMcpConfig(tempDir("jig-home-"), {}, builtin), builtin);
+		assert.deepEqual(readMcpConfig(tempDir("yew-home-"), {}, builtin), builtin);
 		const jigHome = home({ files: { command: "node", args: ["server.js"] } });
 		assert.deepEqual(Object.keys(readMcpConfig(jigHome, {}, builtin)), [
 			"browser",
@@ -201,7 +201,7 @@ describe("servers Jig sets up by itself", () => {
 	});
 
 	test("are turned off and on from the settings; the file only records that one is off", () => {
-		const jigHome = tempDir("jig-home-");
+		const jigHome = tempDir("yew-home-");
 		assert.equal(patchMcpEntry(jigHome, "computer", { disabled: true }, builtin).disabled, true);
 		assert.deepEqual(readMcpConfig(jigHome, {}, builtin).computer, {
 			...builtin.computer,
@@ -215,7 +215,7 @@ describe("servers Jig sets up by itself", () => {
 
 	test("cannot be removed, and an entry of the same name in mcp.json replaces one", () => {
 		assert.throws(
-			() => removeMcpEntry(tempDir("jig-home-"), "browser", builtin),
+			() => removeMcpEntry(tempDir("yew-home-"), "browser", builtin),
 			(e) => e instanceof JigError && e.code === "mcp-builtin",
 		);
 		const jigHome = home({ browser: { command: "node", args: ["my-browser.js"] } });
@@ -225,12 +225,12 @@ describe("servers Jig sets up by itself", () => {
 		});
 		const shown = listMcpEntries(jigHome, builtin).find((entry) => entry.name === "browser");
 		assert.deepEqual([shown?.builtin, shown?.command], [false, "node"]);
-		// The person's own entry is theirs to remove; Jig's own then comes back.
+		// The person's own entry is theirs to remove; Yew's own then comes back.
 		removeMcpEntry(jigHome, "browser", builtin);
 		assert.deepEqual(readMcpConfig(jigHome, {}, builtin).browser, builtin.browser);
 	});
 
-	test("are pinned by a lock file that ships with Jig: every package has its hash", () => {
+	test("are pinned by a lock file that ships with Yew: every package has its hash", () => {
 		const root = fileURLToPath(new URL("../mcp-builtin/", import.meta.url));
 		const wanted = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
 			dependencies: Record<string, string>;
@@ -252,25 +252,25 @@ describe("servers Jig sets up by itself", () => {
 		assert.ok(pkg.files.includes("mcp-builtin"), "the lock file goes out with the package");
 	});
 
-	test("are started with node from Jig's data folder, with their files kept there", () => {
-		const servers = builtinMcp("/data/jig", {});
+	test("are started with node from Yew's data folder, with their files kept there", () => {
+		const servers = builtinMcp("/data/yew", {});
 		assert.equal(servers.browser?.command, process.execPath);
 		assert.deepEqual(servers.browser?.args, [
-			"/data/jig/mcp-builtin/node_modules/@playwright/mcp/cli.js",
+			"/data/yew/mcp-builtin/node_modules/@playwright/mcp/cli.js",
 			"--user-data-dir",
-			"/data/jig/browser",
+			"/data/yew/browser",
 			"--output-dir",
-			"/data/jig/tmp/browser",
+			"/data/yew/tmp/browser",
 		]);
 		assert.deepEqual(servers.computer?.args, [
-			"/data/jig/mcp-builtin/node_modules/computer-use-mcp/dist/main.js",
+			"/data/yew/mcp-builtin/node_modules/computer-use-mcp/dist/main.js",
 		]);
-		assert.deepEqual(builtinMcp("/data/jig", { JIG_MCP_BUILTIN: "off" }), {});
+		assert.deepEqual(builtinMcp("/data/yew", { JIG_MCP_BUILTIN: "off" }), {});
 	});
 
 	test("are installed once per lock file, and again after a failure or a new lock", async () => {
-		const jigHome = tempDir("jig-home-");
-		const source = tempDir("jig-source-");
+		const jigHome = tempDir("yew-home-");
+		const source = tempDir("yew-source-");
 		writeFileSync(join(source, "package.json"), "{}");
 		writeFileSync(join(source, "package-lock.json"), '{"v":1}');
 		const runs: string[] = [];
@@ -295,7 +295,7 @@ describe("servers Jig sets up by itself", () => {
 		assert.deepEqual(runs.at(-1), '{"v":2}');
 	});
 
-	test("get little of Jig's environment", () => {
+	test("get little of Yew's environment", () => {
 		assert.deepEqual(
 			serverEnv({
 				PATH: "/bin",
@@ -331,7 +331,7 @@ describe("servers Jig sets up by itself", () => {
 });
 
 describe("the browser and computer control", () => {
-	const engine = new PermissionEngine(tempDir("jig-home-"));
+	const engine = new PermissionEngine(tempDir("yew-home-"));
 	const session = (rules: Session["rules"], mode: "skip" | "auto" = "skip") =>
 		({ id: "s1", cwd: null, rules, options: { permissionMode: mode } }) as unknown as Session;
 	async function tools(name: string) {
@@ -580,7 +580,7 @@ describe("MCP servers", () => {
 			const call = requests.find((request) => request.body.method === "tools/call");
 			assert.equal(call?.headers.Authorization, "Bearer k");
 			assert.equal(call?.headers["Mcp-Session-Id"], "s-1");
-			assert.equal(call?.headers["User-Agent"], "jig/1.2.3");
+			assert.equal(call?.headers["User-Agent"], "yew/1.2.3");
 			assert.deepEqual(call?.body.params, { name: "lookup", arguments: { q: "x" } });
 			// The configuration is read again only when the file changed.
 			const before = requests.length;
@@ -593,5 +593,5 @@ describe("MCP servers", () => {
 });
 
 function jigHome_missing(): string {
-	return tempDir("jig-none-");
+	return tempDir("yew-none-");
 }

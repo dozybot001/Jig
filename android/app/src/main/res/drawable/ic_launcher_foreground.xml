@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Jig's mark: three parallel lines that form a J (web/public/icons/jig-mark.svg), inside the adaptive icon's safe zone. -->
+<!-- Yew's mark: a yew berry with its seed and one leaf (web/public/icons/yew-mark.svg, viewBox 64), centred in the adaptive icon's safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <group android:translateX="26" android:translateY="24" android:scaleX="0.875" android:scaleY="0.875">
-        <path android:pathData="M54,8V34A22,22 0,0 1,10 34" android:strokeColor="#0D0D0D" android:strokeWidth="5" android:strokeLineCap="round" />
-        <path android:pathData="M45,8V34A13,13 0,0 1,19 34" android:strokeColor="#0D0D0D" android:strokeWidth="5" android:strokeLineCap="round" />
-        <path android:pathData="M36,8V34A4,4 0,0 1,28 34" android:strokeColor="#0D0D0D" android:strokeWidth="5" android:strokeLineCap="round" />
+    <group android:translateX="23.65" android:translateY="23.9" android:scaleX="0.95" android:scaleY="0.95">
+        <path android:pathData="M35.4,50.2C36.6,37.6 42.6,22.6 60,12.6C58.6,24.4 55.2,32.4 49.4,38.6C45,43.3 39.4,46.4 35.4,50.2Z" android:fillColor="#1F3A2E" />
+        <path android:pathData="M3.9,35.4A15.9,15.4 0,1 0,35.7 35.4A15.9,15.4 0,1 0,3.9 35.4Z" android:fillColor="#C8323F" />
+        <group android:rotation="12" android:pivotX="25.8" android:pivotY="22.6">
+            <path android:pathData="M21.2,22.6A4.6,3.1 0,1 0,30.4 22.6A4.6,3.1 0,1 0,21.2 22.6Z" android:fillColor="#1F3A2E" />
+        </group>
     </group>
 </vector>

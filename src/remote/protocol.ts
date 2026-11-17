@@ -20,7 +20,7 @@ export function desktopIdOf(publicKey: Buffer): string {
 export const prologueFor = (desktopId: string) => Buffer.from(PROLOGUE_PREFIX + desktopId);
 
 /**
- * A relay address Jig accepts: wss:// anywhere, ws:// only inside this network (this Mac, `.local`
+ * A relay address Yew accepts: wss:// anywhere, ws:// only inside this network (this Mac, `.local`
  * names, private addresses), for a test relay. The channel is end-to-end encrypted either way.
  */
 export const RELAY_URL =
@@ -45,12 +45,16 @@ export function pairingLink(link: PairingLink): string {
 		s: link.secret,
 		n: link.name,
 	});
-	return `jig://pair?${query.toString()}`;
+	return `yew://pair?${query.toString()}`;
 }
 
+/** Links start with `yew://pair?`; `jig://pair?` is from before Jig was renamed Yew. */
+const PAIRING_PREFIXES = ["yew://pair?", "jig://pair?"];
+
 export function parsePairingLink(text: string): PairingLink | null {
-	if (!text.startsWith("jig://pair?")) return null;
-	const query = new URLSearchParams(text.slice("jig://pair?".length));
+	const prefix = PAIRING_PREFIXES.find((start) => text.startsWith(start));
+	if (!prefix) return null;
+	const query = new URLSearchParams(text.slice(prefix.length));
 	const [relay, desktop, key, secret, name] = ["r", "d", "k", "s", "n"].map((k) => query.get(k));
 	if (!relay || !desktop || !key || !secret) return null;
 	return { relay, desktop, key, secret, name: name ?? "" };

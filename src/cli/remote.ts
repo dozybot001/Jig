@@ -4,9 +4,9 @@ import { type CliIo, EXIT_ERROR, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
 import { serviceRunning } from "./serve.ts";
 
-const HELP = `Usage: jig remote <on|off|status|pair> [options]
+const HELP = `Usage: yew remote <on|off|status|pair> [options]
 
-Let your phone reach Jig on this Mac through Jig's relay. Both sides connect
+Let your phone reach Yew on this Mac through Yew's relay. Both sides connect
 out to the relay, so this Mac opens no port; everything between them is
 end-to-end encrypted, and the relay sees only ciphertext.
 
@@ -43,7 +43,7 @@ export function remoteCommand(): Command {
 			}
 			const action = positionals[0];
 			if (positionals.length !== 1 || !["on", "off", "status", "pair"].includes(action ?? "")) {
-				throw new UsageError("jig remote needs one of on, off, status or pair");
+				throw new UsageError("yew remote needs one of on, off, status or pair");
 			}
 			const relay = values.relay;
 			if (relay !== undefined && !RELAY_URL.test(relay)) {
@@ -72,7 +72,7 @@ export function remoteCommand(): Command {
 					else
 						io.stdout.write(`Phone access is ${next.enabled ? "on" : "off"} (${next.relayUrl}).\n`);
 					// The running service picks the setting up within a few seconds.
-					if (!running) io.stderr.write("jig: Jig is not running; start it with 'jig serve'.\n");
+					if (!running) io.stderr.write("yew: Yew is not running; start it with 'yew serve'.\n");
 					return EXIT_OK;
 				}
 				if (action === "status") {
@@ -82,7 +82,7 @@ export function remoteCommand(): Command {
 						return EXIT_OK;
 					}
 					io.stdout.write(
-						`Phone access: ${settings.enabled ? "on" : "off"}\nRelay: ${settings.relayUrl}\nJig service: ${running ? "running" : "not running"}\nPaired phones: ${devices.length}\n`,
+						`Phone access: ${settings.enabled ? "on" : "off"}\nRelay: ${settings.relayUrl}\nYew service: ${running ? "running" : "not running"}\nPaired phones: ${devices.length}\n`,
 					);
 					for (const device of devices) {
 						const seen = device.lastSeenAt ? new Date(device.lastSeenAt).toISOString() : "never";
@@ -91,7 +91,7 @@ export function remoteCommand(): Command {
 					return EXIT_OK;
 				}
 				if (!settings.enabled) {
-					io.stderr.write("jig: turn on phone access first: jig remote on\n");
+					io.stderr.write("yew: turn on phone access first: yew remote on\n");
 					return EXIT_ERROR;
 				}
 				const { systemKeys } = await import("../server/keys.ts");
@@ -108,9 +108,9 @@ export function remoteCommand(): Command {
 				}
 				const { renderUnicodeCompact } = await import("uqr");
 				io.stdout.write(
-					`${renderUnicodeCompact(link)}\nScan this with Jig on your phone within 5 minutes.\n`,
+					`${renderUnicodeCompact(link)}\nScan this with Yew on your phone within 5 minutes.\n`,
 				);
-				if (!running) io.stderr.write("jig: Jig is not running; start it with 'jig serve'.\n");
+				if (!running) io.stderr.write("yew: Yew is not running; start it with 'yew serve'.\n");
 				return EXIT_OK;
 			} finally {
 				db.close();

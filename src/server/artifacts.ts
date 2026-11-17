@@ -11,7 +11,7 @@ import { errorResult, str, type ToolDefinition, type ToolResult, text } from "./
 /**
  * Artifacts (blueprint 6.6; M4 plan, section 6): what a session makes for the person to keep and
  * look at: a Markdown document, an HTML page, JSON data or a chart. Each belongs to the session
- * that made it and has versions; saving under the same name again adds one. The files are in Jig's
+ * that made it and has versions; saving under the same name again adds one. The files are in Yew's
  * data folder, the list in the database.
  */
 
@@ -46,7 +46,7 @@ const toArtifact = (row: ArtifactRow): Artifact => ({
 	updatedAt: row.updated_at,
 });
 
-/** A chart is data Jig draws itself: bars or lines over labels, a few series. */
+/** A chart is data Yew draws itself: bars or lines over labels, a few series. */
 export function checkChart(content: string): void {
 	let chart: {
 		type?: unknown;
@@ -230,7 +230,7 @@ export function saveArtifactTool(artifacts: ArtifactStore): ToolDefinition {
 	return {
 		name: "save_artifact",
 		description:
-			'Save something you made for the person to keep and look at in Jig: a document (markdown), a page (html, self-contained: inline styles and scripts, no network access), data (json) or a chart. A chart is JSON: {"type":"bar"|"line","title":"…","labels":[…],"series":[{"name":"…","values":[…]}]}. Saving under a name this session already used adds a new version. Use it for results worth keeping, not for every reply.',
+			'Save something you made for the person to keep and look at in Yew: a document (markdown), a page (html, self-contained: inline styles and scripts, no network access), data (json) or a chart. A chart is JSON: {"type":"bar"|"line","title":"…","labels":[…],"series":[{"name":"…","values":[…]}]}. Saving under a name this session already used adds a new version. Use it for results worth keeping, not for every reply.',
 		parameters: {
 			type: "object",
 			properties: {

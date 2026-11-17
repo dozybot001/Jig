@@ -16,7 +16,7 @@ struct Pairing: Codable, Sendable {
 /// The app and its notification extension share them through one keychain access group, so the
 /// extension can decrypt a notification while the app is not running.
 enum Vault {
-	private static let service = "cn.tenonai.apps.jig.remote"
+	private static let service = "cn.tenonai.apps.yew.remote"
 
 	static func phoneKey() -> Curve25519.KeyAgreement.PrivateKey {
 		if let key = existingPhoneKey() { return key }

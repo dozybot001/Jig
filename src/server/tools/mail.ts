@@ -18,7 +18,7 @@ import {
 	type WaitResult,
 } from "./types.ts";
 
-/** Jig's domain errors become messages the model can act on. */
+/** Yew's domain errors become messages the model can act on. */
 function attempt<T>(fn: () => T): T {
 	try {
 		return fn();
@@ -45,7 +45,7 @@ function nameOf(mail: MailContext, id: string): string {
 	return mail.post.sessionName(id) ?? id;
 }
 
-/** What a waiting call returns. The other session's words cannot pass for Jig's own tags. */
+/** What a waiting call returns. The other session's words cannot pass for Yew's own tags. */
 function waitText(name: string, result: WaitResult): ToolResult {
 	switch (result.kind) {
 		case "letter": {
@@ -136,7 +136,7 @@ function letterDetail(mail: MailContext, letter: Letter) {
 export const listSessionsTool: ToolDefinition = {
 	name: "list_sessions",
 	description:
-		"List the sessions (id, name, kind, status, team, model, permission mode and the first line of each role), the teams and Jig's settings.",
+		"List the sessions (id, name, kind, status, team, model, permission mode and the first line of each role), the teams and Yew's settings.",
 	parameters: { type: "object", properties: {}, additionalProperties: false },
 	readOnly: true,
 	needsFolder: false,
@@ -158,7 +158,7 @@ export const listSessionsTool: ToolDefinition = {
 		const teams = [...groups].map(([id, name]) => `- ${id} · ${name}`);
 		const settings = post.settings();
 		const workspaces = settings.workspaces.map((workspace) => workspace.path).join(", ");
-		const jig = [
+		const yew = [
 			`- default model: ${settings.defaultModel.provider}/${settings.defaultModel.model} (${settings.defaultModel.thinking})`,
 			`- decision log: ${settings.decisionLog ?? "none"}`,
 			`- daily budget for all sessions: ${settings.dailyBudget ? `$${settings.dailyBudget}` : "none"}`,
@@ -168,7 +168,7 @@ export const listSessionsTool: ToolDefinition = {
 		return {
 			content: [
 				text(
-					`Sessions (id · name · kind · status · …):\n${lines.join("\n")}\n\nTeams (id · name):\n${teams.length > 0 ? teams.join("\n") : "(none)"}\n\nSettings:\n${jig.join("\n")}`,
+					`Sessions (id · name · kind · status · …):\n${lines.join("\n")}\n\nTeams (id · name):\n${teams.length > 0 ? teams.join("\n") : "(none)"}\n\nSettings:\n${yew.join("\n")}`,
 				),
 			],
 		};
@@ -346,13 +346,13 @@ export const openSessionTool: ToolDefinition = {
 const TEXT = { type: "string" } as const;
 
 /**
- * manage_jig: the model changes Jig itself (blueprint 6.2, item 10). One call, all changes; Jig plans it
+ * manage_jig: the model changes Yew itself (blueprint 6.2, item 10). One call, all changes; Yew plans it
  * to rank how far it reaches and to show the person every change, then applies all or none.
  */
 export const manageJigTool: ToolDefinition = {
 	name: "manage_jig",
 	description:
-		"Change Jig itself when the person asks or the work needs it: sessions (create a standing one, or change its name, team, role, model, working folder, permission mode, how it receives letters, letter quota, rights, pinned, archived), teams, scheduled tasks, and settings. Put every change in one call; Jig checks them, asks the person when a change needs it, and applies all or none. Sessions, teams and tasks are named by name or id. API keys, pairing and deleting data are the person's.",
+		"Change Yew itself when the person asks or the work needs it: sessions (create a standing one, or change its name, team, role, model, working folder, permission mode, how it receives letters, letter quota, rights, pinned, archived), teams, scheduled tasks, and settings. Put every change in one call; Yew checks them, asks the person when a change needs it, and applies all or none. Sessions, teams and tasks are named by name or id. API keys, pairing and deleting data are the person's.",
 	parameters: {
 		type: "object",
 		properties: {
@@ -408,7 +408,7 @@ export const manageJigTool: ToolDefinition = {
 			schedules: {
 				type: "array",
 				description:
-					"Scheduled tasks: at the times of a cron expression, Jig sends a standing session a letter, and its last reply comes back to the main conversation as the report. Leave out schedule to create one; set enabled to false to turn one off.",
+					"Scheduled tasks: at the times of a cron expression, Yew sends a standing session a letter, and its last reply comes back to the main conversation as the report. Leave out schedule to create one; set enabled to false to turn one off.",
 				items: {
 					type: "object",
 					properties: {
@@ -429,7 +429,7 @@ export const manageJigTool: ToolDefinition = {
 						},
 						catch_up: {
 							type: "boolean",
-							description: "Run once after a time missed while Jig was not running (default true).",
+							description: "Run once after a time missed while Yew was not running (default true).",
 						},
 						enabled: { type: "boolean" },
 					},
@@ -634,7 +634,7 @@ export const postCardTool: ToolDefinition = {
 			requested_by: {
 				type: "string",
 				description:
-					"The session whose request this is; the decision goes back to it. Without it, Jig uses the one session whose request is open with you, if there is one.",
+					"The session whose request this is; the decision goes back to it. Without it, Yew uses the one session whose request is open with you, if there is one.",
 			},
 			replaces: {
 				type: "array",

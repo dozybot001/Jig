@@ -39,7 +39,7 @@ function setup(
 		retry: options.retry ?? { maxRetries: 3, baseDelayMs: 1 },
 		...(options.idleMs ? { idleMs: options.idleMs } : {}),
 	});
-	const home = realpathSync(tempDir("jig-home-"));
+	const home = realpathSync(tempDir("yew-home-"));
 	const agents = new Agents({
 		store,
 		gateway,
@@ -174,7 +174,7 @@ describe("model requests that fail", () => {
 		assert.deepEqual(replies(entriesOf(store, session.id)), ["第二次答上了。"]);
 	});
 
-	test("stopping while Jig waits to try again stops the turn", async () => {
+	test("stopping while Yew waits to try again stops the turn", async () => {
 		const { faux, store, agents, session } = setup({
 			retry: { maxRetries: 5, baseDelayMs: 60_000 },
 		});
@@ -407,7 +407,7 @@ describe("a reply cut off at the output limit", () => {
 
 describe("after a restart", () => {
 	test("a session the person stopped is still not started by a letter", async () => {
-		const dbPath = `${realpathSync(tempDir("jig-db-"))}/jig.db`;
+		const dbPath = `${realpathSync(tempDir("yew-db-"))}/jig.db`;
 		const first = setup({ dbPath });
 		const sender = first.make("来信方");
 		let release: () => void = () => {};

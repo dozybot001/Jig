@@ -71,7 +71,7 @@ describe("the relay's APNs client", () => {
 				key: privateKey.export({ format: "pem", type: "pkcs8" }) as string,
 				keyId: "KEY1234567",
 				teamId: "TEAM123456",
-				topic: "cn.tenonai.apps.jig",
+				topic: "cn.tenonai.apps.yew",
 			},
 			{
 				request: async (host, headers, body) => {
@@ -103,7 +103,7 @@ describe("the relay's APNs client", () => {
 		const [call] = calls;
 		assert.equal(call?.host, "https://api.sandbox.push.apple.com");
 		assert.equal(call?.headers[":path"], `/3/device/${"ab".repeat(32)}`);
-		assert.equal(call?.headers["apns-topic"], "cn.tenonai.apps.jig");
+		assert.equal(call?.headers["apns-topic"], "cn.tenonai.apps.yew");
 		assert.equal(call?.headers["apns-push-type"], "alert");
 		assert.equal(call?.headers["apns-collapse-id"], "n1");
 		assert.deepEqual(JSON.parse(call?.body ?? ""), {

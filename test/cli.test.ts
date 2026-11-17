@@ -9,11 +9,11 @@ import { fakeIo } from "./helpers/io.ts";
 
 const main = fileURLToPath(new URL("../src/cli/main.ts", import.meta.url));
 
-describe("jig cli", () => {
+describe("yew cli", () => {
 	test("--version prints version, publisher and website to stdout", async () => {
 		const { io, stdout, stderr } = fakeIo();
 		assert.equal(await run(["--version"], io), 0);
-		assert.equal(stdout.text(), `jig ${VERSION}\nTenon AI · https://tenonai.cn/\n`);
+		assert.equal(stdout.text(), `yew ${VERSION}\nTenon AI · https://tenonai.cn/\n`);
 		assert.equal(stderr.text(), "");
 	});
 
@@ -21,7 +21,7 @@ describe("jig cli", () => {
 		const { io, stdout } = fakeIo();
 		assert.equal(await run(["-v", "--json"], io), 0);
 		assert.deepEqual(JSON.parse(stdout.text()), {
-			name: "jig",
+			name: "yew",
 			version: VERSION,
 			publisher: "Tenon AI",
 			website: "https://tenonai.cn/",
@@ -33,8 +33,8 @@ describe("jig cli", () => {
 			const { io, stdout } = fakeIo();
 			assert.equal(await run(argv, io), 0);
 			// The one-line definition, as everywhere else (spec 1.8).
-			assert.match(stdout.text(), /^jig \S+\nAn AI-native multi-agent workbench\.\n/);
-			assert.match(stdout.text(), /Usage: jig <command>/);
+			assert.match(stdout.text(), /^yew \S+\nAn AI-native multi-agent workbench\.\n/);
+			assert.match(stdout.text(), /Usage: yew <command>/);
 		}
 	});
 
@@ -43,7 +43,7 @@ describe("jig cli", () => {
 			const { io, stdout, stderr } = fakeIo();
 			assert.equal(await run(argv, io), 2);
 			assert.equal(stdout.text(), "");
-			assert.match(stderr.text(), /^jig: .+\nRun 'jig --help' for usage\.\n$/);
+			assert.match(stderr.text(), /^yew: .+\nRun 'yew --help' for usage\.\n$/);
 		}
 	});
 
@@ -61,6 +61,6 @@ describe("jig cli", () => {
 
 	test("the entry point runs under plain node", async () => {
 		const { stdout } = await promisify(execFile)(process.execPath, [main, "--version"]);
-		assert.match(stdout, /^jig \d+\.\d+\.\d+/);
+		assert.match(stdout, /^yew \d+\.\d+\.\d+/);
 	});
 });

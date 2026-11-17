@@ -2,7 +2,7 @@ import type { Store } from "../store.ts";
 
 /**
  * Sessions that are held back: ones the person stopped, and ones that stopped at a daily spending
- * limit. Kept in the database, so Jig behaves the same after a restart: a session the person stopped
+ * limit. Kept in the database, so Yew behaves the same after a restart: a session the person stopped
  * is not started by a letter, and one at a limit goes on when the limit is raised that day.
  */
 export class Held {

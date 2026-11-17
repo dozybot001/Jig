@@ -1,8 +1,11 @@
-# Jig iPhone 应用上架
+# Yew iPhone 应用上架
 
-版本 0.6（2026-11-18）。创始人 2026-11-15 定「Jig iPhone 应用推进上架」（产品组转达）。本文记上架要填的内容和进度；文案以[对外介绍](introduction.md)为准，规范见第 17 节。提交审核和首次上线前请创始人确认一次。
+版本 0.7（2026-11-18）。创始人 2026-11-15 定「Jig iPhone 应用推进上架」（产品组转达）。本文记上架要填的内容和进度；文案以[对外介绍](introduction.md)为准，规范见第 17 节。提交审核和首次上线前请创始人确认一次。
 
 ## 一、进度
+
+2026-11-18 产品改名 Yew（蓝图 1.15、1.16），iPhone 应用的 Bundle ID 改成 `cn.tenonai.apps.yew`（通知扩展 `.push`）。App Store Connect 的记录跟 Bundle ID 绑定，换不了，所以 Yew 另建一条记录（创始人 11-18：「现在建，先不提交」），第二节的内容照着重填、截图重拍，11-16 被拒时要求补的审核录像也要在新记录里交。下表是 Jig 那条旧记录的进度，它停在被拒，不再提交，记录留着不删。Yew 的新记录建好后在这里另起一张表。
+
 
 | 步骤 | 状态 |
 | --- | --- |
@@ -27,7 +30,7 @@
 
 | 项 | 中文 | English |
 | --- | --- | --- |
-| 名称 | Jig — 多 Agent 工作台（「Jig」已被占用） | Jig — Multi-Agent Workbench |
+| 名称 | Yew — 多 Agent 工作台（「Yew」单独一个词能不能用，建记录时看） | Yew — Multi-Agent Workbench |
 | 副标题（限 30 个字符） | AI 原生的多 Agent 工作台 | Approve your agents' requests |
 | 类别 | 开发者工具 | Developer Tools |
 | 年龄分级 | 4+（照问卷如实答的结果） | 4+ |
@@ -40,13 +43,13 @@
 >
 > 按 Session Engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。
 >
-> Jig 运行在你自己的电脑上。这个应用是它的手机端：离开电脑时，在手机上允许或拒绝操作、回答会话的提问、做决定、放行或拒收暂存的信；也能看会话记录、信件和产物，给会话发消息，让干活的会话停下。有事要你处理、会话出错、任务做完时会通知你。
+> Yew 运行在你自己的电脑上。这个应用是它的手机端：离开电脑时，在手机上允许或拒绝操作、回答会话的提问、做决定、放行或拒收暂存的信；也能看会话记录、信件和产物，给会话发消息，让干活的会话停下。有事要你处理、会话出错、任务做完时会通知你。
 >
-> 使用前要在电脑上安装 Jig（npm install -g @tenonai/jig），打开「手机访问」，用手机扫码配对。手机经中继连到你的电脑，两端之间端到端加密，中继只转发密文。电脑上要开着 Jig。
+> 使用前要在电脑上安装 Yew（npm install -g @tenonai/yew），打开「手机访问」，用手机扫码配对。手机经中继连到你的电脑，两端之间端到端加密，中继只转发密文。电脑上要开着 Yew。
 >
 > 没有电脑也可以点「看演示」，用内置的演示数据看一遍。
 >
-> Jig 以 MIT 许可证开源。
+> Yew 以 MIT 许可证开源。
 
 Description (English):
 
@@ -54,13 +57,13 @@ Description (English):
 >
 > Agent sessions organized the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center.
 >
-> Jig runs on your own computer. This app is its phone side: away from the computer, allow or decline an operation, answer a session's question, make a decision, release or refuse a held letter; read sessions, letters and artifacts, send a session a message, or stop one that is working. You are notified when something needs you, a session fails, or a task is done.
+> Yew runs on your own computer. This app is its phone side: away from the computer, allow or decline an operation, answer a session's question, make a decision, release or refuse a held letter; read sessions, letters and artifacts, send a session a message, or stop one that is working. You are notified when something needs you, a session fails, or a task is done.
 >
-> First install Jig on your computer (npm install -g @tenonai/jig), turn on phone access, and scan the pairing code with your phone. The phone reaches your computer through a relay; the two ends are encrypted end to end and the relay only passes ciphertext along. Jig has to be running on the computer.
+> First install Yew on your computer (npm install -g @tenonai/yew), turn on phone access, and scan the pairing code with your phone. The phone reaches your computer through a relay; the two ends are encrypted end to end and the relay only passes ciphertext along. Yew has to be running on the computer.
 >
 > Without a computer, tap "Try the demo" to look around with built-in demo data.
 >
-> Jig is open source under the MIT License.
+> Yew is open source under the MIT License.
 
 关键词：`Agent,AI,多Agent,审批,会话,开发者,Session Engineering` / `agent,AI,multi-agent,approval,sessions,developer,session engineering`
 
@@ -76,11 +79,11 @@ Description (English):
 
 ### 4.1 11-18 改写的审核备注（英文，填在「App 审核信息 → 备注」）
 
-按苹果 11-16 的要求分六段：录像说明、用途和用户、怎样审核（不用 Mac 时点「Try the demo」；用 Mac 时装 Jig 并扫码配对）、外部服务（中继、Apple 推送、模型服务商由用户在电脑上自选、相机只扫码）、地区（各地一样，暂不在中国大陆提供）、监管（不适用）。全文以 App Store Connect 里保存的为准。
+按苹果 11-16 的要求分六段：录像说明、用途和用户、怎样审核（不用 Mac 时点「Try the demo」；用 Mac 时装 Yew 并扫码配对）、外部服务（中继、Apple 推送、模型服务商由用户在电脑上自选、相机只扫码）、地区（各地一样，暂不在中国大陆提供）、监管（不适用）。全文以 App Store Connect 里保存的为准。
 
 ### 4.2 审核录像怎样录
 
-苹果要求在真机、最新系统上录，从启动应用开始。电脑端用 `node scripts/review-demo.ts <新文件夹>`：一个临时的 Jig，不碰 `~/.jig` 和钥匙串，用 `scripts/demo-model.ts` 这个按脚本应答的本地模型代替真实模型，起来后 Website 会话在等删除草稿页的审批，Docs 会话在问发布说明写哪个版本。手机在 TestFlight 装审核的构建，录的顺序：启动 → 「Try the demo」看一遍 → 退出演示 → 扫 Mac 上的配对二维码 → 批准删除、回答问题 → 在 Website 会话里发「Run the tests」→ 看产物和信件 → 设置里的隐私政策 → 断开配对。
+苹果要求在真机、最新系统上录，从启动应用开始。电脑端用 `node scripts/review-demo.ts <新文件夹>`：一个临时的 Yew，不碰 `~/.jig` 和钥匙串，用 `scripts/demo-model.ts` 这个按脚本应答的本地模型代替真实模型，起来后 Website 会话在等删除草稿页的审批，Docs 会话在问发布说明写哪个版本。手机在 TestFlight 装审核的构建，录的顺序：启动 → 「Try the demo」看一遍 → 退出演示 → 扫 Mac 上的配对二维码 → 批准删除、回答问题 → 在 Website 会话里发「Run the tests」→ 看产物和信件 → 设置里的隐私政策 → 断开配对。
 
 ### 4.3 原来的说明（11-15）
 
@@ -88,6 +91,7 @@ Description (English):
 
 ## 修改记录
 
+- **0.7（2026-11-18）** 改名 Yew：Bundle ID 改成 `cn.tenonai.apps.yew`，要另建 App Store Connect 记录；第二节和审核备注改成 Yew 的名字和安装命令，旧记录的进度留作记录。
 - **0.6（2026-11-18）** 11-16 被拒（2.1 需要更多信息）。改用 1.2.0 的构建，商店版本号改成 1.2.0；审核备注按苹果要的五项改写；记下录像的录法和演示电脑端的脚本；建了 TestFlight 内部测试组。
 - **0.5（2026-11-15）** 创始人：「定自动发布即可」。发布方式改成自动发布，1.0.3 已提交审核。
 - **0.4（2026-11-15）** 创始人：「加个免费，销售范围不包含中国大陆」「其他的你应填尽填」。价格、销售范围、年龄分级、内容版权、App 隐私、简体中文的本地化、构建和审核联系人都已填，只剩提交审核。

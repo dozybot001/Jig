@@ -1,8 +1,8 @@
 import { api } from "./api.ts";
 
 /**
- * Tells Jig that you are at the Mac: its page is in front and was used in the last two minutes. While
- * that holds, Jig does not notify your phone about things you can see here (M3 plan, section 8).
+ * Tells Yew that you are at the Mac: its page is in front and was used in the last two minutes. While
+ * that holds, Yew does not notify your phone about things you can see here (M3 plan, section 8).
  */
 const ACTIVE_MS = 2 * 60 * 1000;
 const EVERY_MS = 30_000;

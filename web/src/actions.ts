@@ -145,7 +145,7 @@ export async function boot(): Promise<void> {
 			hasArchived: archived.items.length > 0,
 		});
 		await loadCenter();
-		// A reload stays where the tab was. Otherwise Jig opens on the main conversation; without one,
+		// A reload stays where the tab was. Otherwise Yew opens on the main conversation; without one,
 		// where you left off (blueprint section 5).
 		const view = recallView();
 		const tab = view?.startsWith("center:") ? view.slice("center:".length) : null;
@@ -501,7 +501,7 @@ export interface NewSessionInput {
 	provider: string;
 	model: string;
 	thinking: ThinkingLevel;
-	/** Named after the first message; Jig gives it a short name after its first turn. */
+	/** Named after the first message; Yew gives it a short name after its first turn. */
 	autoName?: boolean;
 }
 
@@ -966,7 +966,7 @@ export const loadMcpServers = () => all<McpServerView>("/api/mcp");
 
 export interface NewMcpServer {
 	name: string;
-	/** One of the presets Jig installs and runs, by its id. */
+	/** One of the presets Yew installs and runs, by its id. */
 	preset?: string;
 	command?: string;
 	args?: string[];
@@ -1007,12 +1007,12 @@ export async function revealSkill(id: string): Promise<void> {
 
 export const loadData = () => api<DataOverview>("GET", "/api/data");
 
-/** The system folder picker on the computer that runs Jig; null when the person cancels. */
+/** The system folder picker on the computer that runs Yew; null when the person cancels. */
 export async function pickFolder(): Promise<string | null> {
 	return (await api<{ path: string | null }>("POST", "/api/folders/pick")).path;
 }
 
-/** Writes everything Jig keeps into a new or empty folder, as `jig export` does. */
+/** Writes everything Yew keeps into a new or empty folder, as `yew export` does. */
 export const exportData = (folder: string) =>
 	api<DataExport>("POST", "/api/data/export", { folder }, { idempotent: true });
 
@@ -1046,7 +1046,7 @@ export async function createPairing(): Promise<{ link: string; svg: string; expi
 	return api("POST", "/api/devices/pairing");
 }
 
-/** Whether Jig sends this phone notifications. */
+/** Whether Yew sends this phone notifications. */
 export async function setDevicePush(id: string, push: boolean): Promise<void> {
 	await api("PATCH", `/api/devices/${id}`, { push });
 	await loadPhones();

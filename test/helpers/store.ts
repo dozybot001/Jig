@@ -14,11 +14,11 @@ export function newStore(path = ":memory:") {
 }
 
 /** A throwaway directory, never the real ~/.jig. */
-export function tempDir(prefix = "jig-test-"): string {
+export function tempDir(prefix = "yew-test-"): string {
 	return mkdtempSync(join(tmpdir(), prefix));
 }
 
-export const sessionInput = (name = "Jig · 开发") => ({
+export const sessionInput = (name = "Yew · 开发") => ({
 	name,
 	kind: "standing" as const,
 	provider: "deepseek",

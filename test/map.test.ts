@@ -113,7 +113,7 @@ describe("sessions map: letters", () => {
 		assert.deepEqual(((await asPhone.json()) as typeof body).letters, second.letters);
 	});
 
-	test("an empty Jig has an empty map", async () => {
+	test("an empty Yew has an empty map", async () => {
 		const { app } = setup();
 		const body = (await (await app.request("/api/map")).json()) as { letters: unknown[] };
 		assert.deepEqual(body.letters, []);
@@ -318,8 +318,8 @@ describe("session progress", () => {
 			said("second", 200),
 			did(210, "read", "edit"),
 			entry({ role: "toolResult", message: {} }, 215),
-			// Jig's own notes to the model do not start a turn.
-			said("[From Jig, not from the person] a job ended", 220),
+			// Yew's own notes to the model do not start a turn.
+			said("[From Yew, not from the person] a job ended", 220),
 			did(230, "grep", "shell", "todo_write"),
 		];
 		const turn = turnProgress(entries, assistant("shell"));
@@ -336,7 +336,7 @@ describe("session progress", () => {
 		const letter = entry(
 			{
 				role: "user",
-				message: { role: "user", content: "[From Jig, not from the person] letter", timestamp: 1 },
+				message: { role: "user", content: "[From Yew, not from the person] letter", timestamp: 1 },
 				letter: { id: "l", kind: "request", summary: "", body: "" },
 			},
 			300,

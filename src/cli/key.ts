@@ -18,7 +18,7 @@ export interface KeyDeps {
 	close?(): void;
 }
 
-const HELP = `Usage: jig key <command> [options]
+const HELP = `Usage: yew key <command> [options]
 
 Manage API keys for model providers. Keys are kept in the system keychain only.
 
@@ -34,16 +34,16 @@ Options:
   -h, --help   Show this help
 
 Examples:
-  jig key set deepseek
-  pbpaste | jig key set deepseek
+  yew key set deepseek
+  pbpaste | yew key set deepseek
 `;
 
 const REGION_ORDER = { cn: 0, custom: 1, global: 2 } as const;
 
 function findProvider(deps: KeyDeps, id: string | undefined): ProviderInfo {
-	if (!id) throw new UsageError("missing provider. Run 'jig key list' to see them.");
+	if (!id) throw new UsageError("missing provider. Run 'yew key list' to see them.");
 	const provider = deps.providers.find((p) => p.id === id);
-	if (!provider) throw new UsageError(`unknown provider '${id}'. Run 'jig key list' to see them.`);
+	if (!provider) throw new UsageError(`unknown provider '${id}'. Run 'yew key list' to see them.`);
 	return provider;
 }
 
@@ -106,7 +106,7 @@ export function keyCommand(load: () => KeyDeps | Promise<KeyDeps>): Command {
 					const provider = findProvider(deps, id);
 					const key = await readSecret(io, `API key for ${provider.name} (input hidden): `);
 					if (!key) {
-						io.stderr.write("jig: no key was entered; nothing saved.\n");
+						io.stderr.write("yew: no key was entered; nothing saved.\n");
 						return EXIT_ERROR;
 					}
 					await deps.keys.set(provider.id, key);

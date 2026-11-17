@@ -14,9 +14,9 @@ const runOsascript: RunScript = (args) =>
 	});
 
 /**
- * Opens the system folder picker on the computer that runs Jig and returns the chosen folder, or null
+ * Opens the system folder picker on the computer that runs Yew and returns the chosen folder, or null
  * when the person cancels. The script is fixed text with nothing from the request in it. Only macOS has
- * a picker Jig can open this way; elsewhere the interface asks for a typed path.
+ * a picker Yew can open this way; elsewhere the interface asks for a typed path.
  */
 export async function pickFolder(
 	platform: string = process.platform,
@@ -26,7 +26,7 @@ export async function pickFolder(
 		throw new JigError(
 			"not-supported",
 			501,
-			"Jig cannot open a folder picker on this computer. Type the folder's path instead.",
+			"Yew cannot open a folder picker on this computer. Type the folder's path instead.",
 		);
 	}
 	try {

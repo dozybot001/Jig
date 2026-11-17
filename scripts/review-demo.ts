@@ -1,11 +1,11 @@
 /**
- * A computer to record the phone apps against, for App Review and demos: a throwaway Jig with two
+ * A computer to record the phone apps against, for App Review and demos: a throwaway Yew with two
  * sessions, a small website project, and the scripted stand-in model (scripts/demo-model.ts) in
  * place of a real one. When it is up, the Website session waits for approval to delete a draft
  * page and the Docs session waits for an answer, so the phone has something to act on at once.
  *
- * Nothing touches ~/.jig, the system keychain or a real model: the data folder is <folder>/home,
- * keys are kept in memory, Jig's own browser and computer control are left out. Phone access goes
+ * Nothing touches ~/.yew, the system keychain or a real model: the data folder is <folder>/home,
+ * keys are kept in memory, Yew's own browser and computer control are left out. Phone access goes
  * through the default relay, as it does for a person, so a real phone can pair with it.
  *
  *   node scripts/review-demo.ts <folder> [port]
@@ -64,8 +64,8 @@ git("-c", "user.name=Demo", "-c", "user.email=demo@example.com", "commit", "-q",
 
 await startDemoModel(MODEL_PORT);
 
-// Seed the data folder before Jig opens it.
-const db = openDatabase(join(home, "jig.db"));
+// Seed the data folder before Yew opens it.
+const db = openDatabase(join(home, "yew.db"));
 const store = new Store(db, new EventBus());
 store.saveCustomProvider({
 	id: "demo",
@@ -95,14 +95,14 @@ db.close();
 
 const env = {
 	...process.env,
-	JIG_HOME: home,
-	JIG_KEYCHAIN: "off",
-	JIG_MCP_BUILTIN: "off",
+	YEW_HOME: home,
+	YEW_KEYCHAIN: "off",
+	YEW_MCP_BUILTIN: "off",
 	NO_COLOR: "1",
 };
-const jig = (...args: string[]) =>
-	execFileSync(process.execPath, [join(root, "bin/jig.js"), ...args], { env, stdio: "ignore" });
-const serve = spawn(process.execPath, [join(root, "bin/jig.js"), "serve", "--port", String(port)], {
+const yew = (...args: string[]) =>
+	execFileSync(process.execPath, [join(root, "bin/yew.js"), ...args], { env, stdio: "ignore" });
+const serve = spawn(process.execPath, [join(root, "bin/yew.js"), "serve", "--port", String(port)], {
 	env,
 	stdio: ["ignore", "pipe", "inherit"],
 });
@@ -113,15 +113,15 @@ serve.stdout.on("data", (text: string) => {
 	if (!link || started) return;
 	started = true;
 	// Work for the phone to act on: an approval and a question.
-	jig(
+	yew(
 		"send",
 		"--kind",
 		"request",
 		"Website",
 		"Please clean up the drafts folder before the release.",
 	);
-	jig("send", "--kind", "request", "Docs", "Please write the release notes for the next version.");
-	log(`Jig is up. Sign in here, then open Settings → Add phone to pair:\n${link}`);
+	yew("send", "--kind", "request", "Docs", "Please write the release notes for the next version.");
+	log(`Yew is up. Sign in here, then open Settings → Add phone to pair:\n${link}`);
 });
 const stop = () => {
 	serve.kill("SIGTERM");
@@ -130,6 +130,6 @@ const stop = () => {
 process.on("SIGINT", stop);
 process.on("SIGTERM", stop);
 serve.on("exit", (code) => {
-	log(`jig serve ended (${code})`);
+	log(`yew serve ended (${code})`);
 	process.exit(code ?? 0);
 });

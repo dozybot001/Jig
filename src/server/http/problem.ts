@@ -83,7 +83,7 @@ export function errorHandler(log: (line: string) => void) {
 			500,
 			"internal-error",
 			titleFor(500),
-			"Something went wrong inside Jig. The request ID is in the log.",
+			"Something went wrong inside Yew. The request ID is in the log.",
 		);
 	};
 }

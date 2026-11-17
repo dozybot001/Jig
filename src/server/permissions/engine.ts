@@ -49,7 +49,7 @@ const SAFE_REDIRECT_TARGETS = new Set(["/dev/null", "/dev/stdout", "/dev/stderr"
 
 /**
  * The rules a new session takes over from the one it was opened by or copied from. "Always allow"
- * for the tools of Jig's own browser and computer control was given for one session, with its scope
+ * for the tools of Yew's own browser and computer control was given for one session, with its scope
  * said at the time (spec 21.2): it does not travel.
  */
 export function inheritableRules(rules: PermissionRule[]): PermissionRule[] {
@@ -69,7 +69,7 @@ function strongest(effects: RuleEffect[]): RuleEffect | null {
  * Decides whether a tool call may run, must be asked about, or is refused (M1 plan, section 8).
  * Order: credential locations are refused; must-confirm operations always ask and cannot be remembered
  * (spec 21.2); then the session's rules, where deny beats ask beats allow; then the built-in defaults.
- * Text in the transcript never counts as approval: only the person's answer in Jig does.
+ * Text in the transcript never counts as approval: only the person's answer in Yew does.
  */
 export class PermissionEngine {
 	readonly #secrets: string[];
@@ -83,7 +83,7 @@ export class PermissionEngine {
 	/**
 	 * `flagged` is the model's own judgment, through the `confirm` argument: in the automatic mode a
 	 * flagged call is asked about, others run. Must-confirm operations, explicit "ask" rules and commands
-	 * Jig cannot read are asked about in every mode.
+	 * Yew cannot read are asked about in every mode.
 	 */
 	decide(subject: Subject, session: Session, flagged = false): Decision {
 		switch (subject.kind) {
@@ -101,7 +101,7 @@ export class PermissionEngine {
 		}
 	}
 
-	/** An approval Jig asks for only by default; the session's mode settles it. */
+	/** An approval Yew asks for only by default; the session's mode settles it. */
 	#byDefault(
 		session: Session,
 		flagged: boolean,
@@ -138,7 +138,7 @@ export class PermissionEngine {
 				const verb = subject.kind === "read" ? "read" : "change";
 				return {
 					effect: "deny",
-					reason: `${path} holds credentials or Jig's own data; sessions cannot ${verb} it.`,
+					reason: `${path} holds credentials or Yew's own data; sessions cannot ${verb} it.`,
 				};
 			}
 		}

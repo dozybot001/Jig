@@ -26,14 +26,14 @@ export interface ToolContext {
 	signal: AbortSignal;
 	readState: ReadState;
 	jobs: Jobs;
-	/** Where long outputs are written; inside Jig's data directory. */
+	/** Where long outputs are written; inside Yew's data directory. */
 	tmpDir: string;
 	acceptsImages: boolean;
 	version: string;
 	/** Live output for the interface while the tool runs. */
 	output(text: string): void;
 	setTodos(todos: Todo[]): void;
-	/** Asks the person a question in Jig and waits for the answer. */
+	/** Asks the person a question in Yew and waits for the answer. */
 	/** Puts questions to the person and waits; resolves with the answer as the session reads it. */
 	ask(request: QuestionRequest): Promise<string>;
 	mail: MailContext;
@@ -91,7 +91,7 @@ export const CONFIRM_ARGUMENT = {
 
 export interface ToolDefinition {
 	name: string;
-	/** Jig's own wording (AGENTS.md: no text copied from other products). */
+	/** Yew's own wording (AGENTS.md: no text copied from other products). */
 	description: string;
 	/** JSON Schema of the arguments. */
 	parameters: JsonObject;
@@ -104,7 +104,7 @@ export interface ToolDefinition {
 	/** What the call touches, for the permission check. Throws ToolInputError on bad arguments. */
 	subject(args: JsonObject, session: Session, lookup?: Lookup): Subject;
 	/**
-	 * What the person sees besides the call itself when Jig asks for permission: its purpose, the change
+	 * What the person sees besides the call itself when Yew asks for permission: its purpose, the change
 	 * it would make. Never throws; a call without a preview is asked about as it is.
 	 */
 	preview?(args: JsonObject, session: Session, lookup: Lookup): PermissionPreview;
@@ -116,7 +116,7 @@ export type PermissionPreview = Partial<
 	Pick<PermissionRequest, "description" | "diff" | "changes">
 >;
 
-/** What a tool may look up while Jig checks a call, before the call runs. */
+/** What a tool may look up while Yew checks a call, before the call runs. */
 export interface Lookup {
 	/** A session's or team's name by id, so what the person reads names the sessions. */
 	name(id: string): string | null;
@@ -127,7 +127,7 @@ export interface Lookup {
 /** What a session may do beyond its tools' own checks. */
 export interface Roles {
 	canPostCards: boolean;
-	/** May change Jig with manage_jig: sessions, teams and settings. */
+	/** May change Yew with manage_jig: sessions, teams and settings. */
 	canOrganize: boolean;
 }
 

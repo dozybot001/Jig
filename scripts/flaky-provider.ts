@@ -1,7 +1,7 @@
 /**
- * A stand-in model endpoint for looking at how Jig shows failed requests, without a real provider:
+ * A stand-in model endpoint for looking at how Yew shows failed requests, without a real provider:
  * it speaks the OpenAI chat API, refuses the first requests of every answer with "503 overloaded"
- * and then answers. Add it in a throwaway Jig (new JIG_HOME, JIG_KEYCHAIN=off) as a custom provider
+ * and then answers. Add it in a throwaway Yew (new YEW_HOME, YEW_KEYCHAIN=off) as a custom provider
  * with the base URL http://127.0.0.1:<port>/v1 and no key.
  *
  *   node scripts/flaky-provider.ts [port] [failures before each answer]

@@ -265,7 +265,7 @@ export class MailStore {
 	 * Requests from other sessions that a session has read and not answered yet. A request stays open
 	 * until the session answers it or finishes a turn normally, so a turn that ended with an error, was
 	 * stopped, or is waiting for answers of its own still owes the requester a reply. Kept in the
-	 * database, so what was owed when Jig stopped is still owed after it starts again.
+	 * database, so what was owed when Yew stopped is still owed after it starts again.
 	 */
 	openRequests(sessionId: string): Letter[] {
 		const rows = this.#q(

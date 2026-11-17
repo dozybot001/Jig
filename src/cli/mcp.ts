@@ -3,16 +3,16 @@ import { VERSION } from "../shared/version.ts";
 import { type CliIo, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
 
-const HELP = `Usage: jig mcp list [options]
+const HELP = `Usage: yew mcp list [options]
 
-Show the MCP servers set up in mcp.json in Jig's data folder: whether each one
+Show the MCP servers set up in mcp.json in Yew's data folder: whether each one
 connects, and the tools it offers. The file uses the usual shape:
 
   { "mcpServers": {
       "files":  { "command": "npx", "args": ["some-mcp-server"], "env": { "KEY": "\${KEY}" } },
       "search": { "url": "https://example.com/mcp", "headers": { "Authorization": "Bearer \${TOKEN}" } } } }
 
-\${NAME} is taken from the environment Jig runs in. Sessions ask you before
+\${NAME} is taken from the environment Yew runs in. Sessions ask you before
 they use a tool of a server for the first time. A server with "disabled": true
 stays in the file and is not started. A project's own .mcp.json is not read.
 Servers can also be added, disabled and removed in the settings of the web
@@ -39,7 +39,7 @@ export function mcpCommand(): Command {
 				return EXIT_OK;
 			}
 			if (positionals.length !== 1 || positionals[0] !== "list") {
-				throw new UsageError("jig mcp needs list");
+				throw new UsageError("yew mcp needs list");
 			}
 			const { jigHome } = await import("../server/paths.ts");
 			const { McpHub } = await import("../server/mcp.ts");
@@ -61,7 +61,7 @@ export function mcpCommand(): Command {
 					return EXIT_OK;
 				}
 				if (servers.length === 0) {
-					io.stdout.write("No MCP servers are set up. See 'jig mcp --help'.\n");
+					io.stdout.write("No MCP servers are set up. See 'yew mcp --help'.\n");
 					return EXIT_OK;
 				}
 				for (const server of servers) {

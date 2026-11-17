@@ -29,7 +29,7 @@ function makeContext(
 		signal: new AbortController().signal,
 		readState: new ReadState(),
 		jobs: new Jobs(() => {}),
-		tmpDir: tempDir("jig-tmp-"),
+		tmpDir: tempDir("yew-tmp-"),
 		acceptsImages: false,
 		version: "0.0.0",
 		output: () => {},
@@ -174,7 +174,7 @@ describe("shell tool", () => {
 		try {
 			const ctx = makeContext(realpathSync(tempDir()));
 			const text = out(
-				await run(shellTool, { command: 'echo "[$DEEPSEEK_API_KEY] [$JIG_SESSION]"' }, ctx),
+				await run(shellTool, { command: 'echo "[$DEEPSEEK_API_KEY] [$YEW_SESSION]"' }, ctx),
 			);
 			assert.match(text, /\[\] \[s1\]/);
 		} finally {

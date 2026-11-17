@@ -73,7 +73,7 @@ describe("model gateway", () => {
 		);
 	});
 
-	test("an OpenAI-compatible endpoint gets jig's User-Agent, the stored key and no attribution", async () => {
+	test("an OpenAI-compatible endpoint gets yew's User-Agent, the stored key and no attribution", async () => {
 		const seen: IncomingHttpHeaders[] = [];
 		const server = createServer((req, res) => {
 			seen.push(req.headers);
@@ -124,7 +124,7 @@ describe("model gateway", () => {
 			assert.equal(final.usage.input, 7);
 			const headers = seen[0];
 			assert.ok(headers);
-			assert.equal(headers["user-agent"], "jig/9.9.9");
+			assert.equal(headers["user-agent"], "yew/9.9.9");
 			assert.equal(headers.authorization, "Bearer sk-local-test");
 			for (const name of ["http-referer", "x-title", "x-openrouter-categories"]) {
 				assert.equal(headers[name], undefined, name);

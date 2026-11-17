@@ -12,7 +12,7 @@ import { sessionInput, tempDir } from "./helpers/store.ts";
 
 /** A data directory of its own, never the real ~/.jig. */
 function home(sessions: Parameters<Store["createSession"]>[0][]) {
-	const dir = tempDir("jig-send-");
+	const dir = tempDir("yew-send-");
 	const db = openDatabase(dbPath(dir));
 	const store = new Store(db, new EventBus());
 	const created = sessions.map((input) => store.createSession(input));
@@ -36,11 +36,11 @@ const send = (argv: string[], env: Record<string, string>, stdin?: string[]) => 
 	}));
 };
 
-describe("jig send", () => {
+describe("yew send", () => {
 	test("inside a session's shell the letter comes from that session, with its limits", async () => {
 		const { dir, created, letters } = home([sessionInput("平台组"), sessionInput("产品会话")]);
 		const from = created[1] as { id: string };
-		const env = { JIG_HOME: dir, JIG_SESSION: from.id };
+		const env = { YEW_HOME: dir, YEW_SESSION: from.id };
 		const result = await send(["平台组", "构建好了"], env);
 		assert.equal(result.code, 0);
 		const [letter] = letters();
@@ -49,9 +49,9 @@ describe("jig send", () => {
 		const again = await send(["平台组", "构建好了"], env);
 		assert.equal(again.code, 1);
 		assert.match(again.stderr.text(), /already sent/);
-		const unknown = await send(["平台组", "构建好了"], { JIG_HOME: dir, JIG_SESSION: "nope" });
+		const unknown = await send(["平台组", "构建好了"], { YEW_HOME: dir, YEW_SESSION: "nope" });
 		assert.equal(unknown.code, 1);
-		assert.match(unknown.stderr.text(), /JIG_SESSION names no session/);
+		assert.match(unknown.stderr.text(), /YEW_SESSION names no session/);
 	});
 
 	test("sends a letter by name; the first line is the summary; it is marked as from the command line", async () => {
@@ -63,7 +63,7 @@ describe("jig send", () => {
 		assert.match(result.stdout.text(), /^Sent letter [\w-]+ to 平台组\.\n$/);
 		assert.match(
 			result.stderr.text(),
-			/Jig is not running; the letter is delivered when it starts/,
+			/Yew is not running; the letter is delivered when it starts/,
 		);
 		const [letter] = letters();
 		assert.equal(letter?.fromKind, "cli");

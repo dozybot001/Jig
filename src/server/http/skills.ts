@@ -8,9 +8,9 @@ import { optBoolean, readJson, reqString } from "./input.ts";
 import type { AppEnv } from "./problem.ts";
 
 export interface SkillRoutesOptions {
-	/** Jig's data folder; its `skills` folder is one of the global ones. */
+	/** Yew's data folder; its `skills` folder is one of the global ones. */
 	home: string;
-	/** The person's home folder, for `~/.claude/skills`; null reads nothing outside Jig's folder. */
+	/** The person's home folder, for `~/.claude/skills`; null reads nothing outside Yew's folder. */
 	userHome: string | null;
 	/** Replace the system and the program runner; tests use them so no window opens. */
 	platform?: string;

@@ -29,8 +29,8 @@ function harness(options: { waitMs?: number; dbPath?: string } = {}) {
 	const { store } = newStore(options.dbPath);
 	const keys = new MemoryKeyStore({ [faux.provider.id]: "test-key" });
 	const gateway = new ModelGateway({ keys, version: "0.0.0", providers: [faux.provider] });
-	const home = realpathSync(tempDir("jig-home-"));
-	const folder = realpathSync(tempDir("jig-cwd-"));
+	const home = realpathSync(tempDir("yew-home-"));
+	const folder = realpathSync(tempDir("yew-cwd-"));
 	const agents = new Agents({
 		store,
 		gateway,
@@ -191,7 +191,7 @@ describe("letters between sessions", () => {
 			role: "user",
 			message: { role: "user", content: "早先的消息", timestamp: Date.now() },
 		});
-		// `jig send` runs in another process: its post office has no runner to wake anyone.
+		// `yew send` runs in another process: its post office has no runner to wake anyone.
 		const cli = new PostOffice(store);
 		cli.send({ kind: "cli" }, { to: b.id, kind: "notice", summary: "main 上的构建失败了" });
 		store.setStatus(c.id, "needs_review");
@@ -249,7 +249,7 @@ describe("letters between sessions", () => {
 });
 
 describe("letters across failures", () => {
-	test("a report owed when Jig stopped is still sent once the session finishes", async () => {
+	test("a report owed when Yew stopped is still sent once the session finishes", async () => {
 		const { store, agents, make, script, entries } = harness();
 		const a = make("产品会话");
 		const b = make("平台组");
@@ -355,7 +355,7 @@ describe("letters across failures", () => {
 describe("task sessions", () => {
 	test("open_session starts a child with the parent's permissions; with wait its reply returns", async () => {
 		const { store, agents, make, script, seen, said, folder } = harness();
-		const parent = make("Jig · 开发", {
+		const parent = make("Yew · 开发", {
 			options: { permissionMode: "skip" },
 			rules: [{ effect: "deny", tool: "web_fetch" }],
 		});
@@ -384,14 +384,14 @@ describe("task sessions", () => {
 		assert.equal(child.options.permissionMode, "skip");
 		assert.deepEqual(child.rules, [{ effect: "deny", tool: "web_fetch" }]);
 		assert.equal(child.outcome, "done");
-		assert.match(lastTool(seen.get("Jig · 开发")?.[1]), /完成：0 个 TODO/);
+		assert.match(lastTool(seen.get("Yew · 开发")?.[1]), /完成：0 个 TODO/);
 		const prompt = String(seen.get("统计 TODO")?.[0]?.messages[0]?.content ?? "");
-		assert.match(prompt, /"Jig · 开发" \(id [^)]+\) opened you for this task/);
+		assert.match(prompt, /"Yew · 开发" \(id [^)]+\) opened you for this task/);
 	});
 
 	test("a child's folder must be inside the parent's; a manual parent asks first", async () => {
 		const { store, agents, make, script, seen } = harness();
-		const outside = realpathSync(tempDir("jig-elsewhere-"));
+		const outside = realpathSync(tempDir("yew-elsewhere-"));
 		const parent = make("产品会话", { options: { permissionMode: "manual" } });
 		mkdirSync(join(parent.cwd as string, "web"));
 		script(parent, [
@@ -430,7 +430,7 @@ describe("the main conversation", () => {
 	test("only it is offered card tools; the person's decision reaches the requester and it", async () => {
 		const { store, agents, make, script, seen, entries, said } = harness();
 		const main = make("总办");
-		const product = make("Jig · 开发");
+		const product = make("Yew · 开发");
 		store.setSetting("mainSessionId", main.id);
 		script(main, [
 			toolUse(
@@ -442,7 +442,7 @@ describe("the main conversation", () => {
 						recommended: 1,
 						undoable: false,
 						reversible: "开源后不能撤回",
-						after: "Jig · 开发改 LICENSE",
+						after: "Yew · 开发改 LICENSE",
 						requested_by: product.id,
 					},
 					{ id: "m1" },
@@ -474,14 +474,14 @@ describe("the main conversation", () => {
 		assert.equal(decision.letter?.decision?.choice, "MIT");
 		assert.match(
 			textOf(decision),
-			/<decision number=\\"1\\" from=\\"the person\\" recorded-by=\\"Jig\\">/,
+			/<decision number=\\"1\\" from=\\"the person\\" recorded-by=\\"Yew\\">/,
 		);
-		const productTools = (seen.get("Jig · 开发")?.[0]?.messages[0]?.toolsAdded ?? []).map(
+		const productTools = (seen.get("Yew · 开发")?.[0]?.messages[0]?.toolsAdded ?? []).map(
 			(t) => t.name,
 		);
 		assert.ok(!productTools.includes("post_card"));
 		assert.match(
-			String(seen.get("Jig · 开发")?.[0]?.messages[0]?.content),
+			String(seen.get("Yew · 开发")?.[0]?.messages[0]?.content),
 			/The person's main conversation is "总办"/,
 		);
 	});
@@ -707,7 +707,7 @@ describe("when things go wrong", () => {
 			),
 			fauxAssistantMessage("高结束"),
 		]);
-		script(low, [fauxAssistantMessage("叫 Jig 吧")]);
+		script(low, [fauxAssistantMessage("叫 Yew 吧")]);
 		agents.send(high.id, "问问聊天会话");
 		await until(() => said(high).some((text) => text.includes("高结束")));
 		await until(() => !agents.isRunning(low.id) && !agents.isRunning(high.id));
@@ -777,7 +777,7 @@ describe("when things go wrong", () => {
 		);
 		agents.stop(b.id);
 		await agents.whenIdle(b.id);
-		agents.wakeQueued(); // what `jig serve` does every 2 seconds
+		agents.wakeQueued(); // what `yew serve` does every 2 seconds
 		assert.equal(agents.isRunning(b.id), false);
 		agents.send(b.id, "继续吧");
 		await until(() => said(b).some((text) => text.includes("看到了通知")));
@@ -785,7 +785,7 @@ describe("when things go wrong", () => {
 	});
 
 	test("an answer handed to a waiting call comes back after a restart when its result was not stored", async () => {
-		const path = join(tempDir("jig-db-"), "jig.db");
+		const path = join(tempDir("yew-db-"), "jig.db");
 		const first = harness({ waitMs: 5000, dbPath: path });
 		const a = first.make("等待方");
 		const b = first.make("回信方");
@@ -817,7 +817,7 @@ describe("when things go wrong", () => {
 			.listLetters({ limit: 10 })
 			.items.find((l) => l.fromSession === b.id && !l.auto) as Letter;
 		assert.equal(answer.status, "delivered");
-		// What `jig serve` does on Ctrl-C: stop everything, then close the database at once.
+		// What `yew serve` does on Ctrl-C: stop everything, then close the database at once.
 		first.agents.shutdown();
 		first.store.db.close();
 
@@ -840,7 +840,7 @@ describe("when things go wrong", () => {
 			role: "user",
 			message: { role: "user", content: "早先的消息", timestamp: Date.now() },
 		});
-		store.setStatus(x.id, "needs_review", "Jig restarted while this session was working.");
+		store.setStatus(x.id, "needs_review", "Yew restarted while this session was working.");
 		agents.post.send(
 			{ kind: "session", session: a },
 			{ to: x.id, kind: "notice", summary: "一封信" },
@@ -850,7 +850,7 @@ describe("when things go wrong", () => {
 		assert.equal(store.getSession(x.id).status, "needs_review");
 		assert.equal(
 			store.getSession(x.id).statusDetail,
-			"Jig restarted while this session was working.",
+			"Yew restarted while this session was working.",
 		);
 		assert.equal(said(x).length, 0);
 	});

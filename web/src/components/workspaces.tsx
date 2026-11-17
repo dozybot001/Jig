@@ -11,7 +11,7 @@ export function useWorkspaces(): Workspace[] {
 	return useAppState((state) => state.settings?.workspaces) ?? [];
 }
 
-/** A home-relative path, so it stays short: /Users/me/Jig → ~/Jig. */
+/** A home-relative path, so it stays short: /Users/me/Yew → ~/Yew. */
 export function shortPath(path: string): string {
 	return path.replace(/^\/(Users|home)\/[^/]+(?=\/|$)/, "~");
 }

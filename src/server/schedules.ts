@@ -359,9 +359,9 @@ const OPEN = new Set(["queued", "held", "delivered"]);
 
 /**
  * Runs scheduled tasks on time (blueprint 6.5): a run is a letter to the task's session in the task's
- * name, which the session reads in a turn of its own. Runs missed while Jig was not running or the
+ * name, which the session reads in a turn of its own. Runs missed while Yew was not running or the
  * computer slept run once afterwards or are skipped, as the task says; a run whose last one is not
- * finished is skipped. The service keeps time; `jig schedule run` uses the same `run`.
+ * finished is skipped. The service keeps time; `yew schedule run` uses the same `run`.
  */
 export class Scheduler {
 	readonly book: ScheduleBook;

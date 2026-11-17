@@ -18,9 +18,9 @@ function skill(folder: string, dir: string, source: string) {
 }
 
 function homes() {
-	const jigHome = real("jig-home-");
-	const userHome = real("jig-user-");
-	const cwd = real("jig-cwd-");
+	const jigHome = real("yew-home-");
+	const userHome = real("yew-user-");
+	const cwd = real("yew-cwd-");
 	return { jigHome, userHome, cwd };
 }
 
@@ -38,9 +38,9 @@ describe("skills", () => {
 		assert.deepEqual(frontMatter("No front matter"), {});
 	});
 
-	test("skills come from Jig's folder, the person's and the project's; the project's wins", () => {
+	test("skills come from Yew's folder, the person's and the project's; the project's wins", () => {
 		const { jigHome, userHome, cwd } = homes();
-		skill(join(jigHome, "skills"), "release", "---\nname: release\ndescription: Jig's own\n---\nA");
+		skill(join(jigHome, "skills"), "release", "---\nname: release\ndescription: Yew's own\n---\nA");
 		skill(
 			join(userHome, ".claude", "skills"),
 			"pdf",
@@ -62,10 +62,10 @@ describe("skills", () => {
 				["release", "The project's"],
 			],
 		);
-		// Without the person's home folder nothing outside Jig's folder and the project is read.
+		// Without the person's home folder nothing outside Yew's folder and the project is read.
 		assert.deepEqual(
 			findSkills(null, jigHome, null).map((s) => s.description),
-			["Jig's own"],
+			["Yew's own"],
 		);
 	});
 
@@ -101,7 +101,7 @@ describe("skills", () => {
 });
 
 describe("instructions, memory folders and what may be read", () => {
-	test("without a file of Jig's own, the person's global file is read; with one, only Jig's", () => {
+	test("without a file of Yew's own, the person's global file is read; with one, only Yew's", () => {
 		const { jigHome, userHome } = homes();
 		mkdirSync(join(userHome, ".claude"));
 		writeFileSync(join(userHome, ".claude", "CLAUDE.md"), "用简体中文。");
@@ -110,16 +110,16 @@ describe("instructions, memory folders and what may be read", () => {
 			["用简体中文。"],
 		);
 		assert.deepEqual(loadInstructions(null, jigHome), []);
-		writeFileSync(join(jigHome, "AGENTS.md"), "Jig 的说明。");
+		writeFileSync(join(jigHome, "AGENTS.md"), "Yew 的说明。");
 		assert.deepEqual(
 			loadInstructions(null, jigHome, { userHome }).map((f) => f.content),
-			["Jig 的说明。"],
+			["Yew 的说明。"],
 		);
 	});
 
 	test("memory folders are named with their index; skills are listed by name", () => {
 		const { jigHome, userHome, cwd } = homes();
-		const memory = real("jig-memory-");
+		const memory = real("yew-memory-");
 		writeFileSync(join(memory, "index.md"), "- 部署规范见 server-deployment.md");
 		skill(
 			join(jigHome, "skills"),
@@ -141,7 +141,7 @@ describe("instructions, memory folders and what may be read", () => {
 
 	test("a memory folder is read without asking; writing there still asks", () => {
 		const { jigHome, cwd } = homes();
-		const memory = real("jig-memory-");
+		const memory = real("yew-memory-");
 		const engine = new PermissionEngine(jigHome);
 		const { store } = newStore();
 		const session = store.createSession({
@@ -176,7 +176,7 @@ describe("instructions, memory folders and what may be read", () => {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(body),
 			});
-		const memory = real("jig-memory-");
+		const memory = real("yew-memory-");
 		const saved = (await (await patch({ memoryDirs: [memory, memory] })).json()) as {
 			memoryDirs: string[];
 		};

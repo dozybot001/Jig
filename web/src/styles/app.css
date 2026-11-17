@@ -1,7 +1,8 @@
 /*
- * Jig's design tokens: a black, white and grey interface. Jig's colour is ink:
- * the mark, primary buttons, focus rings, switches and unread counts are near-black on light themes
- * and near-white on dark ones; links are underlined. Text contrast is at least 4.5:1. Borders are
+ * Yew's design tokens: a black, white and grey interface (blueprint, section 12). Primary buttons,
+ * focus rings and unread counts are near-black on light themes and near-white on dark ones; links
+ * are underlined. Yew's forest green is the mark's leaf and wordmark and a switch that is on; the
+ * red of the berry is only in the mark. Text contrast is at least 4.5:1. Borders are
  * deliberately faint (founder's call, 2026-11-08); fields are told apart by their fill, icon and
  * placeholder, and a focused field gets a stronger border.
  * Four type sizes only: 12 (meta), 14 (body), 16 (titles), 22 (page titles and wordmark).
@@ -41,6 +42,8 @@
 	--lift: 0 2px 10px #0000000d;
 	--backdrop: #00000052;
 	--scroll-thumb: #00000030;
+	--mark-ink: #1f3a2e;
+	--switch-on: #2f7d4f;
 }
 
 :root[data-theme="dark"] {
@@ -77,6 +80,8 @@
 	--lift: 0 2px 10px #00000040;
 	--backdrop: #00000099;
 	--scroll-thumb: #ffffff2e;
+	--mark-ink: #e3e8e4;
+	--switch-on: #3f9c66;
 }
 
 :root {
@@ -210,11 +215,50 @@ a {
 	align-items: flex-start;
 	gap: 4px;
 }
+.mark-leaf {
+	fill: var(--mark-ink);
+}
 .wordmark {
-	font-size: var(--fs-xl);
-	font-weight: 700;
-	line-height: 1;
-	letter-spacing: -0.01em;
+	width: calc(22px * 2.091);
+	height: 22px;
+	fill: var(--mark-ink);
+	overflow: visible;
+}
+
+/* --- the mascot: decoration only, never in the way --- */
+
+.mascot {
+	display: block;
+	flex: none;
+	pointer-events: none;
+	user-select: none;
+	-webkit-user-drag: none;
+}
+.home-mascot,
+.page-mascot {
+	margin: 0 auto;
+}
+/* On About it lines up with the lockup under it. */
+.about-mascot {
+	margin-bottom: 6px;
+}
+.page-mascot {
+	margin-bottom: 12px;
+}
+.empty-state {
+	display: grid;
+	justify-items: center;
+	gap: 4px;
+}
+@media (prefers-reduced-motion: no-preference) {
+	.home-mascot {
+		animation: mascot-float 4.5s ease-in-out infinite;
+	}
+}
+@keyframes mascot-float {
+	50% {
+		transform: translateY(-4px);
+	}
 }
 .lockup-tenon {
 	width: 14px;
@@ -422,8 +466,8 @@ a.btn {
 	transition: transform 0.15s;
 }
 .switch[aria-checked="true"] .switch-track {
-	background: var(--accent);
-	border-color: var(--accent);
+	background: var(--switch-on);
+	border-color: var(--switch-on);
 }
 .switch[aria-checked="true"] .switch-thumb {
 	transform: translateX(16px);
@@ -686,7 +730,7 @@ body.scroll-locked {
 	grid-template-columns: 56px minmax(0, 1fr);
 }
 /*
- * The folded sidebar (as in ChatGPT): Jig's graphic, then the main actions as icons. Folding and
+ * The folded sidebar (as in ChatGPT): Yew's graphic, then the main actions as icons. Folding and
  * unfolding keeps the graphic and the icons where they were: centred 28 px from the left, the graphic
  * 32 px from the top and the rows 42 px apart, as in the open sidebar. The edge is a shadow, not a
  * border, so it does not shift the centre.
@@ -1162,10 +1206,6 @@ body.scroll-locked {
 	justify-items: center;
 	gap: 14px;
 	text-align: center;
-}
-.home-intro .lockup-mark {
-	width: 40px;
-	height: 40px;
 }
 .home h1 {
 	font-size: var(--fs-xl);

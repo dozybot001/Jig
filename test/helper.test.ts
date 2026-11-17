@@ -29,8 +29,8 @@ function harness(mode: PermissionMode = "auto") {
 		version: "0.0.0",
 		providers: [faux.provider],
 	});
-	const home = realpathSync(tempDir("jig-home-"));
-	const folder = realpathSync(tempDir("jig-cwd-"));
+	const home = realpathSync(tempDir("yew-home-"));
+	const folder = realpathSync(tempDir("yew-cwd-"));
 	const agents = new Agents({
 		store,
 		gateway,

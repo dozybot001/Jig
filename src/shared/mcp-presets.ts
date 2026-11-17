@@ -1,10 +1,10 @@
 /**
  * Official MCP servers people often add (blueprint 6.11, item 40). Some take a token; the others are
- * signed in to in the browser. Each was tried with Jig's own client before it went in: the token ones
- * connected and listed their tools; for the sign-in ones Jig found where to sign in, registered or
+ * signed in to in the browser. Each was tried with Yew's own client before it went in: the token ones
+ * connected and listed their tools; for the sign-in ones Yew found where to sign in, registered or
  * used the person's client, and the sign-in page opened. Adding one writes an mcp.json entry. A server
- * that runs on this computer is written as `"preset": "<id>"`: Jig installs its package from npm as a
- * lock file that ships with Jig says (`mcp-builtin/presets/<id>`), without install scripts, the way it
+ * that runs on this computer is written as `"preset": "<id>"`: Yew installs its package from npm as a
+ * lock file that ships with Yew says (`mcp-builtin/presets/<id>`), without install scripts, the way it
  * installs its own two servers, rather than letting npx resolve the package's dependencies when it
  * starts (security review, 2026-11-18). These servers hold the person's token.
  */
@@ -16,7 +16,7 @@ export interface McpPreset {
 	publisher: string;
 	/** Where to read about it. */
 	docs: string;
-	/** A remote server's address, or the npm package, at one version, that Jig installs and runs. */
+	/** A remote server's address, or the npm package, at one version, that Yew installs and runs. */
 	connect: { url: string } | { package: string };
 	token?: {
 		/** Sent as a request header, or set as an environment variable of the command. */
@@ -217,7 +217,7 @@ export function presetEntry(
 	};
 }
 
-/** The npm package, at its version, of a preset Jig installs and runs on this computer; null otherwise. */
+/** The npm package, at its version, of a preset Yew installs and runs on this computer; null otherwise. */
 export function presetPackage(id: string): string | null {
 	const preset = MCP_PRESETS.find((item) => item.id === id);
 	return preset && "package" in preset.connect ? preset.connect.package : null;

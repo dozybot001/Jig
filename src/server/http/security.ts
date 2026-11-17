@@ -9,13 +9,13 @@ import { type AppEnv, problemResponse, titleFor } from "./problem.ts";
 const LOGIN_TTL_MS = 10 * 60 * 1000;
 const BROWSER_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-export const cookieName = (port: number) => `jig_${port}`;
+export const cookieName = (port: number) => `yew_${port}`;
 
 export function hashToken(token: string): string {
 	return createHash("sha256").update(token).digest("hex");
 }
 
-/** A one-time login token, shown by `jig serve` and `jig open` in the URL fragment (spec 15.1.3). */
+/** A one-time login token, shown by `yew serve` and `yew open` in the URL fragment (spec 15.1.3). */
 export function issueLoginToken(store: Store): string {
 	const token = randomBytes(32).toString("base64url");
 	store.pruneAuthTokens();
@@ -27,10 +27,10 @@ export function issueLoginToken(store: Store): string {
  * Only this machine, only this origin (after pi's local checks, prior-art 5.2):
  * - Host must be 127.0.0.1 or localhost with our port, which stops DNS rebinding;
  * - requests that came through a proxy are refused;
- * - API requests must come from Jig's own pages: same-origin `Sec-Fetch-Site`, and a matching `Origin`
+ * - API requests must come from Yew's own pages: same-origin `Sec-Fetch-Site`, and a matching `Origin`
  *   on writes. Other pages on this machine share the cookie's site (ports do not separate sites), so the
  *   cookie alone is not enough;
- * - Jig's pages cannot be framed.
+ * - Yew's pages cannot be framed.
  */
 export function localOnly(port: number): MiddlewareHandler<AppEnv> {
 	const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
@@ -44,7 +44,7 @@ export function localOnly(port: number): MiddlewareHandler<AppEnv> {
 				421,
 				"wrong-host",
 				titleFor(421),
-				"Jig only answers on 127.0.0.1 and localhost.",
+				"Yew only answers on 127.0.0.1 and localhost.",
 			);
 		}
 		for (const header of [
@@ -76,7 +76,7 @@ export function localOnly(port: number): MiddlewareHandler<AppEnv> {
 			}
 			const dest = c.req.header("Sec-Fetch-Dest");
 			if (dest === "iframe" || dest === "frame" || dest === "embed" || dest === "object") {
-				return problemResponse(c, 403, "embedded", titleFor(403), "Jig cannot be embedded.");
+				return problemResponse(c, 403, "embedded", titleFor(403), "Yew cannot be embedded.");
 			}
 			if (c.req.method !== "GET" && c.req.method !== "HEAD") {
 				const origin = c.req.header("Origin");
@@ -86,7 +86,7 @@ export function localOnly(port: number): MiddlewareHandler<AppEnv> {
 						403,
 						"bad-origin",
 						titleFor(403),
-						"This request did not come from Jig's own page.",
+						"This request did not come from Yew's own page.",
 					);
 				}
 			}
@@ -99,7 +99,7 @@ export function localOnly(port: number): MiddlewareHandler<AppEnv> {
 export const securityHeaders = (): MiddlewareHandler<AppEnv> => async (c, next) => {
 	await next();
 	const headers = c.res.headers;
-	// An HTML artifact brings its own, stricter policy, and is framed by Jig's own page only.
+	// An HTML artifact brings its own, stricter policy, and is framed by Yew's own page only.
 	if (c.req.path.startsWith("/artifact-view/") && headers.has("Content-Security-Policy")) {
 		headers.set("X-Content-Type-Options", "nosniff");
 		headers.set("Referrer-Policy", "no-referrer");
@@ -134,7 +134,7 @@ export function requireBrowser(store: Store, port: number): MiddlewareHandler<Ap
 				401,
 				"sign-in-required",
 				titleFor(401),
-				"Open Jig with the link from `jig serve` or `jig open`.",
+				"Open Yew with the link from `yew serve` or `yew open`.",
 			);
 		}
 		await next();
@@ -163,7 +163,7 @@ export function authRoutes(store: Store, port: number): Hono<AppEnv> {
 				401,
 				"invalid-login-token",
 				titleFor(401),
-				"This sign-in link was already used or has expired. Run `jig open` for a new one.",
+				"This sign-in link was already used or has expired. Run `yew open` for a new one.",
 			);
 		}
 		const browser = randomBytes(32).toString("base64url");
@@ -217,7 +217,7 @@ export function deviceLimits(): MiddlewareHandler<AppEnv> {
 				403,
 				"mac-only",
 				titleFor(403),
-				"Only Jig on the Mac can do this: API keys, devices and remote access stay there.",
+				"Only Yew on the Mac can do this: API keys, devices and remote access stay there.",
 			);
 		}
 		await next();

@@ -1,12 +1,12 @@
 // A computer to try the Android app against, all on this machine and in memory: a relay on
-// 127.0.0.1:8791, Jig's API behind it with two sessions and four artifacts, and the notifier. Nothing
-// touches ~/.jig or the system keychain; the artifacts' files go into <folder>. Run from the repository root:
+// 127.0.0.1:8791, Yew's API behind it with two sessions and four artifacts, and the notifier. Nothing
+// touches ~/.yew or the system keychain; the artifacts' files go into <folder>. Run from the repository root:
 //   node android/scripts/test-computer.ts <folder>
 // It writes the pairing link to <folder>/link.txt and takes commands as one line written to
 // <folder>/cmd:  pair | ask <command> | settle | drop | status
-// On the emulator (always name it: `-s emulator-5570` is Jig's own, see docs/android.md),
+// On the emulator (always name it: `-s emulator-5570` is Yew's own, see docs/android.md),
 // `adb -s <serial> reverse tcp:8791 tcp:8791` makes 127.0.0.1:8791 reach this relay; a debug
-// build then pairs with `adb -s <serial> shell am start -n cn.tenonai.apps.jig.debug/cn.tenonai.apps.jig.MainActivity --es jig.pair '<link>'`.
+// build then pairs with `adb -s <serial> shell am start -n cn.tenonai.apps.yew.debug/cn.tenonai.apps.yew.MainActivity --es yew.pair '<link>'`.
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import WebSocket from "ws";
@@ -54,7 +54,7 @@ const notifier = new Notifier({
 });
 store.createSession(sessionInput("总办"));
 const site = store.createSession({ ...sessionInput("官网"), cwd: "/tmp" });
-artifacts.save(site.id, { name: "发布说明", kind: "markdown", content: "**1.0.0**\n\n- 手机上能看产物。\n- `jig serve` 开机启动。" });
+artifacts.save(site.id, { name: "发布说明", kind: "markdown", content: "**1.0.0**\n\n- 手机上能看产物。\n- `yew serve` 开机启动。" });
 artifacts.save(site.id, { name: "配置", kind: "json", content: '{"port":4777,"remote":{"enabled":true}}' });
 artifacts.save(site.id, {
 	name: "每周提交",

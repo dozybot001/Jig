@@ -1,5 +1,5 @@
 #!/bin/bash
-# Creates the signing key of Jig for Android. Run once, on the development Mac (product standard 15.6).
+# Creates the signing key of Yew for Android. Run once, on the development Mac (product standard 15.6).
 #
 # The key cannot be replaced: an update signed with another key does not install over the app.
 # The password is made here, goes straight into the login keychain and is never shown; it is not
@@ -7,13 +7,13 @@
 set -euo pipefail
 umask 077
 
-KEY_DIR="$HOME/.tenon-keys/android/jig"
-KEYSTORE="$KEY_DIR/jig-release.p12"
-KEY_ALIAS="jig"
+KEY_DIR="$HOME/.tenon-keys/android/yew"
+KEYSTORE="$KEY_DIR/yew-release.p12"
+KEY_ALIAS="yew"
 KEYCHAIN_SERVICE="tenon-android-signing"
-KEYCHAIN_ACCOUNT="jig"
+KEYCHAIN_ACCOUNT="yew"
 # The comma in the company name is escaped so keytool does not read " Ltd." as another field.
-DNAME='CN=Jig, O=Changsha Tenon Artificial Intelligence Technology Co.\, Ltd., L=Changsha, C=CN'
+DNAME='CN=Yew, O=Changsha Tenon Artificial Intelligence Technology Co.\, Ltd., L=Changsha, C=CN'
 FINGERPRINT_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/release/signing-certificate.sha256"
 JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home -v 21)}"
 KEYTOOL="$JAVA_HOME/bin/keytool"
@@ -32,27 +32,27 @@ mkdir -p "$KEY_DIR"
 chmod 700 "$HOME/.tenon-keys" "$HOME/.tenon-keys/android" "$KEY_DIR"
 
 # 32 random bytes from the system, as 43 characters of URL-safe base64.
-JIG_KS_PASS="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
-[ "${#JIG_KS_PASS}" -eq 43 ] || fail "no password was generated"
-export JIG_KS_PASS
+YEW_KS_PASS="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
+[ "${#YEW_KS_PASS}" -eq 43 ] || fail "no password was generated"
+export YEW_KS_PASS
 
 # Stored before the key exists, so there is never a keystore whose password is lost. `security -i`
 # reads its command from standard input and printf is part of the shell, so the password is in no
 # process's arguments.
-printf 'add-generic-password -s %s -a %s -l "Jig Android signing key" -w %s\n' \
-    "$KEYCHAIN_SERVICE" "$KEYCHAIN_ACCOUNT" "$JIG_KS_PASS" | security -i
-[ "$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w)" = "$JIG_KS_PASS" ] ||
+printf 'add-generic-password -s %s -a %s -l "Yew Android signing key" -w %s\n' \
+    "$KEYCHAIN_SERVICE" "$KEYCHAIN_ACCOUNT" "$YEW_KS_PASS" | security -i
+[ "$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w)" = "$YEW_KS_PASS" ] ||
     fail "the password did not reach the keychain"
 
 # RSA 4096, valid for 30 years. In a PKCS12 keystore the key uses the keystore's password.
 "$KEYTOOL" -genkeypair \
     -keystore "$KEYSTORE" -storetype PKCS12 -alias "$KEY_ALIAS" \
     -keyalg RSA -keysize 4096 -sigalg SHA256withRSA -validity 10950 \
-    -dname "$DNAME" -storepass:env JIG_KS_PASS
+    -dname "$DNAME" -storepass:env YEW_KS_PASS
 chmod 600 "$KEYSTORE"
 
 certificate() {
-    "$KEYTOOL" -exportcert -rfc -keystore "$KEYSTORE" -storetype PKCS12 -alias "$KEY_ALIAS" -storepass:env JIG_KS_PASS
+    "$KEYTOOL" -exportcert -rfc -keystore "$KEYSTORE" -storetype PKCS12 -alias "$KEY_ALIAS" -storepass:env YEW_KS_PASS
 }
 fingerprint() {
     certificate | openssl x509 -noout -fingerprint "-$1" | sed 's/^.*=//; s/://g'
@@ -70,7 +70,7 @@ SHA1="$(fingerprint sha1)"
 MD5="$(fingerprint md5)"
 # What the App filing asks for besides the MD5 fingerprint: the public key's modulus (hex).
 MODULUS="$(certificate | openssl x509 -noout -modulus | sed 's/^Modulus=//')"
-unset JIG_KS_PASS
+unset YEW_KS_PASS
 
 mkdir -p "$(dirname "$FINGERPRINT_FILE")"
 umask 022

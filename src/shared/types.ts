@@ -30,7 +30,7 @@ export interface SessionOptions {
 	/** Before 0.1: let write and edit change files without asking. Read as the automatic mode. */
 	directEdits?: boolean;
 	/**
-	 * How approvals work: auto (Jig runs calls unless the model marks one with confirm), manual
+	 * How approvals work: auto (Yew runs calls unless the model marks one with confirm), manual
 	 * (edits and commands that are not read-only are asked about) or skip. Operations that must be
 	 * confirmed (spec 21.2) are asked about in every mode.
 	 */
@@ -47,7 +47,7 @@ export interface SessionOptions {
 	dailyBudget?: number | null;
 	/** More room for one day, given when the person continued the session after it reached a limit. */
 	budgetExtra?: { day: string; amount: number } | null;
-	/** Named after its first message; after its first turn Jig gives it a short name of its own. */
+	/** Named after its first message; after its first turn Yew gives it a short name of its own. */
 	autoName?: boolean;
 }
 
@@ -164,7 +164,7 @@ export interface Session {
 export const LETTER_KINDS = ["notice", "request", "decision", "report"] as const;
 export type LetterKind = (typeof LETTER_KINDS)[number];
 export type LetterStatus = "queued" | "held" | "delivered" | "done" | "refused" | "dropped";
-/** Who sent a letter: a session, the person (decisions), the command line (`jig send`) or Jig itself. */
+/** Who sent a letter: a session, the person (decisions), the command line (`yew send`) or Yew itself. */
 export type SenderKind = "session" | "person" | "cli" | "jig";
 
 /** A letter between sessions (blueprint section 7). Stored before it is delivered, so a restart loses none. */
@@ -186,7 +186,7 @@ export interface Letter {
 	statusReason: string | null;
 	/** Sessions that sent letters along this chain, oldest first (loop checks, blueprint 7.2). */
 	path: string[];
-	/** Jig sent the session's final reply on its behalf. */
+	/** Yew sent the session's final reply on its behalf. */
 	auto: boolean;
 	/** For a decision letter: the number of the decision it carries. */
 	decision: number | null;
@@ -419,12 +419,12 @@ export type ScheduleStatus = "running" | "done" | "error" | "stopped" | "skipped
 
 /**
  * Why a run was skipped: the last run was not finished, the session is archived, or the time passed
- * while Jig was not running or the computer slept and the task skips missed runs.
+ * while Yew was not running or the computer slept and the task skips missed runs.
  */
 export type ScheduleSkip = "busy" | "archived" | "missed";
 
 /**
- * A scheduled task (blueprint 6.5, M3 plan section 9): at the times its cron expression names, Jig sends
+ * A scheduled task (blueprint 6.5, M3 plan section 9): at the times its cron expression names, Yew sends
  * a standing session a letter. It belongs to that session's team.
  */
 export interface Schedule {
@@ -437,7 +437,7 @@ export interface Schedule {
 	message: string;
 	/** The permission mode for its runs; null uses the session's own. */
 	permissionMode: PermissionMode | null;
-	/** A run missed while Jig was not running or the computer slept runs once afterwards. */
+	/** A run missed while Yew was not running or the computer slept runs once afterwards. */
 	catchUp: boolean;
 	enabled: boolean;
 	/** When it runs next; null while it is turned off. */
@@ -475,7 +475,7 @@ export interface Device {
 	name: string;
 	/** The phone's Noise static key, base64url. */
 	publicKey: string;
-	/** Whether Jig sends it notifications. */
+	/** Whether Yew sends it notifications. */
 	push: boolean;
 	/** The phone has given an APNs token. */
 	canPush: boolean;
@@ -504,7 +504,7 @@ export interface QuestionOption {
 export interface QuestionRequest {
 	questions?: Question[];
 	/**
-	 * Asked at the end of a reply rather than with ask_user. Jig put it in the approval center; the answer
+	 * Asked at the end of a reply rather than with ask_user. Yew put it in the approval center; the answer
 	 * goes to the session as the person's message.
 	 */
 	fromReply?: boolean;

@@ -24,5 +24,5 @@
 	"responseSealed": [
 		"7c74e3369016f10d224efd0f6d7f32927eb0b2b1d84927daa7accbb9a693d6f17f2d9333ad568218ae5ee5528761ae6a862ccaf13a9690b9f190f93f603330ed4b63319a05d60dbac65b7e58ac1b36af8b4f4bf07d918228ffe0c098bddd9d17f401"
 	],
-	"link": "jig://pair?r=wss%3A%2F%2Frelay.tenonai.cn&d=AAECAwQFBgcICQoLDA0ODw&k=pOCSkrZRwni5dyxWn1-puxPZBrRqtoyd-dwrRAn4ogk&s=c2VjcmV0&n=%E4%B9%A6%E6%88%BF%E7%9A%84%E7%94%B5%E8%84%91+%26+Mac"
+	"link": "yew://pair?r=wss%3A%2F%2Frelay.tenonai.cn&d=AAECAwQFBgcICQoLDA0ODw&k=pOCSkrZRwni5dyxWn1-puxPZBrRqtoyd-dwrRAn4ogk&s=c2VjcmV0&n=%E4%B9%A6%E6%88%BF%E7%9A%84%E7%94%B5%E8%84%91+%26+Mac"
 }

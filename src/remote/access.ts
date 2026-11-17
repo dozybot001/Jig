@@ -7,7 +7,7 @@ import { Connector } from "./connector.ts";
 import { createPairing, type Identity, loadIdentity } from "./identity.ts";
 import { MAX_PUSH_DATA, pushKey, sealPush } from "./push.ts";
 
-/** Where remote access stands, for the settings page and `jig remote status`. */
+/** Where remote access stands, for the settings page and `yew remote status`. */
 export interface RemoteStatus {
 	enabled: boolean;
 	connected: boolean;
@@ -20,7 +20,7 @@ export const desktopName = () => hostname().replace(/\.local$/, "") || "Mac";
 
 /**
  * Starts and stops the relay connection to match the settings, which the interface, `manage_jig` and
- * `jig remote` change; `sync` runs every few seconds, so changes made from the command line take hold.
+ * `yew remote` change; `sync` runs every few seconds, so changes made from the command line take hold.
  */
 export class RemoteAccess {
 	readonly #store: Store;

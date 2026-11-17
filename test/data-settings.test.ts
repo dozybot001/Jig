@@ -36,7 +36,7 @@ function file(path: string, bytes: number): string {
 
 /** A data folder with something of every kind; the numbers are the files' lengths. */
 function prepared() {
-	const home = real("jig-home-");
+	const home = real("yew-home-");
 	file(join(home, "jig.db"), 4000);
 	file(join(home, "jig.db-wal"), 300);
 	file(join(home, "jig.db-shm"), 20);
@@ -88,13 +88,13 @@ describe("data: what the folder takes", () => {
 	});
 
 	test("an empty or missing folder is all zeros; a link is counted as a link, not followed", () => {
-		const empty = dataUsage(real("jig-home-"));
+		const empty = dataUsage(real("yew-home-"));
 		assert.equal(empty.totalBytes, 0);
 		assert.deepEqual(empty.temp, { files: 0, bytes: 0, removableFiles: 0, removableBytes: 0 });
-		assert.equal(dataUsage(join(real("jig-home-"), "missing")).totalBytes, 0);
+		assert.equal(dataUsage(join(real("yew-home-"), "missing")).totalBytes, 0);
 
-		const home = real("jig-home-");
-		const elsewhere = real("jig-else-");
+		const home = real("yew-home-");
+		const elsewhere = real("yew-else-");
 		file(join(elsewhere, "big.bin"), 90_000);
 		symlinkSync(elsewhere, join(home, "skills"));
 		assert.ok(dataUsage(home).totalBytes < 1000);
@@ -119,12 +119,12 @@ describe("data: cleaning up temporary files", () => {
 		assert.equal(dataUsage(home).temp.removableFiles, 1);
 		// Nothing to delete is not an error.
 		const none = { deletedFiles: 0, freedBytes: 0, skippedFiles: 0 };
-		assert.deepEqual(cleanTemp(real("jig-home-")), none);
+		assert.deepEqual(cleanTemp(real("yew-home-")), none);
 	});
 
 	test("links inside tmp are neither followed nor deleted", () => {
 		const { home } = prepared();
-		const elsewhere = real("jig-else-");
+		const elsewhere = real("yew-else-");
 		const kept = file(join(elsewhere, "keep.txt"), 10);
 		symlinkSync(elsewhere, join(home, "tmp", "idle", "output", "dir-link"));
 		symlinkSync(kept, join(home, "tmp", "idle", "output", "file-link.log"));
@@ -137,8 +137,8 @@ describe("data: cleaning up temporary files", () => {
 	});
 
 	test("a tmp folder that is a link out of the data folder is refused", () => {
-		const home = real("jig-home-");
-		const elsewhere = real("jig-else-");
+		const home = real("yew-home-");
+		const elsewhere = real("yew-else-");
 		const kept = file(join(elsewhere, "s1", "output", "keep.log"), 10);
 		symlinkSync(elsewhere, join(home, "tmp"));
 		assert.throws(
@@ -151,7 +151,7 @@ describe("data: cleaning up temporary files", () => {
 
 	test("a data folder reached through a link still cleans its own tmp", () => {
 		const { home, outputs } = prepared();
-		const link = join(real("jig-else-"), "home-link");
+		const link = join(real("yew-else-"), "home-link");
 		symlinkSync(home, link);
 		assert.equal(cleanTemp(link).deletedFiles, 3);
 		assert.equal(existsSync(outputs.busy), false);
@@ -219,18 +219,18 @@ describe("data: the routes", () => {
 		assert.equal((await setup("win32").send("GET", "/api/data")).body.reveal, null);
 	});
 
-	test("export writes what jig export writes and says what it wrote", async () => {
+	test("export writes what yew export writes and says what it wrote", async () => {
 		const { send, store, home } = setup();
 		const session = store.createSession(sessionInput("写周报"));
-		store.createSession(sessionInput("Jig · 开发"));
+		store.createSession(sessionInput("Yew · 开发"));
 		new ArtifactStore(store, home).save(session.id, {
 			name: "周报",
 			kind: "markdown",
 			content: "# 周报",
 		});
-		const byCommand = real("jig-export-");
+		const byCommand = real("yew-export-");
 		const counts = exportAll(store, byCommand, Date.now(), home);
-		const folder = real("jig-export-");
+		const folder = real("yew-export-");
 		const { status, body } = await send("POST", "/api/data/export", { folder });
 		assert.equal(status, 201);
 		assert.deepEqual(body, { folder, ...counts });
@@ -246,9 +246,9 @@ describe("data: the routes", () => {
 		}
 	});
 
-	test("export refuses what jig export refuses, and a folder that is not there", async () => {
+	test("export refuses what yew export refuses, and a folder that is not there", async () => {
 		const { send } = setup();
-		const full = real("jig-export-");
+		const full = real("yew-export-");
 		writeFileSync(join(full, "notes.txt"), "mine");
 		const notEmpty = await send("POST", "/api/data/export", { folder: full });
 		assert.equal(notEmpty.status, 400);
@@ -256,7 +256,7 @@ describe("data: the routes", () => {
 		assert.match(notEmpty.body.type, /invalid-request$/);
 		assert.deepEqual(readdirSync(full), ["notes.txt"]);
 
-		const parent = real("jig-export-");
+		const parent = real("yew-export-");
 		for (const folder of [join(parent, "missing"), "relative/folder", join(full, "notes.txt")]) {
 			const refused = await send("POST", "/api/data/export", { folder });
 			assert.equal(refused.status, 400, folder);
@@ -269,7 +269,7 @@ describe("data: the routes", () => {
 
 	test("a repeated export with the same Idempotency-Key is answered once", async () => {
 		const { send } = setup();
-		const folder = real("jig-export-");
+		const folder = real("yew-export-");
 		const first = await send("POST", "/api/data/export", { folder }, { key: "export-1" });
 		assert.equal(first.status, 201);
 		// Without the key the folder is no longer empty and the repeat would be refused.
@@ -300,8 +300,8 @@ describe("data: the routes", () => {
 	});
 
 	test("cleanup refuses a tmp folder that is a link, as a problem", async () => {
-		const home = real("jig-home-");
-		const elsewhere = real("jig-else-");
+		const home = real("yew-home-");
+		const elsewhere = real("yew-else-");
 		const kept = file(join(elsewhere, "s1", "output", "keep.log"), 10);
 		symlinkSync(elsewhere, join(home, "tmp"));
 		const { store } = newStore();
@@ -321,7 +321,7 @@ describe("data: the routes", () => {
 		const early = await send("POST", "/api/data/reveal", { target: "export" });
 		assert.equal(early.status, 409);
 		assert.match(early.body.type, /no-export$/);
-		const folder = real("jig-export-");
+		const folder = real("yew-export-");
 		await send("POST", "/api/data/export", { folder });
 		// A refused export does not change which folder is remembered.
 		await send("POST", "/api/data/export", { folder: home });
@@ -364,7 +364,7 @@ describe("data: the routes", () => {
 
 	test("a phone gets 403 on all of them, and nothing happens", async () => {
 		const { send, ran, outputs } = setup();
-		const folder = real("jig-export-");
+		const folder = real("yew-export-");
 		for (const [method, path, json] of [
 			["GET", "/api/data", undefined],
 			["POST", "/api/data/export", { folder }],
@@ -387,7 +387,7 @@ describe("data: which sessions are in use", () => {
 		const { store } = newStore();
 		const keys = new MemoryKeyStore({ [faux.provider.id]: "test-key" });
 		const gateway = new ModelGateway({ keys, version: "0.0.0", providers: [faux.provider] });
-		const home = real("jig-home-");
+		const home = real("yew-home-");
 		const agents = new Agents({
 			store,
 			gateway,
@@ -402,7 +402,7 @@ describe("data: which sessions are in use", () => {
 			kind: "task",
 			provider: faux.provider.id,
 			model: faux.getModel().id,
-			cwd: real("jig-cwd-"),
+			cwd: real("yew-cwd-"),
 			thinking: "off",
 		});
 		store.updateSession(session.id, { options: { permissionMode: "skip" } });

@@ -5,7 +5,7 @@ import { conflict, invalid, notFound } from "./errors.ts";
 
 /**
  * Changes to `mcp.json` made from the settings (blueprint 6.10, item 29). The file keeps the shape
- * people write by hand and `jig mcp list` reads: entries Jig does not understand, other top-level
+ * people write by hand and `yew mcp list` reads: entries Yew does not understand, other top-level
  * keys and `${NAME}` references stay as they are. Values of environment variables and headers may
  * be secrets, so what is shown of a server carries their names only.
  */
@@ -23,7 +23,7 @@ const MAX_VALUE = 8192;
 export interface McpEntryView {
 	name: string;
 	kind: "stdio" | "http";
-	/** Set up by Jig itself, not written in mcp.json: it can be turned off, not removed. */
+	/** Set up by Yew itself, not written in mcp.json: it can be turned off, not removed. */
 	builtin: boolean;
 	disabled: boolean;
 	command: string | null;
@@ -35,13 +35,13 @@ export interface McpEntryView {
 	headerNames: string[];
 	/** Its entry names a client to sign in with (the client's secret is never sent). */
 	oauthClient: boolean;
-	/** One of the presets Jig installs: the npm package and version it runs. */
+	/** One of the presets Yew installs: the npm package and version it runs. */
 	package?: string;
 }
 
 export interface NewMcpServer {
 	name: string;
-	/** One of the presets Jig installs and runs (blueprint 6.11, item 40), by its id. */
+	/** One of the presets Yew installs and runs (blueprint 6.11, item 40), by its id. */
 	preset?: string;
 	command?: string;
 	args?: string[];
@@ -87,7 +87,7 @@ function readFile(jigHome: string): McpFile {
 	if (!isObject(doc)) {
 		// Not overwritten: the person may have servers in it that a typo is hiding.
 		throw conflict(
-			"mcp.json in Jig's data folder is not valid JSON. Correct it by hand first.",
+			"mcp.json in Yew's data folder is not valid JSON. Correct it by hand first.",
 			undefined,
 			"mcp-unreadable",
 		);
@@ -165,7 +165,7 @@ function view(name: string, entry: Raw): McpEntryView | null {
 	return null;
 }
 
-/** What Jig sets up by itself, by name: how each server is started. */
+/** What Yew sets up by itself, by name: how each server is started. */
 export type BuiltinServers = Record<string, { command?: string; args?: string[] }>;
 
 /** A built-in server as the settings show it; `off` when mcp.json turns it off. */
@@ -188,7 +188,7 @@ function builtinView(name: string, builtin: BuiltinServers, off: boolean): McpEn
 const turnsOff = (entry: unknown): boolean =>
 	isObject(entry) && entry.disabled === true && !view("x", entry);
 
-/** The servers Jig runs: its own first, then the file's in the file's order. */
+/** The servers Yew runs: its own first, then the file's in the file's order. */
 export function listMcpEntries(jigHome: string, builtin: BuiltinServers = {}): McpEntryView[] {
 	const { servers } = readFile(jigHome);
 	const own = Object.keys(builtin)
@@ -261,7 +261,7 @@ export function addMcpEntry(jigHome: string, input: NewMcpServer): McpEntryView 
 	}
 	let entry: Raw;
 	if (preset) {
-		if (!presetPackage(preset)) throw invalid(`Jig has no preset named ${preset}.`, "preset");
+		if (!presetPackage(preset)) throw invalid(`Yew has no preset named ${preset}.`, "preset");
 		const env = input.env ?? {};
 		checkValues(env, ENV_NAME, "env");
 		entry = { preset, ...(Object.keys(env).length > 0 ? { env } : {}) };
@@ -319,9 +319,9 @@ export function patchMcpEntry(
 ): McpEntryView {
 	const { doc, servers } = readFile(jigHome);
 	if (builtin[name] && (!Object.hasOwn(servers, name) || turnsOff(servers[name]))) {
-		// One of Jig's own: the file only records that it is off.
+		// One of Yew's own: the file only records that it is off.
 		if (patch.env || patch.headers) {
-			throw invalid("A server Jig sets up by itself has no variables to set.", "env");
+			throw invalid("A server Yew sets up by itself has no variables to set.", "env");
 		}
 		if (patch.disabled === true) servers[name] = { disabled: true };
 		else if (patch.disabled === false) delete servers[name];
@@ -361,7 +361,7 @@ export function removeMcpEntry(jigHome: string, name: string, builtin: BuiltinSe
 	const { doc, servers } = readFile(jigHome);
 	if (builtin[name] && (!Object.hasOwn(servers, name) || turnsOff(servers[name]))) {
 		throw conflict(
-			`${name} is set up by Jig itself. It can be turned off, not removed.`,
+			`${name} is set up by Yew itself. It can be turned off, not removed.`,
 			undefined,
 			"mcp-builtin",
 		);

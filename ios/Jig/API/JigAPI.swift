@@ -1,6 +1,6 @@
 import Foundation
 
-// Jig's local API as the iPhone app reads it: the same endpoints the web interface uses on the Mac.
+// Yew's local API as the iPhone app reads it: the same endpoints the web interface uses on the Mac.
 // Only the fields the app shows are decoded; the rest is ignored.
 
 struct SessionSummary: Decodable, Identifiable, Hashable, Sendable {
@@ -219,7 +219,6 @@ struct LetterItem: Decodable, Identifiable, Sendable {
 	var sender: String { Sender.name(kind: fromKind, name: fromName) }
 }
 
-/// An RFC 9457 problem from Jig, shown to the person as it came.
 /// Something a session saved for the person to look at (src/shared/types.ts).
 struct ArtifactItem: Decodable, Identifiable, Hashable, Sendable {
 	let id: String
@@ -230,6 +229,7 @@ struct ArtifactItem: Decodable, Identifiable, Hashable, Sendable {
 	let updatedAt: Double
 }
 
+/// An RFC 9457 problem from Yew, shown to the person as it came.
 struct JigProblem: Error, Decodable, LocalizedError {
 	let title: String
 	let detail: String?

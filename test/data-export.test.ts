@@ -12,7 +12,7 @@ import { Store } from "../src/server/store.ts";
 import { fakeIo } from "./helpers/io.ts";
 import { newStore, sessionInput, tempDir } from "./helpers/store.ts";
 
-describe("jig export", () => {
+describe("yew export", () => {
 	test("sessions become Markdown; letters, cards, tasks and settings become JSON; no secrets", () => {
 		const { store } = newStore();
 		const main = store.createSession(sessionInput("总办"));
@@ -37,7 +37,7 @@ describe("jig export", () => {
 			body: "",
 			status: "queued",
 		});
-		const folder = tempDir("jig-export-");
+		const folder = tempDir("yew-export-");
 		const counts = exportAll(store, folder);
 		assert.deepEqual(
 			{ sessions: counts.sessions, letters: counts.letters },
@@ -68,11 +68,11 @@ describe("jig export", () => {
 	});
 
 	test("the command writes into a new folder and reports what it wrote", async () => {
-		const home = tempDir("jig-home-");
+		const home = tempDir("yew-home-");
 		const db = openDatabase(dbPath(home));
 		new Store(db, new EventBus()).createSession(sessionInput("UI"));
 		db.close();
-		const out = join(tempDir("jig-out-"), "backup");
+		const out = join(tempDir("yew-out-"), "backup");
 		const { io, stdout } = fakeIo({ env: { JIG_HOME: home } });
 		assert.equal(await exportCommand().run([out, "--json"], io), 0);
 		const report = JSON.parse(stdout.text());

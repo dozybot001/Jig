@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The first screen: what Jig is, and how this iPhone connects to Jig on the person's Mac.
+/// The first screen: what Yew is, and how this iPhone connects to Yew on the person's Mac.
 struct ConnectView: View {
 	@Environment(AppModel.self) private var model
 	@State private var link = ""
@@ -13,11 +13,9 @@ struct ConnectView: View {
 			Form {
 				Section {
 					VStack(spacing: 12) {
-						JigMark()
-							.frame(width: 56, height: 56)
-							.accessibilityHidden(true)
-						Text("Jig")
-							.font(.title.weight(.semibold))
+						// She says hello, and looks sorry while the last try to pair has failed.
+						Mascot(pose: model.problem == nil ? .greeting : .sorry, height: 112)
+						Lockup(size: 30)
 						Text("An AI-native multi-agent workbench")
 							.font(.callout)
 							.foregroundStyle(.secondary)
@@ -34,10 +32,10 @@ struct ConnectView: View {
 					}
 					.disabled(!ScannerView.available || busy)
 				} footer: {
-					Text("In Jig on your Mac, open Settings → Phone access, click Add phone, then scan the QR code it shows.")
+					Text("In Yew on your Mac, open Settings → Phone access, click Add phone, then scan the QR code it shows.")
 				}
 				Section("Or paste the pairing link") {
-					TextField("jig://pair?…", text: $pairLink, axis: .vertical)
+					TextField("yew://pair?…", text: $pairLink, axis: .vertical)
 						.textInputAutocapitalization(.never)
 						.autocorrectionDisabled()
 					Button {
@@ -72,7 +70,7 @@ struct ConnectView: View {
 				} header: {
 					Text("Connect to this Mac")
 				} footer: {
-					Text("Debug builds only. Run `jig open` on the Mac and paste the link it prints.")
+					Text("Debug builds only. Run `yew open` on the Mac and paste the link it prints.")
 				}
 				#endif
 				if let problem = model.problem {
@@ -81,7 +79,7 @@ struct ConnectView: View {
 					}
 				}
 				Section {
-					NavigationLink("About Jig") { AboutView() }
+					NavigationLink("About Yew") { AboutView() }
 				}
 			}
 			.sheet(isPresented: $scanning) {
@@ -103,26 +101,67 @@ struct ConnectView: View {
 	}
 }
 
-/// Jig's mark: three parallel lines that form a J (web/public/icons/jig-mark.svg), in the text colour.
-struct JigMark: View {
+/// Yew's mark (web/public/icons/yew-mark.svg): a yew berry with its seed, and a leaf. The leaf is in the
+/// ink colour, dark green in light mode and pale in dark mode; the berry and the seed keep their colours.
+struct YewMark: View {
 	var body: some View {
-		GeometryReader { geometry in
-			let scale = min(geometry.size.width, geometry.size.height) / 64
-			Path { path in
-				for (x, radius) in [(54.0, 22.0), (45.0, 13.0), (36.0, 4.0)] {
-					path.move(to: CGPoint(x: x, y: 8))
-					path.addLine(to: CGPoint(x: x, y: 34))
-					path.addArc(
-						center: CGPoint(x: 32, y: 34),
-						radius: radius,
-						startAngle: .degrees(0),
-						endAngle: .degrees(180),
-						clockwise: false
-					)
-				}
-			}
-			.applying(CGAffineTransform(scaleX: scale, y: scale))
-			.stroke(.primary, style: StrokeStyle(lineWidth: 5 * scale, lineCap: .round))
+		ZStack {
+			Part.leaf.fill(Color.yewInk)
+			Part.berry.fill(Color(red: 200 / 255, green: 50 / 255, blue: 63 / 255))
+			Part.seed.fill(Color(red: 31 / 255, green: 58 / 255, blue: 46 / 255))
 		}
+	}
+
+	/// One piece of the mark, drawn in the SVG's 64-point square and scaled to fit the middle of the frame.
+	private enum Part: Shape {
+		case leaf, berry, seed
+
+		func path(in rect: CGRect) -> Path {
+			var path = Path()
+			switch self {
+			case .leaf:
+				path.move(to: CGPoint(x: 35.4, y: 50.2))
+				path.addCurve(to: CGPoint(x: 60, y: 12.6), control1: CGPoint(x: 36.6, y: 37.6), control2: CGPoint(x: 42.6, y: 22.6))
+				path.addCurve(to: CGPoint(x: 49.4, y: 38.6), control1: CGPoint(x: 58.6, y: 24.4), control2: CGPoint(x: 55.2, y: 32.4))
+				path.addCurve(to: CGPoint(x: 35.4, y: 50.2), control1: CGPoint(x: 45, y: 43.3), control2: CGPoint(x: 39.4, y: 46.4))
+				path.closeSubpath()
+			case .berry:
+				path.addEllipse(in: CGRect(x: 19.8 - 15.9, y: 35.4 - 15.4, width: 2 * 15.9, height: 2 * 15.4))
+			case .seed:
+				// Turned 12° about its centre, as in the SVG.
+				path.addEllipse(
+					in: CGRect(x: -4.6, y: -3.1, width: 2 * 4.6, height: 2 * 3.1),
+					transform: CGAffineTransform(translationX: 25.8, y: 22.6).rotated(by: 12 * .pi / 180)
+				)
+			}
+			let scale = min(rect.width, rect.height) / 64
+			return path.applying(
+				CGAffineTransform(translationX: rect.midX - 32 * scale, y: rect.midY - 32 * scale).scaledBy(x: scale, y: scale)
+			)
+		}
+	}
+}
+
+/// Yew's mascot, a red-haired girl with a yew-berry hair ornament (web/public/mascot), in one of her poses.
+/// She is decoration only: VoiceOver skips her, and she never covers a control.
+struct Mascot: View {
+	/// The poses the app uses, by their image sets. All poses share one 373 × 400 canvas, so swapping one
+	/// for another in the same place never moves anything.
+	enum Pose: String {
+		case greeting = "MascotGreeting"
+		case happy = "MascotHappy"
+		case sorry = "MascotSorry"
+		case gift = "MascotGift"
+	}
+
+	let pose: Pose
+	var height: CGFloat = 110
+
+	var body: some View {
+		Image(pose.rawValue)
+			.renderingMode(.original)
+			.resizable()
+			.frame(width: height * 373 / 400, height: height)
+			.accessibilityHidden(true)
 	}
 }

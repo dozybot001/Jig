@@ -4,6 +4,7 @@ import { boot } from "./actions.ts";
 import { ArtifactsPage } from "./components/artifacts.tsx";
 import { CenterPage } from "./components/center.tsx";
 import { MapPage } from "./components/map.tsx";
+import { Mascot } from "./components/mascot.tsx";
 import { SchedulesPage } from "./components/schedules.tsx";
 import { SessionView } from "./components/session.tsx";
 import { SettingsDialogs } from "./components/settings.tsx";
@@ -27,7 +28,7 @@ function App() {
 	const narrow = useNarrow();
 	// The tab's title carries the approval center's count, so it shows in the tab strip.
 	useEffect(() => {
-		document.title = waiting > 0 ? `(${waiting}) Jig` : "Jig";
+		document.title = waiting > 0 ? `(${waiting}) Yew` : "Yew";
 	}, [waiting]);
 	// The drawer closes with Escape, like a dialog.
 	useEffect(() => {
@@ -49,6 +50,7 @@ function App() {
 		return (
 			<div className="center-page">
 				<div>
+					<Mascot pose="waking" height={120} className="page-mascot" />
 					<h1>{t("signInTitle")}</h1>
 					<p>{t("signInBody")}</p>
 				</div>
@@ -59,6 +61,7 @@ function App() {
 		return (
 			<div className="center-page">
 				<div>
+					<Mascot pose="sorry" height={120} className="page-mascot" />
 					<h1>{t("errorTitle")}</h1>
 					<p>{failure === "network" ? t("connectionLost") : failure}</p>
 					<Button variant="primary" onClick={() => window.location.reload()}>

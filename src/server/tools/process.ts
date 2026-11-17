@@ -63,7 +63,7 @@ export class OutputTail {
 	}
 }
 
-/** Provider keys Jig keeps out of commands' environment (AGENTS.md: keys stay in the keychain). */
+/** Provider keys Yew keeps out of commands' environment (AGENTS.md: keys stay in the keychain). */
 const KEY_VARIABLES =
 	/^(ANTHROPIC|OPENAI|DEEPSEEK|GEMINI|GOOGLE|GROQ|MISTRAL|MOONSHOT|KIMI|ZAI|ZHIPU|MINIMAX|DASHSCOPE|QWEN|XIAOMI|MIMO|OPENROUTER|XAI|TOGETHER|FIREWORKS|CEREBRAS|HF|HUGGINGFACE|NVIDIA|BASETEN|VERCEL_AI_GATEWAY|AZURE_OPENAI)_API_KEY$/;
 
@@ -74,7 +74,7 @@ export function commandEnvironment(sessionId: string): NodeJS.ProcessEnv {
 	}
 	return {
 		...env,
-		JIG_SESSION: sessionId,
+		YEW_SESSION: sessionId,
 		NO_COLOR: "1",
 		PAGER: "cat",
 		GIT_PAGER: "cat",

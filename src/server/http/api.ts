@@ -130,7 +130,7 @@ function contentDisposition(filename: string): string {
 		.replace(/[^\x20-\x7e]/g, "")
 		.replace(/["\\]/g, "_")
 		.trim();
-	const fallback = ascii || "jig-session.md";
+	const fallback = ascii || "yew-session.md";
 	const encoded = encodeURIComponent(filename).replace(
 		/['()*]/g,
 		(character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
@@ -201,7 +201,7 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			thinking: optEnum(fields, "thinking", THINKING_LEVELS) ?? settings.defaultModel.thinking,
 			// New sessions start with no remembered approvals; "always allow" adds them.
 			rules: [],
-			// Named after the first message (the home page): Jig gives it a short name after one turn.
+			// Named after the first message (the home page): Yew gives it a short name after one turn.
 			options: optBoolean(fields, "autoName")
 				? { permissionMode: settings.defaultPermissionMode, autoName: true }
 				: { permissionMode: settings.defaultPermissionMode },
@@ -299,7 +299,7 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			}
 			patch.options = next;
 		}
-		// A name the person chose is not replaced by Jig's automatic one.
+		// A name the person chose is not replaced by Yew's automatic one.
 		if (patch.name !== undefined) patch.options = { ...patch.options, autoName: false };
 		const pinned = optBoolean(fields, "pinned");
 		if (pinned !== undefined) patch.pinned = pinned;
@@ -435,7 +435,7 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			// Remote access is changed on the Mac only (M3 plan, section 4).
 			if (c.env?.device) throw invalid("Phone access can only be changed on the Mac.", "remote");
 			const enabled = optBoolean(remote, "enabled");
-			// null goes back to the relay Jig comes with.
+			// null goes back to the relay Yew comes with.
 			const asked = optNullableString(remote, "relayUrl", 500);
 			const relayUrl = asked === null ? DEFAULT_RELAY_URL : asked?.trim();
 			if (relayUrl !== undefined && !RELAY_URL.test(relayUrl)) {

@@ -1,18 +1,18 @@
 import Foundation
 
 /// Where the app's requests go. The relay channel (M3 plan, sections 4 and 7) and, in Debug builds, a
-/// direct connection to `jig serve` on this Mac (the simulator shares the Mac's network).
+/// direct connection to `yew serve` on this Mac (the simulator shares the Mac's network).
 protocol Transport: Sendable {
 	func send(method: String, path: String, body: Data?) async throws -> (Data, Int)
 	/// A streamed response, such as the event stream, as text in the pieces it arrives in.
 	func stream(path: String) -> AsyncThrowingStream<String, any Error>
 }
 
-/// Debug only: talks to `jig serve` on 127.0.0.1 with the cookie a `jig open` link was exchanged for.
+/// Debug only: talks to `yew serve` on 127.0.0.1 with the cookie a `yew open` link was exchanged for.
 struct DirectTransport: Transport {
 	let base: URL
 
-	/// Jig accepts writes only from its own origin.
+	/// Yew accepts writes only from its own origin.
 	private var origin: String {
 		"\(base.scheme ?? "http")://\(base.host() ?? "127.0.0.1"):\(base.port ?? 80)"
 	}
@@ -127,12 +127,12 @@ struct JigClient: Sendable {
 }
 
 extension JigClient {
-	/// Debug only: trades the one-time token of a `jig open` link for the browser cookie.
+	/// Debug only: trades the one-time token of a `yew open` link for the browser cookie.
 	static func direct(link: String) async throws -> (JigClient, URL) {
 		guard let url = URL(string: link.trimmingCharacters(in: .whitespacesAndNewlines)),
 			let host = url.host(), let fragment = url.fragment(), fragment.hasPrefix("t=")
 		else {
-			throw JigProblem(title: String(localized: "Paste the whole link that `jig open` prints."), detail: nil)
+			throw JigProblem(title: String(localized: "Paste the whole link that `yew open` prints."), detail: nil)
 		}
 		var parts = URLComponents()
 		parts.scheme = url.scheme ?? "http"

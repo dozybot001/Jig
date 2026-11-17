@@ -17,7 +17,7 @@ const CHART = JSON.stringify({
 
 function setup() {
 	const { store, events } = newStore();
-	const home = tempDir("jig-home-");
+	const home = tempDir("yew-home-");
 	const artifacts = new ArtifactStore(store, home);
 	const session = store.createSession(sessionInput("产品"));
 	const app = createApp({ store, artifacts, log: () => {} });
@@ -139,7 +139,7 @@ describe("artifacts", () => {
 		const view = await app.request(`/artifact-view/${page.id}/1`);
 		assert.equal(view.status, 200);
 		const csp = view.headers.get("Content-Security-Policy") ?? "";
-		// Its own origin, no requests of any kind, framed by Jig's page only.
+		// Its own origin, no requests of any kind, framed by Yew's page only.
 		assert.match(csp, /^sandbox allow-scripts;/);
 		assert.equal(csp.includes("allow-same-origin"), false);
 		assert.match(csp, /default-src 'none'/);
@@ -147,7 +147,7 @@ describe("artifacts", () => {
 		assert.equal(csp.includes("connect-src"), false);
 		assert.equal((await app.request(`/artifact-view/${note.id}/1`)).status, 400);
 		assert.equal((await app.request(`/artifact-view/${page.id}/9`)).status, 404);
-		// Jig's own pages keep their policy.
+		// Yew's own pages keep their policy.
 		const api = await app.request("/api/health");
 		assert.match(api.headers.get("Content-Security-Policy") ?? "", /default-src 'self'/);
 
@@ -171,7 +171,7 @@ describe("artifacts", () => {
 		const { store, artifacts, session, home } = setup();
 		const report = artifacts.save(session.id, { name: "周报", kind: "markdown", content: "一" });
 		artifacts.save(session.id, { name: "周报", kind: "markdown", content: "二" });
-		const out = tempDir("jig-export-");
+		const out = tempDir("yew-export-");
 		const counts = exportAll(store, out, Date.now(), home);
 		assert.equal(counts.artifacts, 1);
 		assert.equal(readFileSync(join(out, "artifacts", "产品", "周报", "v2.md"), "utf8"), "二");

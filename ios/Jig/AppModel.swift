@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// What the app knows about the Jig it is connected to, and the actions the screens take.
+/// What the app knows about the Yew it is connected to, and the actions the screens take.
 @MainActor
 @Observable
 final class AppModel {
@@ -69,7 +69,8 @@ final class AppModel {
 		if let link = UserDefaults.standard.string(forKey: "JigDirectLink") {
 			Task { await connectDirect(link: link) }
 		}
-		// `-JigPairLink <jig://pair?…>` pairs through the relay at launch, as scanning would.
+		// `-JigPairLink <yew://pair?…>` pairs through the relay at launch, as scanning would (a `jig://pair?…`
+		// link from a Mac before the rename works too).
 		if let link = UserDefaults.standard.string(forKey: "JigPairLink") {
 			Task { await pair(with: link) }
 		}
@@ -123,7 +124,7 @@ final class AppModel {
 	/// Pairs with the Mac whose QR code (or its link) this is: handshake with its secret, then keep it.
 	func pair(with text: String) async {
 		guard let link = PairingLink(text.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-			problem = String(localized: "That is not a Jig pairing link.")
+			problem = String(localized: "That is not a Yew pairing link.")
 			return
 		}
 		var pairing = Pairing(relay: link.relay, desktop: link.desktop, desktopKey: link.key, desktopName: link.name)
@@ -140,7 +141,7 @@ final class AppModel {
 			await refreshAll()
 			await notifications()
 		} catch RelayError.macOffline {
-			problem = String(localized: "The Mac is not online. Keep Jig running on the Mac with phone access on, then scan again.")
+			problem = String(localized: "The Mac is not online. Keep Yew running on the Mac with phone access on, then scan again.")
 		} catch {
 			problem = String(localized: "Pairing did not work. Show a new QR code on the Mac and scan it again.")
 		}

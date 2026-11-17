@@ -53,7 +53,7 @@ export function ProgressLine({
 				: t(`progressWaiting_${wait.kind}`);
 		spoken = t("progressSince", { time: formatClock(wait.since) });
 	} else if (working && transcript?.retry) {
-		// The request failed in a way that may pass; Jig waits and asks again by itself.
+		// The request failed in a way that may pass; Yew waits and asks again by itself.
 		const { attempt, of, seconds } = transcript.retry;
 		text = t("progressRetrying", { n: attempt, of, s: seconds });
 		hint = transcript.retry.text;

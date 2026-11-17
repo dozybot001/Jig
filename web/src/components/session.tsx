@@ -31,7 +31,6 @@ import {
 	ChevronIcon,
 	CodeIcon,
 	CompactIcon,
-	JigMark,
 	MenuIcon,
 	NotesIcon,
 	PlayIcon,
@@ -44,6 +43,7 @@ import {
 	TodoPendingIcon,
 	TrashIcon,
 } from "./icons.tsx";
+import { Mascot } from "./mascot.tsx";
 import { ProgressLine } from "./progress.tsx";
 import { Transcript } from "./transcript.tsx";
 import { Button, ErrorBox, Select, useAction } from "./ui.tsx";
@@ -602,7 +602,7 @@ function HomeView() {
 			<SidebarToggle className="home-menu" />
 			<div className="home">
 				<div className="home-intro">
-					<JigMark className="lockup-mark" size={40} />
+					<Mascot pose="greeting" height={104} className="home-mascot" />
 					<h1>{t("homeTitle")}</h1>
 				</div>
 				<div className="composer-box">

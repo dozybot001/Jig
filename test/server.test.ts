@@ -62,7 +62,7 @@ describe("local interface security", () => {
 		const first = await exchange();
 		assert.equal(first.status, 204);
 		const cookie = first.headers.get("Set-Cookie") ?? "";
-		assert.match(cookie, /^jig_4777=[\w-]+;/);
+		assert.match(cookie, /^yew_4777=[\w-]+;/);
 		assert.match(cookie, /HttpOnly/);
 		assert.match(cookie, /SameSite=Strict/);
 		assert.equal((await exchange()).status, 401);
@@ -71,7 +71,7 @@ describe("local interface security", () => {
 		});
 		assert.equal(ok.status, 200);
 		assert.equal(
-			(await request("/api/sessions", { headers: { Cookie: "jig_4777=forged" } })).status,
+			(await request("/api/sessions", { headers: { Cookie: "yew_4777=forged" } })).status,
 			401,
 		);
 	});

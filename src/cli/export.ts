@@ -3,9 +3,9 @@ import { parseArgs } from "node:util";
 import { type CliIo, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
 
-const HELP = `Usage: jig export <folder> [options]
+const HELP = `Usage: yew export <folder> [options]
 
-Write everything Jig keeps into a folder, as files you can read without Jig:
+Write everything Yew keeps into a folder, as files you can read without Yew:
 each session as Markdown; letters, decision cards, scheduled tasks and
 settings as JSON; and every version of every artifact. The folder must be new
 or empty.
@@ -21,7 +21,7 @@ Options:
 export function exportCommand(): Command {
 	return {
 		name: "export",
-		summary: "Write all of Jig's data into a folder",
+		summary: "Write all of Yew's data into a folder",
 		async run(args: string[], io: CliIo): Promise<number> {
 			const { values, positionals } = parseArgs({
 				args,
@@ -33,7 +33,7 @@ export function exportCommand(): Command {
 				io.stdout.write(HELP);
 				return EXIT_OK;
 			}
-			if (positionals.length !== 1) throw new UsageError("jig export needs one folder");
+			if (positionals.length !== 1) throw new UsageError("yew export needs one folder");
 			const folder = resolve(positionals[0] as string);
 			const { jigHome, dbPath } = await import("../server/paths.ts");
 			const { openDatabase } = await import("../server/db/database.ts");

@@ -4,7 +4,7 @@ import { conflict } from "./errors.ts";
 
 /**
  * What the data folder takes on disk, by kind (blueprint 6.10, item 36; docs/data-inventory.md), and
- * the one cleanup Jig offers: the over-long command output under `tmp`. Sizes are the files' lengths.
+ * the one cleanup Yew offers: the over-long command output under `tmp`. Sizes are the files' lengths.
  * Links are never followed, so a link in the folder counts as a link and nothing outside is touched.
  */
 export type DataPartId = "database" | "artifacts" | "logs" | "temp" | "other";
@@ -36,7 +36,14 @@ export interface CleanupResult {
 /** Whether a session has a command that may still be writing or reading its output files. */
 export type InUse = (sessionId: string) => boolean;
 
-const DATABASE_FILES = new Set(["jig.db", "jig.db-wal", "jig.db-shm"]);
+const DATABASE_FILES = new Set([
+	"yew.db",
+	"yew.db-wal",
+	"yew.db-shm",
+	"jig.db",
+	"jig.db-wal",
+	"jig.db-shm",
+]);
 const FOLDERS: Record<string, DataPartId> = { artifacts: "artifacts", logs: "logs", tmp: "temp" };
 
 function entries(dir: string): string[] {
@@ -116,7 +123,7 @@ function scanTemp(home: string, inUse: InUse): TempScan {
 
 const outside = () =>
 	conflict(
-		"The tmp folder in Jig's data folder is a link to somewhere else. Jig does not delete through it.",
+		"The tmp folder in Yew's data folder is a link to somewhere else. Yew does not delete through it.",
 		undefined,
 		"temp-outside",
 	);

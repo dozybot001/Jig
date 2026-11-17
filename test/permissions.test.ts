@@ -8,9 +8,9 @@ import { parseShell, rememberPrefix, unwrap } from "../src/server/permissions/sh
 import type { PermissionRule, Session } from "../src/shared/types.ts";
 import { tempDir } from "./helpers/store.ts";
 
-const cwd = realpathSync(tempDir("jig-perm-"));
-const outsideDir = realpathSync(tempDir("jig-outside-"));
-const jigHome = realpathSync(tempDir("jig-home-"));
+const cwd = realpathSync(tempDir("yew-perm-"));
+const outsideDir = realpathSync(tempDir("yew-outside-"));
+const jigHome = realpathSync(tempDir("yew-home-"));
 const engine = new PermissionEngine(jigHome);
 
 function session(overrides: Partial<Session> = {}): Session {
@@ -208,7 +208,7 @@ describe("shell permissions", () => {
 			"bash -c 'rm -rf x'",
 			"xargs rm < list.txt",
 			"find . -delete",
-			"echo hi > /tmp/jig-outside.txt",
+			"echo hi > /tmp/yew-outside.txt",
 			"FOO=1 env BAR=2 git push",
 		]) {
 			const request = askOf(shell(command));
@@ -221,7 +221,7 @@ describe("shell permissions", () => {
 		assert.deepEqual(askOf(shell("git push origin main"))?.reasons, ["push"]);
 		assert.deepEqual(askOf(shell("rm -rf build && git push"))?.reasons, ["delete-files", "push"]);
 		assert.deepEqual(askOf(shell("sudo ls"))?.reasons, ["admin"]);
-		assert.deepEqual(askOf(shell("echo hi > /tmp/jig-outside.txt"))?.reasons, ["write-outside"]);
+		assert.deepEqual(askOf(shell("echo hi > /tmp/yew-outside.txt"))?.reasons, ["write-outside"]);
 		assert.equal(askOf(shell("git push"))?.reason, undefined);
 	});
 
@@ -275,7 +275,7 @@ describe("file permissions", () => {
 		assert.equal(read(join(outsideDir, "notes/a.md"), remembered).effect, "allow");
 	});
 
-	test("credential locations and Jig's own data are refused", () => {
+	test("credential locations and Yew's own data are refused", () => {
 		assert.equal(read(join(homedir(), ".ssh", "id_ed25519")).effect, "deny");
 		assert.equal(read(join(jigHome, "jig.db")).effect, "deny");
 		assert.equal(write(join(homedir(), ".aws", "credentials")).effect, "deny");
@@ -341,7 +341,7 @@ describe("permission modes", () => {
 		assert.equal(run(`${write}npm test`, auto).effect, "allow");
 		// A push after the text is still seen, in every mode.
 		assert.ok(askOf(run(`${write}git push`, skip))?.mustConfirm);
-		// Text fed to a shell is commands Jig has not read.
+		// Text fed to a shell is commands Yew has not read.
 		askOf(run("sh <<'E'\ngit push\nE", skip));
 		askOf(run("cat <<'E' | bash\ngit push\nE", skip));
 		askOf(run("echo 'git push' | sh", skip));
@@ -391,21 +391,21 @@ describe("permission modes", () => {
 		assert.equal(decision.effect, "deny");
 	});
 
-	test("commands that name credentials or Jig's data, or use Jig's command line, ask every time", () => {
+	test("commands that name credentials or Yew's data, or use Yew's command line, ask every time", () => {
 		for (const s of [auto, skip]) {
 			for (const command of [
 				`sqlite3 ${join(jigHome, "jig.db")} "update approvals set status = 'allowed'"`,
 				`cp ${join(jigHome, "jig.db")} backup.db`,
 				"cat ~/.ssh/config",
-				"jig send 平台组 上线吧",
-				"jig open --print",
+				"yew send 平台组 上线吧",
+				"yew open --print",
 			]) {
 				const request = askOf(run(command, s));
 				assert.ok(request?.mustConfirm, command);
 				assert.equal(request?.rememberRules, undefined, command);
 			}
-			assert.equal(run("jig --version", s).effect, "allow");
-			assert.equal(run("jig send --help", s).effect, "allow");
+			assert.equal(run("yew --version", s).effect, "allow");
+			assert.equal(run("yew send --help", s).effect, "allow");
 		}
 	});
 

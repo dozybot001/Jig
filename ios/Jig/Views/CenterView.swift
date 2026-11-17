@@ -55,7 +55,13 @@ struct CenterView: View {
 			}
 			.overlay {
 				if model.loaded, model.center?.count == 0 {
-					ContentUnavailableView("Nothing is waiting for you", systemImage: "checkmark.seal")
+					ContentUnavailableView {
+						Label {
+							Text("Nothing is waiting for you")
+						} icon: {
+							Mascot(pose: .happy)
+						}
+					}
 				}
 			}
 			.navigationTitle("Approvals")
@@ -345,7 +351,7 @@ struct OptionRow: View {
 				Image(systemName: multiple
 					? (selected ? "checkmark.square.fill" : "square")
 					: (selected ? "largecircle.fill.circle" : "circle"))
-					.foregroundStyle(selected ? Color.primary : Color.secondary)
+					.foregroundStyle(selected ? Color.yewGreen : Color.secondary)
 				VStack(alignment: .leading, spacing: 2) {
 					HStack(spacing: 6) {
 						Text(option.label).foregroundStyle(.primary)
@@ -377,7 +383,7 @@ struct Tag: View {
 	}
 }
 
-/// Jig's buttons, as on the Mac (web/src/styles/app.css): the main one on a soft grey fill, the others
+/// Yew's buttons, as on the Mac (web/src/styles/app.css): the main one on a soft grey fill, the others
 /// outlined. Never a white fill in dark mode.
 struct CapsuleButton: ButtonStyle {
 	enum Kind { case primary, secondary, destructive }
@@ -411,10 +417,26 @@ extension Color {
 	static let jigPrimary = adaptive(light: 0xE6, dark: 0x38)
 	static let jigOnPrimary = adaptive(light: 0x0D, dark: 0xF2)
 	static let jigControl = adaptive(light: 0xDC, dark: 0x36)
+	/// Yew's ink, for the leaf of the mark and the wordmark: dark green, and pale in dark mode.
+	static let yewInk = adaptive(rgb: 0x1F3A2E, dark: 0xE3E8E4)
+	/// Yew's green, for the option picked: the one colour besides black, white and grey.
+	static let yewGreen = adaptive(rgb: 0x2F7D4F, dark: 0x3F9C66)
 
 	private static func adaptive(light: Int, dark: Int) -> Color {
 		Color(uiColor: UIColor { traits in
 			UIColor(white: CGFloat(traits.userInterfaceStyle == .dark ? dark : light) / 255, alpha: 1)
+		})
+	}
+
+	private static func adaptive(rgb light: Int, dark: Int) -> Color {
+		Color(uiColor: UIColor { traits in
+			let value = traits.userInterfaceStyle == .dark ? dark : light
+			return UIColor(
+				red: CGFloat(value >> 16 & 0xFF) / 255,
+				green: CGFloat(value >> 8 & 0xFF) / 255,
+				blue: CGFloat(value & 0xFF) / 255,
+				alpha: 1
+			)
 		})
 	}
 }

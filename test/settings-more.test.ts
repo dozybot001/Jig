@@ -72,7 +72,7 @@ describe("settings: defaults for new sessions", () => {
 
 	test("the default workspace is one of the saved ones, and is forgotten when that one is removed", async () => {
 		const { call } = setup();
-		const folder = tempDir("jig-ws-");
+		const folder = tempDir("yew-ws-");
 		const missing = await call("PATCH", "/api/settings", { defaultWorkspaceId: "w1" });
 		assert.equal(missing.status, 400);
 		assert.equal(missing.body.field, "defaultWorkspaceId");
@@ -180,7 +180,7 @@ describe("settings: search services", () => {
 describe("settings: MCP servers", () => {
 	function setup(file?: string) {
 		const { store } = newStore();
-		const home = tempDir("jig-home-");
+		const home = tempDir("yew-home-");
 		const path = join(home, "mcp.json");
 		if (file !== undefined) writeFileSync(path, file);
 		const hub = new McpHub({ jigHome: home, version: "0.0.0", env: {}, log: () => {} });
@@ -302,7 +302,7 @@ describe("settings: MCP servers", () => {
 		}
 	});
 
-	test("what the person wrote by hand stays: other keys, entries Jig skips, header values", async () => {
+	test("what the person wrote by hand stays: other keys, entries Yew skips, header values", async () => {
 		const { call, hub, saved } = setup(
 			JSON.stringify({
 				note: "mine",
@@ -435,8 +435,8 @@ describe("settings: starting at login and the launcher icon", () => {
 	function setup(platform: NodeJS.Platform = "darwin", fail = false) {
 		const { store } = newStore();
 		const calls: string[] = [];
-		const homeDir = tempDir("jig-user-");
-		const home = tempDir("jig-home-");
+		const homeDir = tempDir("yew-user-");
+		const home = tempDir("yew-home-");
 		let enabled = false;
 		const run = (command: string, args: string[]) => {
 			calls.push([command, ...args].join(" "));
@@ -456,14 +456,14 @@ describe("settings: starting at login and the launcher icon", () => {
 			homeDir,
 			uid: 501,
 			node: "/opt/node/bin/node",
-			entry: "/opt/jig/src/cli/main.ts",
+			entry: "/opt/yew/src/cli/main.ts",
 			run,
 		};
 		const appHost: AppHost = {
 			platform,
 			homeDir,
 			node: "/opt/node/bin/node",
-			entry: "/opt/jig/src/cli/main.ts",
+			entry: "/opt/yew/src/cli/main.ts",
 			icon: join(homeDir, "app-icon.png"),
 			run,
 		};
@@ -477,10 +477,10 @@ describe("settings: starting at login and the launcher icon", () => {
 		return { calls, homeDir, home, ...caller(app) };
 	}
 
-	test("on macOS the switch writes the LaunchAgent for the next login and leaves the running Jig alone", async () => {
+	test("on macOS the switch writes the LaunchAgent for the next login and leaves the running Yew alone", async () => {
 		const { call, calls, homeDir, home } = setup();
 		const file = join(homeDir, "Library", "LaunchAgents", `${SERVICE_LABEL}.plist`);
-		const launcher = join(homeDir, "Applications", "Jig.app");
+		const launcher = join(homeDir, "Applications", "Yew.app");
 		assert.deepEqual((await call("GET", "/api/system")).body, {
 			startAtLogin: { supported: true, on: false, file },
 			launcher: { supported: true, on: false, path: launcher },
@@ -491,8 +491,8 @@ describe("settings: starting at login and the launcher icon", () => {
 		const plist = readFileSync(file, "utf8");
 		assert.match(plist, /<string>serve<\/string>/);
 		assert.match(plist, /<key>PATH<\/key>\s*<string>\/opt\/homebrew\/bin:\/usr\/bin<\/string>/);
-		assert.match(plist, new RegExp(`<key>JIG_HOME</key>\\s*<string>${home}</string>`));
-		// Nothing is loaded or stopped now: that would start a second Jig, or stop this one.
+		assert.match(plist, new RegExp(`<key>YEW_HOME</key>\\s*<string>${home}</string>`));
+		// Nothing is loaded or stopped now: that would start a second Yew, or stop this one.
 		assert.deepEqual(calls, []);
 		const off = await call("PATCH", "/api/system", { startAtLogin: false });
 		assert.equal(off.body.startAtLogin.on, false);
@@ -502,7 +502,7 @@ describe("settings: starting at login and the launcher icon", () => {
 
 	test("on Linux the unit is enabled and disabled without starting or stopping it", async () => {
 		const { call, calls, homeDir } = setup("linux");
-		const file = join(homeDir, ".config", "systemd", "user", "jig.service");
+		const file = join(homeDir, ".config", "systemd", "user", "yew.service");
 		const before = await call("GET", "/api/system");
 		assert.deepEqual(before.body.startAtLogin, { supported: true, on: false, file });
 		assert.deepEqual(before.body.launcher, { supported: false, on: false, path: null });
@@ -510,10 +510,10 @@ describe("settings: starting at login and the launcher icon", () => {
 		const on = await call("PATCH", "/api/system", { startAtLogin: true });
 		assert.equal(on.body.startAtLogin.on, true);
 		assert.match(readFileSync(file, "utf8"), /ExecStart=.* serve/);
-		assert.ok(calls.includes("systemctl --user enable jig.service"));
+		assert.ok(calls.includes("systemctl --user enable yew.service"));
 		const off = await call("PATCH", "/api/system", { startAtLogin: false });
 		assert.equal(off.body.startAtLogin.on, false);
-		assert.ok(calls.includes("systemctl --user disable jig.service"));
+		assert.ok(calls.includes("systemctl --user disable yew.service"));
 		assert.equal(
 			calls.some((line) => line.includes("--now")),
 			false,
@@ -528,14 +528,14 @@ describe("settings: starting at login and the launcher icon", () => {
 		assert.match(failed.body.type, /service-failed$/);
 	});
 
-	test("the launcher switch makes and removes Jig.app", async () => {
+	test("the launcher switch makes and removes Yew.app", async () => {
 		const { call, homeDir } = setup();
-		const launcher = join(homeDir, "Applications", "Jig.app", "Contents", "MacOS", "jig-launcher");
+		const launcher = join(homeDir, "Applications", "Yew.app", "Contents", "MacOS", "yew-launcher");
 		const on = await call("PATCH", "/api/system", { launcher: true });
 		assert.equal(on.body.launcher.on, true);
 		assert.match(
 			readFileSync(launcher, "utf8"),
-			/'\/opt\/node\/bin\/node' '\/opt\/jig\/src\/cli\/main\.ts' serve/,
+			/'\/opt\/node\/bin\/node' '\/opt\/yew\/src\/cli\/main\.ts' serve/,
 		);
 		const off = await call("PATCH", "/api/system", { launcher: false });
 		assert.equal(off.body.launcher.on, false);
