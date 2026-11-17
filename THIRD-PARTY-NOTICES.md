@@ -1,6 +1,6 @@
 # Third-party notices
 
-Jig is published under the MIT license. It depends on the packages below, which npm installs
+Yew is published under the MIT license. It depends on the packages below, which npm installs
 beside it; each stays under its own license, found in that package's folder. This list is
 generated from `package-lock.json` by `scripts/notices.mjs`.
 
