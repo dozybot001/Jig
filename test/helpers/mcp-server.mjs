@@ -35,6 +35,12 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 						description: "Reads one variable.",
 						inputSchema: { type: "object", properties: { name: { type: "string" } } },
 					},
+					{
+						name: "wipe",
+						description: "Marked destructive by its server.",
+						inputSchema: { type: "object", properties: {} },
+						annotations: { destructiveHint: true },
+					},
 					{ name: "bad name!", description: "Not offered." },
 				],
 			},

@@ -318,6 +318,8 @@ export type ConfirmReason =
 	| "write-outside"
 	// An action of the computer control tool: a click or keystroke anywhere on the screen.
 	| "computer-control"
+	// An MCP tool that sends, publishes or deletes something in the service it connects to.
+	| "service-action"
 	// manage_jig changes that widen what a session may do (blueprint 6.2, item 10)
 	| "widen-permission"
 	| "change-folder"

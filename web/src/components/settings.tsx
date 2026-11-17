@@ -1865,6 +1865,10 @@ function McpServerRow({
 					<span className="hint" role="status">
 						{state}
 					</span>
+					{/* Which site the sign-in opens, so a server that sends it somewhere odd shows it first. */}
+					{server.state === "sign-in" && server.signInAt && !server.disabled && (
+						<span className="hint">{t("mcpSignInAt", { host: server.signInAt })}</span>
+					)}
 				</div>
 				<div className="setting-control">
 					{/* A link, so the browser opens the sign-in in a new tab without a pop-up to block. */}

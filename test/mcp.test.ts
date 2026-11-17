@@ -5,7 +5,7 @@ import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { JigError } from "../src/server/errors.ts";
 import { decisionFromPhone } from "../src/server/http/agents.ts";
-import { McpHub, readMcpConfig, special as specialFor } from "../src/server/mcp.ts";
+import { McpHub, outward, readMcpConfig, special as specialFor } from "../src/server/mcp.ts";
 import { builtinInstaller, builtinMcp, serverEnv } from "../src/server/mcp-builtin.ts";
 import {
 	addMcpEntry,
@@ -333,6 +333,63 @@ describe("the browser and computer control", () => {
 		}
 	});
 
+	test("a tool that sends, publishes or deletes in its service is asked about every time", async () => {
+		for (const name of [
+			"send_message",
+			"sendEmail",
+			"gmail_send_message",
+			"deploy_to_vercel",
+			"trash_thread",
+			"delete_issue",
+			"invite_user",
+			"share_file",
+			"merge_pull_request",
+			"push_files",
+		]) {
+			assert.equal(outward(name), true, name);
+		}
+		for (const name of [
+			"create_draft",
+			"search_threads",
+			"get_merge_request",
+			"list_deleted_files",
+			"update_issue",
+		]) {
+			assert.equal(outward(name), false, name);
+		}
+		const { hub, echo } = await tools("mail");
+		try {
+			// In the mode that asks nothing, with a rule for each tool.
+			const allowed = session([
+				{ effect: "allow", tool: "mcp__mail__wipe" },
+				{ effect: "allow", tool: "mcp__mail__echo" },
+				{ effect: "allow", tool: "mcp__mail__send_message" },
+			]);
+			const wipe = hub.tools().find((tool) => tool.name === "mcp__mail__wipe");
+			assert.ok(wipe);
+			const marked = engine.decide(wipe.subject({}, allowed, lookup), allowed);
+			assert.ok(marked.effect === "ask", "its server marks it destructive");
+			assert.equal(marked.request.mustConfirm, true);
+			assert.deepEqual(marked.request.reasons, ["service-action"]);
+			assert.equal(marked.request.rememberRules, undefined);
+			const named = engine.decide(
+				{
+					kind: "act",
+					tool: "mcp__mail__send_message",
+					summary: "",
+					always: true,
+					...specialFor("mail", "send_message"),
+				} as never,
+				allowed,
+			);
+			assert.ok(named.effect === "ask" && named.request.mustConfirm, "its name says it sends");
+			const plain = engine.decide(echo.subject({ text: "hi" }, allowed, lookup), allowed);
+			assert.equal(plain.effect, "allow");
+		} finally {
+			hub.stop();
+		}
+	});
+
 	test("always-allow from a phone, for a request that carries the warning, allows once", () => {
 		assert.equal(decisionFromPhone("allow_always", { warning: "acts-as-you" }), "allow_once");
 		assert.equal(decisionFromPhone("allow_always", { tool: "shell" }), "allow_always");
@@ -369,7 +426,7 @@ describe("MCP servers", () => {
 					kind: "stdio",
 					state: "ready",
 					error: null,
-					tools: ["echo", "env"],
+					tools: ["echo", "env", "wipe"],
 					signedIn: false,
 				},
 			);
@@ -378,7 +435,7 @@ describe("MCP servers", () => {
 			const tools = hub.tools();
 			assert.deepEqual(
 				tools.map((tool) => tool.name),
-				["mcp__test__echo", "mcp__test__env"],
+				["mcp__test__echo", "mcp__test__env", "mcp__test__wipe"],
 			);
 			const echo = tools[0];
 			// Every MCP tool asks the first time, in every permission mode, and can be remembered.

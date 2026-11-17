@@ -36,6 +36,8 @@ export interface McpServerView extends McpEntryView {
 	tools: string[];
 	/** Jig holds a sign-in for it. */
 	signedIn: boolean;
+	/** The site the browser goes to to sign in, once Jig has found it. */
+	signInAt?: string;
 }
 
 /** Names with text values (null allowed where a value can be removed); anything else is refused. */
@@ -73,6 +75,7 @@ export function mcpRoutes(store: Store, options: McpRoutesOptions): Hono<AppEnv>
 			error: entry.disabled ? null : (status?.error ?? null),
 			tools: entry.disabled ? [] : (status?.tools ?? []),
 			signedIn: status?.signedIn ?? false,
+			...(status?.signInAt && !entry.disabled ? { signInAt: status.signInAt } : {}),
 		};
 	};
 	const reload = () => {
@@ -174,11 +177,14 @@ export function oauthCallbackRoute(hub: McpHub, log?: (line: string) => void): H
 	const html = (text: string) => text.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 	app.get("/oauth/callback", async (c) => {
 		const state = c.req.query("state") ?? "";
+		// The address held a one-time code: nothing keeps a copy of the page.
+		c.header("Cache-Control", "no-store");
 		try {
 			const name = await hub.completeSignIn(
 				state,
 				c.req.query("code") ?? null,
 				c.req.query("error") ?? null,
+				c.req.query("iss") ?? null,
 			);
 			return c.html(
 				page(

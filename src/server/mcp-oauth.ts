@@ -6,6 +6,12 @@
  * The browser comes back to http://127.0.0.1:<port>/oauth/callback with a code, which Jig trades for
  * tokens. Tokens and registered clients are secrets: they are kept in the system keychain, never in
  * mcp.json, the database or logs.
+ *
+ * What a server says about where to sign in is checked before it is used (security review,
+ * 2026-11-18): every address is https; the details are for this server and from the sign-in server
+ * Jig asked; PKCE with S256 is supported; a sign-in server that names itself in the browser's return
+ * is the one the browser went to (RFC 9207). Requests that carry a code, a secret or a token do not
+ * follow redirects. Signing out asks the server to void the tokens where it says how (RFC 7009).
  */
 import { createHash, randomBytes } from "node:crypto";
 import type { KeyStore } from "./keys.ts";
@@ -20,10 +26,21 @@ export interface OAuthSettings {
 }
 
 interface Endpoints {
+	/** The sign-in server, as its own details name it. */
 	issuer: string;
 	authorization: string;
 	token: string;
 	registration?: string;
+	/** Where to void tokens when the person signs out (RFC 7009). */
+	revocation?: string;
+	/** It names itself in the browser's return to Jig (RFC 9207). */
+	namesItself?: boolean;
+}
+
+interface Discovered {
+	endpoints: Endpoints;
+	/** The scope the server's refusal named, if it did. */
+	scope: string | null;
 }
 
 /** What is kept for one server, in the keychain. */
@@ -62,7 +79,39 @@ export interface McpAuthOptions {
 
 /** How long a started sign-in waits for the browser to come back. */
 const PENDING_MS = 10 * 60 * 1000;
+/** How long what Jig found out about where to sign in is used again. */
+const FOUND_MS = 10 * 60 * 1000;
 const REQUEST_MS = 20_000;
+/** Voiding tokens on sign-out is a courtesy to the server: it does not hold up signing out for long. */
+const REVOKE_MS = 5_000;
+
+const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
+/**
+ * Whether Jig uses an address it was told about while signing in: https only, so a sign-in page, a
+ * code or a token never goes in the clear and a server cannot point Jig at other machines on the
+ * network. A server on this computer may use http on this computer.
+ */
+function usable(url: unknown, local: boolean): url is string {
+	if (typeof url !== "string") return false;
+	try {
+		const at = new URL(url);
+		return (
+			at.protocol === "https:" || (local && at.protocol === "http:" && LOOPBACK.has(at.hostname))
+		);
+	} catch {
+		return false;
+	}
+}
+
+/** The same address, a trailing slash aside. */
+function same(a: string, b: string): boolean {
+	try {
+		return new URL(a).href.replace(/\/+$/, "") === new URL(b).href.replace(/\/+$/, "");
+	} catch {
+		return false;
+	}
+}
 
 const b64url = (bytes: Buffer) => bytes.toString("base64url");
 
@@ -90,6 +139,7 @@ export class McpAuth {
 	readonly #now: () => number;
 	readonly #pending = new Map<string, Pending>();
 	readonly #refreshing = new Map<string, Promise<string | null>>();
+	readonly #found = new Map<string, { at: number; value: Promise<Discovered> }>();
 
 	constructor(options: McpAuthOptions) {
 		this.#keys = options.keys;
@@ -144,7 +194,7 @@ export class McpAuth {
 			resource: saved.resource,
 		});
 		if (saved.client.secret) body.set("client_secret", saved.client.secret);
-		const answer = await this.#form(saved.endpoints.token, body);
+		const answer = await this.#post(saved.endpoints.token, body);
 		if (!answer || typeof answer.access_token !== "string") {
 			// The sign-in no longer works: the person signs in again.
 			const { tokens: _gone, ...rest } = saved;
@@ -154,6 +204,12 @@ export class McpAuth {
 		const tokens = tokensFrom(answer, this.#now(), refresh);
 		await this.#save(server, { ...saved, tokens });
 		return tokens.access;
+	}
+
+	/** The site the person's browser goes to to sign in to a server, for the settings to name. */
+	async where(resource: string, challenge: string | null = null): Promise<string> {
+		const found = await this.#discovered(resource, challenge);
+		return new URL(found.endpoints.authorization).host;
 	}
 
 	/**
@@ -166,7 +222,7 @@ export class McpAuth {
 		settings: OAuthSettings = {},
 		challenge: string | null = null,
 	): Promise<string> {
-		const found = await this.#discover(resource, challenge);
+		const found = await this.#discovered(resource, challenge);
 		const saved = await this.#load(server);
 		let client: Saved["client"];
 		if (settings.clientId) {
@@ -180,7 +236,7 @@ export class McpAuth {
 			saved?.client.registered &&
 			saved.resource === resource &&
 			saved.client.redirectUri === this.#redirect &&
-			saved.endpoints.issuer === found.endpoints.issuer
+			same(saved.endpoints.issuer, found.endpoints.issuer)
 		) {
 			client = saved.client;
 		} else {
@@ -224,15 +280,28 @@ export class McpAuth {
 		return url.toString();
 	}
 
-	/** The browser came back with a code: trade it for tokens. Resolves with the server's name. */
-	async complete(state: string, code: string | null, error: string | null): Promise<string> {
+	/**
+	 * The browser came back with a code: trade it for tokens. `iss` is the sign-in server's name in the
+	 * return, when it gave one. Resolves with the server's name.
+	 */
+	async complete(
+		state: string,
+		code: string | null,
+		error: string | null,
+		iss: string | null = null,
+	): Promise<string> {
 		const pending = this.#pending.get(state);
 		this.#pending.delete(state);
 		if (!pending || this.#now() - pending.createdAt > PENDING_MS) {
 			throw new Error("This sign-in is not valid any more. Start it again from Jig.");
 		}
-		if (error || !code) throw new Error(`The sign-in was not completed (${error ?? "no code"}).`);
 		const { saved } = pending;
+		// RFC 9207: a return that names a sign-in server, or that should and does not, comes from the
+		// one the browser was sent to, or it is not used.
+		if (iss !== null ? !same(iss, saved.endpoints.issuer) : saved.endpoints.namesItself) {
+			throw new Error("The sign-in came back from another server than the one Jig sent you to.");
+		}
+		if (error || !code) throw new Error(`The sign-in was not completed (${error ?? "no code"}).`);
 		const body = new URLSearchParams({
 			grant_type: "authorization_code",
 			code,
@@ -242,7 +311,7 @@ export class McpAuth {
 			resource: saved.resource,
 		});
 		if (saved.client.secret) body.set("client_secret", saved.client.secret);
-		const answer = await this.#form(saved.endpoints.token, body);
+		const answer = await this.#post(saved.endpoints.token, body);
 		if (!answer || typeof answer.access_token !== "string") {
 			throw new Error("The server did not give Jig a token.");
 		}
@@ -250,35 +319,67 @@ export class McpAuth {
 		return pending.server;
 	}
 
-	/** Forgets the sign-in and the registered client. */
+	/**
+	 * Signs out: asks the server to void the tokens where it says how (RFC 7009), then forgets them and
+	 * the registered client. Whether the server voids them or not, Jig keeps nothing.
+	 */
 	async forget(server: string): Promise<void> {
+		const saved = await this.#load(server);
+		const revocation = saved?.endpoints.revocation;
+		if (saved?.tokens && revocation) {
+			const tokens: [string | undefined, string][] = [
+				[saved.tokens.refresh, "refresh_token"],
+				[saved.tokens.access, "access_token"],
+			];
+			for (const [token, hint] of tokens) {
+				if (!token) continue;
+				const body = new URLSearchParams({
+					token,
+					token_type_hint: hint,
+					client_id: saved.client.id,
+				});
+				if (saved.client.secret) body.set("client_secret", saved.client.secret);
+				await this.#post(revocation, body, REVOKE_MS);
+			}
+		}
 		await this.#keys.delete(server);
 	}
 
-	async #json(url: string): Promise<Record<string, unknown> | null> {
+	/** A GET for details; it may follow a redirect, but only to an address Jig would use. */
+	async #json(url: string, local: boolean): Promise<Record<string, unknown> | null> {
 		try {
 			const response = await this.#fetch(url, {
 				headers: { Accept: "application/json", "User-Agent": `jig/${this.#version}` },
 				signal: AbortSignal.timeout(REQUEST_MS),
 			});
-			if (!response.ok) return null;
+			if (!response.ok || !usable(response.url || url, local)) return null;
 			return (await response.json()) as Record<string, unknown>;
 		} catch {
 			return null;
 		}
 	}
 
-	async #form(url: string, body: URLSearchParams): Promise<Record<string, unknown> | null> {
+	/**
+	 * A POST that carries a code, a verifier, a secret or a token. A redirect is not followed: fetch
+	 * would send the whole body on to the new address, whichever site that is.
+	 */
+	async #post(
+		url: string,
+		body: URLSearchParams | string,
+		ms = REQUEST_MS,
+	): Promise<Record<string, unknown> | null> {
 		try {
 			const response = await this.#fetch(url, {
 				method: "POST",
+				redirect: "error",
 				headers: {
-					"Content-Type": "application/x-www-form-urlencoded",
+					"Content-Type":
+						typeof body === "string" ? "application/json" : "application/x-www-form-urlencoded",
 					Accept: "application/json",
 					"User-Agent": `jig/${this.#version}`,
 				},
 				body,
-				signal: AbortSignal.timeout(REQUEST_MS),
+				signal: AbortSignal.timeout(ms),
 			});
 			if (!response.ok) return null;
 			return (await response.json()) as Record<string, unknown>;
@@ -287,26 +388,59 @@ export class McpAuth {
 		}
 	}
 
+	/**
+	 * Where to sign in, found out once and used again for a while: the site the settings name is the
+	 * one the browser then goes to.
+	 */
+	#discovered(resource: string, challenge: string | null): Promise<Discovered> {
+		const key = `${resource}\n${challenge ?? ""}`;
+		const now = this.#now();
+		const kept = this.#found.get(key);
+		if (kept && now - kept.at < FOUND_MS) return kept.value;
+		const value = this.#discover(resource, challenge);
+		this.#found.set(key, { at: now, value });
+		value.catch(() => {
+			if (this.#found.get(key)?.value === value) this.#found.delete(key);
+		});
+		return value;
+	}
+
 	/** Where to sign in for a server, from its protected-resource metadata and its issuer's metadata. */
-	async #discover(
-		resource: string,
-		challenge: string | null,
-	): Promise<{ endpoints: Endpoints; scope: string | null }> {
+	async #discover(resource: string, challenge: string | null): Promise<Discovered> {
 		const at = new URL(resource);
+		const local = at.protocol === "http:" && LOOPBACK.has(at.hostname);
+		if (!usable(resource, local)) {
+			throw new Error("Jig signs in only to servers at https addresses.");
+		}
+		const named = param(challenge, "resource_metadata");
+		if (named !== null && !usable(named, local)) {
+			throw new Error(`The server pointed to an address that is not https (${named}).`);
+		}
 		const path = at.pathname === "/" ? "" : at.pathname;
 		const metadataUrls = [
-			param(challenge, "resource_metadata"),
+			named,
 			`${at.origin}/.well-known/oauth-protected-resource${path}`,
 			`${at.origin}/.well-known/oauth-protected-resource`,
 		].filter((url): url is string => Boolean(url));
 		let metadata: Record<string, unknown> | null = null;
 		for (const url of metadataUrls) {
-			metadata = await this.#json(url);
+			metadata = await this.#json(url, local);
 			if (metadata) break;
+		}
+		// RFC 9728, 3.3: details about another address are not used.
+		if (metadata && !(typeof metadata.resource === "string" && same(metadata.resource, resource))) {
+			throw new Error(
+				`The server's sign-in details are for another address (${String(metadata.resource)}).`,
+			);
 		}
 		const servers = metadata?.authorization_servers;
 		const issuer =
 			Array.isArray(servers) && typeof servers[0] === "string" ? servers[0] : at.origin;
+		if (!usable(issuer, local)) {
+			throw new Error(
+				`The server named a sign-in server that is not at an https address (${issuer}).`,
+			);
+		}
 		const base = new URL(issuer);
 		const issuerPath = base.pathname === "/" ? "" : base.pathname.replace(/\/$/, "");
 		const candidates = [
@@ -314,27 +448,58 @@ export class McpAuth {
 			`${base.origin}/.well-known/openid-configuration${issuerPath}`,
 			`${base.origin}${issuerPath}/.well-known/openid-configuration`,
 		];
+		let problem = "The server did not say where to sign in.";
 		for (const url of candidates) {
-			const found = await this.#json(url);
+			const found = await this.#json(url, local);
 			if (
-				found &&
-				typeof found.authorization_endpoint === "string" &&
-				typeof found.token_endpoint === "string"
+				!found ||
+				typeof found.authorization_endpoint !== "string" ||
+				typeof found.token_endpoint !== "string"
 			) {
-				return {
-					endpoints: {
-						issuer,
-						authorization: found.authorization_endpoint,
-						token: found.token_endpoint,
-						...(typeof found.registration_endpoint === "string"
-							? { registration: found.registration_endpoint }
-							: {}),
-					},
-					scope: param(challenge, "scope"),
-				};
+				continue;
 			}
+			// RFC 8414, 3.3: the details are those of the sign-in server Jig asked about.
+			if (typeof found.issuer !== "string" || !same(found.issuer, issuer)) {
+				problem = `The sign-in server's details are for another server (${String(found.issuer)}).`;
+				continue;
+			}
+			// The MCP authorization spec: no sign-in without PKCE with S256.
+			const methods = found.code_challenge_methods_supported;
+			if (!Array.isArray(methods) || !methods.includes("S256")) {
+				problem =
+					"The sign-in server does not say it supports PKCE with S256, which signing in needs.";
+				continue;
+			}
+			const addresses = [
+				found.authorization_endpoint,
+				found.token_endpoint,
+				found.registration_endpoint,
+				found.revocation_endpoint,
+			].filter((value): value is string => typeof value === "string");
+			const unusable = addresses.find((address) => !usable(address, local));
+			if (unusable !== undefined) {
+				problem = `The sign-in server named an address that is not https (${unusable}).`;
+				continue;
+			}
+			return {
+				endpoints: {
+					issuer: found.issuer,
+					authorization: found.authorization_endpoint,
+					token: found.token_endpoint,
+					...(typeof found.registration_endpoint === "string"
+						? { registration: found.registration_endpoint }
+						: {}),
+					...(typeof found.revocation_endpoint === "string"
+						? { revocation: found.revocation_endpoint }
+						: {}),
+					...(found.authorization_response_iss_parameter_supported === true
+						? { namesItself: true }
+						: {}),
+				},
+				scope: param(challenge, "scope"),
+			};
 		}
-		throw new Error("The server did not say where to sign in.");
+		throw new Error(problem);
 	}
 
 	/** Registers Jig as a public client of the authorization server (RFC 7591). */
@@ -344,29 +509,17 @@ export class McpAuth {
 				"This server only accepts clients registered in advance. Add its client ID and secret to its entry in mcp.json.",
 			);
 		}
-		let answer: Record<string, unknown> | null = null;
-		try {
-			const response = await this.#fetch(endpoints.registration, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Accept: "application/json",
-					"User-Agent": `jig/${this.#version}`,
-				},
-				body: JSON.stringify({
-					client_name: "Jig",
-					redirect_uris: [this.#redirect],
-					grant_types: ["authorization_code", "refresh_token"],
-					response_types: ["code"],
-					token_endpoint_auth_method: "none",
-					software_version: this.#version,
-				}),
-				signal: AbortSignal.timeout(REQUEST_MS),
-			});
-			if (response.ok) answer = (await response.json()) as Record<string, unknown>;
-		} catch {
-			answer = null;
-		}
+		const answer = await this.#post(
+			endpoints.registration,
+			JSON.stringify({
+				client_name: "Jig",
+				redirect_uris: [this.#redirect],
+				grant_types: ["authorization_code", "refresh_token"],
+				response_types: ["code"],
+				token_endpoint_auth_method: "none",
+				software_version: this.#version,
+			}),
+		);
 		if (!answer || typeof answer.client_id !== "string") {
 			throw new Error("The server did not let Jig register to sign in.");
 		}

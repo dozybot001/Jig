@@ -63,6 +63,8 @@ export interface McpServerView {
 	tools: string[];
 	/** Jig holds a sign-in for it (blueprint 6.11, item 40). */
 	signedIn: boolean;
+	/** The site the browser goes to to sign in, once Jig has found it. */
+	signInAt?: string;
 	/** Its entry names a client of the person's to sign in with. */
 	oauthClient: boolean;
 }

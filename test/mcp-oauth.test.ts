@@ -20,11 +20,14 @@ import { tempDir } from "./helpers/store.ts";
 const REDIRECT = "http://127.0.0.1:4777/oauth/callback";
 
 /** An MCP server that wants a bearer token, and the authorization server that hands them out. */
-async function provider(options: { register?: boolean } = {}) {
+async function provider(options: { register?: boolean; iss?: boolean; moveToken?: boolean } = {}) {
 	const seen = {
 		registrations: [] as unknown[],
 		tokens: [] as URLSearchParams[],
 		bearers: [] as string[],
+		revoked: [] as URLSearchParams[],
+		/** What reached the address the token endpoint redirected to. */
+		moved: [] as string[],
 	};
 	let challenge = "";
 	let valid = new Set<string>();
@@ -75,8 +78,25 @@ async function provider(options: { register?: boolean } = {}) {
 					authorization_endpoint: `${base}/as/authorize`,
 					token_endpoint: `${base}/as/token`,
 					...(options.register === false ? {} : { registration_endpoint: `${base}/as/register` }),
+					revocation_endpoint: `${base}/as/revoke`,
+					...(options.iss ? { authorization_response_iss_parameter_supported: true } : {}),
 					code_challenge_methods_supported: ["S256"],
 				});
+			}
+			if (path === "/as/revoke") {
+				seen.revoked.push(new URLSearchParams(body));
+				res.writeHead(200);
+				res.end();
+				return;
+			}
+			if (path === "/as/token" && options.moveToken) {
+				res.writeHead(307, { Location: `${base}/as/elsewhere` });
+				res.end();
+				return;
+			}
+			if (path === "/as/elsewhere") {
+				seen.moved.push(body);
+				return json(200, { access_token: "taken" });
 			}
 			if (path === "/as/register") {
 				seen.registrations.push(JSON.parse(body));
@@ -139,6 +159,7 @@ describe("signing in to an MCP server", () => {
 		try {
 			await hub.refresh();
 			assert.equal(status()?.state, "sign-in");
+			assert.equal(status()?.signInAt, new URL(server.base).host, "the settings name the site");
 			const url = new URL(await hub.signInUrl("demo"));
 			assert.equal(url.origin + url.pathname, `${server.base}/as/authorize`);
 			const params = Object.fromEntries(url.searchParams);
@@ -177,6 +198,18 @@ describe("signing in to an MCP server", () => {
 			await hub.signOut("demo");
 			assert.equal(status()?.state, "sign-in");
 			assert.equal(await keys.get("demo"), null);
+			// The server was asked to void both tokens first (RFC 7009).
+			assert.deepEqual(
+				server.seen.revoked.map((form) => [
+					form.get("token"),
+					form.get("token_type_hint"),
+					form.get("client_id"),
+				]),
+				[
+					["rt-1", "refresh_token", "c-1"],
+					["at-1", "access_token", "c-1"],
+				],
+			);
 		} finally {
 			hub.stop();
 			server.close();
@@ -246,6 +279,7 @@ describe("signing in to an MCP server", () => {
 			await hub.refresh();
 			const bad = await page.request("/oauth/callback?state=forged&code=code-1");
 			assert.equal(bad.status, 400);
+			assert.equal(bad.headers.get("cache-control"), "no-store");
 			assert.match(await bad.text(), /not valid any more/);
 			const url = new URL(await hub.signInUrl("demo"));
 			server.expect(url);
@@ -253,11 +287,131 @@ describe("signing in to an MCP server", () => {
 				`/oauth/callback?state=${url.searchParams.get("state")}&code=code-1`,
 			);
 			assert.equal(good.status, 200);
+			assert.equal(good.headers.get("cache-control"), "no-store");
 			assert.match(await good.text(), /已登录 demo/);
 			assert.equal(status()?.state, "ready");
 		} finally {
 			hub.stop();
 			server.close();
 		}
+	});
+	test("a return that names another sign-in server, or leaves out the name it should give, is not used", async () => {
+		const server = await provider({ iss: true });
+		const { hub, status } = setup({ url: `${server.base}/mcp` });
+		try {
+			await hub.refresh();
+			const start = async () => {
+				const url = new URL(await hub.signInUrl("demo"));
+				server.expect(url);
+				return url.searchParams.get("state") as string;
+			};
+			await assert.rejects(
+				hub.completeSignIn(await start(), "code-1", null, "https://elsewhere.example"),
+				/another server/,
+			);
+			await assert.rejects(
+				hub.completeSignIn(await start(), "code-1", null, null),
+				/another server/,
+			);
+			assert.equal(server.seen.tokens.length, 0, "no code was traded");
+			await hub.completeSignIn(await start(), "code-1", null, `${server.base}/as`);
+			assert.equal(status()?.state, "ready");
+		} finally {
+			hub.stop();
+			server.close();
+		}
+	});
+
+	test("a code is not sent on when the token address redirects", async () => {
+		const server = await provider({ moveToken: true });
+		const { hub, status } = setup({ url: `${server.base}/mcp` });
+		try {
+			await hub.refresh();
+			const url = new URL(await hub.signInUrl("demo"));
+			server.expect(url);
+			await assert.rejects(
+				hub.completeSignIn(url.searchParams.get("state") as string, "code-1", null),
+				/did not give Jig a token/,
+			);
+			assert.deepEqual(server.seen.moved, []);
+			assert.equal(status()?.state, "sign-in");
+		} finally {
+			hub.stop();
+			server.close();
+		}
+	});
+});
+
+describe("what a server says about signing in is checked before it is used", () => {
+	const resource = "https://mcp.example.com/mcp";
+	const prm = "https://mcp.example.com/.well-known/oauth-protected-resource/mcp";
+	const meta = "https://auth.example.com/.well-known/oauth-authorization-server";
+	const good: Record<string, Record<string, unknown>> = {
+		[prm]: { resource, authorization_servers: ["https://auth.example.com/"] },
+		[meta]: {
+			issuer: "https://auth.example.com",
+			authorization_endpoint: "https://auth.example.com/authorize",
+			token_endpoint: "https://auth.example.com/token",
+			code_challenge_methods_supported: ["S256"],
+		},
+	};
+	/** Starts a sign-in against a table of addresses and their answers, noting each address asked. */
+	const begin = (
+		table: Record<string, Record<string, unknown>>,
+		at = resource,
+		challenge: string | null = null,
+	) => {
+		const asked: string[] = [];
+		const fetch = (async (input: string | URL | Request) => {
+			const url = String(input);
+			asked.push(url);
+			const body = table[url];
+			return body
+				? new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } })
+				: new Response("", { status: 404 });
+		}) as typeof globalThis.fetch;
+		const keys = new MemoryKeyStore();
+		const auth = new McpAuth({ keys, redirectUri: REDIRECT, version: "0", fetch });
+		return { asked, result: auth.begin("demo", at, { clientId: "mine" }, challenge) };
+	};
+
+	test("details that hold together are used, a trailing slash aside", async () => {
+		const url = new URL(await begin(good).result);
+		assert.equal(url.origin + url.pathname, "https://auth.example.com/authorize");
+	});
+
+	test("an address that is not https is not used, nor asked", async () => {
+		await assert.rejects(begin(good, "http://mcp.example.com/mcp").result, /https addresses/);
+		const lan = begin(good, resource, 'Bearer resource_metadata="http://192.168.1.2/prm"');
+		await assert.rejects(lan.result, /not https/);
+		assert.deepEqual(lan.asked, []);
+		const plain = begin({
+			...good,
+			[prm]: { resource, authorization_servers: ["http://auth.example.com"] },
+		});
+		await assert.rejects(plain.result, /not at an https address/);
+		assert.ok(!plain.asked.some((url) => url.startsWith("http:")));
+		const token = begin({
+			...good,
+			[meta]: { ...good[meta], token_endpoint: "http://auth.example.com/token" },
+		});
+		await assert.rejects(token.result, /not https/);
+	});
+
+	test("details about another address, from another server, or without S256 are not used", async () => {
+		const other = { ...good, [prm]: { ...good[prm], resource: "https://other.example.com/mcp" } };
+		await assert.rejects(begin(other).result, /another address/);
+		const issuer = { ...good, [meta]: { ...good[meta], issuer: "https://elsewhere.example.com" } };
+		await assert.rejects(begin(issuer).result, /another server/);
+		const { code_challenge_methods_supported: _s256, ...noPkce } = good[meta] as Record<
+			string,
+			unknown
+		>;
+		await assert.rejects(begin({ ...good, [meta]: noPkce }).result, /S256/);
+		const plainOnly = {
+			...good,
+			[meta]: { ...good[meta], code_challenge_methods_supported: ["plain"] },
+		};
+		await assert.rejects(begin(plainOnly).result, /S256/);
 	});
 });

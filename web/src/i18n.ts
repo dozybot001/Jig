@@ -267,6 +267,7 @@ const zh = {
 	"confirm_write-credentials": "写入密钥所在的位置",
 	confirm_admin: "用管理员权限运行",
 	"confirm_computer-control": "操作整个屏幕（点击、输入或按键），每次都要你确认",
+	"confirm_service-action": "在你连接的服务里发送、发布或删除东西，每次都要你确认",
 	alwaysActsAsYou:
 		"选「总是允许」后，本会话内这个工具的所有调用都不再问，包括在自带浏览器里以你的登录身份发送、付款、删除这类操作。",
 	"confirm_write-outside": "改动工作区外的文件",
@@ -863,6 +864,7 @@ const zh = {
 	mcpClientSecret: "客户端密钥",
 	mcpClientStored: "保存后写进 Jig 数据目录的 mcp.json，这里不再显示。",
 	mcpSignIn: "登录",
+	mcpSignInAt: "登录页面在 {host}",
 	mcpSignOut: "退出登录",
 	"mcpState_sign-in": "需要登录",
 	mcpNone: "还没有 MCP 服务。",
@@ -1224,6 +1226,8 @@ const en: Record<MessageKey, string> = {
 	confirm_admin: "Run as administrator",
 	"confirm_computer-control":
 		"Act on the whole screen (click, type or press keys); asked every time",
+	"confirm_service-action":
+		"Send, publish or delete something in a service you connected; asked every time",
 	alwaysActsAsYou:
 		"With Always allow, no call of this tool in this session is asked about again, including sending, paying and deleting in the built-in browser with your sign-ins.",
 	"confirm_write-outside": "Change files outside the working folder",
@@ -1845,6 +1849,7 @@ const en: Record<MessageKey, string> = {
 	mcpClientSecret: "Client secret",
 	mcpClientStored: "Saved to mcp.json in Jig's data folder and not shown here again.",
 	mcpSignIn: "Sign in",
+	mcpSignInAt: "The sign-in page is at {host}",
 	mcpSignOut: "Sign out",
 	"mcpState_sign-in": "Needs sign-in",
 	mcpNone: "No MCP servers yet.",

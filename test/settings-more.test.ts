@@ -233,14 +233,14 @@ describe("settings: MCP servers", () => {
 					oauthClient: false,
 					state: "ready",
 					error: null,
-					tools: ["echo", "env"],
+					tools: ["echo", "env", "wipe"],
 					signedIn: false,
 				},
 			]);
 			assert.doesNotMatch(listed.text, /s3cret-greeting/);
 			assert.deepEqual(
 				hub.tools().map((tool) => tool.name),
-				["mcp__test__echo", "mcp__test__env"],
+				["mcp__test__echo", "mcp__test__env", "mcp__test__wipe"],
 			);
 		} finally {
 			hub.stop();
