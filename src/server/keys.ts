@@ -8,7 +8,7 @@ export interface KeyStore {
 	delete(provider: string): Promise<boolean>;
 }
 
-export const KEYCHAIN_SERVICE = "asia.tenon.yew";
+export const KEYCHAIN_SERVICE = "cn.tenonai.yew";
 /** Where Jig kept them before it was renamed Yew; a key found there moves over when first read. */
 const JIG_SERVICE = "asia.tenon.jig";
 

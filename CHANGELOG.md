@@ -8,7 +8,7 @@
 
 - Jig 改名为 Yew，用上 Yew 的名字、标志、配色和吉祥物：界面、命令行、文档和手机应用里都叫 Yew。一句话定义不变。
 - 命令改叫 `yew`，npm 包改叫 `@tenonai/yew`，`jig` 仍能用。第一次运行时，数据目录 `~/.jig` 搬到 `~/.yew`，原处留一个链接；API Key 第一次用到时从钥匙串里 Jig 的位置搬过来；环境变量改叫 `YEW_HOME`、`YEW_KEYCHAIN`、`YEW_MCP_BUILTIN`，旧的 `JIG_*` 仍然认。`yew service install`、`yew app install` 会换掉 Jig 装的开机启动和启动图标。
-- iPhone 和安卓上的 Yew 是新的应用（包名 `cn.tenonai.apps.yew`，安卓用新的签名证书），装上后要重新配对；配对二维码里的链接改成 `yew://`。
+- iPhone 和安卓上的 Yew 是新的应用（包名 `cn.tenonai.apps.yew`），装上后要重新配对；配对二维码里的链接改成 `yew://`。安卓版换了签名证书，SHA-256 指纹是 `9F:F5:6E:EA:A8:3C:DC:01:BA:66:D8:79:23:9C:DE:5A:2A:69:C3:AE:D2:60:5C:D8:E1:B9:34:8D:BF:28:61:B2`，不会覆盖安装 Jig，请先卸载 Jig 再装 Yew。
 
 ### 新增
 

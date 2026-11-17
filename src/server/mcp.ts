@@ -115,18 +115,39 @@ export function outward(tool: string): boolean {
  *   ones a common server's preset names (a calendar event invites its attendees). A server's word
  *   that a tool only reads is not taken.
  */
+/**
+ * The common server a configured one is: by its `preset` in mcp.json, or by the host of its address,
+ * so a person who renames the entry keeps the preset's rules. Failing those, by its name.
+ */
+function presetOf(server: string, config?: Pick<McpServerConfig, "url" | "preset">) {
+	const host = (url: string) => {
+		try {
+			return new URL(url).host;
+		} catch {
+			return null;
+		}
+	};
+	if (config?.preset) return MCP_PRESETS.find((preset) => preset.id === config.preset);
+	if (config?.url) {
+		const at = host(config.url);
+		return MCP_PRESETS.find((preset) => "url" in preset.connect && host(preset.connect.url) === at);
+	}
+	return MCP_PRESETS.find((preset) => preset.id === server);
+}
+
 export function special(
 	server: string,
 	tool: string,
 	args: JsonObject = {},
 	destructive = false,
+	config?: Pick<McpServerConfig, "url" | "preset">,
 ): { reasons?: ConfirmReason[]; warning?: "acts-as-you" } {
 	if (server === "computer") {
 		const action = typeof args.action === "string" ? args.action : "";
 		return COMPUTER_READS.has(action) ? {} : { reasons: ["computer-control"] };
 	}
 	if (server === "browser") return BROWSER_READS.has(tool) ? {} : { warning: "acts-as-you" };
-	const named = MCP_PRESETS.find((preset) => preset.id === server)?.asksEveryTime?.includes(tool);
+	const named = presetOf(server, config)?.asksEveryTime?.includes(tool);
 	return destructive || named || outward(tool) ? { reasons: ["service-action"] } : {};
 }
 
@@ -739,7 +760,7 @@ export class McpHub {
 					tool: name,
 					summary: `${server.name}: ${tool.name} ${shown.length > 300 ? `${shown.slice(0, 300)}…` : shown}`,
 					always: true,
-					...special(server.name, tool.name, args as JsonObject, tool.destructive),
+					...special(server.name, tool.name, args as JsonObject, tool.destructive, server.config),
 				};
 			},
 			async run(args, ctx): Promise<ToolResult> {

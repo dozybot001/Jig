@@ -471,6 +471,11 @@ describe("the browser and computer control", () => {
 			});
 			assert.deepEqual(specialFor("google-calendar", "list_events"), {});
 			assert.deepEqual(specialFor("gmail", "create_draft"), {});
+			// Renamed in mcp.json, it is still known by its address.
+			const renamed = { url: "https://calendarmcp.googleapis.com/mcp/v1" };
+			assert.deepEqual(specialFor("my-calendar", "create_event", {}, false, renamed), {
+				reasons: ["service-action"],
+			});
 			const plain = engine.decide(echo.subject({ text: "hi" }, allowed, lookup), allowed);
 			assert.equal(plain.effect, "allow");
 		} finally {
