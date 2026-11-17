@@ -140,9 +140,9 @@ const zh = {
 	rewindBusy: "会话在干活，停下后才能回溯",
 	rewindTitle: "回溯到这里？",
 	rewindBodyMine:
-		"这条消息和之后的对话会撤回：不再显示，也不再发给模型；这条消息放回输入框，可以改了再发。已经改的文件、跑过的命令和发出的信不会撤回，文件要恢复请用 git。",
+		"这条消息和之后的对话（消息、回复和工具调用）会从 Jig 里删掉，不能恢复；这条消息放回输入框，可以改了再发。已经发给模型服务商的内容收不回；改过的文件、跑过的命令和发出的信也不会撤回，文件要恢复请用 git。",
 	rewindBodyReply:
-		"这条回复之后的对话会撤回：不再显示，也不再发给模型。已经改的文件、跑过的命令和发出的信不会撤回，文件要恢复请用 git。",
+		"这条回复之后的对话（消息、回复和工具调用）会从 Jig 里删掉，不能恢复。已经发给模型服务商的内容收不回；改过的文件、跑过的命令和发出的信也不会撤回，文件要恢复请用 git。",
 	rewind: "回溯",
 	moveToTeam: "移到团队",
 	newTeamEllipsis: "新建团队…",
@@ -1100,9 +1100,9 @@ const en: Record<MessageKey, string> = {
 	rewindBusy: "The session is working; stop it first",
 	rewindTitle: "Go back to here?",
 	rewindBodyMine:
-		"This message and what came after are taken back: no longer shown or sent to the model. The message goes back into the box to change and send again. Files changed, commands run and letters sent are not undone; use git to restore files.",
+		"This message and what came after (messages, replies and tool calls) are deleted from Jig and cannot be restored. The message goes back into the box to change and send again. What was already sent to the model provider cannot be called back, and files changed, commands run and letters sent are not undone; use git to restore files.",
 	rewindBodyReply:
-		"What came after this reply is taken back: no longer shown or sent to the model. Files changed, commands run and letters sent are not undone; use git to restore files.",
+		"What came after this reply (messages, replies and tool calls) is deleted from Jig and cannot be restored. What was already sent to the model provider cannot be called back, and files changed, commands run and letters sent are not undone; use git to restore files.",
 	rewind: "Go back",
 	moveToTeam: "Move to team",
 	newTeamEllipsis: "New team…",

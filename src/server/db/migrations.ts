@@ -285,4 +285,12 @@ CREATE TABLE artifact_versions (
 	// Taking a conversation back (blueprint 6.11, item 42): entries after the point stay in the
 	// database, marked, and are no longer shown or sent to the model.
 	"ALTER TABLE messages ADD COLUMN rewound INTEGER NOT NULL DEFAULT 0;",
+	// Rewinding deletes what was taken back (security review, 2026-11-18); entries taken back before
+	// that lose their content now.
+	`UPDATE messages SET body = json_object('role', role, 'content', json('[]'), 'timestamp', created_at)
+	WHERE rewound = 1;
+DELETE FROM approvals WHERE tool_call_id IN (SELECT tool_calls.id FROM tool_calls
+	JOIN messages ON messages.id = tool_calls.message_id WHERE messages.rewound = 1);
+UPDATE tool_calls SET args = '{}', detail = NULL
+	WHERE message_id IN (SELECT id FROM messages WHERE rewound = 1);`,
 ];

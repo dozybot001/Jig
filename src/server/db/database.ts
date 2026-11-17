@@ -7,6 +7,9 @@ export type Db = DatabaseSync;
 export function openDatabase(path: string): Db {
 	const db = new DatabaseSync(path, { timeout: 5000 });
 	db.exec("PRAGMA foreign_keys = ON");
+	// What is deleted is overwritten with zeros, not left in free pages of the file: a rewound
+	// conversation, a deleted session.
+	db.exec("PRAGMA secure_delete = ON");
 	if (path !== ":memory:") {
 		db.exec("PRAGMA journal_mode = WAL");
 		db.exec("PRAGMA synchronous = NORMAL");

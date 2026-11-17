@@ -264,6 +264,39 @@ describe("taking a conversation back", () => {
 		assert.doesNotMatch(visible(store, fork.id).join(), /Now the header|header is fixed/);
 	});
 
+	test("what was taken back is deleted from the database, not only hidden", async () => {
+		const { store, agents, site, scripts } = setup();
+		scripts.set("Website", [
+			fauxAssistantMessage("The footer is fixed."),
+			toolUse(fauxToolCall("read", { path: "notes-sk-test-0042.txt" }, { id: "r1" })),
+			fauxAssistantMessage("Noted sk-test-0042."),
+		]);
+		agents.send(site.id, "Fix the footer.");
+		await agents.whenIdle(site.id);
+		agents.send(site.id, "My key is sk-test-0042, keep it.");
+		await agents.whenIdle(site.id);
+		const reply = store
+			.listEntries(site.id, { limit: 50 })
+			.entries.find((entry) => JSON.stringify(entry).includes("The footer is fixed.")) as Entry;
+		assert.equal(agents.rewind(site.id, reply.id), 4);
+		const everything = [
+			"SELECT body FROM messages",
+			"SELECT args, detail FROM tool_calls",
+			"SELECT data FROM session_events",
+			"SELECT request, response FROM approvals",
+			"SELECT text FROM message_search",
+		]
+			.flatMap((sql) =>
+				store.db
+					.prepare(sql)
+					.all()
+					.map((row) => JSON.stringify(row)),
+			)
+			.join("\n");
+		assert.doesNotMatch(everything, /sk-test-0042/);
+		assert.match(everything, /The footer is fixed/, "what came before stays");
+	});
+
 	test("to just before a message of yours, which can be forked from too", async () => {
 		const { store, agents, site, scripts } = setup();
 		scripts.set("Website", [fauxAssistantMessage("Done."), fauxAssistantMessage("Done again.")]);

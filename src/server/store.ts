@@ -340,6 +340,9 @@ export function validateSessionName(name: unknown): string {
  * with the session's next sequence number; events are published on the bus only after the transaction
  * that wrote them commits.
  */
+/** What a taken-back entry keeps: its role and time, without content (blueprint 6.11, item 42). */
+const TAKEN_BACK = "json_object('role', role, 'content', json('[]'), 'timestamp', created_at)";
+
 export class Store {
 	readonly db: Db;
 	readonly #bus: EventBus;
@@ -783,13 +786,16 @@ export class Store {
 	}
 
 	/**
-	 * Takes the conversation back to just after `throughSeq` (blueprint 6.11, item 42). The entries after
-	 * it stay in the database, marked, and are no longer shown, searched or sent to the model. Files
-	 * changed, commands run and letters sent meanwhile stay as they are. It cannot go back past the
-	 * latest summary of earlier history. Returns how many entries were taken back.
+	 * Takes the conversation back to just after `throughSeq` (blueprint 6.11, item 42). What came after
+	 * is deleted, since a rewind is often for a key or something private pasted by mistake (security
+	 * review, 2026-11-18): each entry keeps a row without content, so numbering and references stay
+	 * whole, and its tool calls' arguments and results, the approvals asked for them, its search entries
+	 * and the session's event history go. Files changed, commands run and letters sent meanwhile stay as
+	 * they are. It cannot go back past the latest summary of earlier history. Returns how many entries
+	 * were taken back.
 	 */
 	rewindSession(id: string, throughSeq: number): number {
-		return this.tx(() => {
+		const count = this.tx(() => {
 			this.getSession(id);
 			const summary = this.#q(
 				"SELECT seq FROM messages WHERE session_id = ? AND role = 'compaction' AND rewound = 0 ORDER BY seq DESC LIMIT 1",
@@ -817,12 +823,33 @@ export class Store {
 				WHERE session_id = ? AND status IN ('pending', 'waiting', 'running', 'needs_review')
 				AND message_id IN (SELECT id FROM messages WHERE session_id = ? AND rewound = 1)`,
 			).run(Date.now(), id, id);
+			this.#q(
+				`DELETE FROM approvals WHERE tool_call_id IN (SELECT id FROM tool_calls
+				WHERE message_id IN (SELECT id FROM messages WHERE session_id = ? AND rewound = 1))`,
+			).run(id);
+			this.#q(
+				`UPDATE tool_calls SET args = '{}', detail = NULL
+				WHERE message_id IN (SELECT id FROM messages WHERE session_id = ? AND rewound = 1)`,
+			).run(id);
+			this.#q(`UPDATE messages SET body = ${TAKEN_BACK} WHERE session_id = ? AND rewound = 1`).run(
+				id,
+			);
+			// Earlier events can carry what was taken back. A client that missed some loads the
+			// conversation again, as it does after a rewind anyway.
+			this.#q("DELETE FROM session_events WHERE session_id = ?").run(id);
 			// A fresh look at the folder and instruction files next turn; the context is measured again.
 			this.#q("UPDATE sessions SET context = NULL, context_tokens = 0 WHERE id = ?").run(id);
 			this.appendEvent(id, { type: "rewound", throughSeq });
 			this.#emitSession(id);
 			return gone.length;
 		});
+		// Old copies of the pages leave the write-ahead log too, where it is not in use.
+		try {
+			this.db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+		} catch {
+			// Another connection is reading; the log is overwritten later.
+		}
+		return count;
 	}
 
 	duplicateSession(id: string, name: string): Session {
