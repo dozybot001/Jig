@@ -1077,7 +1077,7 @@ export function describeRule(rule: PermissionRule): string {
 							? t("ruleFetch", { p: pattern })
 							: rule.tool === "read" && pattern
 								? t("ruleRead", { p: pattern })
-								: rule.tool === "manage_jig" && (pattern === "organize" || pattern === "configure")
+								: rule.tool === "manage_yew" && (pattern === "organize" || pattern === "configure")
 									? t(`manage_${pattern}`)
 									: !pattern && hasMessage(`ask_${rule.tool}`)
 										? t(`ask_${rule.tool}` as MessageKey)

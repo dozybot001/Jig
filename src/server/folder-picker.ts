@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { JigError } from "./errors.ts";
+import { YewError } from "./errors.ts";
 
 /** Runs osascript with the given arguments and returns its standard output. */
 export type RunScript = (args: string[]) => Promise<string>;
@@ -23,7 +23,7 @@ export async function pickFolder(
 	run: RunScript = runOsascript,
 ): Promise<string | null> {
 	if (platform !== "darwin") {
-		throw new JigError(
+		throw new YewError(
 			"not-supported",
 			501,
 			"Yew cannot open a folder picker on this computer. Type the folder's path instead.",
@@ -36,6 +36,6 @@ export async function pickFolder(
 		const text = `${(error as Error).message} ${(error as { stderr?: string }).stderr ?? ""}`;
 		// osascript reports a cancelled dialog as error -128.
 		if (text.includes("-128")) return null;
-		throw new JigError("picker-failed", 500, "The folder picker could not be opened.");
+		throw new YewError("picker-failed", 500, "The folder picker could not be opened.");
 	}
 }

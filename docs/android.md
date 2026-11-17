@@ -1,6 +1,6 @@
 # Yew 安卓版
 
-**改名（2026-11-18）**：产品改名 Yew（蓝图 1.15、1.16）。安卓版跟着改：包名 `cn.tenonai.apps.yew`（调试版 `.yew.debug`），源码在 `cn/tenonai/apps/yew/`；用一把新的签名密钥（7.2 第一张表），旧的 Jig 密钥留着不删，1.2.0 及以前的安装包是它签的；安装包叫 `Yew-<版本>.apk`；配对链接是 `yew://pair?…`，也认旧的 `jig://pair?…`；调试参数改成 `yew.pair`、`yew.demo`、`yew.tab`。新包名在手机上是另一个应用，装过 Jig 的要另装 Yew、重新配对。下面的交接和验证记录写在改名之前，里面的 Jig、`jig` 照当时的名字留着。
+**改名（2026-11-18）**：产品改名 Yew（蓝图 1.15、1.16）。安卓版跟着改：包名 `cn.tenonai.apps.yew`（调试版 `.yew.debug`），源码在 `cn/tenonai/apps/yew/`；用一把新的签名密钥（7.2 第一张表），旧的 Jig 密钥留着不删，1.2.0 及以前的安装包是它签的；安装包叫 `Yew-<版本>.apk`；配对链接是 `yew://pair?…`，也认旧的 `jig://pair?…`；调试参数改成 `yew.pair`、`yew.demo`、`yew.tab`；本机的两台模拟器改名 `yew37`（Android 17，端口 5570）、`yew26`（Android 8.0，端口 5572）；手机和电脑之间握手、推送加密的标签改成 `yew-remote/1`、`yew-push/1`。新包名在手机上是另一个应用，装过 Jig 的要另装 Yew、重新配对。下面的交接和验证记录写在改名之前，里面的 Jig、`jig` 照当时的名字留着。
 
 状态（2026-11-15）：功能写完（含 1.0.0 加的「产物」入口），能构建，单元测试通过，在 Android 17 和 Android 8.0 两台模拟器上走查过（第 6 节）。签名密钥 11-15 02:07 已生成，02:27 做了备份和恢复演练（7.2）。1.0.1 已于 11-15 放到 GitHub 和 Gitee 的 Releases（7.5）。还没做：真机、扫码的实测、发布。安卓版不卡 v1 的验收（蓝图第十三节）。
 
@@ -113,17 +113,17 @@
 连本机的测试电脑：
 
 ```bash
-node android/scripts/test-computer.ts /tmp/jig-android    # 配对链接写在 /tmp/jig-android/link.txt
-emulator -avd jig37 -port 5570 &                            # Jig 自己的模拟器，固定端口，序列号 emulator-5570
+node android/scripts/test-computer.ts /tmp/yew-android    # 配对链接写在 /tmp/yew-android/link.txt
+emulator -avd yew37 -port 5570 &                            # Yew 自己的模拟器，固定端口，序列号 emulator-5570
 adb -s emulator-5570 reverse tcp:8791 tcp:8791
-adb -s emulator-5570 shell am start -n cn.tenonai.apps.yew.debug/cn.tenonai.apps.yew.MainActivity --es yew.pair "'$(cat /tmp/jig-android/link.txt)'"
-echo "ask git push origin main" > /tmp/jig-android/cmd      # 电脑端出现一个待授权的操作，手机收到通知
-echo settle > /tmp/jig-android/cmd                          # 电脑端处理掉，手机上的通知撤下
+adb -s emulator-5570 shell am start -n cn.tenonai.apps.yew.debug/cn.tenonai.apps.yew.MainActivity --es yew.pair "'$(cat /tmp/yew-android/link.txt)'"
+echo "ask git push origin main" > /tmp/yew-android/cmd      # 电脑端出现一个待授权的操作，手机收到通知
+echo settle > /tmp/yew-android/cmd                          # 电脑端处理掉，手机上的通知撤下
 ```
 
 这台 Mac 上别的会话也在用模拟器，创始人的真机也可能连着，所以：
 
-- 每条 `adb` 命令都带 `-s <序列号>`，不用不带序列号的 `adb`，也不「关掉全部模拟器」。Jig 的两台模拟器 `jig37`、`jig26` 固定用端口 5570 和 5572（序列号 `emulator-5570`、`emulator-5572`），操作前用 `adb -s <序列号> emu avd name` 核对是自己那台，结束时只关自己那台。
+- 每条 `adb` 命令都带 `-s <序列号>`，不用不带序列号的 `adb`，也不「关掉全部模拟器」。Yew 的两台模拟器 `yew37`、`yew26` 固定用端口 5570 和 5572（序列号 `emulator-5570`、`emulator-5572`），操作前用 `adb -s <序列号> emu avd name` 核对是自己那台，结束时只关自己那台。
 - 真机（创始人的 Redmi）上有他的真实数据：没有他在本会话里明说，不往上装包、不操作。
 - 2026-11-15 15:41 我犯过一次错：没核对就认定 `emulator-5554` 是自己的，其实那是 PassBy 会话的 `passby37`。我往它上面装了 Jig 的调试包、打开过、点了一下、截了图，然后把它关了机；没有动 PassBy 的应用和数据。自己的 `jig37` 当时起在 5556 上，被留着没关。已告诉 PassBy 会话。
 

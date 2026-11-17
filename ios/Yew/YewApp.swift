@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct JigApp: App {
+struct YewApp: App {
 	@UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 	@State private var model = AppModel()
 

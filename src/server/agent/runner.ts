@@ -29,7 +29,7 @@ import {
 	localDay,
 	reached,
 } from "../budget.ts";
-import { conflict, invalid, JigError } from "../errors.ts";
+import { conflict, invalid, YewError } from "../errors.ts";
 import { PostOffice } from "../mail/post.ts";
 import { Manager } from "../manage.ts";
 import type { ModelGateway, ModelInfo } from "../model/gateway.ts";
@@ -51,7 +51,7 @@ import {
 	type ToolResult,
 } from "../tools/types.ts";
 import { ContextKeeper, notice } from "./compaction.ts";
-import { JIG_NOTE, sanitizeInterrupted, toModelMessages, usageTotals } from "./context.ts";
+import { sanitizeInterrupted, toModelMessages, usageTotals, YEW_NOTE } from "./context.ts";
 import { Held } from "./held.ts";
 import { runHelper } from "./helper.ts";
 import { freeName, Mailroom } from "./mailroom.ts";
@@ -654,14 +654,14 @@ export class Agents {
 		} catch (error) {
 			endStatus = "error";
 			detail =
-				error instanceof JigError
+				error instanceof YewError
 					? error.message
 					: `Yew hit an internal error: ${(error as Error).message}`;
-			if (!(error instanceof JigError))
+			if (!(error instanceof YewError))
 				this.#log(`session ${sessionId}: ${(error as Error).stack ?? error}`);
 			// The code lets the interface explain the problem in the person's language.
 			const data: JsonObject =
-				error instanceof JigError
+				error instanceof YewError
 					? { code: error.code, ...((error.details ?? {}) as JsonObject) }
 					: { code: "internal-error" };
 			this.#notice(sessionId, "error", detail, data);
@@ -1289,7 +1289,7 @@ export class Agents {
 		const notes = this.#notes.get(sessionId) ?? [];
 		this.#notes.delete(sessionId);
 		for (const note of notes) {
-			this.#store.appendEntry(sessionId, userEntry(`${JIG_NOTE} ${note}`));
+			this.#store.appendEntry(sessionId, userEntry(`${YEW_NOTE} ${note}`));
 		}
 		const letters = this.#mail.deliver(sessionId, this.#mail.firstDelivery(sessionId));
 		const fromPerson = this.#store.deliverQueue(sessionId, userEntry).length;

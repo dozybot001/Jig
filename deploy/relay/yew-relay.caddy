@@ -7,7 +7,7 @@ relay.tenonai.cn {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		-Server
 	}
-	# BEGIN JIG RELAY
+	# BEGIN YEW RELAY
 	reverse_proxy 127.0.0.1:7290
-	# END JIG RELAY
+	# END YEW RELAY
 }

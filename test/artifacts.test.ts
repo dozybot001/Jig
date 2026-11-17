@@ -153,7 +153,7 @@ describe("artifacts", () => {
 
 		// A phone looks at artifacts but does not delete them.
 		const asPhone = await app.fetch(
-			new Request(`http://jig.internal/api/artifacts/${note.id}`, { method: "DELETE" }),
+			new Request(`http://yew.internal/api/artifacts/${note.id}`, { method: "DELETE" }),
 			{
 				device: "d1",
 			},

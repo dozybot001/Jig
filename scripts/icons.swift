@@ -98,5 +98,5 @@ for (name, background, leaf) in [
 	context.setFillColor(background)
 	context.fill(CGRect(x: 0, y: 0, width: 1024, height: 1024))
 	placeMark(context, size: 1024, width: 660, leaf: leaf)
-	try write(context, "ios/Jig/Assets.xcassets/AppIcon.appiconset/\(name)", opaque: true)
+	try write(context, "ios/Yew/Assets.xcassets/AppIcon.appiconset/\(name)", opaque: true)
 }

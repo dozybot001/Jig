@@ -137,7 +137,7 @@ describe("scheduled tasks", () => {
 		assert.equal(post.mail.listLetters({ limit: 10 }).items.length, 0);
 		scheduler.tick(at(2026, 11, 9, 9, 0) + 400);
 		const [letter] = post.mail.listLetters({ limit: 10 }).items;
-		assert.equal(letter?.fromKind, "jig");
+		assert.equal(letter?.fromKind, "yew");
 		assert.equal(letter?.fromName, "每周周报");
 		assert.equal(letter?.kind, "request");
 		assert.equal(letter?.summary, "写本周周报");
@@ -273,7 +273,7 @@ describe("scheduled runs", () => {
 
 		const [letter] = entries(weekly).filter((entry) => entry.role === "user" && entry.letter);
 		assert.ok(letter?.role === "user" && letter.letter);
-		assert.equal(letter.letter.from.kind, "jig");
+		assert.equal(letter.letter.from.kind, "yew");
 		assert.equal(letter.letter.from.name, "每周周报");
 		assert.match(
 			textOf(letter),
@@ -352,7 +352,7 @@ describe("scheduled runs", () => {
 		await until(() => !agents.isRunning(design.id));
 	});
 
-	test("the main conversation sets up tasks with manage_jig; a run mode wider than the session's is confirmed", async () => {
+	test("the main conversation sets up tasks with manage_yew; a run mode wider than the session's is confirmed", async () => {
 		const { store, agents, make, script, said } = harness();
 		const main = make("总办", { options: { permissionMode: "skip" } });
 		make("设计", { options: { permissionMode: "manual" } });
@@ -360,7 +360,7 @@ describe("scheduled runs", () => {
 		script(main, [
 			toolUse(
 				fauxToolCall(
-					"manage_jig",
+					"manage_yew",
 					{
 						schedules: [
 							{ name: "日报", cron: "0 18 * * 1-5", session: "设计", message: "写今天的日报" },
@@ -371,7 +371,7 @@ describe("scheduled runs", () => {
 			),
 			toolUse(
 				fauxToolCall(
-					"manage_jig",
+					"manage_yew",
 					{ schedules: [{ schedule: "日报", permission: "skip", enabled: false }] },
 					{ id: "s2" },
 				),
@@ -456,7 +456,7 @@ describe("scheduled tasks over the API and the command line", () => {
 		assert.equal(changed.permissionMode, null);
 		const ran = await call("POST", `/api/schedules/${task.id}/run`);
 		assert.equal(ran.status, 200);
-		assert.equal((await ran.json()).letter.fromKind, "jig");
+		assert.equal((await ran.json()).letter.fromKind, "yew");
 		const again = await call("POST", `/api/schedules/${task.id}/run`);
 		assert.equal(again.status, 409);
 		assert.equal((await again.json()).type.endsWith("/schedule-busy"), true);

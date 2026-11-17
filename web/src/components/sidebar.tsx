@@ -148,7 +148,7 @@ function InlineRename({
 }
 
 /** What a dragged session row carries: the session's id. */
-const SESSION_DRAG = "application/x-jig-session";
+const SESSION_DRAG = "application/x-yew-session";
 
 /**
  * Lets a row take a session dragged from the sessions list: dropped on a team it joins the team, on a

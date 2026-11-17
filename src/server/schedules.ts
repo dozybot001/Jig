@@ -50,7 +50,7 @@ function toSchedule(row: ScheduleRow): Schedule {
 	};
 }
 
-/** What the person or manage_jig gives for a task; the session by id or name. Missing fields keep theirs. */
+/** What the person or manage_yew gives for a task; the session by id or name. Missing fields keep theirs. */
 export interface ScheduleFields {
 	name?: string;
 	cron?: string;

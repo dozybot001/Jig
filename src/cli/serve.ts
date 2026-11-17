@@ -119,11 +119,11 @@ export function serveCommand(): Command {
 			const { systemKeys } = await import("../server/keys.ts");
 			const { builtinMcp, mcpInstaller } = await import("../server/mcp-builtin.ts");
 			const mcp = new McpHub({
-				jigHome: home,
+				yewHome: home,
 				version: VERSION,
 				log,
 				builtin: builtinMcp(home, io.env as NodeJS.ProcessEnv),
-				prepare: mcpInstaller({ jigHome: home, env: io.env as NodeJS.ProcessEnv, log }),
+				prepare: mcpInstaller({ yewHome: home, env: io.env as NodeJS.ProcessEnv, log }),
 				// Sign-ins to MCP servers: tokens in the keychain; the browser comes back to this port.
 				auth: new McpAuth({
 					keys: systemKeys("mcp", io.env as NodeJS.ProcessEnv),
@@ -288,8 +288,8 @@ export function openCommand(): Command {
 				io.stdout.write(OPEN_HELP);
 				return EXIT_OK;
 			}
-			const { jigHome } = await import("../server/paths.ts");
-			const home = jigHome(io.env);
+			const { yewHome } = await import("../server/paths.ts");
+			const home = yewHome(io.env);
 			let info: ServeFile;
 			try {
 				info = JSON.parse(readFileSync(serveFile(home), "utf8")) as ServeFile;

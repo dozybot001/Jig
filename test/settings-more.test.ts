@@ -183,7 +183,7 @@ describe("settings: MCP servers", () => {
 		const home = tempDir("yew-home-");
 		const path = join(home, "mcp.json");
 		if (file !== undefined) writeFileSync(path, file);
-		const hub = new McpHub({ jigHome: home, version: "0.0.0", env: {}, log: () => {} });
+		const hub = new McpHub({ yewHome: home, version: "0.0.0", env: {}, log: () => {} });
 		const app = createApp({ store, log: () => {}, mcp: { home, hub } });
 		const saved = () => JSON.parse(readFileSync(path, "utf8"));
 		return { home, hub, path, saved, ...caller(app) };

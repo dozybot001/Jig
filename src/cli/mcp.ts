@@ -41,17 +41,17 @@ export function mcpCommand(): Command {
 			if (positionals.length !== 1 || positionals[0] !== "list") {
 				throw new UsageError("yew mcp needs list");
 			}
-			const { jigHome } = await import("../server/paths.ts");
+			const { yewHome } = await import("../server/paths.ts");
 			const { McpHub } = await import("../server/mcp.ts");
 			const { builtinInstaller, builtinMcp } = await import("../server/mcp-builtin.ts");
-			const home = jigHome(io.env);
+			const home = yewHome(io.env);
 			const hub = new McpHub({
-				jigHome: home,
+				yewHome: home,
 				version: VERSION,
 				env: io.env as NodeJS.ProcessEnv,
 				log: () => {},
 				builtin: builtinMcp(home, io.env as NodeJS.ProcessEnv),
-				prepare: builtinInstaller({ jigHome: home, env: io.env as NodeJS.ProcessEnv }),
+				prepare: builtinInstaller({ yewHome: home, env: io.env as NodeJS.ProcessEnv }),
 			});
 			try {
 				await hub.refresh();

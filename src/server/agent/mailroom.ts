@@ -12,7 +12,7 @@ import {
 	type Session,
 	type SessionStatus,
 } from "../../shared/types.ts";
-import { conflict, invalid, JigError } from "../errors.ts";
+import { conflict, invalid, YewError } from "../errors.ts";
 import { decisionRef, letterRef, letterText, type ScheduleRef } from "../mail/envelope.ts";
 import { BODY_MAX, type PostOffice, reasonText, SUMMARY_MAX } from "../mail/post.ts";
 import type { ModelGateway } from "../model/gateway.ts";
@@ -472,7 +472,7 @@ export class Mailroom {
 				},
 			);
 		} catch (error) {
-			if (!(error instanceof JigError)) throw error;
+			if (!(error instanceof YewError)) throw error;
 			this.#log(`session ${session.id}: no ${letter.kind} to ${to}: ${error.message}`);
 		}
 	}

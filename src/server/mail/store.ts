@@ -278,7 +278,7 @@ export class MailStore {
 	/** Letters from scheduled tasks the session has read in the turn that is ending. */
 	scheduledRead(sessionId: string): Letter[] {
 		const rows = this.#q(
-			`SELECT * FROM letters WHERE to_session = ? AND status = 'delivered' AND from_kind = 'jig'
+			`SELECT * FROM letters WHERE to_session = ? AND status = 'delivered' AND from_kind = 'yew'
 				AND schedule_id IS NOT NULL ORDER BY created_at, id`,
 		).all(sessionId) as unknown as LetterRow[];
 		return rows.map(toLetter);

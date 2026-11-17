@@ -43,7 +43,7 @@ actor RelayChannel {
 		var initiator = NoiseInitiator(
 			staticKey: key,
 			remoteStatic: pairing.desktopKey,
-			prologue: Data("jig-remote/1:\(pairing.desktop)".utf8)
+			prologue: Data("yew-remote/1:\(pairing.desktop)".utf8)
 		)
 		let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
 		let name = await UIDevice.current.name

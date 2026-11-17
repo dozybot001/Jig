@@ -957,7 +957,7 @@ describe("organizing sessions", () => {
 		script(main, [
 			toolUse(
 				fauxToolCall(
-					"manage_jig",
+					"manage_yew",
 					{
 						teams: [{ name: "产品" }],
 						sessions: [
@@ -970,7 +970,7 @@ describe("organizing sessions", () => {
 			),
 			toolUse(
 				fauxToolCall(
-					"manage_jig",
+					"manage_yew",
 					{ teams: [{ name: "临时" }], sessions: [{ session: b.id, name: "甲 · 产品" }] },
 					{ id: "o2" },
 				),
@@ -989,7 +989,7 @@ describe("organizing sessions", () => {
 			{ action: "move_to_team", sessions: ["乙"], team: "产品" },
 		]);
 		assert.deepEqual(request.rememberRules, [
-			{ effect: "allow", tool: "manage_jig", pattern: "organize" },
+			{ effect: "allow", tool: "manage_yew", pattern: "organize" },
 		]);
 		agents.answer(approval?.id as string, { decision: "allow_once" });
 		await until(() => said(main).some((text) => text.includes("整理好了")));
@@ -1005,12 +1005,12 @@ describe("organizing sessions", () => {
 		assert.ok(!store.listGroups().some((group) => group.name === "临时"));
 		assert.equal(store.getSession(b.id).name, "乙");
 		const mainTools = (seen.get("总办")?.[0]?.messages[0]?.toolsAdded ?? []).map((t) => t.name);
-		assert.ok(mainTools.includes("manage_jig"));
+		assert.ok(mainTools.includes("manage_yew"));
 		script(b, [fauxAssistantMessage("好")]);
 		agents.send(b.id, "你好");
 		await until(() => said(b).length === 1);
 		const otherTools = (seen.get("乙")?.[0]?.messages[0]?.toolsAdded ?? []).map((t) => t.name);
-		assert.ok(!otherTools.includes("manage_jig"));
+		assert.ok(!otherTools.includes("manage_yew"));
 	});
 
 	test("settings changes always ask; widening a session must be confirmed every time and leaves a trace", async () => {
@@ -1021,14 +1021,14 @@ describe("organizing sessions", () => {
 		script(main, [
 			toolUse(
 				fauxToolCall(
-					"manage_jig",
+					"manage_yew",
 					{ sessions: [{ session: "UI", role: "负责界面", pinned: true }] },
 					{ id: "m1" },
 				),
 			),
 			toolUse(
 				fauxToolCall(
-					"manage_jig",
+					"manage_yew",
 					{ sessions: [{ session: "UI", permission: "skip", can_post_cards: true }] },
 					{ id: "m2" },
 				),
@@ -1042,7 +1042,7 @@ describe("organizing sessions", () => {
 		const first = configure?.request as PermissionRequest;
 		assert.equal(first.mustConfirm, false);
 		assert.deepEqual(first.rememberRules, [
-			{ effect: "allow", tool: "manage_jig", pattern: "configure" },
+			{ effect: "allow", tool: "manage_yew", pattern: "configure" },
 		]);
 		assert.deepEqual(first.changes, [
 			{ action: "pin", session: "UI", on: true },
@@ -1083,7 +1083,7 @@ describe("organizing sessions", () => {
 		});
 		store.setSetting("defaultPermissionMode", "manual");
 		script(helper, [
-			toolUse(fauxToolCall("manage_jig", { sessions: [{ name: "文档" }] }, { id: "d1" })),
+			toolUse(fauxToolCall("manage_yew", { sessions: [{ name: "文档" }] }, { id: "d1" })),
 			fauxAssistantMessage("好"),
 		]);
 		agents.send(helper.id, "开个文档会话");
@@ -1104,14 +1104,14 @@ describe("organizing sessions", () => {
 		script(helper, [
 			toolUse(
 				fauxToolCall(
-					"manage_jig",
+					"manage_yew",
 					{ sessions: [{ session: "助手", permission: "skip" }] },
 					{ id: "w1" },
 				),
 			),
 			toolUse(
 				fauxToolCall(
-					"manage_jig",
+					"manage_yew",
 					{ sessions: [{ name: "文档", role: "整理文档" }], settings: { theme: "dark" } },
 					{ id: "w2" },
 				),

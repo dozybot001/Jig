@@ -16,6 +16,20 @@ import { watchPresence } from "./presence.ts";
 import { centerCount, setState, useAppState } from "./state.ts";
 import "./styles/app.css";
 
+// What this browser remembered for Jig, Yew's name until 2026-11-18 (the last session, the view, the
+// sidebar), moves to Yew's keys once. Drop this when nobody upgrades from Jig any more.
+try {
+	for (const name of ["lastSession", "view", "sidebar"]) {
+		const old = localStorage.getItem(`jig.${name}`);
+		if (old !== null && localStorage.getItem(`yew.${name}`) === null) {
+			localStorage.setItem(`yew.${name}`, old);
+		}
+		localStorage.removeItem(`jig.${name}`);
+	}
+} catch {
+	// Storage is off in this browser; nothing to move.
+}
+
 function App() {
 	useLang();
 	const phase = useAppState((state) => state.phase);

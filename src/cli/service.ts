@@ -4,6 +4,7 @@ import { homedir, userInfo } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { fromJigEnv, JIG_SERVICE_LABEL, JIG_SERVICE_UNIT } from "../server/from-jig.ts";
 import { type CliIo, EXIT_ERROR, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
 import { serviceRunning } from "./serve.ts";
@@ -27,9 +28,9 @@ Options:
 `;
 
 export const SERVICE_LABEL = "cn.tenonai.apps.yew";
-/** What Jig installed before it was renamed Yew; installing or removing Yew's takes it away. */
-const JIG_LABEL = "cn.tenonai.apps.jig";
-const JIG_UNIT = "jig.service";
+/** Jig's, Yew's earlier name (from-jig.ts): installing or removing Yew's takes it away. */
+const JIG_LABEL = JIG_SERVICE_LABEL;
+const JIG_UNIT = JIG_SERVICE_UNIT;
 const UNIT = "yew.service";
 
 /** What the command touches on the system, so tests can stand in for launchd and systemd. */
@@ -205,7 +206,7 @@ export function installService(
 	mkdirSync(join(home, "logs"), { recursive: true, mode: 0o700 });
 	// Shell commands the sessions run need your PATH; launchd and systemd start with a bare one.
 	const vars: Record<string, string> = { PATH: env.PATH ?? "/usr/bin:/bin" };
-	if (env.YEW_HOME || env.JIG_HOME) vars.YEW_HOME = home;
+	if (fromJigEnv(env, "HOME")) vars.YEW_HOME = home;
 	mkdirSync(dirname(file), { recursive: true });
 	writeFileSync(file, mac ? launchAgent(host, vars, log) : systemdUnit(host, vars, log), {
 		mode: 0o644,
@@ -263,8 +264,8 @@ export function serviceCommand(host: ServiceHost = realServiceHost()): Command {
 			if (positionals.length !== 1 || !["install", "uninstall", "status"].includes(action ?? "")) {
 				throw new UsageError("yew service needs one of install, uninstall or status");
 			}
-			const { jigHome } = await import("../server/paths.ts");
-			const home = jigHome(io.env);
+			const { yewHome } = await import("../server/paths.ts");
+			const home = yewHome(io.env);
 			const file = serviceFile(host);
 			const mac = host.platform === "darwin";
 

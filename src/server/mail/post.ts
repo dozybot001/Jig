@@ -10,7 +10,7 @@ import {
 	type Schedule,
 	type Session,
 } from "../../shared/types.ts";
-import { conflict, invalid, JigError } from "../errors.ts";
+import { conflict, invalid, YewError } from "../errors.ts";
 import { readSettings, type Settings } from "../settings.ts";
 import type { Store } from "../store.ts";
 import { type CardFields, MailStore } from "./store.ts";
@@ -304,7 +304,7 @@ export class PostOffice {
 		const base = {
 			threadId,
 			replyTo: repliedTo?.id ?? null,
-			fromKind: sender.kind === "schedule" ? ("jig" as const) : sender.kind,
+			fromKind: sender.kind === "schedule" ? ("yew" as const) : sender.kind,
 			fromSession: from,
 			fromName:
 				sender.kind === "session"
@@ -565,7 +565,7 @@ export class PostOffice {
 					},
 				);
 			} catch (error) {
-				if (!(error instanceof JigError)) throw error;
+				if (!(error instanceof YewError)) throw error;
 				this.#log(`decision #${card.number}: could not reach ${id}: ${error.message}`);
 			}
 		}

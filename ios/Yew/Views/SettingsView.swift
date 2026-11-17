@@ -217,12 +217,12 @@ struct Lockup: View {
 extension View {
 	/// What the first screen of each tab has: the settings button, and a banner while the Mac can't be
 	/// reached or the app shows sample data.
-	func jigChrome() -> some View {
-		modifier(JigChrome())
+	func yewChrome() -> some View {
+		modifier(YewChrome())
 	}
 }
 
-private struct JigChrome: ViewModifier {
+private struct YewChrome: ViewModifier {
 	@Environment(AppModel.self) private var model
 
 	func body(content: Content) -> some View {
@@ -287,7 +287,7 @@ private struct Banner: View {
 		.padding(.horizontal, 16)
 		.padding(.vertical, 2)
 		.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-		.overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.jigControl))
+		.overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.yewControl))
 		.padding(.horizontal)
 		.padding(.bottom, 8)
 	}

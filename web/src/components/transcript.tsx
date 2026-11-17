@@ -49,7 +49,7 @@ import {
 	t,
 	useLang,
 } from "../i18n.ts";
-import { JIG_NOTE, tally } from "../progress.ts";
+import { tally, YEW_NOTE } from "../progress.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
 import { ArtifactChip } from "./artifacts.tsx";
 import { Capped, Diff, Markdown, ScrollBlock, useStickToBottom } from "./content.tsx";
@@ -95,7 +95,7 @@ function callSummary(call: ToolCallBlock, recipient: string | null): string {
 		case "todo":
 		case "list_sessions":
 		case "list_cards":
-		case "manage_jig":
+		case "manage_yew":
 			return "";
 	}
 	const asked = askedQuestion(args);
@@ -129,7 +129,7 @@ const TOOL_VERBS = [
 	"update_card",
 	"withdraw_card",
 	"list_cards",
-	"manage_jig",
+	"manage_yew",
 	"delegate",
 ] as const;
 
@@ -173,9 +173,9 @@ function permissionHeadline(request: PermissionRequest): string {
 			.join(t("listSeparator"));
 	}
 	if (request.reason) return request.reason;
-	// manage_jig: organizing, or changing settings; widening shows its reasons above.
+	// manage_yew: organizing, or changing settings; widening shows its reasons above.
 	const scope = request.rememberRules?.[0]?.pattern;
-	if (request.tool === "manage_jig" && (scope === "organize" || scope === "configure")) {
+	if (request.tool === "manage_yew" && (scope === "organize" || scope === "configure")) {
 		return t(`manage_${scope}`);
 	}
 	// A task session is named in the line itself; there is no command or file to show under it.
@@ -191,7 +191,7 @@ const clip = (text: string, max = 80) => {
 	return [...flat].length > max ? `${[...flat].slice(0, max).join("")}…` : flat;
 };
 
-/** One change manage_jig makes, in the person's language, for permission cards and the trace notice. */
+/** One change manage_yew makes, in the person's language, for permission cards and the trace notice. */
 export function changeText(step: ChangeStep): string {
 	const quoted = (name: string) => t("quoted", { s: name });
 	const folder = (path: string | null) => (path === null ? t("change_no_folder") : path);
@@ -843,7 +843,7 @@ function buildItems(transcript: TranscriptState, working: boolean): Item[] {
 		if (entry.role === "assistant") blocks(entry.message, entry.id, false);
 		else if (entry.role === "system" || entry.role === "compaction") {
 			run.push({ kind: "note", key: entry.id, entry });
-		} else if (entry.role === "user" && userText(entry).startsWith(JIG_NOTE)) {
+		} else if (entry.role === "user" && userText(entry).startsWith(YEW_NOTE)) {
 			// Yew's own notes to the model are not shown and do not split a run.
 		} else if (entry.role !== "toolResult") {
 			flush();
@@ -1109,7 +1109,7 @@ function LetterEntry({ letter }: { letter: LetterRef }) {
 			? t("fromCli")
 			: letter.from.kind === "person"
 				? t("you")
-				: letter.from.kind === "jig"
+				: letter.from.kind === "yew"
 					? t("fromSchedule", { name: t("quoted", { s: letter.from.name }) })
 					: (sender ?? letter.from.name);
 	// An automatic report repeats its first line as the summary; show it once.
@@ -1131,7 +1131,7 @@ function LetterEntry({ letter }: { letter: LetterRef }) {
 					<span>{from}</span>
 				)}
 				<span className="tag">{kind}</span>
-				{letter.schedule && letter.from.kind !== "jig" && (
+				{letter.schedule && letter.from.kind !== "yew" && (
 					<span className="hint">
 						{t("fromSchedule", { name: t("quoted", { s: letter.schedule.name }) })}
 					</span>

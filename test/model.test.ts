@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer, type IncomingHttpHeaders } from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, test } from "node:test";
-import { JigError } from "../src/server/errors.ts";
+import { YewError } from "../src/server/errors.ts";
 import { MemoryKeyStore } from "../src/server/keys.ts";
 import { ModelGateway } from "../src/server/model/gateway.ts";
 import { fauxAssistantMessage, fauxProvider } from "../src/server/model/testing.ts";
@@ -21,11 +21,11 @@ describe("model gateway", () => {
 		assert.ok(pro.cost.input > 0);
 		assert.throws(
 			() => gateway.check("deepseek", "nope"),
-			(e) => e instanceof JigError,
+			(e) => e instanceof YewError,
 		);
 		assert.throws(
 			() => gateway.check("nope", "x"),
-			(e) => e instanceof JigError,
+			(e) => e instanceof YewError,
 		);
 	});
 
@@ -69,7 +69,7 @@ describe("model gateway", () => {
 				model: faux.getModel().id,
 				messages: [{ role: "user", content: "hi", timestamp: 1 }],
 			}),
-			(e) => e instanceof JigError && e.code === "missing-api-key",
+			(e) => e instanceof YewError && e.code === "missing-api-key",
 		);
 	});
 

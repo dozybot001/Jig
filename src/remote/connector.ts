@@ -257,7 +257,7 @@ class Channel {
 		const controller = new AbortController();
 		this.#requests.set(message.id, controller);
 		try {
-			const request = new Request(`http://jig.internal${message.path}`, {
+			const request = new Request(`http://yew.internal${message.path}`, {
 				method: message.method,
 				headers: { "Content-Type": "application/json" },
 				...(message.body !== undefined && message.method !== "GET" ? { body: message.body } : {}),

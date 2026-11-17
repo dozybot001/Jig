@@ -50,12 +50,12 @@ export function remoteCommand(): Command {
 				throw new UsageError("--relay must be a wss:// address (ws:// only inside this network)");
 			}
 
-			const { jigHome, dbPath } = await import("../server/paths.ts");
+			const { yewHome, dbPath } = await import("../server/paths.ts");
 			const { openDatabase } = await import("../server/db/database.ts");
 			const { EventBus } = await import("../server/events.ts");
 			const { Store } = await import("../server/store.ts");
 			const { readSettings } = await import("../server/settings.ts");
-			const home = jigHome(io.env);
+			const home = yewHome(io.env);
 			const db = openDatabase(dbPath(home));
 			try {
 				const store = new Store(db, new EventBus());

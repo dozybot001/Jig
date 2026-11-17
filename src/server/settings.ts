@@ -5,7 +5,7 @@ import { DEFAULT_RELAY_URL, type PermissionMode, type ThinkingLevel } from "../s
 import { invalid } from "./errors.ts";
 import type { Store } from "./store.ts";
 
-/** Yew's settings: what the settings menu and new sessions read, shared by the API and manage_jig. */
+/** Yew's settings: what the settings menu and new sessions read, shared by the API and manage_yew. */
 export interface DefaultModel {
 	provider: string;
 	model: string;

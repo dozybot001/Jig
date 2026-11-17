@@ -51,7 +51,7 @@ import {
 	upsertEntry,
 } from "./state.ts";
 
-const LAST_SESSION = "jig.lastSession";
+const LAST_SESSION = "yew.lastSession";
 
 function remember(key: string, value: string | null): void {
 	try {
@@ -70,7 +70,7 @@ function recall(key: string): string | null {
 	}
 }
 
-const VIEW = "jig.view";
+const VIEW = "yew.view";
 const CENTER_TABS: readonly string[] = ["pending", "decided", "letters"];
 
 /**

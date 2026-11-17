@@ -69,11 +69,11 @@ interface McpFile {
 const isObject = (value: unknown): value is Raw =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 
-const mcpFile = (jigHome: string) => join(jigHome, "mcp.json");
+const mcpFile = (yewHome: string) => join(yewHome, "mcp.json");
 
 /** The file as it is written, with the object that holds the servers (`mcpServers`, or `servers`). */
-function readFile(jigHome: string): McpFile {
-	const file = mcpFile(jigHome);
+function readFile(yewHome: string): McpFile {
+	const file = mcpFile(yewHome);
 	if (!existsSync(file)) {
 		const servers: Raw = {};
 		return { doc: { mcpServers: servers }, servers };
@@ -106,8 +106,8 @@ function readFile(jigHome: string): McpFile {
 }
 
 /** Written beside the file and moved into place, so a reader never sees half of it. */
-function writeFile(jigHome: string, doc: Raw): void {
-	const file = mcpFile(jigHome);
+function writeFile(yewHome: string, doc: Raw): void {
+	const file = mcpFile(yewHome);
 	const draft = `${file}.${process.pid}.tmp`;
 	// Readable by the person only: values in it may be secrets.
 	writeFileSync(draft, `${JSON.stringify(doc, null, 2)}\n`, { mode: 0o600 });
@@ -189,8 +189,8 @@ const turnsOff = (entry: unknown): boolean =>
 	isObject(entry) && entry.disabled === true && !view("x", entry);
 
 /** The servers Yew runs: its own first, then the file's in the file's order. */
-export function listMcpEntries(jigHome: string, builtin: BuiltinServers = {}): McpEntryView[] {
-	const { servers } = readFile(jigHome);
+export function listMcpEntries(yewHome: string, builtin: BuiltinServers = {}): McpEntryView[] {
+	const { servers } = readFile(yewHome);
 	const own = Object.keys(builtin)
 		.filter((name) => !Object.hasOwn(servers, name) || turnsOff(servers[name]))
 		.map((name) => builtinView(name, builtin, turnsOff(servers[name])));
@@ -239,11 +239,11 @@ function checkOAuth(oauth: NewMcpServer["oauth"]): Raw | null {
 	};
 }
 
-export function addMcpEntry(jigHome: string, input: NewMcpServer): McpEntryView {
+export function addMcpEntry(yewHome: string, input: NewMcpServer): McpEntryView {
 	if (!MCP_NAME.test(input.name)) {
 		throw invalid("The name uses letters, digits, dashes and underscores, up to 32.", "server");
 	}
-	const { doc, servers } = readFile(jigHome);
+	const { doc, servers } = readFile(yewHome);
 	if (Object.hasOwn(servers, input.name)) {
 		throw conflict(`mcp.json already has a server named ${input.name}.`, undefined, "mcp-exists");
 	}
@@ -299,7 +299,7 @@ export function addMcpEntry(jigHome: string, input: NewMcpServer): McpEntryView 
 		entry = { command, args, ...(Object.keys(env).length > 0 ? { env } : {}) };
 	}
 	servers[input.name] = entry;
-	writeFile(jigHome, doc);
+	writeFile(yewHome, doc);
 	return view(input.name, entry) as McpEntryView;
 }
 
@@ -312,12 +312,12 @@ function entryOf(servers: Raw, name: string): Raw {
 }
 
 export function patchMcpEntry(
-	jigHome: string,
+	yewHome: string,
 	name: string,
 	patch: McpServerPatch,
 	builtin: BuiltinServers = {},
 ): McpEntryView {
-	const { doc, servers } = readFile(jigHome);
+	const { doc, servers } = readFile(yewHome);
 	if (builtin[name] && (!Object.hasOwn(servers, name) || turnsOff(servers[name]))) {
 		// One of Yew's own: the file only records that it is off.
 		if (patch.env || patch.headers) {
@@ -325,7 +325,7 @@ export function patchMcpEntry(
 		}
 		if (patch.disabled === true) servers[name] = { disabled: true };
 		else if (patch.disabled === false) delete servers[name];
-		if (patch.disabled !== undefined) writeFile(jigHome, doc);
+		if (patch.disabled !== undefined) writeFile(yewHome, doc);
 		return builtinView(name, builtin, turnsOff(servers[name]));
 	}
 	const entry = entryOf(servers, name);
@@ -353,12 +353,12 @@ export function patchMcpEntry(
 		checkValues(patch.headers, HEADER_NAME, "headers");
 		merge("headers", patch.headers);
 	}
-	writeFile(jigHome, doc);
+	writeFile(yewHome, doc);
 	return view(name, entry) as McpEntryView;
 }
 
-export function removeMcpEntry(jigHome: string, name: string, builtin: BuiltinServers = {}): void {
-	const { doc, servers } = readFile(jigHome);
+export function removeMcpEntry(yewHome: string, name: string, builtin: BuiltinServers = {}): void {
+	const { doc, servers } = readFile(yewHome);
 	if (builtin[name] && (!Object.hasOwn(servers, name) || turnsOff(servers[name]))) {
 		throw conflict(
 			`${name} is set up by Yew itself. It can be turned off, not removed.`,
@@ -368,5 +368,5 @@ export function removeMcpEntry(jigHome: string, name: string, builtin: BuiltinSe
 	}
 	entryOf(servers, name);
 	delete servers[name];
-	writeFile(jigHome, doc);
+	writeFile(yewHome, doc);
 }

@@ -31,7 +31,7 @@ struct LettersView: View {
 			}
 			.navigationTitle("Letters")
 			.refreshable { await model.refreshLetters() }
-			.jigChrome()
+			.yewChrome()
 		}
 	}
 }

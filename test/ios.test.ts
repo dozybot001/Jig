@@ -16,7 +16,7 @@ type Catalog = {
 	>;
 };
 
-const catalog = JSON.parse(read("ios/Jig/Localizable.xcstrings")) as Catalog;
+const catalog = JSON.parse(read("ios/Yew/Localizable.xcstrings")) as Catalog;
 const value = (key: string, language: string) =>
 	catalog.strings[key]?.localizations?.[language]?.stringUnit?.value;
 
@@ -24,7 +24,7 @@ describe("the iPhone app", () => {
 	test("its version is the one in package.json (spec 17.5)", () => {
 		const { version } = JSON.parse(read("package.json")) as { version: string };
 		const versions = [
-			...read("ios/Jig.xcodeproj/project.pbxproj").matchAll(/MARKETING_VERSION = ([^;]+);/g),
+			...read("ios/Yew.xcodeproj/project.pbxproj").matchAll(/MARKETING_VERSION = ([^;]+);/g),
 		];
 		assert.ok(versions.length > 0);
 		for (const [, marketing] of versions) assert.equal(marketing, version);

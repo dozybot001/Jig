@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import { invalid, JigError } from "../errors.ts";
+import { invalid, YewError } from "../errors.ts";
 
 export type Fields = Record<string, unknown>;
 
@@ -7,7 +7,7 @@ export type Fields = Record<string, unknown>;
 export async function readJson(c: Context): Promise<Fields> {
 	const type = c.req.header("Content-Type") ?? "";
 	if (!/^application\/json\b/i.test(type)) {
-		throw new JigError("unsupported-media-type", 415, "Send the body as application/json.");
+		throw new YewError("unsupported-media-type", 415, "Send the body as application/json.");
 	}
 	let value: unknown;
 	try {

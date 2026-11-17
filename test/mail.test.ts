@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { describe, test } from "node:test";
 import { migrate } from "../src/server/db/database.ts";
 import { migrations } from "../src/server/db/migrations.ts";
-import { JigError } from "../src/server/errors.ts";
+import { YewError } from "../src/server/errors.ts";
 import { letterRef, letterText } from "../src/server/mail/envelope.ts";
 import { type Outgoing, PostOffice } from "../src/server/mail/post.ts";
 import type { Letter, Session } from "../src/shared/types.ts";
@@ -15,7 +15,7 @@ function code(fn: () => unknown): string | undefined {
 	try {
 		fn();
 	} catch (error) {
-		return error instanceof JigError ? error.code : String(error);
+		return error instanceof YewError ? error.code : String(error);
 	}
 	return undefined;
 }
@@ -72,7 +72,7 @@ describe("schema", () => {
 });
 
 describe("migration 4", () => {
-	test("what was always allowed for organize_sessions stays limited to organizing in manage_jig", () => {
+	test("what was always allowed for organize_sessions stays limited to organizing in manage_yew", () => {
 		const db = new DatabaseSync(join(tempDir(), "jig.db"));
 		for (const sql of migrations.slice(0, 3)) db.exec(sql);
 		db.prepare(
@@ -84,10 +84,11 @@ describe("migration 4", () => {
 				{ effect: "allow", tool: "shell", pattern: "npm test" },
 			]),
 		);
-		db.exec(migrations[3] as string);
+		// Then every migration after it, the rename of Jig to Yew among them.
+		for (const sql of migrations.slice(3)) db.exec(sql as string);
 		const row = db.prepare("SELECT rules FROM sessions WHERE id = 's1'").get() as { rules: string };
 		assert.deepEqual(JSON.parse(row.rules), [
-			{ effect: "allow", tool: "manage_jig", pattern: "organize" },
+			{ effect: "allow", tool: "manage_yew", pattern: "organize" },
 			{ effect: "allow", tool: "shell", pattern: "npm test" },
 		]);
 		db.close();

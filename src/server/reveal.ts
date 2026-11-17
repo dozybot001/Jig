@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { conflict, JigError } from "./errors.ts";
+import { conflict, YewError } from "./errors.ts";
 
 /** Runs a program with its arguments, without a shell; rejects when it cannot start or fails. */
 export type RunCommand = (command: string, args: string[]) => Promise<void>;
@@ -50,6 +50,6 @@ export async function showInFileManager(
 	try {
 		await (options.run ?? runProgram)(program.command, program.args);
 	} catch {
-		throw new JigError("reveal-failed", 500, "The folder could not be shown.");
+		throw new YewError("reveal-failed", 500, "The folder could not be shown.");
 	}
 }

@@ -372,7 +372,7 @@ private fun toolSummary(names: List<String>): String {
 fun senderName(kind: String?, name: String): String = when (kind) {
     "person" -> stringResource(R.string.sender_you)
     "cli" -> stringResource(R.string.sender_cli)
-    "jig" -> stringResource(R.string.sender_schedule, name)
+    "yew" -> stringResource(R.string.sender_schedule, name)
     else -> name
 }
 

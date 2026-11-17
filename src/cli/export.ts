@@ -35,12 +35,12 @@ export function exportCommand(): Command {
 			}
 			if (positionals.length !== 1) throw new UsageError("yew export needs one folder");
 			const folder = resolve(positionals[0] as string);
-			const { jigHome, dbPath } = await import("../server/paths.ts");
+			const { yewHome, dbPath } = await import("../server/paths.ts");
 			const { openDatabase } = await import("../server/db/database.ts");
 			const { EventBus } = await import("../server/events.ts");
 			const { Store } = await import("../server/store.ts");
 			const { exportAll } = await import("../server/data-export.ts");
-			const home = jigHome(io.env);
+			const home = yewHome(io.env);
 			const db = openDatabase(dbPath(home));
 			try {
 				const counts = exportAll(new Store(db, new EventBus()), folder, Date.now(), home);

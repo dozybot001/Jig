@@ -6,9 +6,9 @@ import { createHash } from "node:crypto";
  */
 
 /** Signed by the Mac when it connects, after the relay's nonce. */
-export const CHALLENGE_PREFIX = "jig-relay-desktop:";
+export const CHALLENGE_PREFIX = "yew-relay-desktop:";
 /** Mixed into every handshake with the Mac's id, so a handshake cannot be replayed to another Mac. */
-export const PROLOGUE_PREFIX = "jig-remote/1:";
+export const PROLOGUE_PREFIX = "yew-remote/1:";
 /** The relay closes a phone's connection with this code when its Mac is not connected. */
 export const OFFLINE = 4404;
 
@@ -48,13 +48,11 @@ export function pairingLink(link: PairingLink): string {
 	return `yew://pair?${query.toString()}`;
 }
 
-/** Links start with `yew://pair?`; `jig://pair?` is from before Jig was renamed Yew. */
-const PAIRING_PREFIXES = ["yew://pair?", "jig://pair?"];
+const PAIRING_PREFIX = "yew://pair?";
 
 export function parsePairingLink(text: string): PairingLink | null {
-	const prefix = PAIRING_PREFIXES.find((start) => text.startsWith(start));
-	if (!prefix) return null;
-	const query = new URLSearchParams(text.slice(prefix.length));
+	if (!text.startsWith(PAIRING_PREFIX)) return null;
+	const query = new URLSearchParams(text.slice(PAIRING_PREFIX.length));
 	const [relay, desktop, key, secret, name] = ["r", "d", "k", "s", "n"].map((k) => query.get(k));
 	if (!relay || !desktop || !key || !secret) return null;
 	return { relay, desktop, key, secret, name: name ?? "" };

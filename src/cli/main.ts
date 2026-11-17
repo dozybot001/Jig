@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { moveJigHome } from "../server/paths.ts";
+import { moveJigHome } from "../server/from-jig.ts";
 import { appCommand } from "./app.ts";
 import { exportCommand } from "./export.ts";
 import { keyCommand } from "./key.ts";

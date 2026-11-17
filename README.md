@@ -23,10 +23,10 @@ Yew 以 MIT 许可证开源，当前版本 1.2.0。能做什么见[更新记录]
 
 Yew 原名 Jig，2026-11-18 改名。从 Jig 升级：
 
-1. 停掉正在运行的 Jig，换装新包：`npm uninstall -g @tenonai/jig`，再 `npm install -g @tenonai/yew`。命令改叫 `yew`，`jig` 仍能用。
+1. 停掉正在运行的 Jig，换装新包：`npm uninstall -g @tenonai/jig`，再 `npm install -g @tenonai/yew`。命令改叫 `yew`。
 2. 第一次运行 `yew` 时，数据目录 `~/.jig` 会搬到 `~/.yew`，原处留一个指向新目录的链接；API Key 第一次用到时从钥匙串里旧的位置搬过来。环境变量改叫 `YEW_HOME` 这类名字，旧的 `JIG_HOME` 这类仍然认。
 3. 设过开机启动或启动图标的，各运行一次 `yew service install`、`yew app install`，换成 Yew 的，旧的 Jig 那份会一起撤掉。
-4. 手机上的 Yew 是新的应用，要重新安装并重新配对。
+4. 手机上的 Yew 是新的应用，要重新安装并重新配对；手机上原来的 Jig 应用连不上 Yew，可以卸掉。
 
 ## 手机端
 

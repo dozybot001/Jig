@@ -54,7 +54,7 @@ export function exportAll(
 	store: Store,
 	folder: string,
 	now = Date.now(),
-	jigHome: string | null = null,
+	yewHome: string | null = null,
 ): ExportCounts {
 	if (existsSync(folder) && readdirSync(folder).length > 0) {
 		throw invalid(`${folder} is not empty. Export into a new or empty folder.`, "folder");
@@ -112,8 +112,8 @@ export function exportAll(
 	write("settings.json", json({ exportedAt: new Date(now).toISOString(), ...settings }));
 	// Artifacts: every version's file under the session's and the artifact's name, with a list.
 	let artifacts = 0;
-	if (jigHome) {
-		const kept = new ArtifactStore(store, jigHome);
+	if (yewHome) {
+		const kept = new ArtifactStore(store, yewHome);
 		const names = new Map(index.map((entry) => [entry.id, entry.file.replace(/\.md$/, "")]));
 		const used = new Set<string>();
 		for (const artifact of kept.list({ limit: 100_000 })) {

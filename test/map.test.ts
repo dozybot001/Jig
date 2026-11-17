@@ -105,7 +105,7 @@ describe("sessions map: letters", () => {
 
 		// A phone reads sessions and letters, so it reads the map too.
 		const phone = (path: string) =>
-			app.fetch(new Request(`http://jig.internal${path}`), { device: "d1" });
+			app.fetch(new Request(`http://yew.internal${path}`), { device: "d1" });
 		assert.equal((await phone("/api/sessions")).status, 200);
 		assert.equal((await phone("/api/letters")).status, 200);
 		const asPhone = await phone("/api/map");

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Context, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { JigError } from "../errors.ts";
+import { YewError } from "../errors.ts";
 
 /**
  * `Bindings.device` is set only for requests a paired phone sends through the relay channel: the
@@ -11,7 +11,7 @@ import { JigError } from "../errors.ts";
 export type AppEnv = { Variables: { requestId: string }; Bindings: { device?: string } };
 
 /** Problem types are tag URIs (RFC 4151): stable identifiers that are not meant to be fetched. */
-export const problemType = (code: string) => `tag:tenonai.cn,2026:jig/problem/${code}`;
+export const problemType = (code: string) => `tag:tenonai.cn,2026:yew/problem/${code}`;
 
 export function problemResponse(
 	c: Context<AppEnv>,
@@ -64,7 +64,7 @@ export const requestId = (): MiddlewareHandler<AppEnv> => async (c, next) => {
 
 export function errorHandler(log: (line: string) => void) {
 	return (error: Error, c: Context<AppEnv>): Response => {
-		if (error instanceof JigError) {
+		if (error instanceof YewError) {
 			return problemResponse(
 				c,
 				error.status,

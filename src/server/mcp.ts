@@ -208,11 +208,11 @@ function oauthOf(value: unknown, env: NodeJS.ProcessEnv): OAuthSettings | undefi
 }
 
 export function readMcpConfig(
-	jigHome: string,
+	yewHome: string,
 	env: NodeJS.ProcessEnv = process.env,
 	builtin: Record<string, McpServerConfig> = {},
 ): Record<string, McpServerConfig> {
-	const file = join(jigHome, "mcp.json");
+	const file = join(yewHome, "mcp.json");
 	if (!existsSync(file)) return { ...builtin };
 	const parsed = JSON.parse(readFileSync(file, "utf8")) as {
 		mcpServers?: unknown;
@@ -243,10 +243,10 @@ export function readMcpConfig(
 				...(oauth ? { oauth } : {}),
 				...off,
 			};
-		} else if (typeof entry.preset === "string" && presetMcp(jigHome, entry.preset)) {
+		} else if (typeof entry.preset === "string" && presetMcp(yewHome, entry.preset)) {
 			const envs = strings(entry.env);
 			configs[name] = {
-				...(presetMcp(jigHome, entry.preset) as McpServerConfig),
+				...(presetMcp(yewHome, entry.preset) as McpServerConfig),
 				...(envs ? { env: envs } : {}),
 				...off,
 			};
@@ -566,7 +566,7 @@ class Server {
 }
 
 export interface McpHubOptions {
-	jigHome: string;
+	yewHome: string;
 	version: string;
 	env?: NodeJS.ProcessEnv;
 	fetch?: typeof fetch;
@@ -602,7 +602,7 @@ export class McpHub {
 
 	/** Reads the configuration again when the file changed; connects new servers, stops removed ones. */
 	async refresh(): Promise<void> {
-		const file = join(this.#options.jigHome, "mcp.json");
+		const file = join(this.#options.yewHome, "mcp.json");
 		const stamp = existsSync(file) ? statSync(file).mtimeMs : 0;
 		if (stamp === this.#configAt) {
 			await this.#connecting;
@@ -611,7 +611,7 @@ export class McpHub {
 		this.#configAt = stamp;
 		let configs: Record<string, McpServerConfig> = { ...this.builtin };
 		try {
-			configs = readMcpConfig(this.#options.jigHome, this.#options.env, this.builtin);
+			configs = readMcpConfig(this.#options.yewHome, this.#options.env, this.builtin);
 		} catch (error) {
 			this.#options.log?.(`mcp: mcp.json could not be read: ${(error as Error).message}`);
 		}

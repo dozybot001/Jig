@@ -7,11 +7,11 @@
 
 ## 技术栈
 
-- Node.js 24 及以上，TypeScript，ESM。服务端用 Node 自带的类型擦除直接运行 `.ts`，开发时不另设构建步骤；对外发布的 npm 包（`@tenonai/yew`，命令 `yew`，旧名 `jig` 留作别名）用 `npm run build` 编译到 `dist/`，`bin/yew.js` 在源码目录里跑源码、在装好的包里跑编译结果。只用可擦除的语法，不用 `enum`、`namespace` 和参数属性。
+- Node.js 24 及以上，TypeScript，ESM。服务端用 Node 自带的类型擦除直接运行 `.ts`，开发时不另设构建步骤；对外发布的 npm 包（`@tenonai/yew`，命令 `yew`）用 `npm run build` 编译到 `dist/`，`bin/yew.js` 在源码目录里跑源码、在装好的包里跑编译结果。只用可擦除的语法，不用 `enum`、`namespace` 和参数属性。
 - 存储：Node 自带的 `node:sqlite`。数据目录默认 `~/.yew`，可用 `YEW_HOME` 指定；表结构变更写成按序号执行的迁移。
 - 模型接入：`@earendil-works/pi-ai`，锁定精确版本，只在 `src/server/model/` 里引用；其他模块通过这一层调用模型，换库时只改这一层。Agent 循环、工具和权限自己写，这是产品本身（蓝图第九节）。
 - 本地服务：Hono；服务端向界面推送用 SSE。网页界面：React + Vite。
-- iPhone 应用：Swift 6、SwiftUI，iOS 17 起，工程在 `ios/`，Bundle ID `cn.tenonai.apps.yew`（2026-11-18 起，改名前是 `cn.tenonai.apps.jig`）；文案用 String Catalog（中英）。中继服务：TypeScript，在 `relay/`，按 `~/memory/server-deployment.md` 部署。
+- iPhone 应用：Swift 6、SwiftUI，iOS 17 起，工程在 `ios/`，Bundle ID `cn.tenonai.apps.yew`；文案用 String Catalog（中英）。中继服务：TypeScript，在 `relay/`，按 `~/memory/server-deployment.md` 部署。
 - 密钥：系统钥匙串（`@napi-rs/keyring`）。
 - 检查：Biome（格式与 lint）、`tsc --noEmit`、`node --test`。
 

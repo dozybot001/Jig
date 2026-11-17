@@ -1,4 +1,5 @@
 import { AsyncEntry } from "@napi-rs/keyring";
+import { fromJigEnv, JIG_KEYCHAIN_SERVICE } from "./from-jig.ts";
 
 /** Where API keys live. They never go into SQLite, logs, URLs or command arguments (spec 15.1.3). */
 export interface KeyStore {
@@ -9,8 +10,8 @@ export interface KeyStore {
 }
 
 export const KEYCHAIN_SERVICE = "cn.tenonai.yew";
-/** Where Jig kept them before it was renamed Yew; a key found there moves over when first read. */
-const JIG_SERVICE = "asia.tenon.jig";
+/** Where Jig, Yew's earlier name, kept them; a key found there moves over when first read. */
+const JIG_SERVICE = JIG_KEYCHAIN_SERVICE;
 
 /** The operating system keychain (macOS Keychain, Windows Credential Manager, Secret Service). */
 export class KeychainStore implements KeyStore {
@@ -55,14 +56,13 @@ export class KeychainStore implements KeyStore {
 }
 
 /**
- * The key store Yew runs with: the system keychain, or one in memory when `YEW_KEYCHAIN=off` (or
- * `JIG_KEYCHAIN=off`, its name before the rename).
+ * The key store Yew runs with: the system keychain, or one in memory when `YEW_KEYCHAIN=off`.
  * The keychain is shared by every data folder on this computer, so a Yew started on a scratch
  * `YEW_HOME` to try something out would otherwise hold the real API keys and could call a model
  * with them. With the switch off it starts with no keys and forgets what is saved when it stops.
  */
 export function systemKeys(prefix = "provider", env: NodeJS.ProcessEnv = process.env): KeyStore {
-	const off = (env.YEW_KEYCHAIN ?? env.JIG_KEYCHAIN) === "off";
+	const off = fromJigEnv(env, "KEYCHAIN") === "off";
 	return off ? new MemoryKeyStore() : new KeychainStore(prefix);
 }
 

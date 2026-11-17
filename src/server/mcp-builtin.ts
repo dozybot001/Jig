@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { fromJigEnv } from "./from-jig.ts";
 import type { McpServerConfig } from "./mcp.ts";
 
 /**
@@ -21,14 +22,13 @@ import type { McpServerConfig } from "./mcp.ts";
  * is updated.
  *
  * An entry of the same name in mcp.json replaces one of these; `{"disabled": true}` turns it off.
- * `YEW_MCP_BUILTIN=off` (or `JIG_MCP_BUILTIN=off`, from before the rename) leaves them out, for a
- * throwaway Yew that should start nothing.
+ * `YEW_MCP_BUILTIN=off` leaves them out, for a throwaway Yew that should start nothing.
  */
 const SOURCE = fileURLToPath(new URL("../../mcp-builtin/", import.meta.url));
 const FILES = ["package.json", "package-lock.json"] as const;
 
 /** Where the servers are installed. */
-const installDir = (jigHome: string) => join(jigHome, "mcp-builtin");
+const installDir = (yewHome: string) => join(yewHome, "mcp-builtin");
 
 /**
  * The common servers Yew adds that run on this computer (Gitee, Notion, Sentry; blueprint 6.11, item
@@ -47,33 +47,33 @@ export const INSTALLED_PRESETS = Object.keys(PRESET_PROGRAMS);
  * How the preset `id` is started: with node from Yew's data folder, with a small part of Yew's
  * environment and the entry's own variables (its token). Null for a preset Yew does not install.
  */
-export function presetMcp(jigHome: string, id: string): McpServerConfig | null {
+export function presetMcp(yewHome: string, id: string): McpServerConfig | null {
 	const program = Object.hasOwn(PRESET_PROGRAMS, id) ? PRESET_PROGRAMS[id] : undefined;
 	if (!program) return null;
 	return {
 		command: process.execPath,
-		args: [join(jigHome, "mcp-presets", id, "node_modules", ...program.split("/"))],
+		args: [join(yewHome, "mcp-presets", id, "node_modules", ...program.split("/"))],
 		ownEnv: true,
 		preset: id,
 	};
 }
 
 export function builtinMcp(
-	jigHome: string,
+	yewHome: string,
 	env: NodeJS.ProcessEnv = process.env,
 ): Record<string, McpServerConfig> {
-	if ((env.YEW_MCP_BUILTIN ?? env.JIG_MCP_BUILTIN) === "off") return {};
-	const modules = join(installDir(jigHome), "node_modules");
+	if (fromJigEnv(env, "MCP_BUILTIN") === "off") return {};
+	const modules = join(installDir(yewHome), "node_modules");
 	return {
 		browser: {
 			command: process.execPath,
 			args: [
 				join(modules, "@playwright", "mcp", "cli.js"),
 				"--user-data-dir",
-				join(jigHome, "browser"),
+				join(yewHome, "browser"),
 				// Page snapshots and screenshots it saves; otherwise they land in the folder Yew was started in.
 				"--output-dir",
-				join(jigHome, "tmp", "browser"),
+				join(yewHome, "tmp", "browser"),
 			],
 			ownEnv: true,
 		},
@@ -107,7 +107,7 @@ function npmCi(folder: string, env: NodeJS.ProcessEnv): Promise<void> {
 }
 
 export interface InstallOptions {
-	jigHome: string;
+	yewHome: string;
 	env?: NodeJS.ProcessEnv;
 	log?: (line: string) => void;
 	/**
@@ -157,7 +157,7 @@ export function builtinInstaller(options: InstallOptions): () => Promise<void> {
 	return lockedInstaller(
 		options,
 		options.source ?? SOURCE,
-		installDir(options.jigHome),
+		installDir(options.yewHome),
 		"Yew's own servers (browser, computer control)",
 	);
 }
@@ -177,7 +177,7 @@ export function mcpInstaller(options: InstallOptions): (config: McpServerConfig)
 			install = lockedInstaller(
 				options,
 				join(options.source ?? SOURCE, "presets", id),
-				join(options.jigHome, "mcp-presets", id),
+				join(options.yewHome, "mcp-presets", id),
 				`the ${id} server`,
 			);
 			presets.set(id, install);

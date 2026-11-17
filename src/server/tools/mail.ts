@@ -1,6 +1,6 @@
 import type { CardOption, Letter, TaskOutcome } from "../../shared/types.ts";
 import { TASK_OUTCOMES, THINKING_LEVELS } from "../../shared/types.ts";
-import { JigError } from "../errors.ts";
+import { YewError } from "../errors.ts";
 import { decisionReport, directoryLine, neutralize } from "../mail/envelope.ts";
 import { type CardInput, reasonText } from "../mail/post.ts";
 import {
@@ -23,7 +23,7 @@ function attempt<T>(fn: () => T): T {
 	try {
 		return fn();
 	} catch (error) {
-		if (error instanceof JigError) throw new ToolInputError(error.message);
+		if (error instanceof YewError) throw new ToolInputError(error.message);
 		throw error;
 	}
 }
@@ -346,11 +346,11 @@ export const openSessionTool: ToolDefinition = {
 const TEXT = { type: "string" } as const;
 
 /**
- * manage_jig: the model changes Yew itself (blueprint 6.2, item 10). One call, all changes; Yew plans it
+ * manage_yew: the model changes Yew itself (blueprint 6.2, item 10). One call, all changes; Yew plans it
  * to rank how far it reaches and to show the person every change, then applies all or none.
  */
 export const manageJigTool: ToolDefinition = {
-	name: "manage_jig",
+	name: "manage_yew",
 	description:
 		"Change Yew itself when the person asks or the work needs it: sessions (create a standing one, or change its name, team, role, model, working folder, permission mode, how it receives letters, letter quota, rights, pinned, archived), teams, scheduled tasks, and settings. Put every change in one call; Yew checks them, asks the person when a change needs it, and applies all or none. Sessions, teams and tasks are named by name or id. API keys, pairing and deleting data are the person's.",
 	parameters: {
@@ -398,7 +398,7 @@ export const manageJigTool: ToolDefinition = {
 							description: "The most it may spend in a day, in US dollars; 0 for no limit.",
 						},
 						can_post_cards: { type: "boolean" },
-						can_manage: { type: "boolean", description: "May use manage_jig." },
+						can_manage: { type: "boolean", description: "May use manage_yew." },
 						pinned: { type: "boolean" },
 						archived: { type: "boolean" },
 					},
@@ -465,17 +465,17 @@ export const manageJigTool: ToolDefinition = {
 	needsFolder: false,
 	offered: (_session, roles) => roles.canOrganize,
 	subject(args, _session, lookup) {
-		if (!lookup) return { kind: "act", tool: "manage_jig", summary: "manage_jig", always: true };
+		if (!lookup) return { kind: "act", tool: "manage_yew", summary: "manage_yew", always: true };
 		let plan: ReturnType<Lookup["plan"]>;
 		try {
 			plan = lookup.plan(args);
 		} catch (error) {
-			if (error instanceof JigError) throw new ToolInputError(error.message);
+			if (error instanceof YewError) throw new ToolInputError(error.message);
 			throw error;
 		}
 		return {
 			kind: "act",
-			tool: "manage_jig",
+			tool: "manage_yew",
 			summary: plan.summary.join("\n"),
 			scope: plan.tier === "widen" ? undefined : plan.tier,
 			always: plan.tier !== "organize",

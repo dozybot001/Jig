@@ -66,7 +66,7 @@ struct CenterView: View {
 			}
 			.navigationTitle("Approvals")
 			.refreshable { await model.refreshCenter() }
-			.jigChrome()
+			.yewChrome()
 		}
 	}
 }
@@ -396,16 +396,16 @@ struct CapsuleButton: ButtonStyle {
 			.foregroundStyle(foreground)
 			.padding(.horizontal, 16)
 			.frame(minHeight: 44)
-			.background(kind == .primary ? Color.jigPrimary : Color.clear, in: Capsule())
+			.background(kind == .primary ? Color.yewPrimary : Color.clear, in: Capsule())
 			.overlay {
-				if kind != .primary { Capsule().stroke(Color.jigControl) }
+				if kind != .primary { Capsule().stroke(Color.yewControl) }
 			}
 			.opacity(configuration.isPressed ? 0.7 : 1)
 	}
 
 	private var foreground: Color {
 		switch kind {
-		case .primary: .jigOnPrimary
+		case .primary: .yewOnPrimary
 		case .secondary: .primary
 		case .destructive: .red
 		}
@@ -414,9 +414,9 @@ struct CapsuleButton: ButtonStyle {
 
 extension Color {
 	/// The Mac's `--primary`, `--on-primary` and `--control`, light and dark.
-	static let jigPrimary = adaptive(light: 0xE6, dark: 0x38)
-	static let jigOnPrimary = adaptive(light: 0x0D, dark: 0xF2)
-	static let jigControl = adaptive(light: 0xDC, dark: 0x36)
+	static let yewPrimary = adaptive(light: 0xE6, dark: 0x38)
+	static let yewOnPrimary = adaptive(light: 0x0D, dark: 0xF2)
+	static let yewControl = adaptive(light: 0xDC, dark: 0x36)
 	/// Yew's ink, for the leaf of the mark and the wordmark: dark green, and pale in dark mode.
 	static let yewInk = adaptive(rgb: 0x1F3A2E, dark: 0xE3E8E4)
 	/// Yew's green, for the option picked: the one colour besides black, white and grey.

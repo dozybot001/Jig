@@ -57,13 +57,13 @@ export function sendCommand(): Command {
 			message = message.trim();
 			if (!message) throw new UsageError("the message is empty");
 
-			const { jigHome, dbPath } = await import("../server/paths.ts");
+			const { yewHome, dbPath } = await import("../server/paths.ts");
 			const { openDatabase } = await import("../server/db/database.ts");
 			const { EventBus } = await import("../server/events.ts");
 			const { Store } = await import("../server/store.ts");
 			const { PostOffice, SUMMARY_MAX, reasonText } = await import("../server/mail/post.ts");
-			const { JigError } = await import("../server/errors.ts");
-			const home = jigHome(io.env);
+			const { YewError } = await import("../server/errors.ts");
+			const home = yewHome(io.env);
 			const db = openDatabase(dbPath(home));
 			try {
 				const store = new Store(db, new EventBus());
@@ -77,7 +77,8 @@ export function sendCommand(): Command {
 					}
 				}
 				// Inside a session's shell the letter is that session's, with its quota, limits and hold.
-				const fromId = (io.env.YEW_SESSION ?? io.env.JIG_SESSION)?.trim();
+				const { fromJigEnv } = await import("../server/from-jig.ts");
+				const fromId = fromJigEnv(io.env, "SESSION")?.trim();
 				let sender: Sender = { kind: "cli" };
 				if (fromId) {
 					try {
@@ -98,7 +99,7 @@ export function sendCommand(): Command {
 				try {
 					letter = new PostOffice(store).send(sender, { to: session.id, kind, summary, body });
 				} catch (error) {
-					if (!(error instanceof JigError)) throw error;
+					if (!(error instanceof YewError)) throw error;
 					io.stderr.write(`yew: ${error.message}\n`);
 					return EXIT_ERROR;
 				}

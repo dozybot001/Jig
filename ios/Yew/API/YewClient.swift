@@ -53,7 +53,7 @@ struct DirectTransport: Transport {
 	}
 }
 
-struct JigClient: Sendable {
+struct YewClient: Sendable {
 	let transport: any Transport
 
 	/// The Mac's event stream: one name and data per event, as the web interface reads them. With a
@@ -119,27 +119,27 @@ struct JigClient: Sendable {
 	private func call(_ method: String, _ path: String, body: Data?) async throws -> Data {
 		let (data, status) = try await transport.send(method: method, path: path, body: body)
 		guard (200..<300).contains(status) else {
-			throw (try? JSONDecoder().decode(JigProblem.self, from: data))
-				?? JigProblem(title: "HTTP \(status)", detail: nil)
+			throw (try? JSONDecoder().decode(YewProblem.self, from: data))
+				?? YewProblem(title: "HTTP \(status)", detail: nil)
 		}
 		return data
 	}
 }
 
-extension JigClient {
+extension YewClient {
 	/// Debug only: trades the one-time token of a `yew open` link for the browser cookie.
-	static func direct(link: String) async throws -> (JigClient, URL) {
+	static func direct(link: String) async throws -> (YewClient, URL) {
 		guard let url = URL(string: link.trimmingCharacters(in: .whitespacesAndNewlines)),
 			let host = url.host(), let fragment = url.fragment(), fragment.hasPrefix("t=")
 		else {
-			throw JigProblem(title: String(localized: "Paste the whole link that `yew open` prints."), detail: nil)
+			throw YewProblem(title: String(localized: "Paste the whole link that `yew open` prints."), detail: nil)
 		}
 		var parts = URLComponents()
 		parts.scheme = url.scheme ?? "http"
 		parts.host = host
 		parts.port = url.port
 		guard let base = parts.url else { throw URLError(.badURL) }
-		let client = JigClient(transport: DirectTransport(base: base))
+		let client = YewClient(transport: DirectTransport(base: base))
 		try await client.post("/api/auth/exchange", ["token": String(fragment.dropFirst(2))])
 		return (client, base)
 	}

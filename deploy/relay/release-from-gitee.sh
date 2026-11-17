@@ -7,29 +7,50 @@ set -Eeuo pipefail
 main() {
 	release="${1:-}"
 	[[ "$release" =~ ^[0-9a-f]{40}$ ]] || { echo 'usage: <commit> <gitee-keys>' >&2; exit 2; }
-	base=/opt/jig-relay
+	base=/opt/yew-relay
 	builder="$base/builder"
 	key="$builder/gitee_read_ed25519"
 	hosts="$builder/gitee_known_hosts"
 	source="$builder/source.git"
+	repo=git@gitee.com:dozybot/yew.git
 	node_image='docker.m.daocloud.io/library/node@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7'
+	# One-time move of the folder from before the rename (Jig was Yew's name until 2026-11-18;
+	# release.py lists every step). Until then the release lock is in the old folder; a lock belongs
+	# to the file, not to its path, so it stays held when the folder is renamed.
+	old=/opt/jig-relay
+	if [[ -d "$old" && ! -L "$old" ]]; then
+		exec 9>"$old/.controller-lock"
+	else
+		install -d -m 0750 "$base"
+		exec 9>"$base/.controller-lock"
+	fi
+	flock -n 9 || { echo 'Another Yew relay release is running.' >&2; exit 1; }
+	if [[ -d "$old" && ! -L "$old" ]]; then
+		[[ ! -e "$base" ]] || { echo "Both $old and $base exist; publishing stops until one is moved aside by hand." >&2; exit 1; }
+		mv -T "$old" "$base"
+	fi
+	# Containers made before the move name their files under the old path. The link lets them start
+	# again (a rollback, a reboot) until release.py has removed the last of them, and then the link.
+	if [[ ! -e "$old" && ! -L "$old" ]] && docker ps -a --format '{{.Names}}' | grep '^jig-relay-' >/dev/null; then
+		ln -sT "$base" "$old"
+	fi
 	install -d -m 0750 "$base" "$builder"
-	exec 9>"$base/.controller-lock"
-	flock -n 9 || { echo 'Another Jig relay release is running.' >&2; exit 1; }
 
 	# Gitee host keys come from the repository's deploy/relay/known_hosts, never a scan.
 	printf '%s' "${2:-}" | base64 -d > "$hosts.candidate"
 	[[ -s "$hosts.candidate" ]] && ! grep -qv '^gitee\.com ' "$hosts.candidate" || { echo 'Pinned Gitee host keys are missing.' >&2; exit 1; }
 	mv "$hosts.candidate" "$hosts"
 	if [[ ! -f "$key" ]]; then
-		ssh-keygen -q -t ed25519 -N '' -C 'jig-relay-server-gitee-read' -f "$key"
+		ssh-keygen -q -t ed25519 -N '' -C 'yew-relay-server-gitee-read' -f "$key"
 		chmod 0600 "$key"
-		echo 'Created the server read-only key. Add this public key to Gitee dozybot/jig as a deploy key (pull only), then publish again:' >&2
+		echo 'Created the server read-only key. Add this public key to Gitee dozybot/yew as a deploy key (pull only), then publish again:' >&2
 		cat "$key.pub" >&2
 		exit 3
 	fi
 	export GIT_SSH_COMMAND="ssh -i $key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$hosts"
-	[[ -d "$source" ]] || git clone -q --bare git@gitee.com:dozybot/jig.git "$source"
+	[[ -d "$source" ]] || git clone -q --bare "$repo" "$source"
+	# A clone made before the repository was renamed still names the old address.
+	git --git-dir="$source" remote set-url origin "$repo"
 	# Bounded retries absorb short outages; a failure stops before production changes.
 	for attempt in 1 2 3 4; do
 		git --git-dir="$source" fetch -q origin +refs/heads/main:refs/heads/main && break
@@ -41,7 +62,7 @@ main() {
 
 	stage="$(mktemp -d)"
 	trap 'rm -rf "$stage"' EXIT
-	# The relay and the three protocol files it shares with Jig on the Mac; nothing else.
+	# The relay and the three protocol files it shares with Yew on the Mac; nothing else.
 	git --git-dir="$source" archive "$release" relay src/remote/protocol.ts src/remote/push.ts \
 		src/remote/noise.ts deploy/relay | tar -x -C "$stage"
 	# Install the exact locked dependencies in the pinned runtime image, without host secrets.
@@ -52,7 +73,7 @@ main() {
 	mkdir -p "$bundle/app/src"
 	cp -R "$stage/relay" "$bundle/app/relay"
 	cp -R "$stage/src/remote" "$bundle/app/src/remote"
-	cp "$stage/deploy/relay/jig-relay.caddy" "$bundle/"
+	cp "$stage/deploy/relay/yew-relay.caddy" "$bundle/"
 	python3 - "$bundle" "$release" <<'PY'
 import hashlib, json, pathlib, sys
 root = pathlib.Path(sys.argv[1]); files = {}
@@ -62,7 +83,7 @@ for p in root.rglob('*'):
 (root / 'manifest.json').write_text(json.dumps({'commit': sys.argv[2], 'files': files}))
 PY
 	# The bundle stays in the private staging folder, which is removed when this script ends.
-	tar --no-xattrs -czf "$stage/bundle.tar.gz" -C "$bundle" app jig-relay.caddy manifest.json
+	tar --no-xattrs -czf "$stage/bundle.tar.gz" -C "$bundle" app yew-relay.caddy manifest.json
 	python3 "$stage/deploy/relay/release.py" "$release" "$node_image" "$stage/bundle.tar.gz"
 }
 main "$@" </dev/null

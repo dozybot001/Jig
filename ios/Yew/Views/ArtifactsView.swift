@@ -28,7 +28,7 @@ struct ArtifactsView: View {
 			}
 			.navigationTitle("Artifacts")
 			.refreshable { await model.refreshArtifacts() }
-			.jigChrome()
+			.yewChrome()
 		}
 	}
 }

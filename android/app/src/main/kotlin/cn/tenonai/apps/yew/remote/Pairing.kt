@@ -3,10 +3,7 @@ package cn.tenonai.apps.yew.remote
 import java.net.URLDecoder
 import java.util.Base64
 
-/**
- * What the pairing QR code on the computer carries: `yew://pair?r=…&d=…&k=…&s=…&n=…` (src/remote/protocol.ts).
- * A computer from before the rename to Yew writes `jig://pair?…` with the same fields; both are read.
- */
+/** What the pairing QR code on the computer carries: `yew://pair?r=…&d=…&k=…&s=…&n=…` (src/remote/protocol.ts). */
 class PairingLink(
     val relay: String,
     val desktop: String,
@@ -17,14 +14,14 @@ class PairingLink(
     val name: String,
 ) {
     companion object {
-        private val PREFIXES = listOf("yew://pair?", "jig://pair?")
+        private const val PREFIX = "yew://pair?"
 
         /** Whether the text is meant as a pairing link, as the camera tells one QR code from another. */
-        fun isLink(text: String): Boolean = PREFIXES.any(text::startsWith)
+        fun isLink(text: String): Boolean = text.startsWith(PREFIX)
 
         fun parse(text: String): PairingLink? {
-            val prefix = PREFIXES.firstOrNull(text::startsWith) ?: return null
-            val values = text.removePrefix(prefix).split("&").mapNotNull { part ->
+            if (!isLink(text)) return null
+            val values = text.removePrefix(PREFIX).split("&").mapNotNull { part ->
                 val at = part.indexOf('=')
                 if (at < 0) return@mapNotNull null
                 runCatching { part.substring(0, at) to URLDecoder.decode(part.substring(at + 1), "UTF-8") }.getOrNull()

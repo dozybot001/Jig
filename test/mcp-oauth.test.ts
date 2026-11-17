@@ -141,13 +141,13 @@ async function provider(options: { register?: boolean; iss?: boolean; moveToken?
 }
 
 function setup(entry: Record<string, unknown>, now = () => Date.now()) {
-	const jigHome = tempDir("yew-home-");
-	writeFileSync(join(jigHome, "mcp.json"), JSON.stringify({ mcpServers: { demo: entry } }));
+	const yewHome = tempDir("yew-home-");
+	writeFileSync(join(yewHome, "mcp.json"), JSON.stringify({ mcpServers: { demo: entry } }));
 	const keys = new MemoryKeyStore();
 	const auth = new McpAuth({ keys, redirectUri: REDIRECT, version: "0.0.0", now });
-	const hub = new McpHub({ jigHome, version: "0.0.0", log: () => {}, auth });
+	const hub = new McpHub({ yewHome, version: "0.0.0", log: () => {}, auth });
 	const status = () => hub.status().find((server) => server.name === "demo");
-	return { jigHome, keys, auth, hub, status };
+	return { yewHome, keys, auth, hub, status };
 }
 
 const ctx = { signal: new AbortController().signal, acceptsImages: false } as ToolContext;
@@ -155,7 +155,7 @@ const ctx = { signal: new AbortController().signal, acceptsImages: false } as To
 describe("signing in to an MCP server", () => {
 	test("Yew finds where to sign in, registers itself, and keeps the tokens in the keychain", async () => {
 		const server = await provider();
-		const { jigHome, keys, hub, status } = setup({ url: `${server.base}/mcp` });
+		const { yewHome, keys, hub, status } = setup({ url: `${server.base}/mcp` });
 		try {
 			await hub.refresh();
 			assert.equal(status()?.state, "sign-in");
@@ -186,7 +186,7 @@ describe("signing in to an MCP server", () => {
 			assert.match(JSON.stringify(result), /hi with at-1/);
 			// The token went with the request; nothing of it is in mcp.json.
 			assert.ok(server.seen.bearers.includes("at-1"));
-			assert.doesNotMatch(readFileSync(join(jigHome, "mcp.json"), "utf8"), /at-1|rt-1|c-1/);
+			assert.doesNotMatch(readFileSync(join(yewHome, "mcp.json"), "utf8"), /at-1|rt-1|c-1/);
 			assert.match((await keys.get("demo")) ?? "", /"access":"at-1"/);
 
 			// A state works once.

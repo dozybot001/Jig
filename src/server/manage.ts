@@ -24,7 +24,7 @@ import { readSettings, resolveLogFile, type Workspace } from "./settings.ts";
 import { type SessionPatch, type Store, validateSessionName } from "./store.ts";
 
 /**
- * How far a manage_jig call reaches (blueprint 6.2, item 10). Yew decides, not the model: organizing
+ * How far a manage_yew call reaches (blueprint 6.2, item 10). Yew decides, not the model: organizing
  * follows the session's permission mode, configuring asks every time unless always allowed, and
  * widening what a session may do must be confirmed every time.
  */
@@ -105,7 +105,7 @@ function budgetOf(value: unknown): number | null | undefined {
 }
 
 /**
- * manage_jig: everything the settings interface can do, for the main conversation and the sessions the
+ * manage_yew: everything the settings interface can do, for the main conversation and the sessions the
  * person allowed. A call is planned first (checked, worded and ranked without changing anything), so
  * the permission card shows exactly what will happen; running it plans again and applies all or none.
  */

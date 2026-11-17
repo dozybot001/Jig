@@ -1,5 +1,5 @@
 /** Domain errors; the HTTP layer maps each to an RFC 9457 problem type. */
-export class JigError extends Error {
+export class YewError extends Error {
 	readonly code: string;
 	readonly status: number;
 	readonly details: Record<string, unknown> | undefined;
@@ -13,11 +13,11 @@ export class JigError extends Error {
 }
 
 export const notFound = (what: string, id: string) =>
-	new JigError("not-found", 404, `${what} ${id} does not exist.`);
+	new YewError("not-found", 404, `${what} ${id} does not exist.`);
 
 export const invalid = (message: string, field?: string) =>
-	new JigError("invalid-request", 400, message, field ? { field } : undefined);
+	new YewError("invalid-request", 400, message, field ? { field } : undefined);
 
 /** A request that does not fit the current state; `code` lets the interface explain it in either language. */
 export const conflict = (message: string, details?: Record<string, unknown>, code = "conflict") =>
-	new JigError(code, 409, message, details);
+	new YewError(code, 409, message, details);

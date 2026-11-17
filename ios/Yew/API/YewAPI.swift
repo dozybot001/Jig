@@ -108,7 +108,7 @@ struct LetterRef: Decodable, Sendable {
 	let body: String
 
 	struct From: Decodable, Sendable {
-		/// session, person, cli, or jig (a scheduled task).
+		/// session, person, cli, or yew (a scheduled task).
 		let kind: String?
 		let name: String
 	}
@@ -230,7 +230,7 @@ struct ArtifactItem: Decodable, Identifiable, Hashable, Sendable {
 }
 
 /// An RFC 9457 problem from Yew, shown to the person as it came.
-struct JigProblem: Error, Decodable, LocalizedError {
+struct YewProblem: Error, Decodable, LocalizedError {
 	let title: String
 	let detail: String?
 

@@ -7,11 +7,11 @@ import { dh, type KeyPair } from "./noise.ts";
  * relay and Apple's push service carry the ciphertext and the phone's token, never the text. The
  * phone's notification service extension decrypts it before it is shown.
  *
- * key    = HKDF-SHA256(X25519(Mac static, phone static), salt = empty, info = "jig-push/1"), 32 bytes
+ * key    = HKDF-SHA256(X25519(Mac static, phone static), salt = empty, info = "yew-push/1"), 32 bytes
  * sealed = nonce (12 random bytes) | ChaCha20-Poly1305 ciphertext | tag (16 bytes)
  */
 
-const INFO = "jig-push/1";
+const INFO = "yew-push/1";
 const NONCE = 12;
 const TAG = 16;
 

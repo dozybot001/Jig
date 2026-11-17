@@ -44,7 +44,7 @@ class NoiseTest {
         val initiator = NoiseInitiator(
             staticKey = hex(text("phonePrivate")),
             remoteStatic = hex(text("computerPublic")),
-            prologue = "jig-remote/1:${text("desktop")}".toByteArray(),
+            prologue = "yew-remote/1:${text("desktop")}".toByteArray(),
             ephemeral = hex(text("phoneEphemeral")),
         )
         return initiator to initiator.writeFirst(text("hello").toByteArray())
@@ -131,13 +131,8 @@ class NoiseTest {
         assertEquals(text("computerPublic"), link.key.hex())
         assertEquals("c2VjcmV0", link.secret)
         assertEquals("书房的电脑 & Mac", link.name)
-        // Computers write yew:// since the rename and jig:// before it; the phone reads both, and only those.
-        val fields = text("link").substringAfter("?")
-        for (scheme in listOf("yew", "jig")) {
-            assertTrue(PairingLink.isLink("$scheme://pair?$fields"))
-            assertEquals(text("desktop"), checkNotNull(PairingLink.parse("$scheme://pair?$fields")).desktop)
-        }
-        assertFalse(PairingLink.isLink("https://example.com/?$fields"))
+        assertTrue(PairingLink.isLink(text("link")))
+        assertFalse(PairingLink.isLink("https://example.com/?r=a&d=b&k=c&s=d"))
         assertNull(PairingLink.parse("https://example.com/?r=a&d=b&k=c&s=d"))
         assertNull(PairingLink.parse("yew://pair?r=wss://x&d=b&k=AAAA&s=d"))
         assertNull(PairingLink.parse("yew://pair?d=b&k=${text("computerPublic")}&s=d"))
@@ -149,10 +144,10 @@ class NoiseTest {
         val computer = ByteArray(32) { 1 }
         val phone = ByteArray(32) { 2 }
         val key = PushCrypto.key(phone, Curve.publicKeyOf(computer))
-        assertEquals("6b8f194238cae3afb991545fc73bc9ef0f4ac1fb92e6bd67ad924d580e318f4d", key.hex()) // gitleaks:allow
+        assertEquals("bf2f399751d75ff40f167677924af1407de6afd15b6daa221300a279db14fa2c", key.hex()) // gitleaks:allow
         assertArrayEquals(key, PushCrypto.key(computer, Curve.publicKeyOf(phone)))
         val sealed = Base64.getDecoder().decode(
-            "AwMDAwMDAwMDAwMDB+tpFSbM9MdgSEpAPCVHoBuxkomSUYkChVi7sCkBKDLTEV3tKqnLNqbBb+DxF7V53Z3Jw99sz29PXii88JgcsCZI4s3k5pJzmPg6raQATNjwu19EyTotKOZeuygs5lVF1Kc=",
+            "AwMDAwMDAwMDAwMDzlSL/SON53/W/tTl6GMwmom0kDXkK4kZJ+oDF+dDT3PM+7WahUcxbjb+0S51ticZLimYofNBxprt/PVjZgZGDvt2QNdmP3KukCVTHGN9yXVCG7u/8ewUsx7sxw9Dgrnhzvo=",
         )
         assertEquals(
             """{"v":1,"id":"n1","kind":"permission","title":"官网","body":"git push","badge":2}""",

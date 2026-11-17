@@ -4,6 +4,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { fromJigEnv, JIG_APP, JIG_LAUNCHER } from "../server/from-jig.ts";
 import { VERSION } from "../shared/version.ts";
 import { type CliIo, EXIT_ERROR, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
@@ -124,8 +125,8 @@ export const appPath = (host: AppHost) => join(host.homeDir, "Applications", "Ye
  * it is the one Jig made, by the executable it has.
  */
 function removeJigApp(host: AppHost): void {
-	const old = join(host.homeDir, "Applications", "Jig.app");
-	if (existsSync(join(old, "Contents", "MacOS", "jig-launcher"))) {
+	const old = join(host.homeDir, "Applications", JIG_APP);
+	if (existsSync(join(old, "Contents", "MacOS", JIG_LAUNCHER))) {
 		rmSync(old, { recursive: true, force: true });
 	}
 }
@@ -143,7 +144,7 @@ export function installApp(
 	removeJigApp(host);
 	// Sessions' commands need your PATH; an app starts with a bare one.
 	const vars: Record<string, string> = { PATH: env.PATH ?? "/usr/bin:/bin" };
-	if (env.YEW_HOME || env.JIG_HOME) vars.YEW_HOME = home;
+	if (fromJigEnv(env, "HOME")) vars.YEW_HOME = home;
 	rmSync(app, { recursive: true, force: true });
 	const contents = join(app, "Contents");
 	mkdirSync(join(contents, "MacOS"), { recursive: true });
@@ -228,8 +229,8 @@ export function appCommand(host: AppHost = realAppHost()): Command {
 				return EXIT_OK;
 			}
 
-			const { jigHome } = await import("../server/paths.ts");
-			const { icon } = installApp(host, jigHome(io.env), io.env);
+			const { yewHome } = await import("../server/paths.ts");
+			const { icon } = installApp(host, yewHome(io.env), io.env);
 			if (values.json) io.stdout.write(`${JSON.stringify({ installed: true, app, icon })}\n`);
 			else {
 				io.stdout.write(

@@ -24,8 +24,7 @@
 		"node": ">=24"
 	},
 	"bin": {
-		"yew": "bin/yew.js",
-		"jig": "bin/jig.js"
+		"yew": "bin/yew.js"
 	},
 	"files": [
 		"bin",

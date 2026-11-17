@@ -31,9 +31,9 @@ const VECTOR = {
 	nonce: Buffer.alloc(12, 3),
 	note: '{"v":1,"id":"n1","kind":"permission","title":"官网","body":"git push","badge":2}',
 	// Derived from the two fixed test keys above; not a secret.
-	key: "6b8f194238cae3afb991545fc73bc9ef0f4ac1fb92e6bd67ad924d580e318f4d", // gitleaks:allow
+	key: "bf2f399751d75ff40f167677924af1407de6afd15b6daa221300a279db14fa2c", // gitleaks:allow
 	sealed:
-		"AwMDAwMDAwMDAwMDB+tpFSbM9MdgSEpAPCVHoBuxkomSUYkChVi7sCkBKDLTEV3tKqnLNqbBb+DxF7V53Z3Jw99sz29PXii88JgcsCZI4s3k5pJzmPg6raQATNjwu19EyTotKOZeuygs5lVF1Kc=",
+		"AwMDAwMDAwMDAwMDzlSL/SON53/W/tTl6GMwmom0kDXkK4kZJ+oDF+dDT3PM+7WahUcxbjb+0S51ticZLimYofNBxprt/PVjZgZGDvt2QNdmP3KukCVTHGN9yXVCG7u/8ewUsx7sxw9Dgrnhzvo=",
 };
 
 describe("notification encryption", () => {

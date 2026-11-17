@@ -50,7 +50,7 @@ class ApiTest {
         assertEquals(listOf("e1", "tools-e2", "e3", "e4", "e5"), steps.map { it.id })
         assertEquals(listOf("read", "grep", "shell"), (steps[1] as Step.Tools).names)
         assertEquals("总办", (steps[3] as Step.Letter).letter.fromName)
-        assertEquals(listOf("read" to 1, "search" to 1, "shell" to 2, "other" to 1), ToolKinds.count(listOf("shell", "read", "glob", "shell_job", "manage_jig")))
+        assertEquals(listOf("read" to 1, "search" to 1, "shell" to 2, "other" to 1), ToolKinds.count(listOf("shell", "read", "glob", "shell_job", "manage_yew")))
     }
 
     @Test

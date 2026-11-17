@@ -75,7 +75,7 @@ export interface MailContext {
 	wait(letter: Letter): Promise<WaitResult>;
 	open(input: OpenInput): { session: Session; letter: Letter };
 	finish(outcome: TaskOutcome): Session;
-	/** Applies a manage_jig call, all of it or none; returns what changed, one line each. */
+	/** Applies a manage_yew call, all of it or none; returns what changed, one line each. */
 	manage(args: JsonObject): string[];
 }
 
@@ -120,14 +120,14 @@ export type PermissionPreview = Partial<
 export interface Lookup {
 	/** A session's or team's name by id, so what the person reads names the sessions. */
 	name(id: string): string | null;
-	/** Checks a manage_jig call of the calling session and says what it would change, changing nothing. */
+	/** Checks a manage_yew call of the calling session and says what it would change, changing nothing. */
 	plan(args: JsonObject): ManagePlan;
 }
 
 /** What a session may do beyond its tools' own checks. */
 export interface Roles {
 	canPostCards: boolean;
-	/** May change Yew with manage_jig: sessions, teams and settings. */
+	/** May change Yew with manage_yew: sessions, teams and settings. */
 	canOrganize: boolean;
 }
 

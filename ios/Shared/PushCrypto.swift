@@ -4,13 +4,13 @@ import Foundation
 /// Notifications from the Mac arrive sealed for this phone (src/remote/push.ts): the relay and Apple's
 /// push service carry ciphertext only.
 ///
-/// key    = HKDF-SHA256(X25519(phone static, Mac static), salt = empty, info = "jig-push/1"), 32 bytes
+/// key    = HKDF-SHA256(X25519(phone static, Mac static), salt = empty, info = "yew-push/1"), 32 bytes
 /// sealed = nonce (12 bytes) | ChaCha20-Poly1305 ciphertext | tag (16 bytes)
 enum PushCrypto {
 	static func key(own: Curve25519.KeyAgreement.PrivateKey, mac: Data) throws -> SymmetricKey {
 		let shared = try own.sharedSecretFromKeyAgreement(with: Curve25519.KeyAgreement.PublicKey(rawRepresentation: mac))
 		return shared.hkdfDerivedSymmetricKey(
-			using: SHA256.self, salt: Data(), sharedInfo: Data("jig-push/1".utf8), outputByteCount: 32)
+			using: SHA256.self, salt: Data(), sharedInfo: Data("yew-push/1".utf8), outputByteCount: 32)
 	}
 
 	static func open(_ sealed: Data, key: SymmetricKey) throws -> Data {

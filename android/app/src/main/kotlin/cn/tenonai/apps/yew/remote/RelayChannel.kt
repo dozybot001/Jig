@@ -119,7 +119,7 @@ class RelayChannel(
     /** Shakes hands with the computer; [pairSecret] is the QR code's secret when this phone is not paired yet. */
     suspend fun connect(pairSecret: String? = null): Welcome = connecting.withLock {
         close()
-        val initiator = NoiseInitiator(key, pairing.desktopKey, "jig-remote/1:${pairing.desktop}".toByteArray())
+        val initiator = NoiseInitiator(key, pairing.desktopKey, "yew-remote/1:${pairing.desktop}".toByteArray())
         val hello = buildJsonObject {
             if (pairSecret != null) put("pair", pairSecret)
             put("name", deviceName)

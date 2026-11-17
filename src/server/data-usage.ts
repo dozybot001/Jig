@@ -1,6 +1,7 @@
 import { lstatSync, readdirSync, realpathSync, rmdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { conflict } from "./errors.ts";
+import { JIG_DATABASE_FILES } from "./from-jig.ts";
 
 /**
  * What the data folder takes on disk, by kind (blueprint 6.10, item 36; docs/data-inventory.md), and
@@ -36,14 +37,7 @@ export interface CleanupResult {
 /** Whether a session has a command that may still be writing or reading its output files. */
 export type InUse = (sessionId: string) => boolean;
 
-const DATABASE_FILES = new Set([
-	"yew.db",
-	"yew.db-wal",
-	"yew.db-shm",
-	"jig.db",
-	"jig.db-wal",
-	"jig.db-shm",
-]);
+const DATABASE_FILES = new Set(["yew.db", "yew.db-wal", "yew.db-shm", ...JIG_DATABASE_FILES]);
 const FOLDERS: Record<string, DataPartId> = { artifacts: "artifacts", logs: "logs", tmp: "temp" };
 
 function entries(dir: string): string[] {

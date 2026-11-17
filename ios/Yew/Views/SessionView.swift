@@ -242,7 +242,7 @@ struct StepView: View {
 			}
 			.padding(12)
 			.frame(maxWidth: .infinity, alignment: .leading)
-			.overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.jigControl))
+			.overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.yewControl))
 		case .answer(let entry):
 			AnswerText(text: entry.text)
 		case .tools(_, let names):
@@ -328,7 +328,7 @@ enum Sender {
 		switch kind {
 		case "person": String(localized: "You")
 		case "cli": String(localized: "Command line")
-		case "jig": String(localized: "Scheduled task “\(name)”")
+		case "yew": String(localized: "Scheduled task “\(name)”")
 		default: name
 		}
 	}

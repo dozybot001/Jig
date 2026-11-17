@@ -3,7 +3,7 @@ import { openDatabase } from "./db/database.ts";
 import { EventBus } from "./events.ts";
 import { type KeyStore, systemKeys } from "./keys.ts";
 import { ModelGateway } from "./model/gateway.ts";
-import { dbPath, ensureDir, jigHome } from "./paths.ts";
+import { dbPath, ensureDir, yewHome } from "./paths.ts";
 import { Store } from "./store.ts";
 
 export interface Runtime {
@@ -19,7 +19,7 @@ export interface Runtime {
 export function openRuntime(
 	options: { env?: Record<string, string | undefined>; keys?: KeyStore } = {},
 ): Runtime {
-	const home = ensureDir(jigHome(options.env));
+	const home = ensureDir(yewHome(options.env));
 	const bus = new EventBus();
 	const db = openDatabase(dbPath(home));
 	const store = new Store(db, bus);

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { exportAll } from "../data-export.ts";
 import { cleanTemp, dataUsage, type InUse } from "../data-usage.ts";
-import { conflict, invalid, JigError } from "../errors.ts";
+import { conflict, invalid, YewError } from "../errors.ts";
 import { resolveWorkingFolder } from "../paths.ts";
 import { type RunCommand, revealKind, showInFileManager } from "../reveal.ts";
 import type { Store } from "../store.ts";
@@ -43,7 +43,7 @@ export function dataRoutes(store: Store, options: DataRoutesOptions): Hono<AppEn
 		try {
 			folder = resolveWorkingFolder(requested);
 		} catch (error) {
-			if (error instanceof JigError) throw invalid(error.message, "folder");
+			if (error instanceof YewError) throw invalid(error.message, "folder");
 			throw error;
 		}
 		// The same call as `yew export`: it refuses a folder that is not empty.

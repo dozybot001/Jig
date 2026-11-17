@@ -27,7 +27,7 @@ const body = (name: string, description: string) =>
 
 /** A global folder and one workspace, each with skills that read and folders that do not. */
 function folders() {
-	const jigHome = real("yew-home-");
+	const yewHome = real("yew-home-");
 	const userHome = real("yew-user-");
 	const cwd = real("yew-cwd-");
 	const global = join(userHome, ".claude", "skills");
@@ -44,13 +44,13 @@ function folders() {
 	writeFileSync(join(global, "README.md"), "notes");
 	mkdirSync(join(global, ".git"));
 	const workspaces = [{ id: "w1", name: "App", path: cwd }];
-	return { jigHome, userHome, cwd, ids, workspaces };
+	return { yewHome, userHome, cwd, ids, workspaces };
 }
 
 describe("skills: what the settings list", () => {
 	test("skills are listed by source, and folders that cannot be read carry the reason", () => {
-		const { jigHome, userHome, cwd, ids, workspaces } = folders();
-		const listing = listSkills(workspaces, jigHome, userHome, [ids.pdf]);
+		const { yewHome, userHome, cwd, ids, workspaces } = folders();
+		const listing = listSkills(workspaces, yewHome, userHome, [ids.pdf]);
 		const workspace = { kind: "workspace", name: "App", path: cwd };
 		assert.deepEqual(
 			listing.items.map((item) => [item.name, item.source, item.problem, item.disabled, item.id]),
@@ -68,7 +68,7 @@ describe("skills: what the settings list", () => {
 		assert.deepEqual(listing.folders, [
 			{
 				source: { kind: "global" },
-				paths: [join(jigHome, "skills"), join(userHome, ".claude", "skills")],
+				paths: [join(yewHome, "skills"), join(userHome, ".claude", "skills")],
 			},
 			{
 				source: workspace,
@@ -79,25 +79,25 @@ describe("skills: what the settings list", () => {
 
 	test("a SKILL.md that cannot be opened is reported as unreadable", (t) => {
 		if (process.getuid?.() === 0) return t.skip("root reads every file");
-		const { jigHome, userHome, ids } = folders();
+		const { yewHome, userHome, ids } = folders();
 		chmodSync(join(ids.pdf, "SKILL.md"), 0o000);
 		t.after(() => chmodSync(join(ids.pdf, "SKILL.md"), 0o600));
-		const pdf = listSkills([], jigHome, userHome).items.find((item) => item.id === ids.pdf);
+		const pdf = listSkills([], yewHome, userHome).items.find((item) => item.id === ids.pdf);
 		assert.equal(pdf?.problem, "unreadable");
 		assert.deepEqual(
-			findSkills(null, jigHome, userHome).map((s) => s.name),
+			findSkills(null, yewHome, userHome).map((s) => s.name),
 			["release"],
 		);
 	});
 
 	test("without the person's home folder only Yew's own folder is listed", () => {
-		const { jigHome, workspaces } = folders();
-		skill(join(jigHome, "skills"), "own", body("own", "Yew's"));
+		const { yewHome, workspaces } = folders();
+		skill(join(yewHome, "skills"), "own", body("own", "Yew's"));
 		assert.deepEqual(
-			listSkills([], jigHome, null).items.map((item) => item.name),
+			listSkills([], yewHome, null).items.map((item) => item.name),
 			["own"],
 		);
-		assert.equal(listSkills(workspaces, jigHome, null).items.length, 4);
+		assert.equal(listSkills(workspaces, yewHome, null).items.length, 4);
 	});
 });
 
@@ -106,19 +106,19 @@ describe("skills: the switch", () => {
 		skills.map((s) => `${s.name}: ${s.description}`);
 
 	test("a skill that is off is left out of what a session gets; the others stay", async () => {
-		const { jigHome, userHome, cwd, ids } = folders();
-		assert.deepEqual(names(findSkills(cwd, jigHome, userHome, [ids.pdf])), [
+		const { yewHome, userHome, cwd, ids } = folders();
+		assert.deepEqual(names(findSkills(cwd, yewHome, userHome, [ids.pdf])), [
 			"deploy: Ship it",
 			"release: The project's",
 		]);
 		// The prompt no longer lists it and the tool no longer reads it.
-		const note = loadInstructions(cwd, jigHome, { userHome, disabledSkills: [ids.pdf] }).find(
+		const note = loadInstructions(cwd, yewHome, { userHome, disabledSkills: [ids.pdf] }).find(
 			(file) => file.path === "skills",
 		);
 		assert.equal(note?.content.includes("- pdf"), false);
 		assert.ok(note?.content.includes("- deploy: Ship it"));
 		let off = [ids.pdf];
-		const tool = skillTool(jigHome, userHome, () => off);
+		const tool = skillTool(yewHome, userHome, () => off);
 		const session = { cwd } as Session;
 		const run = (name: string) => tool.run({ name }, { session } as ToolContext);
 		assert.equal((await run("pdf")).isError, true);
@@ -131,9 +131,9 @@ describe("skills: the switch", () => {
 	});
 
 	test("with the same name in both places the project's wins, and each has its own switch", () => {
-		const { jigHome, userHome, cwd, ids } = folders();
+		const { yewHome, userHome, cwd, ids } = folders();
 		const release = (disabled: string[], dir: string | null = cwd) =>
-			findSkills(dir, jigHome, userHome, disabled).find((s) => s.name === "release")?.description;
+			findSkills(dir, yewHome, userHome, disabled).find((s) => s.name === "release")?.description;
 		assert.equal(release([]), "The project's");
 		// The global one off: the project's is still used there, and other folders have none.
 		assert.equal(release([ids.globalRelease]), "The project's");
@@ -154,7 +154,7 @@ describe("skills: the routes", () => {
 			store,
 			log: () => {},
 			skills: {
-				home: made.jigHome,
+				home: made.yewHome,
 				userHome: made.userHome,
 				platform,
 				run: async (command, args) => {
@@ -201,7 +201,7 @@ describe("skills: the routes", () => {
 	});
 
 	test("the switch is saved per skill; wrong input is refused and an unknown skill is 404", async () => {
-		const { send, ids, store, jigHome, userHome, cwd } = setup();
+		const { send, ids, store, yewHome, userHome, cwd } = setup();
 		const off = await send("PATCH", "/api/skills", { id: ids.projectRelease, disabled: true });
 		assert.equal(off.status, 200);
 		assert.equal(off.body.disabled, true);
@@ -216,7 +216,7 @@ describe("skills: the routes", () => {
 		);
 		const disabled = store.getSetting<string[]>("disabledSkills", []);
 		assert.equal(
-			findSkills(cwd, jigHome, userHome, disabled).find((s) => s.name === "release")?.description,
+			findSkills(cwd, yewHome, userHome, disabled).find((s) => s.name === "release")?.description,
 			"The person's",
 		);
 		const on = await send("PATCH", "/api/skills", { id: ids.projectRelease, disabled: false });
@@ -281,7 +281,7 @@ describe("skills: the routes", () => {
 			store,
 			log: () => {},
 			skills: {
-				home: made.jigHome,
+				home: made.yewHome,
 				userHome: made.userHome,
 				platform: "linux",
 				run: () => Promise.reject(new Error("spawn xdg-open ENOENT")),

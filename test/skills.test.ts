@@ -18,10 +18,10 @@ function skill(folder: string, dir: string, source: string) {
 }
 
 function homes() {
-	const jigHome = real("yew-home-");
+	const yewHome = real("yew-home-");
 	const userHome = real("yew-user-");
 	const cwd = real("yew-cwd-");
-	return { jigHome, userHome, cwd };
+	return { yewHome, userHome, cwd };
 }
 
 describe("skills", () => {
@@ -39,8 +39,8 @@ describe("skills", () => {
 	});
 
 	test("skills come from Yew's folder, the person's and the project's; the project's wins", () => {
-		const { jigHome, userHome, cwd } = homes();
-		skill(join(jigHome, "skills"), "release", "---\nname: release\ndescription: Yew's own\n---\nA");
+		const { yewHome, userHome, cwd } = homes();
+		skill(join(yewHome, "skills"), "release", "---\nname: release\ndescription: Yew's own\n---\nA");
 		skill(
 			join(userHome, ".claude", "skills"),
 			"pdf",
@@ -53,8 +53,8 @@ describe("skills", () => {
 			"---\nname: release\ndescription: The project's\n---\nD",
 		);
 		skill(join(cwd, ".jig", "skills"), "bad name", "---\nname: not a name!\n---\nE");
-		mkdirSync(join(jigHome, "skills", "empty"), { recursive: true });
-		const found = findSkills(cwd, jigHome, userHome);
+		mkdirSync(join(yewHome, "skills", "empty"), { recursive: true });
+		const found = findSkills(cwd, yewHome, userHome);
 		assert.deepEqual(
 			found.map((s) => [s.name, s.description]),
 			[
@@ -64,23 +64,23 @@ describe("skills", () => {
 		);
 		// Without the person's home folder nothing outside Yew's folder and the project is read.
 		assert.deepEqual(
-			findSkills(null, jigHome, null).map((s) => s.description),
+			findSkills(null, yewHome, null).map((s) => s.description),
 			["Yew's own"],
 		);
 	});
 
 	test("the skill tool gives the instructions without the front matter, and the folder", async () => {
-		const { jigHome, userHome, cwd } = homes();
+		const { yewHome, userHome, cwd } = homes();
 		skill(
 			join(userHome, ".claude", "skills"),
 			"pdf",
 			"---\nname: pdf\ndescription: PDF work\n---\n# PDF\nRun scripts/fill.py",
 		);
-		const tool = skillTool(jigHome, userHome);
+		const tool = skillTool(yewHome, userHome);
 		const session = { cwd } as Session;
 		assert.equal(tool.offered?.(session, { canPostCards: false, canOrganize: false }), true);
 		assert.equal(
-			skillTool(jigHome, null).offered?.(session, { canPostCards: false, canOrganize: false }),
+			skillTool(yewHome, null).offered?.(session, { canPostCards: false, canOrganize: false }),
 			false,
 		);
 		const run = async (name: string) => {
@@ -102,31 +102,31 @@ describe("skills", () => {
 
 describe("instructions, memory folders and what may be read", () => {
 	test("without a file of Yew's own, the person's global file is read; with one, only Yew's", () => {
-		const { jigHome, userHome } = homes();
+		const { yewHome, userHome } = homes();
 		mkdirSync(join(userHome, ".claude"));
 		writeFileSync(join(userHome, ".claude", "CLAUDE.md"), "用简体中文。");
 		assert.deepEqual(
-			loadInstructions(null, jigHome, { userHome }).map((f) => f.content),
+			loadInstructions(null, yewHome, { userHome }).map((f) => f.content),
 			["用简体中文。"],
 		);
-		assert.deepEqual(loadInstructions(null, jigHome), []);
-		writeFileSync(join(jigHome, "AGENTS.md"), "Yew 的说明。");
+		assert.deepEqual(loadInstructions(null, yewHome), []);
+		writeFileSync(join(yewHome, "AGENTS.md"), "Yew 的说明。");
 		assert.deepEqual(
-			loadInstructions(null, jigHome, { userHome }).map((f) => f.content),
+			loadInstructions(null, yewHome, { userHome }).map((f) => f.content),
 			["Yew 的说明。"],
 		);
 	});
 
 	test("memory folders are named with their index; skills are listed by name", () => {
-		const { jigHome, userHome, cwd } = homes();
+		const { yewHome, userHome, cwd } = homes();
 		const memory = real("yew-memory-");
 		writeFileSync(join(memory, "index.md"), "- 部署规范见 server-deployment.md");
 		skill(
-			join(jigHome, "skills"),
+			join(yewHome, "skills"),
 			"release",
 			"---\nname: release\ndescription: Cut a release\n---\nA",
 		);
-		const files = loadInstructions(cwd, jigHome, {
+		const files = loadInstructions(cwd, yewHome, {
 			userHome,
 			memoryDirs: [memory, join(memory, "gone")],
 		});
@@ -140,9 +140,9 @@ describe("instructions, memory folders and what may be read", () => {
 	});
 
 	test("a memory folder is read without asking; writing there still asks", () => {
-		const { jigHome, cwd } = homes();
+		const { yewHome, cwd } = homes();
 		const memory = real("yew-memory-");
-		const engine = new PermissionEngine(jigHome);
+		const engine = new PermissionEngine(yewHome);
 		const { store } = newStore();
 		const session = store.createSession({
 			...sessionInput("s"),

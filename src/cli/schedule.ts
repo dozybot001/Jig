@@ -61,13 +61,13 @@ export function scheduleCommand(): Command {
 			}
 			if (positionals.length > 2) throw new UsageError("too many arguments");
 
-			const { jigHome, dbPath } = await import("../server/paths.ts");
+			const { yewHome, dbPath } = await import("../server/paths.ts");
 			const { openDatabase } = await import("../server/db/database.ts");
 			const { EventBus } = await import("../server/events.ts");
 			const { Store } = await import("../server/store.ts");
 			const { PostOffice } = await import("../server/mail/post.ts");
 			const { ScheduleBook, Scheduler } = await import("../server/schedules.ts");
-			const home = jigHome(io.env);
+			const home = yewHome(io.env);
 			const db = openDatabase(dbPath(home));
 			try {
 				const store = new Store(db, new EventBus());

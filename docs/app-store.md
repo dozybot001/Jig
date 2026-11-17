@@ -24,7 +24,7 @@
 
 商店里的名称：「Jig」已被别的应用占用，现在用的是「Jig — Multi-Agent Workbench」。副标题限 30 个字符，一句话定义的英文放不下（34 个），现在填的是「Approve your agents' requests」。两处提交前都能改，由创始人定。
 
-截图：App Store Connect 现在以 6.3 英寸（1206×2622）为准，用 iPhone 17 Pro 模拟器拍，启动参数 `-JigDemo YES`、`-JigTab <approvals|letters|artifacts>`、`-JigSession website` 直接进演示的各页，状态栏统一为 9:41、满格、满电。五张：审批、会话列表、会话、信件、产物；中英文各一套。原图不入库，要用时重拍。
+截图：App Store Connect 现在以 6.3 英寸（1206×2622）为准，用 iPhone 17 Pro 模拟器拍，启动参数 `-YewDemo YES`、`-YewTab <approvals|letters|artifacts>`、`-YewSession website` 直接进演示的各页，状态栏统一为 9:41、满格、满电。五张：审批、会话列表、会话、信件、产物；中英文各一套。原图不入库，要用时重拍。
 
 ## 二、商店里填什么
 

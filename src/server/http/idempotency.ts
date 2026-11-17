@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { Db } from "../db/database.ts";
-import { JigError } from "../errors.ts";
+import { YewError } from "../errors.ts";
 import type { AppEnv } from "./problem.ts";
 
 const KEEP_MS = 24 * 60 * 60 * 1000;
@@ -28,7 +28,7 @@ export function idempotent(db: Db): MiddlewareHandler<AppEnv> {
 		const key = c.req.header("Idempotency-Key");
 		if (key === undefined) return next();
 		if (!KEY_PATTERN.test(key)) {
-			throw new JigError(
+			throw new YewError(
 				"invalid-request",
 				400,
 				"Idempotency-Key must be 1–255 visible characters.",
@@ -43,7 +43,7 @@ export function idempotent(db: Db): MiddlewareHandler<AppEnv> {
 			| undefined;
 		if (saved) {
 			if (saved.fingerprint !== fingerprint) {
-				throw new JigError(
+				throw new YewError(
 					"idempotency-key-reused",
 					422,
 					"This Idempotency-Key was already used with a different request body.",
@@ -56,7 +56,7 @@ export function idempotent(db: Db): MiddlewareHandler<AppEnv> {
 		}
 		const slot = `${scope} ${key}`;
 		if (inFlight.has(slot)) {
-			throw new JigError(
+			throw new YewError(
 				"idempotency-key-in-use",
 				409,
 				"A request with this Idempotency-Key is still being processed.",

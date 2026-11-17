@@ -8,7 +8,7 @@ import org.bouncycastle.crypto.InvalidCipherTextException
  * (`GET /api/notes`), so it does not open sealed ones today; this stays checked against the
  * computer's fixed vector for a delivery path that carries them.
  *
- * key    = HKDF-SHA256(X25519(phone static, computer static), salt = empty, info = "jig-push/1"), 32 bytes
+ * key    = HKDF-SHA256(X25519(phone static, computer static), salt = empty, info = "yew-push/1"), 32 bytes
  * sealed = nonce (12 bytes) | ChaCha20-Poly1305 ciphertext | tag (16 bytes)
  */
 object PushCrypto {
@@ -18,7 +18,7 @@ object PushCrypto {
     fun key(own: ByteArray, computer: ByteArray): ByteArray {
         // HKDF (RFC 5869) with an empty salt and one block of output.
         val pseudorandom = hmacSha256(ByteArray(32), Curve.dh(own, computer))
-        return hmacSha256(pseudorandom, "jig-push/1".toByteArray(Charsets.US_ASCII), byteArrayOf(1))
+        return hmacSha256(pseudorandom, "yew-push/1".toByteArray(Charsets.US_ASCII), byteArrayOf(1))
     }
 
     fun open(sealed: ByteArray, key: ByteArray): ByteArray {

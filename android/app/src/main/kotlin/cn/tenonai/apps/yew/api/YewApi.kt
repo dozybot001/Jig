@@ -64,7 +64,7 @@ class MessageText(val text: String, val tools: List<String>) {
 /** Who sent a letter into a session, and what kind it is. */
 class LetterRef(
     val kind: String,
-    /** session, person, cli, or jig (a scheduled task). */
+    /** session, person, cli, or yew (a scheduled task). */
     val fromKind: String?,
     val fromName: String,
     val summary: String,

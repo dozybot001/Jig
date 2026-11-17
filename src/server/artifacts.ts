@@ -93,9 +93,9 @@ export class ArtifactStore {
 	readonly #folder: string;
 	readonly #statements = new Map<string, StatementSync>();
 
-	constructor(store: Store, jigHome: string) {
+	constructor(store: Store, yewHome: string) {
 		this.#store = store;
-		this.#folder = join(jigHome, "artifacts");
+		this.#folder = join(yewHome, "artifacts");
 	}
 
 	#q(sql: string): StatementSync {

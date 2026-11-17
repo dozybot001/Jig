@@ -16,7 +16,7 @@ export function neutralize(text: string): string {
 function senderLabel(letter: Letter): string {
 	if (letter.fromKind === "cli") return "the command line (yew send)";
 	if (letter.fromKind === "person") return "the person";
-	if (letter.fromKind === "jig")
+	if (letter.fromKind === "yew")
 		return `the scheduled task '${letter.fromName}' (set up by the person)`;
 	return letter.fromName;
 }
@@ -89,7 +89,7 @@ export function letterText(
 		`thread="${letter.threadId}"`,
 		...(letter.replyTo ? [`reply-to="${letter.replyTo}"`] : []),
 		...(letter.auto ? ['auto="true"'] : []),
-		...(schedule && letter.fromKind !== "jig" ? [`schedule="${attr(schedule.name)}"`] : []),
+		...(schedule && letter.fromKind !== "yew" ? [`schedule="${attr(schedule.name)}"`] : []),
 	];
 	const lines = [`<letter ${attributes.join(" ")}>`, neutralize(letter.summary)];
 	if (letter.body) lines.push("", neutralize(letter.body));

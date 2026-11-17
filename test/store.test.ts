@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, test } from "node:test";
 import { openDatabase } from "../src/server/db/database.ts";
 import { migrations } from "../src/server/db/migrations.ts";
-import { JigError } from "../src/server/errors.ts";
+import { YewError } from "../src/server/errors.ts";
 import { MATCH_END, MATCH_START } from "../src/server/store.ts";
 import type { EntryBody } from "../src/shared/messages.ts";
 import { newStore, sessionInput, tempDir } from "./helpers/store.ts";
@@ -35,7 +35,7 @@ const assistant = (text: string): EntryBody => ({
 });
 
 function code(error: unknown): string | undefined {
-	return error instanceof JigError ? error.code : undefined;
+	return error instanceof YewError ? error.code : undefined;
 }
 
 describe("database", () => {

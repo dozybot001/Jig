@@ -125,7 +125,7 @@ export interface Notice {
 		| "error"
 		| "compacted"
 		| "job_finished"
-		/** Another session changed this one with manage_jig; data has who and the changes. */
+		/** Another session changed this one with manage_yew; data has who and the changes. */
 		| "changed"
 		/** A daily spending limit: data has the code (budget-warning or budget-reached), scope, spent and limit. */
 		| "budget";
@@ -148,7 +148,7 @@ export interface DecisionRef {
 export interface LetterRef {
 	id: string;
 	kind: "notice" | "request" | "decision" | "report";
-	from: { kind: "session" | "person" | "cli" | "jig"; sessionId: string | null; name: string };
+	from: { kind: "session" | "person" | "cli" | "yew"; sessionId: string | null; name: string };
 	summary: string;
 	body: string;
 	/** Yew sent the session's final reply on its behalf. */

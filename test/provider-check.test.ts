@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { createServer, type IncomingHttpHeaders, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, test } from "node:test";
-import { JigError } from "../src/server/errors.ts";
+import { YewError } from "../src/server/errors.ts";
 import { MemoryKeyStore } from "../src/server/keys.ts";
 import { ModelGateway, plainError } from "../src/server/model/gateway.ts";
 
@@ -94,9 +94,9 @@ describe("connection test", () => {
 		try {
 			await assert.rejects(
 				local(provider.url, true).ping("local"),
-				(e) => e instanceof JigError && e.code === "missing-api-key",
+				(e) => e instanceof YewError && e.code === "missing-api-key",
 			);
-			await assert.rejects(local(provider.url).ping("local", "nope"), JigError);
+			await assert.rejects(local(provider.url).ping("local", "nope"), YewError);
 			assert.equal(provider.seen.length, 0);
 		} finally {
 			provider.close();

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publishes Jig's relay (M3 plan, section 5). The exact clean main commit is pushed to Gitee
+# Publishes Yew's relay (M3 plan, section 5). The exact clean main commit is pushed to Gitee
 # first; the server then fetches that commit and builds the release itself. Nothing is uploaded
 # from this Mac. Run it as: npm run relay:publish
 set -Eeuo pipefail
@@ -15,7 +15,7 @@ npm audit --prefix relay --omit=dev --audit-level=high
 npm run check >/dev/null
 # origin pushes to Gitee and GitHub. Only Gitee carries the release; GitHub is a mirror.
 git push origin main || echo 'A push reported an error; checking Gitee.' >&2
-gitee="$(git ls-remote https://gitee.com/dozybot/jig.git refs/heads/main | cut -f1)"
+gitee="$(git ls-remote https://gitee.com/dozybot/yew.git refs/heads/main | cut -f1)"
 [[ "$gitee" == "$release" ]] || { echo "Gitee main is ${gitee:-unreadable}, not $release." >&2; exit 1; }
 # Both the server's and Gitee's host keys come from the repository, never a scan.
 gitee_keys="$(grep '^gitee\.com ' deploy/relay/known_hosts | base64 | tr -d '\n')"

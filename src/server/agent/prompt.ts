@@ -110,7 +110,7 @@ function withoutCode(text: string): string {
  */
 export function loadInstructions(
 	cwd: string | null,
-	jigHome: string,
+	yewHome: string,
 	extras: InstructionExtras = {},
 ): InstructionFile[] {
 	const files: InstructionFile[] = [];
@@ -145,9 +145,9 @@ export function loadInstructions(
 	};
 
 	const userHome = extras.userHome ?? null;
-	const own = join(jigHome, "AGENTS.md");
+	const own = join(yewHome, "AGENTS.md");
 	// A person who has set nothing up for Yew keeps the global file they already have.
-	if (existsSync(own) || !userHome) add(own, jigHome, 0);
+	if (existsSync(own) || !userHome) add(own, yewHome, 0);
 	else add(join(userHome, ".claude", "CLAUDE.md"), join(userHome, ".claude"), 0);
 	if (cwd) {
 		const root = findProjectRoot(cwd);
@@ -170,7 +170,7 @@ export function loadInstructions(
 			if (index && !seen.has(index.path)) files.push(index);
 		}
 	}
-	const skills = findSkills(cwd, jigHome, userHome, extras.disabledSkills);
+	const skills = findSkills(cwd, yewHome, userHome, extras.disabledSkills);
 	if (skills.length > 0) files.push({ path: "skills", content: skillsNote(skills) });
 	return files;
 }
@@ -187,7 +187,7 @@ export interface InstructionExtras {
 
 export function takeSnapshot(
 	session: Session,
-	jigHome: string,
+	yewHome: string,
 	placement: Placement = { main: null, parent: null },
 	extras: InstructionExtras = {},
 ): ContextSnapshot {
@@ -197,7 +197,7 @@ export function takeSnapshot(
 		shell: process.env.SHELL ?? "/bin/sh",
 		cwd: session.cwd,
 		git: session.cwd ? gitStatus(session.cwd) : null,
-		instructions: loadInstructions(session.cwd, jigHome, extras),
+		instructions: loadInstructions(session.cwd, yewHome, extras),
 		permissionMode: permissionModeOf(session.options),
 		main: placement.main,
 		parent: placement.parent,
@@ -234,7 +234,7 @@ export const MAIN_ROLE = `You are the person's main conversation. The person wor
 - When reports come back, tell the person the outcome in a few lines; they can open the session for the details.
 - When something needs the person's decision, put a card in the approval center with post_card. Merge cards about the same question, update cards when things change, and withdraw cards that no longer apply.
 - Yew delivers the person's decision to the session that asked and to you, marked as the person's; you do not need to pass it on.
-- Change Yew itself with manage_jig when the person asks or the organization needs it: sessions, teams, scheduled tasks and settings.
+- Change Yew itself with manage_yew when the person asks or the organization needs it: sessions, teams, scheduled tasks and settings.
 - Decide only what your role covers. Never answer in the person's place.`;
 
 /** Asks a session's own model for a short name after its first turn (Yew's wording). */

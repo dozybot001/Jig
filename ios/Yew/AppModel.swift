@@ -17,7 +17,7 @@ final class AppModel {
 		case unreachable
 	}
 
-	private(set) var client: JigClient?
+	private(set) var client: YewClient?
 	private var channel: RelayChannel?
 	private(set) var sessions: [SessionSummary] = []
 	private(set) var center: Center?
@@ -36,22 +36,22 @@ final class AppModel {
 	/// The tab in front, and the session open in the sessions tab: where a screen can send the person.
 	var tab: Tab = .sessions
 	var sessionPath: [SessionSummary] = []
-	/// The session to open once the list has it: from a tapped notification, or `-JigSession <id>` in Debug.
+	/// The session to open once the list has it: from a tapped notification, or `-YewSession <id>` in Debug.
 	private var sessionToOpen: String?
 	/// This phone's APNs token, and the one the Mac was last given.
 	private var apnsToken: String?
 	private var tokenOnMac: String?
 	#if DEBUG
-	/// `-JigSettings YES` or `-JigSettings about`: what the settings sheet opens at.
-	let settingsAtLaunch = UserDefaults.standard.string(forKey: "JigSettings")
+	/// `-YewSettings YES` or `-YewSettings about`: what the settings sheet opens at.
+	let settingsAtLaunch = UserDefaults.standard.string(forKey: "YewSettings")
 	#endif
 
 	private static let directKey = "directBase"
 
 	init() {
 		#if DEBUG
-		// `-JigReset YES` starts as if newly installed: no pairing, no saved address.
-		if UserDefaults.standard.bool(forKey: "JigReset") {
+		// `-YewReset YES` starts as if newly installed: no pairing, no saved address.
+		if UserDefaults.standard.bool(forKey: "YewReset") {
 			Vault.forget()
 			UserDefaults.standard.removeObject(forKey: Self.directKey)
 		}
@@ -63,28 +63,27 @@ final class AppModel {
 		#if DEBUG
 		// The cookie survives in the shared cookie store; the address is all the app has to remember.
 		if let saved = UserDefaults.standard.string(forKey: Self.directKey), let base = URL(string: saved) {
-			client = JigClient(transport: DirectTransport(base: base))
+			client = YewClient(transport: DirectTransport(base: base))
 		}
-		// `-JigDirectLink <link>` at launch connects at once (simulator runs and UI tests).
-		if let link = UserDefaults.standard.string(forKey: "JigDirectLink") {
+		// `-YewDirectLink <link>` at launch connects at once (simulator runs and UI tests).
+		if let link = UserDefaults.standard.string(forKey: "YewDirectLink") {
 			Task { await connectDirect(link: link) }
 		}
-		// `-JigPairLink <yew://pair?…>` pairs through the relay at launch, as scanning would (a `jig://pair?…`
-		// link from a Mac before the rename works too).
-		if let link = UserDefaults.standard.string(forKey: "JigPairLink") {
+		// `-YewPairLink <yew://pair?…>` pairs through the relay at launch, as scanning would.
+		if let link = UserDefaults.standard.string(forKey: "YewPairLink") {
 			Task { await pair(with: link) }
 		}
-		// `-JigDemo YES` opens the demo; with `-JigTab`, `-JigSession` and `-JigSettings` a screen of it
+		// `-YewDemo YES` opens the demo; with `-YewTab`, `-YewSession` and `-YewSettings` a screen of it
 		// (screenshots, including the App Store's).
-		if UserDefaults.standard.bool(forKey: "JigDemo") { startDemo() }
-		switch UserDefaults.standard.string(forKey: "JigTab") {
+		if UserDefaults.standard.bool(forKey: "YewDemo") { startDemo() }
+		switch UserDefaults.standard.string(forKey: "YewTab") {
 		case "approvals": tab = .approvals
 		case "letters": tab = .letters
 		case "artifacts": tab = .artifacts
 		default: break
 		}
 		if settingsAtLaunch != nil { showingSettings = true }
-		sessionToOpen = UserDefaults.standard.string(forKey: "JigSession")
+		sessionToOpen = UserDefaults.standard.string(forKey: "YewSession")
 		#endif
 	}
 
@@ -104,13 +103,13 @@ final class AppModel {
 
 	private func use(_ channel: RelayChannel) {
 		self.channel = channel
-		client = JigClient(transport: RelayTransport(channel: channel))
+		client = YewClient(transport: RelayTransport(channel: channel))
 	}
 
 	#if DEBUG
 	func connectDirect(link: String) async {
 		do {
-			let (client, base) = try await JigClient.direct(link: link)
+			let (client, base) = try await YewClient.direct(link: link)
 			UserDefaults.standard.set(base.absoluteString, forKey: Self.directKey)
 			self.client = client
 			problem = nil
@@ -173,7 +172,7 @@ final class AppModel {
 		reset()
 		isDemo = true
 		desktopName = String(localized: "Demo Mac")
-		client = JigClient(transport: DemoTransport())
+		client = YewClient(transport: DemoTransport())
 		link = .online
 	}
 
@@ -411,13 +410,13 @@ final class AppModel {
 	}
 
 	/// Runs a request; a refusal from the Mac is shown to the person, a lost connection goes to the banner.
-	private func attempt(_ work: (JigClient) async throws -> Void) async {
+	private func attempt(_ work: (YewClient) async throws -> Void) async {
 		guard let client else { return }
 		do {
 			try await work(client)
 			link = .online
 		} catch is CancellationError {
-		} catch let refusal as JigProblem {
+		} catch let refusal as YewProblem {
 			link = .online
 			problem = refusal.localizedDescription
 		} catch {

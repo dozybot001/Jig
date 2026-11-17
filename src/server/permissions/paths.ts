@@ -35,10 +35,10 @@ export function isInside(path: string, folder: string): boolean {
 }
 
 /** Places that hold credentials. Sessions never read or write them through file tools (M1 plan, section 7). */
-export function secretLocations(jigHome: string): string[] {
+export function secretLocations(yewHome: string): string[] {
 	const home = homedir();
 	return [
-		jigHome,
+		yewHome,
 		join(home, ".ssh"),
 		join(home, ".gnupg"),
 		join(home, ".aws"),

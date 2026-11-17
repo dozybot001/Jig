@@ -1,5 +1,5 @@
 {
-	"name": "jig-relay",
+	"name": "yew-relay",
 	"private": true,
 	"type": "module",
 	"engines": {

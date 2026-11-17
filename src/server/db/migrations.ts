@@ -293,4 +293,51 @@ DELETE FROM approvals WHERE tool_call_id IN (SELECT tool_calls.id FROM tool_call
 	JOIN messages ON messages.id = tool_calls.message_id WHERE messages.rewound = 1);
 UPDATE tool_calls SET args = '{}', detail = NULL
 	WHERE message_id IN (SELECT id FROM messages WHERE rewound = 1);`,
+	// Jig was renamed Yew (blueprint, section 12): stored values that carried the old name take the
+	// new one. A letter sent by Yew itself (a scheduled task) was from kind 'jig', and the check on
+	// that column can only change by rebuilding the table; nothing refers to it, so it is copied over.
+	`CREATE TABLE letters_yew (
+	id TEXT PRIMARY KEY,
+	thread_id TEXT NOT NULL,
+	reply_to TEXT,
+	from_kind TEXT NOT NULL CHECK (from_kind IN ('session', 'person', 'cli', 'yew')),
+	from_session TEXT REFERENCES sessions (id) ON DELETE SET NULL,
+	from_name TEXT NOT NULL,
+	to_session TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+	kind TEXT NOT NULL CHECK (kind IN ('notice', 'request', 'decision', 'report')),
+	summary TEXT NOT NULL,
+	body TEXT NOT NULL,
+	status TEXT NOT NULL
+		CHECK (status IN ('queued', 'held', 'delivered', 'done', 'refused', 'dropped')),
+	status_reason TEXT,
+	path TEXT NOT NULL DEFAULT '[]',
+	auto INTEGER NOT NULL DEFAULT 0,
+	decision INTEGER,
+	entry_id TEXT,
+	created_at INTEGER NOT NULL,
+	delivered_at INTEGER,
+	updated_at INTEGER NOT NULL,
+	schedule_id TEXT REFERENCES schedules (id) ON DELETE SET NULL
+) STRICT;
+INSERT INTO letters_yew (id, thread_id, reply_to, from_kind, from_session, from_name, to_session, kind,
+	summary, body, status, status_reason, path, auto, decision, entry_id, created_at, delivered_at,
+	updated_at, schedule_id)
+SELECT id, thread_id, reply_to, CASE from_kind WHEN 'jig' THEN 'yew' ELSE from_kind END, from_session,
+	from_name, to_session, kind, summary, body, status, status_reason, path, auto, decision, entry_id,
+	created_at, delivered_at, updated_at, schedule_id FROM letters;
+DROP TABLE letters;
+ALTER TABLE letters_yew RENAME TO letters;
+CREATE INDEX letters_inbox ON letters (to_session, status);
+CREATE INDEX letters_time ON letters (created_at, id);
+CREATE INDEX letters_pair ON letters (from_session, to_session, created_at);
+UPDATE tool_calls SET tool = 'manage_yew' WHERE tool = 'manage_jig';
+UPDATE messages SET body = replace(replace(body, '"name":"manage_jig"', '"name":"manage_yew"'),
+	'"toolName":"manage_jig"', '"toolName":"manage_yew"')
+	WHERE body LIKE '%manage_jig%';
+UPDATE approvals SET request = replace(replace(request, '"tool":"manage_jig"', '"tool":"manage_yew"'),
+	'"jig-cli"', '"yew-cli"')
+	WHERE request LIKE '%manage_jig%' OR request LIKE '%jig-cli%';
+UPDATE sessions SET rules = replace(rules, '"tool":"manage_jig"', '"tool":"manage_yew"')
+	WHERE rules LIKE '%manage_jig%';
+DELETE FROM session_events;`,
 ];

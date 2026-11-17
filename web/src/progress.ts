@@ -50,7 +50,7 @@ export function tally(tools: string[]): Tally {
 }
 
 /** Yew's own notes to the model start with this; they are not the person's words and start no turn. */
-export const JIG_NOTE = "[From Yew, not from the person]";
+export const YEW_NOTE = "[From Yew, not from the person]";
 
 function startsTurn(entry: Entry): boolean {
 	if (entry.role === "notice") {
@@ -64,7 +64,7 @@ function startsTurn(entry: Entry): boolean {
 		typeof content === "string"
 			? content
 			: content.map((block) => (block.type === "text" ? block.text : "")).join("\n");
-	return !text.startsWith(JIG_NOTE);
+	return !text.startsWith(YEW_NOTE);
 }
 
 export interface TurnProgress {

@@ -165,7 +165,7 @@ export const LETTER_KINDS = ["notice", "request", "decision", "report"] as const
 export type LetterKind = (typeof LETTER_KINDS)[number];
 export type LetterStatus = "queued" | "held" | "delivered" | "done" | "refused" | "dropped";
 /** Who sent a letter: a session, the person (decisions), the command line (`yew send`) or Yew itself. */
-export type SenderKind = "session" | "person" | "cli" | "jig";
+export type SenderKind = "session" | "person" | "cli" | "yew";
 
 /** A letter between sessions (blueprint section 7). Stored before it is delivered, so a restart loses none. */
 export interface Letter {
@@ -311,7 +311,7 @@ export type ConfirmReason =
 	| "cluster"
 	| "infrastructure"
 	| "system-services"
-	| "jig-cli"
+	| "yew-cli"
 	| "credentials"
 	| "write-credentials"
 	| "admin"
@@ -320,7 +320,7 @@ export type ConfirmReason =
 	| "computer-control"
 	// An MCP tool that sends, publishes or deletes something in the service it connects to.
 	| "service-action"
-	// manage_jig changes that widen what a session may do (blueprint 6.2, item 10)
+	// manage_yew changes that widen what a session may do (blueprint 6.2, item 10)
 	| "widen-permission"
 	| "change-folder"
 	| "open-letters"
@@ -351,12 +351,12 @@ export interface PermissionRequest {
 	description?: string;
 	/** The change an edit or write would make, as a unified patch, so the person sees it first. */
 	diff?: string;
-	/** The changes manage_jig would make, with names in place of ids, for the interface to word. */
+	/** The changes manage_yew would make, with names in place of ids, for the interface to word. */
 	changes?: ChangeStep[];
 }
 
 /**
- * One change manage_jig makes, as the person reads it on the permission card and in the changed
+ * One change manage_yew makes, as the person reads it on the permission card and in the changed
  * session: names in place of ids, settings as codes the interface words in its language.
  */
 export type ChangeStep =

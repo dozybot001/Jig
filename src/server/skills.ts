@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
 import { invalid } from "./errors.ts";
+import { JIG_PROJECT_FOLDER } from "./from-jig.ts";
 import { errorResult, str, type ToolDefinition, type ToolResult, text } from "./tools/types.ts";
 
 /**
@@ -119,13 +120,13 @@ function scan(folder: string): { skills: Skill[]; broken: BrokenSkill[] } {
 /** The folders skills are looked for in, later ones winning over earlier ones with the same name. */
 export function skillFolders(
 	cwd: string | null,
-	jigHome: string,
+	yewHome: string,
 	userHome: string | null = homedir(),
 ): string[] {
-	const folders = [join(jigHome, "skills")];
+	const folders = [join(yewHome, "skills")];
 	if (userHome) folders.push(join(userHome, ".claude", "skills"));
 	if (cwd) {
-		for (const local of [".agents", ".claude", ".yew", ".jig"])
+		for (const local of [".agents", ".claude", ".yew", JIG_PROJECT_FOLDER])
 			folders.push(join(cwd, local, "skills"));
 	}
 	return folders;
@@ -138,12 +139,12 @@ export function skillFolders(
  */
 export function findSkills(
 	cwd: string | null,
-	jigHome: string,
+	yewHome: string,
 	userHome: string | null = homedir(),
 	disabled: readonly string[] = [],
 ): Skill[] {
 	const byName = new Map<string, Skill>();
-	for (const folder of skillFolders(cwd, jigHome, userHome)) {
+	for (const folder of skillFolders(cwd, yewHome, userHome)) {
 		for (const skill of scan(folder).skills) {
 			if (!disabled.includes(skill.dir)) byName.set(skill.name, skill);
 		}
@@ -179,16 +180,16 @@ export interface SkillListing {
  */
 export function listSkills(
 	workspaces: readonly { name: string; path: string }[],
-	jigHome: string,
+	yewHome: string,
 	userHome: string | null,
 	disabled: readonly string[] = [],
 ): SkillListing {
-	const global = skillFolders(null, jigHome, userHome);
+	const global = skillFolders(null, yewHome, userHome);
 	const groups: SkillListing["folders"] = [
 		{ source: { kind: "global" }, paths: global },
 		...workspaces.map((workspace) => ({
 			source: { kind: "workspace" as const, name: workspace.name, path: workspace.path },
-			paths: skillFolders(workspace.path, jigHome, userHome).slice(global.length),
+			paths: skillFolders(workspace.path, yewHome, userHome).slice(global.length),
 		})),
 	];
 	const items: SkillEntry[] = [];
@@ -286,7 +287,7 @@ export function memoryNote(dirs: string[]): string {
 
 /** Reads one skill in full. Offered when the session has any skill. */
 export function skillTool(
-	jigHome: string,
+	yewHome: string,
 	userHome: string | null = homedir(),
 	/** The skills switched off in the settings, read each time so a change applies at once. */
 	disabled: () => readonly string[] = () => [],
@@ -303,11 +304,11 @@ export function skillTool(
 		},
 		readOnly: true,
 		needsFolder: false,
-		offered: (session) => findSkills(session.cwd, jigHome, userHome, disabled()).length > 0,
+		offered: (session) => findSkills(session.cwd, yewHome, userHome, disabled()).length > 0,
 		subject: () => ({ kind: "none" }),
 		async run(args, ctx): Promise<ToolResult> {
 			const name = str(args, "name", true).trim();
-			const skills = findSkills(ctx.session.cwd, jigHome, userHome, disabled());
+			const skills = findSkills(ctx.session.cwd, yewHome, userHome, disabled());
 			const skill =
 				skills.find((s) => s.name === name) ?? skills.find((s) => basename(s.dir) === name);
 			if (!skill) {

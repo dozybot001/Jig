@@ -392,10 +392,10 @@ export function mustConfirmReason(argv: string[]): ConfirmReason | null {
 
 	if (["rm", "rmdir", "unlink", "shred", "srm", "trash"].includes(name)) return "delete-files";
 	// Yew's own command line sends letters and manages keys and the service; sessions use their tools.
-	if (name === "yew" || name === "jig") {
+	if (name === "yew" || name === "yew") {
 		const informational =
 			has("--help", "-h") || args.every((arg) => ["--version", "-v", "--json"].includes(arg));
-		if (!informational) return "jig-cli";
+		if (!informational) return "yew-cli";
 	}
 	if (name === "find" && has("-delete")) return "delete-files";
 	if (name === "rsync" && hasPrefix("--delete", "--remove-source-files")) return "delete-files";

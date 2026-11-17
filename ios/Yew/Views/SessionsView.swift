@@ -22,7 +22,7 @@ struct SessionsView: View {
 				SessionView(session: session)
 			}
 			.refreshable { await model.refreshAll() }
-			.jigChrome()
+			.yewChrome()
 		}
 	}
 }

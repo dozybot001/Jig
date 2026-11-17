@@ -6,17 +6,17 @@ import type {
 } from "../../shared/messages.ts";
 import { messageText } from "../../shared/messages.ts";
 import type { Entry, UsageTotals } from "../../shared/types.ts";
+import { isJigNote } from "../from-jig.ts";
 
 export const SUMMARY_HEADING =
 	"[Summary of the earlier conversation, written by Yew when it shortened the context]";
 export const REQUEST_HEADING =
 	"[The latest message to you before that summary, word for word; it is still what you are working on]";
 /** What Yew puts in front of its own messages to the model, which are stored like the person's. */
-export const JIG_NOTE = "[From Yew, not from the person]";
+export const YEW_NOTE = "[From Yew, not from the person]";
 
-/** Whether a stored message is one of Yew's own notes, written before or after the rename. */
-export const isOwnNote = (text: string): boolean =>
-	text.startsWith(JIG_NOTE) || text.startsWith("[From Jig, not from the person]");
+/** Whether a stored message is one of Yew's own notes (or Jig's, from before the rename). */
+export const isOwnNote = (text: string): boolean => text.startsWith(YEW_NOTE) || isJigNote(text);
 
 function placeholder(call: ToolCallBlock, timestamp: number): ToolResultMessage {
 	return {

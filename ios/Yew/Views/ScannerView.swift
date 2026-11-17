@@ -39,7 +39,7 @@ struct ScannerView: UIViewControllerRepresentable {
 		func dataScanner(_ scanner: DataScannerViewController, didAdd items: [RecognizedItem], allItems: [RecognizedItem]) {
 			guard !done else { return }
 			for item in items {
-				if case .barcode(let code) = item, let value = code.payloadStringValue, PairingLink.looksLikeOne(value) {
+				if case .barcode(let code) = item, let value = code.payloadStringValue, value.hasPrefix(PairingLink.prefix) {
 					done = true
 					scanner.stopScanning()
 					onCode(value)

@@ -287,7 +287,7 @@ export function centerCount(center: CenterState): number {
 	);
 }
 
-const SIDEBAR_KEY = "jig.sidebar";
+const SIDEBAR_KEY = "yew.sidebar";
 
 function rememberedCollapse(): boolean {
 	try {

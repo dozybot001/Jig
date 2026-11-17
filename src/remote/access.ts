@@ -19,7 +19,7 @@ export interface RemoteStatus {
 export const desktopName = () => hostname().replace(/\.local$/, "") || "Mac";
 
 /**
- * Starts and stops the relay connection to match the settings, which the interface, `manage_jig` and
+ * Starts and stops the relay connection to match the settings, which the interface, `manage_yew` and
  * `yew remote` change; `sync` runs every few seconds, so changes made from the command line take hold.
  */
 export class RemoteAccess {

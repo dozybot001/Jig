@@ -76,8 +76,8 @@ export class PermissionEngine {
 	/** Folders outside the working folder that may be read without asking: memory and skill folders. */
 	readRoots: () => string[] = () => [];
 
-	constructor(jigHome: string) {
-		this.#secrets = secretLocations(jigHome);
+	constructor(yewHome: string) {
+		this.#secrets = secretLocations(yewHome);
 	}
 
 	/**

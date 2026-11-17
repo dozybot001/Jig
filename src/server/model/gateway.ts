@@ -26,13 +26,13 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { AssistantMessage, JsonObject, ModelMessage } from "../../shared/messages.ts";
 import type { ThinkingLevel } from "../../shared/types.ts";
-import { invalid, JigError } from "../errors.ts";
+import { invalid, YewError } from "../errors.ts";
 import type { KeyStore } from "../keys.ts";
 
 // Compile-time guarantees that Yew's stored message shapes and the library's stay interchangeable.
 type Assert<T extends true> = T;
 export type _MessagesFitLibrary = Assert<ModelMessage extends Message ? true : false>;
-export type _LibraryResultFitsJig = Assert<
+export type _LibraryResultFitsYew = Assert<
 	import("@earendil-works/pi-ai").AssistantMessage extends AssistantMessage ? true : false
 >;
 
@@ -186,7 +186,7 @@ const HIDDEN_PROVIDERS = new Set([
 ]);
 
 /** Sent to keyless local servers, which ignore it; the OpenAI client needs some value. */
-const KEYLESS = "jig-no-key";
+const KEYLESS = "yew-no-key";
 
 /** Keys come only from the keychain: never from environment variables or files (AGENTS.md). */
 const NO_AMBIENT_AUTH: AuthContext = {
@@ -433,7 +433,7 @@ export class ModelGateway {
 		const model = this.#models.getModel(request.provider, request.model);
 		if (!model) throw invalid(`${request.provider} has no model ${request.model}.`, "model");
 		if (!(await this.hasKey(request.provider))) {
-			throw new JigError(
+			throw new YewError(
 				"missing-api-key",
 				400,
 				`There is no API key for ${request.provider}. Add one in Settings, or run: yew key set ${request.provider}`,
@@ -546,7 +546,7 @@ export class ModelGateway {
 		if (!model)
 			throw invalid(`${provider} has no model ${modelId ?? ""}.`.replace(" .", "."), "model");
 		if (!(await this.hasKey(provider))) {
-			throw new JigError("missing-api-key", 400, `There is no API key for ${provider}.`, {
+			throw new YewError("missing-api-key", 400, `There is no API key for ${provider}.`, {
 				provider,
 			});
 		}

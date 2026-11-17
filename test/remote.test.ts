@@ -28,7 +28,7 @@ async function until(check: () => boolean, ms = 3000): Promise<void> {
 }
 
 describe("Noise IK", () => {
-	const prologue = Buffer.from("jig-remote/1:test");
+	const prologue = Buffer.from("yew-remote/1:test");
 
 	function handshake(options: { remoteStatic?: Buffer } = {}) {
 		const mac = generateKeyPair();
