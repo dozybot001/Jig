@@ -34,7 +34,7 @@
 
 - **密钥库**：`~/.tenon-keys/android/jig/jig-release.p12`（目录 0700、文件 0600），别名 `jig`。口令在登录钥匙串里：服务 `tenon-android-signing`，账户 `jig`。证书指纹和公钥在 7.2 节和 `android/release/`。
 - **备份**：已做并通过恢复演练（7.2）；位置和口令的保管方式不写在公开仓库里，在安全组的内部文档。每年做一次恢复演练：创始人在能直接打字的终端里运行 `android/scripts/backup-signing-key.sh <文件夹>`，映像口令由他自己输入。
-- **出正式包**：在 `android/` 下运行 `scripts/release.sh`（7.3）。它要求 `android/`、`package.json`、`src/shared/policy.ts` 没有未提交的改动，先查 OSV，再跑测试和 lint、构建、签名、核对，产物在 `android/build/release/`。它不发布。
+- **出正式包**：在 `android/` 下运行 `scripts/release.sh`（7.3）。它要求 `android/`、`package.json`、`src/shared/policy.ts` 没有未提交的改动，先查 OSV，再跑测试和 lint、构建、签名、核对，产物在 `android/build/release/`。它不发布。发版时先跑它，通过了再打发布标签：1.5.0 先打了标签，跑脚本时一个单元测试没过，包只好从标签后面只改了测试的 1d785a2 出，和标签错开了（安全组 11-18：「以后先跑发布脚本，通过了再打标签」）。
 - **升级依赖**：见第 3 节（锁文件、校验值、`dependencies.ts`、`check-vulnerabilities.ts` 要一起更新）。隐私政策改了以后跑 `node android/scripts/sync-policy.ts`。
 - **不要做的**：不要重新生成密钥（`create-signing-key.sh` 发现已有密钥库会停）；不要把密钥库、口令或备份映像复制到别处，导出和另做备份要创始人确认（15.6.4）。
 
@@ -395,6 +395,9 @@ English:
 | 1.1.0 | 2026-11-16 | `v1.1.0`，指向 1e973ec | `6b22dd3ca3a3f44d8d3fd08c80942d84cc196e7c48f39529ca89afd56c0b7d94` |
 | 1.1.1 | 2026-11-16 | `v1.1.1`，指向 1f861da | `be0ae54def251bcc28ea7f59e9f75cb4f2a7ab701998279813c9e0e8b2ac6210` |
 | 1.2.0 | 2026-11-17 | `v1.2.0`，指向 4a3c63c | `d4646618a2e6a26e3b5adf3772b06d25a337ba3c298e83e43d3c06ccc06ecd6c` |
+| 1.3.0 | 2026-11-18 | `v1.3.0`，指向 3683338 | `b32ff52465cd5f07f88ee25819681c7cf851d734481c7e448bb8df7ef84507bb` |
+| 1.4.0 | 2026-11-18 | `v1.4.0`，指向 be3dfa4 | `8bb00944d07307e9fc448a35a8bff5ed77bd7e9a098fc71cd31e22467fe51519` |
+| 1.5.0 | 2026-11-18 | `v1.5.0`，指向 606cbef；包从 1d785a2 出，只多一处单元测试 | `586e6a781dd2b8514804dbbfc26947969ef84360dcbf8c8ff77cdf7f986b3be7` |
 
 - 地址：https://github.com/dozybot001/Jig/releases/tag/v1.0.1 、https://gitee.com/dozybot/jig/releases/tag/v1.0.1 。就是 7.4 那个候选包，由主开发会话上传；它从两边各下载一次核对过校验值，已告诉安全组。
 - 我另查了 GitHub 这个 Release 的附件信息（没有下载）：`Jig-1.0.1.apk` 2,455,041 字节，GitHub 记的 SHA-256 和上表一致；本地的 `v1.0.1` 标签指向 9920519。Gitee 那边我没有自己核对。
