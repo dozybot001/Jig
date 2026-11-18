@@ -31,15 +31,17 @@ export const GREETING_MS = 60_000;
  * The poses each line may take; one is picked per ten minutes, so she changes now and then but never
  * flickers. New poses join these lists.
  */
-const POSES: Record<"waiting" | "error" | "review" | "working" | "clear" | "night", MascotPose[]> =
-	{
-		waiting: ["greeting"],
-		error: ["sorry"],
-		review: ["gift"],
-		working: ["thinking", "writing"],
-		clear: ["happy"],
-		night: ["sleepy"],
-	};
+export const POSES: Record<
+	"waiting" | "error" | "review" | "working" | "clear" | "night",
+	MascotPose[]
+> = {
+	waiting: ["greeting", "stamp", "pointing", "halt", "pout"],
+	error: ["sorry", "bow", "teary"],
+	review: ["gift", "giftbox", "proud"],
+	working: ["thinking", "writing", "typing", "clipboard", "magnifier", "books", "fired-up"],
+	clear: ["happy", "tea", "stretch", "peek", "branch"],
+	night: ["sleepy", "nap", "pajamas", "dozing"],
+};
 
 const SLOT_MS = 10 * 60_000;
 

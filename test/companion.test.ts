@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { describe, test } from "node:test";
 import type { Session } from "../src/shared/types.ts";
-import { companionMood, GREETING_MS, greetingFor, isNight } from "../web/src/companion.ts";
+import { companionMood, GREETING_MS, greetingFor, isNight, POSES } from "../web/src/companion.ts";
+import { MASCOT_POSES } from "../web/src/poses.ts";
 
 function session(
 	id: string,
@@ -20,7 +22,7 @@ describe("the mascot at the foot of the sidebar", () => {
 		const mood = companionMood({ ...base, sessions: [session("a", "error")], waiting: 2 });
 		assert.deepEqual(mood.line, { kind: "waiting", count: 2 });
 		assert.deepEqual(mood.target, { kind: "center" });
-		assert.equal(mood.pose, "greeting");
+		assert.ok(POSES.waiting.includes(mood.pose));
 	});
 
 	test("then a failed session, then one to review, then sessions at work", () => {
@@ -43,13 +45,13 @@ describe("the mascot at the foot of the sidebar", () => {
 		});
 		assert.deepEqual(mood.line, { kind: "error", count: 2, name: null });
 		assert.equal(mood.target, null);
-		assert.equal(mood.pose, "sorry");
+		assert.ok(POSES.error.includes(mood.pose));
 	});
 
 	test("archived sessions do not count", () => {
 		const mood = companionMood({ ...base, sessions: [session("a", "error", 1, 5)], waiting: 0 });
 		assert.deepEqual(mood.line, { kind: "clear", night: false });
-		assert.equal(mood.pose, "happy");
+		assert.ok(POSES.clear.includes(mood.pose));
 	});
 
 	test("she greets during the first minute, by the time of day", () => {
@@ -72,7 +74,7 @@ describe("the mascot at the foot of the sidebar", () => {
 	test("at night with nothing to do she dozes", () => {
 		const mood = companionMood({ ...base, hour: 1, sessions: [], waiting: 0 });
 		assert.deepEqual(mood.line, { kind: "clear", night: true });
-		assert.equal(mood.pose, "sleepy");
+		assert.ok(POSES.night.includes(mood.pose));
 		assert.equal(isNight(23), true);
 		assert.equal(isNight(5), false);
 	});
@@ -83,5 +85,12 @@ describe("the mascot at the foot of the sidebar", () => {
 		const slot = 10 * 60_000;
 		assert.equal(at(3 * slot), at(3 * slot + slot - 1));
 		assert.notEqual(at(3 * slot), at(4 * slot));
+	});
+
+	test("every pose has its picture", () => {
+		for (const pose of MASCOT_POSES) {
+			const file = new URL(`../web/public/mascot/${pose}.webp`, import.meta.url);
+			assert.ok(existsSync(file), `${pose}.webp is missing`);
+		}
 	});
 });
