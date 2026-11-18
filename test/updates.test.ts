@@ -122,7 +122,10 @@ describe("versions", () => {
 		assert.equal(installKind(checkout), "source");
 		const { prefix, root } = npmInstall();
 		assert.equal(installKind(root), "npm");
+		// As serve.ts gives it: a folder URL turned into a path, with a slash at the end.
+		assert.equal(installKind(`${root}/`), "npm");
 		assert.equal(globalPrefix(root), prefix);
+		assert.equal(globalPrefix(`${root}/`), prefix);
 		assert.equal(installKind(realpathSync(tempDir("yew-other-"))), "other");
 	});
 

@@ -1,6 +1,6 @@
 import { execFile, execFileSync } from "node:child_process";
 import { accessSync, constants, existsSync, readFileSync } from "node:fs";
-import { dirname, join, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import type { InstallKind, UpdateState } from "../shared/types.ts";
 import { conflict, invalid } from "./errors.ts";
 import type { Store } from "./store.ts";
@@ -44,13 +44,16 @@ export function newer(a: string, b: string): boolean {
 /** How the package in `root` was installed. */
 export function installKind(root: string): InstallKind {
 	if (existsSync(join(root, ".git"))) return "source";
-	// `npm install --global` puts it at <prefix>/lib/node_modules/@tenonai/yew.
-	return root.split(sep).slice(-4).join("/") === `lib/node_modules/${PACKAGE}` ? "npm" : "other";
+	// `npm install --global` puts it at <prefix>/lib/node_modules/@tenonai/yew. The folder may come
+	// with a slash at the end, as a URL turned into a path does.
+	return resolve(root).split(sep).slice(-4).join("/") === `lib/node_modules/${PACKAGE}`
+		? "npm"
+		: "other";
 }
 
 /** The folder a global npm install of the package in `root` went into. */
 export function globalPrefix(root: string): string {
-	return dirname(dirname(dirname(dirname(root))));
+	return dirname(dirname(dirname(dirname(resolve(root)))));
 }
 
 /** npm's own program next to a Node.js: the npm that came with it. */
@@ -110,6 +113,8 @@ interface Latest {
 export class Updates {
 	readonly #o: UpdateOptions;
 	readonly #kind: InstallKind;
+	/** The package's folder, without a slash at the end. */
+	readonly #root: string;
 	readonly #run: NonNullable<UpdateOptions["run"]>;
 	readonly #now: () => number;
 	#job: UpdateState["job"] = null;
@@ -120,7 +125,8 @@ export class Updates {
 
 	constructor(options: UpdateOptions) {
 		this.#o = options;
-		this.#kind = installKind(options.root);
+		this.#root = resolve(options.root);
+		this.#kind = installKind(this.#root);
 		this.#run = options.run ?? runFile;
 		this.#now = options.now ?? Date.now;
 	}
@@ -160,7 +166,7 @@ export class Updates {
 	#installed(): UpdateState["installed"] {
 		let version = this.#o.version;
 		try {
-			const pkg = JSON.parse(readFileSync(join(this.#o.root, "package.json"), "utf8")) as {
+			const pkg = JSON.parse(readFileSync(join(this.#root, "package.json"), "utf8")) as {
 				version?: unknown;
 			};
 			if (typeof pkg.version === "string") version = pkg.version;
@@ -171,7 +177,7 @@ export class Updates {
 		if (this.#kind === "source") {
 			try {
 				build = execFileSync("git", ["rev-parse", "--short", "HEAD"], {
-					cwd: this.#o.root,
+					cwd: this.#root,
 					encoding: "utf8",
 					stdio: ["ignore", "pipe", "ignore"],
 					timeout: 5000,
@@ -197,8 +203,8 @@ export class Updates {
 					return false;
 				}
 			});
-		const prefix = globalPrefix(this.#o.root);
-		const places = [dirname(this.#o.root), join(prefix, "bin")];
+		const prefix = globalPrefix(this.#root);
+		const places = [dirname(this.#root), join(prefix, "bin")];
 		const ok = existsSync(npmNextTo(this.#o.node)) && places.every((place) => writable(place));
 		return ok ? null : command;
 	}
@@ -235,7 +241,7 @@ export class Updates {
 			const result = await this.#run(
 				this.#o.node,
 				[npm, "config", "get", "registry"],
-				dirname(this.#o.root),
+				dirname(this.#root),
 				15_000,
 			);
 			const said = result.output.trim().split("\n").at(-1)?.trim() ?? "";
@@ -334,7 +340,7 @@ export class Updates {
 	}
 
 	async #install(version: string): Promise<void> {
-		const prefix = globalPrefix(this.#o.root);
+		const prefix = globalPrefix(this.#root);
 		const registry = await this.#registryUrl();
 		// From a mirror, the package must be the one npm's own registry has (the security group, 11-19):
 		// a different one is not installed. When npm's registry cannot be reached, it goes ahead.
@@ -378,7 +384,7 @@ export class Updates {
 		// What npm put there must be the package and version asked for before its app is run.
 		let installed: { name?: unknown; version?: unknown } = {};
 		try {
-			installed = JSON.parse(readFileSync(join(this.#o.root, "package.json"), "utf8"));
+			installed = JSON.parse(readFileSync(join(this.#root, "package.json"), "utf8"));
 		} catch {
 			// Checked just below.
 		}
@@ -386,14 +392,14 @@ export class Updates {
 			this.#job = {
 				state: "failed",
 				version,
-				output: `${result.output}\nAfter npm ran, ${this.#o.root} does not hold ${PACKAGE}@${version}; the Mac app was left as it was.`,
+				output: `${result.output}\nAfter npm ran, ${this.#root} does not hold ${PACKAGE}@${version}; the Mac app was left as it was.`,
 			};
-			this.#o.log(`update: ${this.#o.root} does not hold ${PACKAGE}@${version} after npm`);
+			this.#o.log(`update: ${this.#root} does not hold ${PACKAGE}@${version} after npm`);
 			return;
 		}
 		let output = result.output;
 		try {
-			await this.#o.refreshApp?.(this.#o.root);
+			await this.#o.refreshApp?.(this.#root);
 		} catch (error) {
 			output += `\nThe Mac app was not updated: ${(error as Error).message}. Run: yew app install`;
 		}
