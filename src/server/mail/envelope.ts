@@ -10,7 +10,13 @@ const attr = (value: string) => value.replace(/["\n\r<>]/g, " ");
  * person. Only what the model reads changes; the interface shows the text as written.
  */
 export function neutralize(text: string): string {
-	return text.replace(/<(\/?)(letter|decision)\b/gi, "&lt;$1$2");
+	return (
+		text
+			.replace(/<(\/?)(letter|decision)\b/gi, "&lt;$1$2")
+			// Yew's own lines start with "[Yew" or "[From Yew"; one written in a letter gets a full-width
+			// bracket, so it cannot pass for Yew's.
+			.replace(/^(\s*)\[(?=(?:From )?Yew\b)/gim, "$1［")
+	);
 }
 
 function senderLabel(letter: Letter): string {
@@ -65,8 +71,9 @@ function decisionLines(decision: DecisionRef): string[] {
 
 /**
  * What the model reads for a delivered letter. The closing tag repeats the letter's id, which the sender
- * could not know while writing, so text inside a letter cannot pass itself off as the end of it. `note`
- * is Yew's own line about the letter, such as how a scheduled run works.
+ * could not know while writing, so text inside a letter cannot pass itself off as the end of it. Yew's
+ * own lines come after that tag: the check of a decision the letter refers to, and `note`, such as how a
+ * scheduled run works. Inside the letter everything is the sender's.
  */
 export function letterText(
 	letter: Letter,
@@ -93,15 +100,14 @@ export function letterText(
 	];
 	const lines = [`<letter ${attributes.join(" ")}>`, neutralize(letter.summary)];
 	if (letter.body) lines.push("", neutralize(letter.body));
+	lines.push(`</letter id="${letter.id}">`);
 	if (decision) {
 		lines.push(
-			"",
 			`[Yew checked decision #${decision.number}: the person decided it in Yew.]`,
 			...decisionLines(decision),
 		);
 	}
-	if (note) lines.push("", `[Yew] ${note}`);
-	lines.push(`</letter id="${letter.id}">`);
+	if (note) lines.push(`[Yew] ${note}`);
 	return lines.join("\n");
 }
 
