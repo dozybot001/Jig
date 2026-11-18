@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -24,9 +25,10 @@ import { secretLocations } from "./permissions/paths.ts";
  *   have a key; any other site is put to the person while the command runs. Yew Harness's own port,
  *   local ports, private networks and Unix sockets stay closed.
  *
- * On by default on macOS (founder, 11-18: 「现在开放」, after the security group's tests passed).
- * Linux waits until it has been tested on a real machine: there it runs only with `YEW_SANDBOX=on`.
- * `YEW_SANDBOX=off` turns it off; commands then run as the person, as they did before.
+ * On by default on macOS (founder, 11-18: 「现在开放」, after the security group's tests passed) and
+ * on Linux (founder, 11-18: 「Linux 上的沙箱也打开」). `YEW_SANDBOX=off` turns it off; commands then
+ * run as the person, as they did before. Where it cannot start or run a command, it stays off and
+ * `yew serve` and the settings say so.
  */
 
 /** Where the sandbox's commands run from, and what they must not touch. */
@@ -299,8 +301,8 @@ export function sandboxConfig(
 }
 
 /**
- * Whether `yew serve` starts the sandbox: `YEW_SANDBOX=on` or `off` decides; otherwise on macOS
- * only, since Linux has not been tested on a real machine yet (the security group, 11-18).
+ * Whether `yew serve` starts the sandbox: on macOS and Linux unless `YEW_SANDBOX=off` (founder,
+ * 11-18: Linux too). `YEW_SANDBOX=on` asks for it elsewhere as well; startSandbox says why not.
  */
 export function sandboxWanted(
 	setting: string | undefined,
@@ -308,7 +310,7 @@ export function sandboxWanted(
 ): boolean {
 	if (setting === "on") return true;
 	if (setting === "off") return false;
-	return platform === "darwin";
+	return platform === "darwin" || platform === "linux";
 }
 
 /** A program's full path, from PATH and the usual places a service started at login may lack. */
@@ -456,6 +458,13 @@ export async function startSandbox(
 	const options = { ripgrep, ...(env.SSH_AUTH_SOCK ? { agentSocket: env.SSH_AUTH_SOCK } : {}) };
 	const config = sandboxConfig(places, policy(), options);
 	await SandboxManager.initialize(config, decideSite, true);
+	// A system that cannot run a command in it (bubblewrap without user namespaces, say) gets no
+	// sandbox, rather than sessions whose every command fails.
+	const failed = await selfCheck(SandboxManager, places, policy());
+	if (failed) {
+		await SandboxManager.reset();
+		return { kind: "none", problems: [failed] };
+	}
 	const kind: SandboxKind = process.platform === "darwin" ? "macos" : "linux";
 	active = {
 		kind,
@@ -466,6 +475,40 @@ export async function startSandbox(
 		applied: JSON.stringify(config),
 	};
 	return { kind, problems: check.warnings };
+}
+
+/** Runs `true` in the sandbox; null when it ran, otherwise why it did not. */
+async function selfCheck(
+	manager: Manager,
+	places: SandboxPlaces,
+	policy: SandboxPolicy,
+): Promise<string | null> {
+	const line = await manager.wrapWithSandbox("true", undefined, {
+		filesystem: commandFilesystem(places, policy),
+	});
+	const outcome = await new Promise<string | null>((resolve) => {
+		const child = spawn(line, { shell: true, stdio: ["ignore", "ignore", "pipe"] });
+		let errors = "";
+		child.stderr.on("data", (chunk: Buffer) => {
+			errors = (errors + chunk.toString("utf8")).slice(-500);
+		});
+		const timer = setTimeout(() => {
+			child.kill("SIGKILL");
+			resolve("a test command in the sandbox did not finish within 10 seconds");
+		}, 10_000);
+		child.on("error", (error) => {
+			clearTimeout(timer);
+			resolve(`a test command in the sandbox could not start: ${error.message}`);
+		});
+		child.on("close", (code) => {
+			clearTimeout(timer);
+			resolve(
+				code === 0 ? null : `a test command in the sandbox failed (${code}): ${errors.trim()}`,
+			);
+		});
+	});
+	manager.cleanupAfterCommand();
+	return outcome;
 }
 
 /** Stops the sandbox's helpers (its proxies) when `yew serve` stops. */

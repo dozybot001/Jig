@@ -1014,7 +1014,7 @@ const zh = {
 	sandbox: "会话的命令",
 	sandbox_none: "没有进沙箱",
 	sandbox_none_hint:
-		"Linux 上还没有沙箱；macOS 上没装 ripgrep，或起 yew serve 时设了 YEW_SANDBOX=off，也没有。这时不问就跑的命令以你的系统账户运行，能改 Yew Harness 自己的记录、读它保存的密钥。",
+		"这台电脑上沙箱没起来：缺少要用的程序（macOS 要 ripgrep，Linux 要 bubblewrap、socat 和 ripgrep），系统不让 bubblewrap 运行，或起 yew serve 时设了 YEW_SANDBOX=off。原因写在 yew serve 的输出里。这时不问就跑的命令以你的系统账户运行，能改 Yew Harness 自己的记录、读它保存的密钥。",
 	sandbox_macos: "在系统沙箱里运行（macOS）",
 	sandbox_linux: "在系统沙箱里运行（Linux）",
 	sandboxHint:
@@ -2081,7 +2081,7 @@ const en: Record<MessageKey, string> = {
 	sandbox: "Sessions' commands",
 	sandbox_none: "Not sandboxed",
 	sandbox_none_hint:
-		"There is no sandbox on Linux yet; on macOS there is none without ripgrep, or when yew serve was started with YEW_SANDBOX=off. Commands that run without asking then run as your user account and can change Yew Harness's own records and read the keys it keeps.",
+		"The sandbox did not start on this computer: a program it needs is missing (ripgrep on macOS; bubblewrap, socat and ripgrep on Linux), the system does not let bubblewrap run, or yew serve was started with YEW_SANDBOX=off. yew serve's output says which. Commands that run without asking then run as your user account and can change Yew Harness's own records and read the keys it keeps.",
 	sandbox_macos: "Run in the system sandbox (macOS)",
 	sandbox_linux: "Run in the system sandbox (Linux)",
 	sandboxHint:

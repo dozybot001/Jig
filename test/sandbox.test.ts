@@ -137,11 +137,12 @@ describe("sandbox configuration", () => {
 		assert.equal(config.allowNestedUserNamespaces, false);
 	});
 
-	test("on by default on macOS only; YEW_SANDBOX turns it on or off", () => {
+	test("on by default on macOS and Linux; YEW_SANDBOX turns it on or off", () => {
 		assert.equal(sandboxWanted(undefined, "darwin"), true);
-		assert.equal(sandboxWanted(undefined, "linux"), false);
-		assert.equal(sandboxWanted("on", "linux"), true);
-		assert.equal(sandboxWanted("off", "darwin"), false);
+		assert.equal(sandboxWanted(undefined, "linux"), true);
+		assert.equal(sandboxWanted(undefined, "win32"), false);
+		assert.equal(sandboxWanted("off", "linux"), false);
+		assert.equal(sandboxWanted("on", "win32"), true);
 	});
 
 	test("the usual tools keep their caches in the sandbox's own folder", () => {

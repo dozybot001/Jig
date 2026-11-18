@@ -217,7 +217,8 @@ describe("the relay under bad input", () => {
 			await until(() => connector.connected);
 			const idle = new WebSocket(`${url}/phone/${identity.desktopId}`);
 			assert.equal(await closed(idle), 1000);
-			assert.equal(relay.counts.phones, 0);
+			// The relay may see the close a moment after the phone does (Linux).
+			await until(() => relay.counts.phones === 0);
 		} finally {
 			connector.stop();
 			await relay.close();

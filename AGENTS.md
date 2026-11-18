@@ -13,7 +13,7 @@
 - 本地服务：Hono；服务端向界面推送用 SSE。网页界面：React + Vite。
 - iPhone 应用：Swift 6、SwiftUI，iOS 17 起，工程在 `ios/`，Bundle ID `cn.tenonai.apps.yew`；文案用 String Catalog（中英）。中继服务：TypeScript，在 `relay/`，按 `~/memory/server-deployment.md` 部署。
 - 密钥：系统钥匙串（`@napi-rs/keyring`）。
-- 系统沙箱：`@anthropic-ai/sandbox-runtime`，锁定精确版本，只在 `src/server/sandbox.ts` 里引用，只用它 README 和类型定义里公开的接口（蓝图第十一节）。macOS 上默认打开（2026-11-18 起），`YEW_SANDBOX=off` 关掉；Linux 在真机上测过之前默认不开，`YEW_SANDBOX=on` 只给测试用。改沙箱配置或升级它，把提交号发给安全组复测。`package.json` 的 `overrides` 把它用的 zod 定到 4.6.6：它声明 `^3.25.0`，而 zod 3.x 有高危公告 GHSA-mrhx-c7xc-m3w5、没有修复版，生产依赖的门禁不放行；它导入的是 zod 4 也带的 `zod/v3`，上游 README 写明可以这样用。升级 sandbox-runtime 时复核这条覆盖，能去掉就去掉。
+- 系统沙箱：`@anthropic-ai/sandbox-runtime`，锁定精确版本，只在 `src/server/sandbox.ts` 里引用，只用它 README 和类型定义里公开的接口（蓝图第十一节）。macOS 和 Linux 上默认打开（2026-11-18 起），`YEW_SANDBOX=off` 关掉；起不来或跑不了测试命令时不进沙箱，并写明原因。改沙箱配置或升级它，把提交号发给安全组复测。`package.json` 的 `overrides` 把它用的 zod 定到 4.6.6：它声明 `^3.25.0`，而 zod 3.x 有高危公告 GHSA-mrhx-c7xc-m3w5、没有修复版，生产依赖的门禁不放行；它导入的是 zod 4 也带的 `zod/v3`，上游 README 写明可以这样用。升级 sandbox-runtime 时复核这条覆盖，能去掉就去掉。
 - 检查：Biome（格式与 lint）、`tsc --noEmit`、`node --test`。
 
 ## 开发约定
