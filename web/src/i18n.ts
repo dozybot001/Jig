@@ -268,7 +268,8 @@ const zh = {
 	"confirm_write-credentials": "写入密钥所在的位置",
 	confirm_admin: "用管理员权限运行",
 	"confirm_computer-control": "操作整个屏幕（点击、输入或按键），每次都要你确认",
-	"confirm_browser-action": "在你自己的浏览器里操作页面（点击、输入、打开网址等），每次都要你确认",
+	"confirm_browser-action":
+		"在你自己的浏览器里操作页面或标签页（点击、输入、打开网址、后退、关标签页等），每次都要你确认",
 	"confirm_browser-script": "在你自己的浏览器页面里运行脚本，每次都要你确认",
 	"confirm_service-action": "在你连接的服务里发送、发布或删除东西，每次都要你确认",
 	alwaysActsAsYou:
@@ -880,7 +881,7 @@ const zh = {
 	browserMode_own: "你自己的 Chrome",
 	browserMode_separate: "单独的窗口",
 	browserModeHint_own:
-		"先在 Chrome 应用商店装上「Playwright Extension」扩展。会话第一次用浏览器时，Chrome 会打开一页，请你同意连接，并选给它用的标签页或标签页分组；之后它只碰选给它的和它自己开的标签页，用的是你在 Chrome 里已有的登录。它改不了 Cookie 和网站权限这类整个浏览器的设置；在网页里运行脚本时，能读到这个网站允许脚本读取的 Cookie。点击、输入、打开网址这类动页面的操作每次都要你确认，不能选「总是允许」；共享的标签页里有开着 Yew Harness 的，它就停下，等你把那个标签页拿出来。它下载的文件进你自己的下载文件夹。",
+		"先在 Chrome 应用商店装上「Playwright Extension」扩展。会话第一次用浏览器时，Chrome 会打开一页，请你同意连接，并选给它用的标签页或标签页分组；之后它只碰选给它的和它自己开的标签页，用的是你在 Chrome 里已有的登录。它改不了 Cookie 和网站权限这类整个浏览器的设置；在网页里运行脚本时，能读到这个网站允许脚本读取的 Cookie。点击、输入、打开网址，以及后退、切换或关闭标签页这类会动页面和标签页的操作，每次都要你确认，不能选「总是允许」；共享的标签页里有开着 Yew Harness 的，它就停下，等你把那个标签页拿出来。它下载的文件进你自己的下载文件夹。",
 	browserModeHint_separate:
 		"开一个单独的 Chrome 窗口。在里面登录过的网站会一直保持登录，记录存在 Yew Harness 的数据目录里，和你平时用的 Chrome 分开。它的点击、输入可以选「总是允许」，只在当前会话有效。",
 	mcpBuiltin_computer: "电脑操控",
@@ -1308,7 +1309,7 @@ const en: Record<MessageKey, string> = {
 	"confirm_computer-control":
 		"Act on the whole screen (click, type or press keys); asked every time",
 	"confirm_browser-action":
-		"Act on a page in your own browser (click, type, open an address and so on); asked every time",
+		"Act on pages or tabs in your own browser (click, type, open an address, go back, close a tab and so on); asked every time",
 	"confirm_browser-script": "Run a script in a page in your own browser; asked every time",
 	"confirm_service-action":
 		"Send, publish or delete something in a service you connected; asked every time",
@@ -1944,7 +1945,7 @@ const en: Record<MessageKey, string> = {
 	browserMode_own: "Your own Chrome",
 	browserMode_separate: "A separate window",
 	browserModeHint_own:
-		"First install “Playwright Extension” from the Chrome Web Store. The first time a session uses the browser, Chrome opens a page asking you to approve the connection and choose the tabs or tab group it may use; after that it touches only those tabs and the ones it opens, with the sign-ins you already have in Chrome. It cannot change browser-wide settings such as cookies and site permissions; a script it runs in a page can read the cookies that site lets scripts read. Actions on a page, such as clicking, typing and opening an address, are confirmed by you every time; Always allow is not offered. If a shared tab has Yew Harness open, it stops until you take that tab out. Files it downloads go to your own Downloads folder.",
+		"First install “Playwright Extension” from the Chrome Web Store. The first time a session uses the browser, Chrome opens a page asking you to approve the connection and choose the tabs or tab group it may use; after that it touches only those tabs and the ones it opens, with the sign-ins you already have in Chrome. It cannot change browser-wide settings such as cookies and site permissions; a script it runs in a page can read the cookies that site lets scripts read. Actions on pages and tabs, such as clicking, typing, opening an address, going back and switching or closing tabs, are confirmed by you every time; Always allow is not offered. If a shared tab has Yew Harness open, it stops until you take that tab out. Files it downloads go to your own Downloads folder.",
 	browserModeHint_separate:
 		"Opens a Chrome window of its own. Sites you sign in to there stay signed in, kept in Yew Harness's data folder and apart from the Chrome you use. Its clicks and typing can be set to Always allow, for the current session only.",
 	mcpBuiltin_computer: "Computer control",

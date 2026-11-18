@@ -581,6 +581,12 @@ describe("the browser in the person's own Chrome (the security group, 11-18)", (
 							"browser_evaluate",
 							"browser_snapshot",
 							"browser_navigate",
+							"browser_navigate_back",
+							"browser_close",
+							"browser_resize",
+							"browser_emulate_media",
+							"browser_hover",
+							"browser_find",
 						].join(","),
 						TABS: SAFE_TABS,
 						...env,
@@ -634,12 +640,20 @@ describe("the browser in the person's own Chrome (the security group, 11-18)", (
 	test("an action on a page is asked about every time; a remembered allow does not cover it", async () => {
 		const { hub, tool } = await browser(true);
 		try {
-			const allowed = session([
-				{ effect: "allow", tool: "mcp__browser__browser_click" },
-				{ effect: "allow", tool: "mcp__browser__browser_evaluate" },
-				{ effect: "allow", tool: "mcp__browser__browser_tabs" },
-				{ effect: "allow", tool: "mcp__browser__browser_snapshot" },
-			]);
+			const allowed = session(
+				[
+					"browser_click",
+					"browser_evaluate",
+					"browser_tabs",
+					"browser_snapshot",
+					"browser_navigate_back",
+					"browser_close",
+					"browser_resize",
+					"browser_emulate_media",
+					"browser_hover",
+					"browser_find",
+				].map((name) => ({ effect: "allow" as const, tool: `mcp__browser__${name}` })),
+			);
 			const asked = (name: string, args: JsonObject = {}) => {
 				const decision = engine.decide(tool(name).subject(args, allowed, lookup), allowed);
 				assert.ok(decision.effect === "ask", name);
@@ -656,6 +670,18 @@ describe("the browser in the person's own Chrome (the security group, 11-18)", (
 			assert.deepEqual(asked("browser_tabs", { action: "new", url: "https://example.com/" }), [
 				"browser-action",
 			]);
+			// So is changing the tabs and windows the person works in (the security group, 11-18).
+			for (const name of [
+				"browser_navigate_back",
+				"browser_close",
+				"browser_resize",
+				"browser_emulate_media",
+			]) {
+				assert.deepEqual(asked(name), ["browser-action"], name);
+			}
+			for (const action of ["select", "close", "new"]) {
+				assert.deepEqual(asked("browser_tabs", { action, index: 1 }), ["browser-action"], action);
+			}
 			// Looking can be remembered, and the remembered rule covers it.
 			assert.equal(
 				engine.decide(tool("browser_snapshot").subject({}, allowed, lookup), allowed).effect,
@@ -666,6 +692,13 @@ describe("the browser in the person's own Chrome (the security group, 11-18)", (
 					.effect,
 				"allow",
 			);
+			for (const name of ["browser_hover", "browser_find"]) {
+				assert.equal(
+					engine.decide(tool(name).subject({}, allowed, lookup), allowed).effect,
+					"allow",
+					name,
+				);
+			}
 			const fresh = session([]);
 			const look = engine.decide(tool("browser_snapshot").subject({}, fresh, lookup), fresh);
 			assert.ok(look.effect === "ask" && look.request.rememberRules?.length === 1);
@@ -679,6 +712,10 @@ describe("the browser in the person's own Chrome (the security group, 11-18)", (
 			const click = engine.decide(separate.tool("browser_click").subject({}, fresh, lookup), fresh);
 			assert.ok(click.effect === "ask" && click.request.warning === "acts-as-you");
 			assert.equal(click.request.rememberRules?.length, 1);
+			// Closing a page there is still looking-class, as before.
+			const close = engine.decide(separate.tool("browser_close").subject({}, fresh, lookup), fresh);
+			assert.ok(close.effect === "ask" && close.request.warning === undefined);
+			assert.equal(close.request.rememberRules?.length, 1);
 		} finally {
 			separate.hub.stop();
 		}

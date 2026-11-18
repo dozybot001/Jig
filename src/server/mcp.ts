@@ -66,6 +66,22 @@ const BROWSER_READS = new Set([
 ]);
 
 /**
+ * In the person's own Chrome, what only reads and can be remembered (the security group, 11-18);
+ * browser_tabs counts only for listing. Anything else, going back, closing a page and resizing the
+ * window included, changes the tabs and windows the person works in, and is asked every time.
+ */
+const OWN_BROWSER_READS = new Set([
+	"browser_snapshot",
+	"browser_take_screenshot",
+	"browser_console_messages",
+	"browser_network_requests",
+	"browser_network_request",
+	"browser_find",
+	"browser_wait_for",
+	"browser_hover",
+]);
+
+/**
  * Browser tools Yew does not offer, whoever runs the server (the security group, 11-18):
  * browser_run_code_unsafe runs any JavaScript in the browser server's own Node process, which is
  * outside the system sandbox, so one approval of it would be running code outside the sandbox.
@@ -229,12 +245,15 @@ export function special(
 		return COMPUTER_READS.has(action) ? {} : { reasons: ["computer-control"] };
 	}
 	if (server === "browser") {
-		if (BROWSER_READS.has(tool) && !opensAddress(tool, args)) return {};
 		// In the person's own Chrome, with their sign-ins: each action is asked about, cannot be
 		// remembered, and an earlier "always allow" does not cover it (the security group, 11-18).
 		if (ownBrowser(config, env)) {
+			if (OWN_BROWSER_READS.has(tool) || (tool === "browser_tabs" && args.action === "list")) {
+				return {};
+			}
 			return { reasons: [tool === "browser_evaluate" ? "browser-script" : "browser-action"] };
 		}
+		if (BROWSER_READS.has(tool) && !opensAddress(tool, args)) return {};
 		return { warning: "acts-as-you" };
 	}
 	const named = presetOf(server, config)?.asksEveryTime?.includes(tool);
