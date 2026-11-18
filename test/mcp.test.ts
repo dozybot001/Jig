@@ -278,6 +278,11 @@ describe("servers Yew sets up by itself", () => {
 			"/data/yew/tmp/browser",
 		]);
 		assert.equal(servers.browser?.cwd, "/data/yew/browser-files");
+		// Neither way is it started with tools for cookies or a site's storage (the security group).
+		for (const mode of ["own", "separate"] as const) {
+			const args = builtinMcp("/data/yew", {}, 4777, mode).browser?.args ?? [];
+			assert.ok(!args.some((arg) => arg.startsWith("--caps")), mode);
+		}
 		assert.deepEqual(servers.computer?.args, [
 			"/data/yew/mcp-builtin/node_modules/computer-use-mcp/dist/main.js",
 		]);
@@ -563,8 +568,20 @@ describe("the browser in the person's own Chrome (the security group, 11-18)", (
 					command: "node",
 					args: own ? [server, "--extension"] : [server],
 					env: {
-						EXTRA_TOOLS:
-							"browser_run_code_unsafe,browser_tabs,browser_click,browser_evaluate,browser_snapshot,browser_navigate",
+						EXTRA_TOOLS: [
+							"browser_run_code_unsafe",
+							"browser_cookie_list",
+							"browser_cookie_set",
+							"browser_localstorage_get",
+							"browser_sessionstorage_set",
+							"browser_storage_state",
+							"browser_set_storage_state",
+							"browser_tabs",
+							"browser_click",
+							"browser_evaluate",
+							"browser_snapshot",
+							"browser_navigate",
+						].join(","),
 						TABS: SAFE_TABS,
 						...env,
 					},
@@ -583,15 +600,20 @@ describe("the browser in the person's own Chrome (the security group, 11-18)", (
 		return { hub, tool };
 	}
 
-	test("browser_run_code_unsafe is not offered in either mode", async () => {
+	test("browser_run_code_unsafe and cookie or storage tools are not offered in either mode", async () => {
 		for (const own of [true, false]) {
 			const { hub } = await browser(own);
 			try {
 				const names = hub.tools().map((t) => t.name);
 				assert.ok(names.includes("mcp__browser__browser_click"));
-				// Not offered, so a session that calls it anyway is told there is no such tool.
-				assert.ok(!names.includes("mcp__browser__browser_run_code_unsafe"), `own: ${own}`);
-				assert.ok(!hub.status()[0]?.tools.includes("browser_run_code_unsafe"));
+				// Not offered, so a session that calls one anyway is told there is no such tool.
+				const refused = names.filter((name) => /run_code_unsafe|cookie|storage/i.test(name));
+				assert.deepEqual(refused, [], `own: ${own}`);
+				const listed = hub.status()[0]?.tools ?? [];
+				assert.deepEqual(
+					listed.filter((name) => /run_code_unsafe|cookie|storage/i.test(name)),
+					[],
+				);
 			} finally {
 				hub.stop();
 			}

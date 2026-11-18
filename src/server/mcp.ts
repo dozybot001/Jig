@@ -73,6 +73,15 @@ const BROWSER_READS = new Set([
 const BROWSER_REFUSED = new Set(["browser_run_code_unsafe"]);
 
 /**
+ * Whether Yew refuses a browser tool. Besides the one above, any tool that reads or writes cookies
+ * or a site's storage (browser_cookie_list, browser_localstorage_get, browser_storage_state): Yew
+ * does not start the server with them (no `--caps=storage`), and filters them by name as well.
+ */
+function refusedBrowserTool(tool: string): boolean {
+	return BROWSER_REFUSED.has(tool) || /cookie|storage/i.test(tool);
+}
+
+/**
  * Whether the browser server drives the person's own Chrome through Playwright's extension: started
  * with `--extension`, or told so by PLAYWRIGHT_MCP_EXTENSION in its environment.
  */
@@ -673,7 +682,7 @@ class Server {
 					} => tool && typeof tool.name === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(tool.name),
 				)
 				// Not offered, whatever the server says it has.
-				.filter((tool) => !(this.name === "browser" && BROWSER_REFUSED.has(tool.name)))
+				.filter((tool) => !(this.name === "browser" && refusedBrowserTool(tool.name)))
 				.slice(0, 100)
 				.map((tool) => ({
 					name: tool.name,
@@ -700,8 +709,8 @@ class Server {
 	}
 
 	async call(tool: string, args: JsonObject, signal: AbortSignal): Promise<unknown> {
-		if (this.name === "browser" && BROWSER_REFUSED.has(tool)) {
-			throw new Error(`${tool} is not offered: it would run code outside the system sandbox.`);
+		if (this.name === "browser" && refusedBrowserTool(tool)) {
+			throw new Error(`${tool} is not offered in Yew Harness.`);
 		}
 		if (!this.#transport) throw new Error("the server is not connected");
 		try {
