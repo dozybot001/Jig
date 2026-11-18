@@ -184,6 +184,12 @@
     <string name="push_separator">：</string>
 
     <string name="about_version">版本 %1$s · 构建 %2$s</string>
+    <string name="update_available">有新版本 %1$s，去下载</string>
+    <string name="update_daily">每天检查新版本</string>
+    <string name="update_daily_on">开</string>
+    <string name="update_daily_off">关</string>
+    <string name="update_daily_turn_off">不再检查新版本</string>
+    <string name="update_daily_turn_on">每天检查新版本（向 Gitee 查询，只带应用的版本号）</string>
     <string name="about_what">AI 原生的多 Agent 工作台。Yew Harness 按 Session Engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。会话跑在你电脑上的 Yew Harness 里。</string>
     <string name="about_phone">安卓上的 Yew Harness 经中继连接你的电脑，两端之间端到端加密。离开电脑时，你在这里处理要你做的事：授权操作、回答会话的提问、处理决定卡，也能看会话的进展并回复。</string>
     <string name="publisher">出品方</string>

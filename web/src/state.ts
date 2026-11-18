@@ -14,6 +14,7 @@ import type {
 	Session,
 	ThinkingLevel,
 	ToolCallView,
+	UpdateState,
 } from "../../src/shared/types.ts";
 
 export interface Settings {
@@ -45,6 +46,8 @@ export interface Settings {
 	hiddenFolders: string[];
 	/** The built-in browser drives the person's own Chrome, or a separate window of its own. */
 	browser: "own" | "separate";
+	/** Yew Harness asks npm for a new version once a day (blueprint, "版本与更新"). */
+	updateCheck: boolean;
 }
 
 /** This browser remembers "off" here, so the opening knows before the settings arrive. */
@@ -260,6 +263,8 @@ export interface AppState {
 		sandbox?: "macos" | "linux" | "none";
 	} | null;
 	settings: Settings | null;
+	/** Versions and updates; null until read, and in a browser that cannot read them. */
+	updates: UpdateState | null;
 	groups: Group[];
 	sessions: Record<string, Session>;
 	providers: ProviderSummary[];
@@ -342,6 +347,7 @@ let state: AppState = {
 	connection: "open",
 	health: null,
 	settings: null,
+	updates: null,
 	groups: [],
 	sessions: {},
 	providers: [],

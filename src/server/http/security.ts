@@ -200,6 +200,8 @@ const COMPUTER_ONLY = [
 	"/api/system",
 	"/api/skills",
 	"/api/data",
+	// Updating and restarting Yew Harness change what runs on this computer.
+	"/api/updates",
 ];
 export function deviceLimits(): MiddlewareHandler<AppEnv> {
 	return async (c, next) => {

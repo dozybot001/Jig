@@ -477,6 +477,11 @@ export class Agents {
 		return ids;
 	}
 
+	/** Sessions at work now: a restart for an update waits for them (updates.ts). */
+	busy(): number {
+		return this.#live.size;
+	}
+
 	shutdown(): void {
 		for (const live of this.#live.values()) live.controller.abort();
 		for (const jobs of this.#jobs.values()) jobs.stopAll();

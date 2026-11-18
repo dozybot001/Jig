@@ -35,6 +35,7 @@ import cn.tenonai.apps.yew.remote.PairingLink
 import cn.tenonai.apps.yew.remote.RelayChannel
 import cn.tenonai.apps.yew.remote.RelayException
 import cn.tenonai.apps.yew.remote.StreamRefused
+import cn.tenonai.apps.yew.update.ReleaseCheck
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
@@ -94,6 +95,11 @@ class AppModel(private val context: Context) {
     private val scope = MainScope()
     private val vault = Vault(context)
     val notifier = Notifier(context)
+    /** New versions on Gitee, checked once a day unless turned off (blueprint, "版本与更新"). */
+    val releases = ReleaseCheck(context)
+    /** A newer version than this app, when one was found; the About page links to it. */
+    var newVersion by mutableStateOf(releases.newer)
+        private set
 
     var client by mutableStateOf<YewClient?>(null)
         private set
@@ -133,6 +139,7 @@ class AppModel(private val context: Context) {
     private var networkBack = CompletableDeferred<Unit>()
 
     init {
+        checkReleases()
         vault.pairing?.let { pairing ->
             use(newChannel(pairing))
             desktopName = pairing.desktopName
@@ -168,6 +175,20 @@ class AppModel(private val context: Context) {
     private fun use(channel: RelayChannel) {
         this.channel = channel
         client = YewClient(RelayTransport(channel))
+    }
+
+    /** Asks Gitee for a new version when a day has passed since the last time. */
+    fun checkReleases() {
+        scope.launch {
+            releases.checkIfDue()
+            newVersion = releases.newer
+        }
+    }
+
+    /** Turns the daily check on or off; on, it checks at once if a day has passed. */
+    fun setReleaseChecks(on: Boolean) {
+        releases.enabled = on
+        if (on) checkReleases()
     }
 
     /** Runs an action of a screen to its end, even when that screen closes meanwhile. */

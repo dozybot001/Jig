@@ -1,6 +1,6 @@
-import { execFileSync, spawn } from "node:child_process";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { execFile, execFileSync, spawn } from "node:child_process";
+import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { VERSION } from "../shared/version.ts";
@@ -70,6 +70,35 @@ async function modelSites(gateway: {
 		sites.push(url.port ? `${host}:${url.port}` : host);
 	}
 	return [...new Set(sites)];
+}
+
+/** The exit that has the login service start Yew Harness again (KeepAlive, Restart=on-failure). */
+const EXIT_RESTART = 75;
+
+/**
+ * Starts Yew Harness again, the same way, once this process has ended: for a restart after an update
+ * when no login service would. Its output goes to the log the app's start script and the service use.
+ */
+function startReplacement(home: string): void {
+	const log = join(home, "logs", "serve.log");
+	mkdirSync(dirname(log), { recursive: true });
+	const out = openSync(log, "a");
+	// Not --open again: the page already open comes back by itself.
+	const args = process.argv.slice(1).filter((arg) => arg !== "--open");
+	spawn(
+		"/bin/sh",
+		[
+			"-c",
+			'pid=$1; shift; while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done; exec "$@"',
+			"yew-restart",
+			String(process.pid),
+			process.execPath,
+			...process.execArgv,
+			...args,
+		],
+		{ detached: true, stdio: ["ignore", out, out] },
+	).unref();
+	closeSync(out);
 }
 
 /** The short commit of a source checkout; null when Yew does not run from a git checkout. */
@@ -268,6 +297,40 @@ export function serveCommand(): Command {
 				send: (note, mode, id) => remote.push(note, mode, id) + notes.send(note),
 			});
 			const { systemControl } = await import("./system.ts");
+			// Versions and updates (blueprint, "版本与更新"): a restart replaces this process.
+			const { Updates } = await import("../server/updates.ts");
+			const { startedByService } = await import("./service.ts");
+			const { appInstalled, realAppHost } = await import("./app.ts");
+			const build = shortCommit();
+			let stopWith: ((code: number) => void) | null = null;
+			const updates = new Updates({
+				version: VERSION,
+				build,
+				root: fileURLToPath(new URL("../..", import.meta.url)),
+				node: process.execPath,
+				store,
+				busy: () => agents.busy(),
+				log,
+				// Under the login service, an exit with an error has the service start it again;
+				// otherwise a new process starts once this one has ended.
+				restart: () => {
+					const managed = startedByService();
+					if (!managed) startReplacement(home);
+					stopWith?.(managed ? EXIT_RESTART : EXIT_OK);
+				},
+				// The Mac app's program comes with the package: the new one goes into the app.
+				refreshApp: async (root) => {
+					if (!appInstalled(realAppHost())) return;
+					await new Promise<void>((done, fail) => {
+						execFile(
+							process.execPath,
+							[join(root, "bin", "yew.js"), "app", "install"],
+							{ timeout: 60_000 },
+							(error) => (error ? fail(error) : done()),
+						);
+					});
+				},
+			});
 			// Scheduled tasks run from the service, whether or not a page is open (blueprint 6.5).
 			const scheduler = new Scheduler(store, agents.post, agents.schedules, log);
 			const app = createApp({
@@ -278,7 +341,7 @@ export function serveCommand(): Command {
 				log,
 				security: { port },
 				webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
-				build: shortCommit(),
+				build,
 				remote,
 				scheduler,
 				onPresence: () => notifier.seen(),
@@ -289,6 +352,7 @@ export function serveCommand(): Command {
 				data: { home },
 				search,
 				system: systemControl({ home, env: io.env }),
+				updates,
 			});
 			handle = async (request, device) => app.fetch(request, { device });
 
@@ -315,6 +379,7 @@ export function serveCommand(): Command {
 			// Runs missed while Yew was not running are run or skipped now, as each task says.
 			scheduler.start();
 			notifier.start();
+			updates.start();
 			// Phone access follows the settings, which `yew remote` may change while Yew runs.
 			const syncRemote = () => {
 				void remote.sync().catch((error: Error) => log(`remote access: ${error.message}`));
@@ -340,13 +405,16 @@ export function serveCommand(): Command {
 			if (values.open) openBrowser(url);
 
 			return await new Promise<number>((resolve) => {
-				const stop = () => {
-					io.stderr.write("Stopping Yew Harness…\n");
+				const stop = (code: number = EXIT_OK) => {
+					io.stderr.write(
+						code === EXIT_OK ? "Stopping Yew Harness…\n" : "Restarting Yew Harness…\n",
+					);
 					clearInterval(sweep);
 					clearInterval(remoteSweep);
 					if (sitesSweep) clearInterval(sitesSweep);
 					scheduler.stop();
 					notifier.stop();
+					updates.stop();
 					mcp.stop();
 					remote.stop();
 					agents.shutdown();
@@ -360,11 +428,12 @@ export function serveCommand(): Command {
 						.catch((error: Error) => log(`sandbox: ${error.message}`))
 						.finally(() => {
 							runtime.close();
-							resolve(EXIT_OK);
+							resolve(code);
 						});
 				};
-				process.once("SIGINT", stop);
-				process.once("SIGTERM", stop);
+				stopWith = stop;
+				process.once("SIGINT", () => stop());
+				process.once("SIGTERM", () => stop());
 			});
 		},
 	};

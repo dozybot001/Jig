@@ -125,6 +125,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 	}
 
+	/// After an update put a new program into the app (`yew app install` replaces the app), the
+	/// page's next load opens the app again from it, so the window is as new as the page.
+	func relaunchIfReplaced() {
+		let running = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+		let plist = Bundle.main.bundleURL.appendingPathComponent("Contents/Info.plist")
+		guard let info = NSDictionary(contentsOf: plist),
+			let installed = info["CFBundleVersion"] as? String, installed != running
+		else { return }
+		let relaunch = Process()
+		relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
+		// Opens the app again once this one has quit.
+		relaunch.arguments = [
+			"-c", "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; /usr/bin/open \"$2\"",
+			"yew-relaunch", String(ProcessInfo.processInfo.processIdentifier), Bundle.main.bundlePath,
+		]
+		do {
+			try relaunch.run()
+		} catch {
+			return
+		}
+		NSApp.terminate(nil)
+	}
+
 	/// Whether an address is one of Yew Harness's own pages: its host and port.
 	func isYew(_ url: URL) -> Bool {
 		guard let port else { return false }

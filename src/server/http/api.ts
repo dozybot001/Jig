@@ -431,6 +431,8 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			store.setSetting("browser", browser);
 			deps.onBrowserChanged?.();
 		}
+		const updateCheck = optBoolean(fields, "updateCheck");
+		if (updateCheck !== undefined) store.setSetting("updateCheck", updateCheck);
 		const credentials = optBoolean(fields, "sandboxCredentials");
 		if (credentials !== undefined) store.setSetting("sandboxCredentials", credentials);
 		const hidden = optArray(fields, "hiddenFolders");

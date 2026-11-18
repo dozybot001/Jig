@@ -1,7 +1,7 @@
 /**
  * What Yew at the foot of the sidebar says (blueprint, section 12): the one thing that matters most
  * right now, in this order: things waiting for the person, a session that failed, a session that
- * finished and waits for review, sessions at work; otherwise that nothing waits. In the first minute
+ * finished and waits for review, sessions at work, a new version; otherwise that nothing waits. In the first minute
  * after the interface opens she greets first. Her pose follows what she says: holding a card when a
  * permission waits, and on duty when nothing does but scheduled tasks are on (blueprint, section 11).
  */
@@ -13,10 +13,16 @@ export type Greeting = "morning" | "afternoon" | "evening";
 export type CompanionLine =
 	| { kind: "waiting"; count: number }
 	| { kind: "error" | "review" | "working"; count: number; name: string | null }
+	/** A new version to install, or one installed that a restart takes up (blueprint, "版本与更新"). */
+	| { kind: "update" | "restart"; version: string }
 	| { kind: "clear"; night: boolean };
 
 /** Where clicking the bubble goes; null when it names nothing to go to. */
-export type CompanionTarget = { kind: "center" } | { kind: "session"; id: string } | null;
+export type CompanionTarget =
+	| { kind: "center" }
+	| { kind: "session"; id: string }
+	| { kind: "about" }
+	| null;
 
 export interface CompanionMood {
 	pose: MascotPose;
@@ -74,6 +80,8 @@ export function companionMood(input: {
 	hour: number;
 	/** When Yew opened in this tab. */
 	openedAt: number;
+	/** A version installed but not running yet, or a newer one on npm (blueprint, "版本与更新"). */
+	update?: { kind: "update" | "restart"; version: string } | null;
 }): CompanionMood {
 	const { now, hour } = input;
 	const greeting = now - input.openedAt < GREETING_MS ? greetingFor(hour) : null;
@@ -100,6 +108,14 @@ export function companionMood(input: {
 				target: only ? { kind: "session", id: only.id } : null,
 			};
 		}
+	}
+	if (input.update) {
+		return {
+			pose: greeting ? "greeting" : input.update.kind === "update" ? "giftbox" : "waking",
+			greeting,
+			line: input.update,
+			target: { kind: "about" },
+		};
 	}
 	const night = isNight(hour);
 	return {

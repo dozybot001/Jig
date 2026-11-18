@@ -13,6 +13,7 @@ import { activeSandbox } from "../sandbox.ts";
 import type { Scheduler } from "../schedules.ts";
 import type { Store } from "../store.ts";
 import type { SearchAccess } from "../tools/web-search.ts";
+import type { Updates } from "../updates.ts";
 import { agentRoutes } from "./agents.ts";
 import { api } from "./api.ts";
 import { artifactRoutes } from "./artifacts.ts";
@@ -35,6 +36,7 @@ import {
 } from "./security.ts";
 import { type SkillRoutesOptions, skillRoutes } from "./skills.ts";
 import { type SystemControl, systemRoutes } from "./system.ts";
+import { updateRoutes } from "./updates.ts";
 
 export interface AppOptions {
 	store: Store;
@@ -70,6 +72,8 @@ export interface AppOptions {
 	search?: SearchAccess;
 	/** Starting at login and the launcher icon (item 33). */
 	system?: SystemControl;
+	/** Versions and updates (updates.ts). */
+	updates?: Updates;
 }
 
 const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Yew Harness</title>
@@ -146,6 +150,7 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 	}
 	if (options.search) app.route("/api", searchRoutes(options.search));
 	if (options.system) app.route("/api", systemRoutes(options.system));
+	if (options.updates) app.route("/api", updateRoutes(options.updates));
 	if (options.artifacts) app.route("/", artifactRoutes(options.artifacts));
 
 	const root = options.webRoot;

@@ -75,6 +75,8 @@ export const SETTING_DEFAULTS = {
 	 * extension, with their sign-ins (founder, 11-18), or a separate window of its own.
 	 */
 	browser: "own" as BrowserMode,
+	/** Whether Yew Harness asks npm for a new version once a day (blueprint, "版本与更新"). */
+	updateCheck: true as boolean,
 };
 
 export const BROWSER_MODES = ["own", "separate"] as const;
@@ -120,6 +122,7 @@ export function readSettings(store: Store): Settings {
 		sandboxCredentials: store.getSetting("sandboxCredentials", SETTING_DEFAULTS.sandboxCredentials),
 		hiddenFolders: store.getSetting("hiddenFolders", SETTING_DEFAULTS.hiddenFolders),
 		browser: store.getSetting("browser", SETTING_DEFAULTS.browser),
+		updateCheck: store.getSetting("updateCheck", SETTING_DEFAULTS.updateCheck),
 	};
 }
 

@@ -1,4 +1,4 @@
-import { openCenter, selectSession } from "../actions.ts";
+import { openCenter, openSettings, selectSession } from "../actions.ts";
 import { type CompanionLine, type CompanionMood, companionMood } from "../companion.ts";
 import { t, useLang } from "../i18n.ts";
 import { centerCount, setState, useAppState } from "../state.ts";
@@ -16,6 +16,10 @@ function lineText(line: CompanionLine): string {
 				: t("companion_waiting", { n: line.count });
 		case "clear":
 			return t(line.night ? "companion_night" : "companion_clear");
+		case "update":
+			return t("companion_update", { v: line.version });
+		case "restart":
+			return t("companion_restart");
 		default:
 			return line.name
 				? t(`companion_${line.kind}_named`, { name: line.name })
@@ -44,6 +48,7 @@ export function Companion() {
 	const schedules = useAppState((state) => state.schedules);
 	const page = useAppState((state) => state.page);
 	const selectedId = useAppState((state) => state.selectedId);
+	const updates = useAppState((state) => state.updates);
 	// Often enough to end the greeting about on time; the pose itself changes every ten minutes.
 	const now = useNow(15_000);
 	if (!enabled) return null;
@@ -55,6 +60,12 @@ export function Companion() {
 		now,
 		hour: new Date(now).getHours(),
 		openedAt: OPENED_AT,
+		update:
+			updates?.restart || updates?.job?.state === "installed"
+				? { kind: "restart", version: updates.installed.version }
+				: updates?.available && updates.latest
+					? { kind: "update", version: updates.latest.version }
+					: null,
 	});
 	const text = moodText(mood);
 	// Where you already are, the bubble only talks.
@@ -69,6 +80,7 @@ export function Companion() {
 		setState({ drawerOpen: false });
 		if (target?.kind === "center") openCenter("pending");
 		else if (target?.kind === "session") void selectSession(target.id);
+		else if (target?.kind === "about") openSettings("about");
 	};
 	return (
 		<div className="companion">

@@ -9,6 +9,7 @@ import {
 } from "../../../src/shared/types.ts";
 import {
 	addMcpServer,
+	checkUpdates,
 	cleanUpData,
 	createPairing,
 	deleteArchivedSessions,
@@ -16,6 +17,7 @@ import {
 	deleteKey,
 	deleteSearchKey,
 	exportData,
+	installUpdate,
 	loadArchived,
 	loadData,
 	loadMcpServers,
@@ -23,11 +25,13 @@ import {
 	loadSearchServices,
 	loadSkills,
 	loadSystem,
+	loadUpdates,
 	openSettings,
 	patchMcpServer,
 	patchSkill,
 	pickFolder,
 	removeMcpServer,
+	restartYew,
 	revealData,
 	revealSkill,
 	revokeDevice,
@@ -47,6 +51,7 @@ import {
 	formatBytes,
 	formatClock,
 	formatCost,
+	getLang,
 	hasMessage,
 	type MessageKey,
 	permissionHint,
@@ -71,10 +76,12 @@ import {
 } from "../state.ts";
 import { ConfirmDialog, cleanAmount } from "./dialogs.tsx";
 import {
+	ArrowUpIcon,
 	BackIcon,
 	CheckIcon,
 	ChevronIcon,
 	CloseIcon,
+	CopyIcon,
 	DataIcon,
 	ExportIcon,
 	FolderIcon,
@@ -746,6 +753,7 @@ function About() {
 					{health?.build ? ` · ${t("build", { b: health.build })}` : ""}
 				</p>
 			</div>
+			<UpdateStatus />
 			<div className="about-text">{paragraphs(t("aboutBody"))}</div>
 			<div className="about-list">
 				<div className="about-row">
@@ -787,6 +795,172 @@ function About() {
 				</Dialog>
 			)}
 		</section>
+	);
+}
+
+/** Where a version's changes are listed: the release notes, in the interface's language. */
+function releaseNotes(version: string): string {
+	return getLang() === "zh"
+		? `https://gitee.com/dozybot/yew/releases/tag/v${version}`
+		: `https://github.com/dozybot001/Yew/releases/tag/v${version}`;
+}
+
+/**
+ * Versions and updates on the About page (blueprint, "版本与更新"): whether this is the newest
+ * version, a new one to install with one click (or the command, where Yew Harness cannot run it), a
+ * service running older code than is installed, and the daily check.
+ */
+function UpdateStatus() {
+	useLang();
+	const updates = useAppState((state) => state.updates);
+	const checks = useAppState((state) => state.settings?.updateCheck !== false);
+	const [asking, setAsking] = useState(false);
+	const checkId = useId();
+	const now = useNow(60_000);
+	const check = useAction(checkUpdates);
+	const install = useAction(installUpdate);
+	const restart = useAction(async (now: boolean) => {
+		await restartYew(now);
+		setAsking(false);
+	});
+	const copy = useAction(async (text: string) => navigator.clipboard.writeText(text));
+	useEffect(() => {
+		void loadUpdates();
+	}, []);
+	if (!updates) return null;
+	const { job, latest } = updates;
+	const installedNew = job?.state === "installed";
+	const restartLine = updates.restartPending ? (
+		<p className="update-line">{t("update_restartWaiting", { n: updates.busy })}</p>
+	) : null;
+	const restartButtons = (
+		<div className="update-actions">
+			<Button
+				variant="primary"
+				busy={restart.busy}
+				onClick={() => (updates.busy > 0 ? setAsking(true) : void restart.run(true))}
+			>
+				<RetryIcon />
+				{updates.restartPending ? t("update_restartNow") : t("update_restart")}
+			</Button>
+		</div>
+	);
+	let body: ReactNode;
+	if (job?.state === "installing") {
+		body = (
+			<p className="update-line" aria-live="polite">
+				{t("update_installing", { v: job.version })}
+			</p>
+		);
+	} else if (updates.restart || installedNew) {
+		body = (
+			<>
+				<p className="update-line">
+					{updates.kind === "source" && updates.installed.version === updates.version
+						? t("update_sourceChanged", { b: updates.installed.build ?? "" })
+						: t("update_installed", { v: updates.installed.version })}
+				</p>
+				{restartLine}
+				{restartButtons}
+			</>
+		);
+	} else if (updates.available && latest) {
+		body = (
+			<>
+				<p className="update-line">
+					{t("update_available", { v: latest.version })}{" "}
+					<a href={releaseNotes(latest.version)} target="_blank" rel="noopener noreferrer">
+						{t("update_notes")}
+					</a>
+				</p>
+				{job?.state === "failed" && (
+					<details className="update-output">
+						<summary>{t("update_failed", { v: job.version })}</summary>
+						<pre>{job.output}</pre>
+					</details>
+				)}
+				{updates.manual ? (
+					<div className="update-manual">
+						<p className="hint">{t("update_manual")}</p>
+						<div className="update-command">
+							<code className="update-code">{updates.manual}</code>
+							<Button
+								variant="icon"
+								aria-label={t("copy")}
+								busy={copy.busy}
+								onClick={() => void copy.run(updates.manual ?? "")}
+							>
+								<CopyIcon />
+							</Button>
+						</div>
+					</div>
+				) : (
+					<div className="update-actions">
+						<Button
+							variant="primary"
+							busy={install.busy}
+							onClick={() => void install.run(latest.version)}
+						>
+							<ArrowUpIcon />
+							{t("update_install", { v: latest.version })}
+						</Button>
+					</div>
+				)}
+			</>
+		);
+	} else if (updates.kind === "source") {
+		body = <p className="update-line">{t("update_source")}</p>;
+	} else {
+		body = (
+			<>
+				<p className="update-line">
+					{latest
+						? t("update_current", { time: formatAgo(latest.checkedAt, now) })
+						: t("update_unchecked")}
+				</p>
+				<div className="update-actions">
+					<Button busy={check.busy} onClick={() => void check.run()}>
+						<RetryIcon />
+						{t("update_check")}
+					</Button>
+				</div>
+			</>
+		);
+	}
+	return (
+		<div className="about-update">
+			{body}
+			<ErrorBox error={check.error ?? install.error ?? restart.error ?? copy.error} />
+			{updates.kind !== "source" && (
+				<SettingRow label={t("update_daily")} hint={t("update_dailyHint")} labelId={checkId}>
+					<Switch
+						checked={checks}
+						labelledBy={checkId}
+						onChange={(on) => void saveSettings({ updateCheck: on }).catch(() => {})}
+					/>
+				</SettingRow>
+			)}
+			{asking && (
+				<Dialog
+					title={t("update_restartTitle")}
+					size="s"
+					onClose={() => setAsking(false)}
+					footer={
+						<>
+							<Button onClick={() => setAsking(false)}>{t("cancel")}</Button>
+							<Button busy={restart.busy} onClick={() => void restart.run(false)}>
+								{t("update_restartLater")}
+							</Button>
+							<Button variant="danger" busy={restart.busy} onClick={() => void restart.run(true)}>
+								{t("update_restartNow")}
+							</Button>
+						</>
+					}
+				>
+					<p>{t("update_restartBody", { n: updates.busy })}</p>
+				</Dialog>
+			)}
+		</div>
 	);
 }
 

@@ -247,6 +247,7 @@ final class WebWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDel
 		loaded = true
 		themeChanged(webView.themeColor)
 		reveal()
+		if primary { app.relaunchIfReplaced() }
 	}
 
 	func webView(

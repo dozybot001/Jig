@@ -210,6 +210,12 @@
 
     <!-- About -->
     <string name="about_version">Version %1$s · Build %2$s</string>
+    <string name="update_available">Version %1$s is available: download it</string>
+    <string name="update_daily">Check for new versions daily</string>
+    <string name="update_daily_on">On</string>
+    <string name="update_daily_off">Off</string>
+    <string name="update_daily_turn_off">Stop checking for new versions</string>
+    <string name="update_daily_turn_on">Check for new versions daily (asks Gitee, sending only the app\'s version)</string>
     <string name="about_what">An AI-native multi-agent workbench. Yew Harness organizes agent sessions the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center. The sessions run in Yew Harness on your computer.</string>
     <string name="about_phone">Yew Harness on Android connects to your computer through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions\' questions and decide on cards, and you can follow and reply to sessions.</string>
     <string name="publisher">Publisher</string>

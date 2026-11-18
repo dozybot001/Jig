@@ -653,3 +653,32 @@ export interface Transcript {
 	/** Seq of the oldest entry returned when older ones exist; pass as `before` to load them. */
 	olderCursor: number | null;
 }
+
+/** How this Yew Harness was installed: a global npm package, a source checkout, or some other way. */
+export type InstallKind = "npm" | "source" | "other";
+
+/** Versions and updates, for the About page and Yew in the sidebar (blueprint, "版本与更新"). */
+export interface UpdateState {
+	/** What is running now. */
+	version: string;
+	build: string | null;
+	/** What is installed on this computer now; it differs after an update or a pull without a restart. */
+	installed: { version: string; build: string | null };
+	/** The service runs older code than is installed: a restart takes it up. */
+	restart: boolean;
+	kind: InstallKind;
+	/** Whether Yew Harness checks npm for a new version once a day. */
+	checks: boolean;
+	/** The newest version on npm when last checked; null before any check. */
+	latest: { version: string; checkedAt: number } | null;
+	/** A newer version than the installed one is on npm. */
+	available: boolean;
+	/** The command to run yourself when Yew Harness cannot update itself here; null when it can. */
+	manual: string | null;
+	/** An update being installed, or how the last one ended. */
+	job: { state: "installing" | "installed" | "failed"; version: string; output: string } | null;
+	/** Sessions at work now; a restart waits for them unless you say now. */
+	busy: number;
+	/** A restart waits for the sessions at work to stop. */
+	restartPending: boolean;
+}

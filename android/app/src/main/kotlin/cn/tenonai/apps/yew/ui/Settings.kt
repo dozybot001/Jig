@@ -57,6 +57,7 @@ import cn.tenonai.apps.yew.BuildConfig
 import cn.tenonai.apps.yew.Link
 import cn.tenonai.apps.yew.Page
 import cn.tenonai.apps.yew.R
+import cn.tenonai.apps.yew.update.ReleaseCheck
 
 private fun Context.open(intent: Intent) {
     try {
@@ -250,6 +251,29 @@ fun AboutScreen(model: AppModel, close: () -> Unit) {
                     color = colors.soft, style = MaterialTheme.typography.bodySmall,
                 )
             }
+            // New versions (blueprint, "版本与更新"): the release page on Gitee, and the daily check.
+            var checks by remember { mutableStateOf(model.releases.enabled) }
+            Group {
+                model.newVersion?.let { version ->
+                    GroupRow(stringResource(R.string.update_available, version), onClick = {
+                        context.open(Intent(Intent.ACTION_VIEW, ReleaseCheck.page(version).toUri()))
+                    })
+                    GroupDivider()
+                }
+                GroupRow(
+                    stringResource(R.string.update_daily),
+                    stringResource(if (checks) R.string.update_daily_on else R.string.update_daily_off),
+                )
+                GroupDivider()
+                GroupRow(
+                    stringResource(if (checks) R.string.update_daily_turn_off else R.string.update_daily_turn_on),
+                    onClick = {
+                        checks = !checks
+                        model.setReleaseChecks(checks)
+                    },
+                )
+            }
+            Spacer(Modifier.height(16.dp))
             Column(Modifier.padding(16.dp, 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.about_what))
                 Text(stringResource(R.string.about_phone))

@@ -2413,6 +2413,59 @@ body.scroll-locked {
 	color: var(--text-3);
 	font-size: var(--fs-s);
 }
+/* Versions and updates (blueprint, "版本与更新"): one line, its buttons, then the daily check. */
+.about-update {
+	display: grid;
+	gap: 10px;
+	padding: 14px 16px 4px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-l);
+}
+.update-line {
+	margin: 0;
+	line-height: 1.6;
+}
+.update-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.update-manual {
+	display: grid;
+	gap: 6px;
+}
+.update-command {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 4px 4px 10px;
+	border-radius: var(--radius-s);
+	background: var(--code-bg);
+}
+.update-code {
+	flex: 1;
+	overflow-wrap: anywhere;
+	font-size: var(--fs-s);
+}
+.update-output summary {
+	color: var(--danger);
+	cursor: pointer;
+}
+.update-output pre {
+	max-height: 200px;
+	margin: 8px 0 0;
+	padding: 8px 10px;
+	overflow: auto;
+	border-radius: var(--radius-s);
+	background: var(--code-bg);
+	font-size: var(--fs-s);
+	white-space: pre-wrap;
+}
+/* The daily check sits in the box, under a line, like the rows of a group. */
+.about-update .setting-row {
+	margin: 0 -16px;
+	border-top: 1px solid var(--border);
+}
 .about-text {
 	display: grid;
 	gap: 12px;

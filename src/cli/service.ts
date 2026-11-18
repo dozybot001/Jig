@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, userInfo } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,6 +28,26 @@ Options:
 
 export const SERVICE_LABEL = "cn.tenonai.apps.yew";
 const UNIT = "yew.service";
+
+/**
+ * Whether this process is the one the login service started. It is then started again by the
+ * service when it exits with an error, which is how it restarts for an update (serve.ts).
+ */
+export function startedByService(
+	env: Record<string, string | undefined> = process.env,
+	platform: NodeJS.Platform = process.platform,
+	cgroup: () => string = () => readFileSync("/proc/self/cgroup", "utf8"),
+): boolean {
+	if (platform === "darwin") return env.XPC_SERVICE_NAME === SERVICE_LABEL;
+	if (platform !== "linux") return false;
+	try {
+		return cgroup()
+			.split("\n")
+			.some((line) => line.trim().endsWith(`/${UNIT}`));
+	} catch {
+		return false;
+	}
+}
 
 /** What the command touches on the system, so tests can stand in for launchd and systemd. */
 export interface ServiceHost {
