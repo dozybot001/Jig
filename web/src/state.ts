@@ -35,7 +35,12 @@ export interface Settings {
 	defaultWorkspaceId: string | null;
 	/** Which kinds of events notify the phone. */
 	notify: Record<NotifyKind, boolean>;
+	/** The mascot at the foot of the sidebar and the opening (blueprint, section 12). */
+	mascot: boolean;
 }
+
+/** This browser remembers "off" here, so the opening knows before the settings arrive. */
+export const MASCOT_KEY = "yew.mascot";
 
 export const NOTIFY_KINDS = ["waiting", "error", "task", "budget"] as const;
 export type NotifyKind = (typeof NOTIFY_KINDS)[number];
@@ -230,6 +235,8 @@ export type SettingsDialogName =
 
 export interface AppState {
 	phase: "loading" | "signin" | "ready" | "failed";
+	/** Set once the start has also read the approval center; the opening's last step. */
+	booted: boolean;
 	failure: string | null;
 	connection: "open" | "connecting";
 	health: { version: string; build: string | null } | null;
@@ -310,6 +317,7 @@ export function setSidebarCollapsed(collapsed: boolean): void {
 
 let state: AppState = {
 	phase: "loading",
+	booted: false,
 	failure: null,
 	// Only a stream that was open and then dropped shows the reconnecting banner.
 	connection: "open",

@@ -48,6 +48,7 @@ import {
 	ShieldAlert,
 	SlidersHorizontal,
 	Smartphone,
+	Smile,
 	Split,
 	Square,
 	SquarePen,
@@ -122,6 +123,8 @@ export const CheckAllIcon = () => <CheckCheck {...props} />;
 export const RefuseIcon = () => <Ban {...props} />;
 export const ThemeIcon = () => <SunMoon {...props} />;
 export const LanguageIcon = () => <Languages {...props} />;
+/** The mascot at the foot of the sidebar and the opening, shown or hidden in the settings menu. */
+export const MascotIcon = () => <Smile {...props} />;
 /** Yew's data on this computer. */
 export const DataIcon = () => <Database {...props} />;
 /** The session menu: pin, rename, copy, export, archive. */
@@ -140,10 +143,6 @@ export const TodoPendingIcon = () => <Circle {...props} size={14} />;
 export const TodoActiveIcon = () => <CircleDot {...props} size={14} />;
 export const TodoDoneIcon = () => <CircleCheck {...props} size={14} />;
 
-/**
- * Yew's mark: three parallel strokes forming a J. Drawn in the text colour, so it is ink on light
- * themes and reversed on dark ones (spec 1.5). Decorative: the lockup around it carries the name.
- */
 /**
  * Yew's mark (blueprint, section 12): a yew berry, red with its dark green seed, and one leaf. The
  * berry and the seed keep their colours; the leaf is the theme's mark ink.

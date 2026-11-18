@@ -417,6 +417,8 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		if (theme) store.setSetting("theme", theme);
 		const language = optEnum(fields, "language", ["system", "zh", "en"] as const);
 		if (language) store.setSetting("language", language);
+		const mascot = optBoolean(fields, "mascot");
+		if (mascot !== undefined) store.setSetting("mascot", mascot);
 		const workspaces = optArray(fields, "workspaces");
 		if (workspaces) {
 			store.setSetting("workspaces", parseWorkspaces(workspaces, readSettings(store).workspaces));

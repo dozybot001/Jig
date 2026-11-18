@@ -34,6 +34,7 @@ import {
 	type DataExport,
 	type DataOverview,
 	getState,
+	MASCOT_KEY,
 	type McpServerView,
 	type ModelInfo,
 	type PhonesState,
@@ -103,6 +104,15 @@ export function applyAppearance(settings: Settings | null): void {
 	document.documentElement.dataset.theme = dark ? "dark" : "light";
 	const language = settings?.language ?? "system";
 	setLang(language === "system" ? systemLang() : language);
+	// The opening plays before the settings arrive, so this browser remembers when the mascot is off.
+	if (settings) {
+		try {
+			if (settings.mascot === false) localStorage.setItem(MASCOT_KEY, "off");
+			else localStorage.removeItem(MASCOT_KEY);
+		} catch {
+			// Storage is off in this browser; the opening then stops once the settings arrive.
+		}
+	}
 }
 
 darkQuery.addEventListener("change", () => applyAppearance(getState().settings));
@@ -127,7 +137,10 @@ export async function boot(): Promise<void> {
 	try {
 		await exchangeToken();
 		const health = await api<{ version: string; build?: string }>("GET", "/api/health");
+		// The opening lists these steps as they finish.
+		setState({ health: { version: health.version, build: health.build ?? null } });
 		const settings = await api<Settings>("GET", "/api/settings");
+		setState({ settings });
 		applyAppearance(settings);
 		const [groups, sessions, providers, archived] = await Promise.all([
 			all<Group>("/api/groups"),
@@ -137,14 +150,13 @@ export async function boot(): Promise<void> {
 		]);
 		setState({
 			phase: "ready",
-			health: { version: health.version, build: health.build ?? null },
-			settings,
 			groups,
 			sessions: Object.fromEntries(sessions.map((s) => [s.id, s])),
 			providers,
 			hasArchived: archived.items.length > 0,
 		});
 		await loadCenter();
+		setState({ booted: true });
 		// A reload stays where the tab was. Otherwise Yew opens on the main conversation; without one,
 		// where you left off (blueprint section 5).
 		const view = recallView();

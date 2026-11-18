@@ -1,0 +1,87 @@
+import assert from "node:assert/strict";
+import { describe, test } from "node:test";
+import type { Session } from "../src/shared/types.ts";
+import { companionMood, GREETING_MS, greetingFor, isNight } from "../web/src/companion.ts";
+
+function session(
+	id: string,
+	status: Session["status"],
+	updatedAt = 1,
+	archivedAt: number | null = null,
+) {
+	return { id, name: id, status, updatedAt, archivedAt } as Session;
+}
+
+// Long after Yew opened, at two in the afternoon.
+const base = { now: 10 * GREETING_MS, hour: 14, openedAt: 0 };
+
+describe("the mascot at the foot of the sidebar", () => {
+	test("things waiting for the person come first and take her to the approval center", () => {
+		const mood = companionMood({ ...base, sessions: [session("a", "error")], waiting: 2 });
+		assert.deepEqual(mood.line, { kind: "waiting", count: 2 });
+		assert.deepEqual(mood.target, { kind: "center" });
+		assert.equal(mood.pose, "greeting");
+	});
+
+	test("then a failed session, then one to review, then sessions at work", () => {
+		const sessions = [session("w", "working"), session("r", "needs_review"), session("e", "error")];
+		assert.equal(companionMood({ ...base, sessions, waiting: 0 }).line.kind, "error");
+		assert.equal(
+			companionMood({ ...base, sessions: sessions.slice(0, 2), waiting: 0 }).line.kind,
+			"review",
+		);
+		const working = companionMood({ ...base, sessions: sessions.slice(0, 1), waiting: 0 });
+		assert.deepEqual(working.line, { kind: "working", count: 1, name: "w" });
+		assert.deepEqual(working.target, { kind: "session", id: "w" });
+	});
+
+	test("one session is named and opened; several are counted and go nowhere", () => {
+		const mood = companionMood({
+			...base,
+			sessions: [session("a", "error"), session("b", "error")],
+			waiting: 0,
+		});
+		assert.deepEqual(mood.line, { kind: "error", count: 2, name: null });
+		assert.equal(mood.target, null);
+		assert.equal(mood.pose, "sorry");
+	});
+
+	test("archived sessions do not count", () => {
+		const mood = companionMood({ ...base, sessions: [session("a", "error", 1, 5)], waiting: 0 });
+		assert.deepEqual(mood.line, { kind: "clear", night: false });
+		assert.equal(mood.pose, "happy");
+	});
+
+	test("she greets during the first minute, by the time of day", () => {
+		const fresh = companionMood({ sessions: [], waiting: 0, now: 1_000, hour: 9, openedAt: 0 });
+		assert.equal(fresh.greeting, "morning");
+		assert.equal(fresh.pose, "greeting");
+		const later = companionMood({
+			sessions: [],
+			waiting: 0,
+			now: GREETING_MS,
+			hour: 9,
+			openedAt: 0,
+		});
+		assert.equal(later.greeting, null);
+		assert.equal(greetingFor(13), "afternoon");
+		assert.equal(greetingFor(20), "evening");
+		assert.equal(greetingFor(2), null);
+	});
+
+	test("at night with nothing to do she dozes", () => {
+		const mood = companionMood({ ...base, hour: 1, sessions: [], waiting: 0 });
+		assert.deepEqual(mood.line, { kind: "clear", night: true });
+		assert.equal(mood.pose, "sleepy");
+		assert.equal(isNight(23), true);
+		assert.equal(isNight(5), false);
+	});
+
+	test("her pose changes at most every ten minutes", () => {
+		const at = (now: number) =>
+			companionMood({ ...base, now, sessions: [session("w", "working")], waiting: 0 }).pose;
+		const slot = 10 * 60_000;
+		assert.equal(at(3 * slot), at(3 * slot + slot - 1));
+		assert.notEqual(at(3 * slot), at(4 * slot));
+	});
+});

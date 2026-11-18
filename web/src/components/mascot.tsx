@@ -1,20 +1,9 @@
-/**
- * Yew's mascot (blueprint, section 12): a girl with a yew-berry hair ornament, in ten poses. Each pose
- * is on the same 373 by 400 canvas, so changing the pose in a place never makes it jump. She only
- * decorates: screen readers skip her and she never covers a control.
- */
-export type MascotPose =
-	| "greeting"
-	| "thinking"
-	| "happy"
-	| "sleepy"
-	| "writing"
-	| "shush"
-	| "sorry"
-	| "waking"
-	| "gift"
-	| "lost";
+import type { MascotPose } from "../poses.ts";
 
+/**
+ * Yew's mascot (blueprint, section 12): a girl with a yew-berry hair ornament, in the poses listed in
+ * `poses.ts`. She only decorates: screen readers skip her and she never covers a control.
+ */
 const WIDTH = 373;
 const HEIGHT = 400;
 

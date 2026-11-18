@@ -26,6 +26,7 @@ import {
 	useAppState,
 	type Workspace,
 } from "../state.ts";
+import { Companion } from "./companion.tsx";
 import { Snippet } from "./content.tsx";
 import { ConfirmDialog, GroupDialog, NewSessionDialog, SessionSettingsDialog } from "./dialogs.tsx";
 import {
@@ -1160,6 +1161,7 @@ export function Sidebar() {
 				)}
 			</div>
 			<div className="sidebar-bottom">
+				<Companion />
 				<SettingsMenu variant="row" />
 			</div>
 			{newSession && <NewSessionDialog groupId={newSession} onClose={() => setNewSession(null)} />}

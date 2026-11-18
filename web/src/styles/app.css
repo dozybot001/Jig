@@ -44,6 +44,8 @@
 	--scroll-thumb: #00000030;
 	--mark-ink: #1f3a2e;
 	--switch-on: #2f7d4f;
+	/* The faint wordmark behind sessions and the home page (blueprint, section 12). */
+	--watermark: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 -840 2091 1000%27%3E%3Cpath fill=%27%231f3a2e%27 fill-opacity=%270.04%27 d=%27M769 -750Q784 -750 784 -735V-705Q784 -690 769 -690Q736 -690 704.5 -667Q673 -644 644 -594L490 -333Q485 -326 485 -314V-155Q485 -115 499.5 -87.5Q514 -60 552 -60H559Q574 -60 574 -45V-15Q574 0 559 0H251Q236 0 236 -15V-45Q236 -60 251 -60H257Q295 -60 310 -87.5Q325 -115 325 -155V-309Q325 -318 319 -327L139 -594Q105 -644 81 -667Q57 -690 25 -690Q10 -690 10 -705V-735Q10 -750 25 -750H372Q387 -750 387 -735V-705Q387 -690 372 -690Q345 -690 323.5 -679.5Q302 -669 302 -643Q302 -622 319 -594L436 -407L544 -594Q566 -634 566 -657Q566 -690 520 -690Q505 -690 505 -705V-735Q505 -750 520 -750ZM829 -179Q846 -137 883.5 -104Q921 -71 979 -71Q1011 -71 1046 -89Q1081 -107 1107 -145Q1110 -150 1115 -150Q1120 -150 1125.5 -147Q1131 -144 1155 -130Q1159 -127 1159 -122Q1159 -115 1153 -105Q1125 -53 1077 -20Q1029 13 952 13Q869 13 809 -24Q749 -61 716.5 -122Q684 -183 684 -255Q684 -324 704.5 -373.5Q725 -423 759 -453.5Q793 -484 835.5 -498.5Q878 -513 922 -513Q972 -513 1010 -493.5Q1048 -474 1074.5 -444Q1101 -414 1114.5 -380.5Q1128 -347 1128 -318Q1128 -310 1119 -306ZM978 -322Q978 -370 955 -401Q932 -432 897 -432Q856 -432 832 -399.5Q808 -367 808 -318Q808 -303 809.5 -281Q811 -259 817 -241ZM2070 -500Q2085 -500 2085 -485V-455Q2085 -440 2070 -440H2055Q2039 -440 2026.5 -428Q2014 -416 1997 -378L1838 -11Q1834 0 1823 0H1766Q1755 0 1750 -11L1618 -317L1486 -11Q1482 0 1470 0H1414Q1403 0 1398 -11L1240 -377Q1224 -415 1213 -427.5Q1202 -440 1182 -440H1180Q1165 -440 1165 -455V-485Q1165 -500 1180 -500H1411Q1426 -500 1426 -485V-455Q1426 -440 1411 -440H1409Q1390 -440 1382.5 -432.5Q1375 -425 1375 -411Q1375 -398 1381.5 -381Q1388 -364 1396 -345L1476 -158L1562 -371Q1575 -401 1575 -419Q1575 -440 1554 -440H1532Q1519 -440 1519 -455V-485Q1519 -500 1533 -500H1773Q1788 -500 1788 -485V-455Q1788 -440 1773 -440H1761Q1742 -440 1734.5 -432.5Q1727 -425 1727 -411Q1727 -398 1733 -381Q1739 -364 1747 -345L1828 -158L1914 -371Q1927 -401 1927 -419Q1927 -440 1906 -440H1886Q1871 -440 1871 -455V-485Q1871 -500 1886 -500Z%27/%3E%3C/svg%3E");
 }
 
 :root[data-theme="dark"] {
@@ -82,6 +84,7 @@
 	--scroll-thumb: #ffffff2e;
 	--mark-ink: #e3e8e4;
 	--switch-on: #3f9c66;
+	--watermark: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 -840 2091 1000%27%3E%3Cpath fill=%27%23e3e8e4%27 fill-opacity=%270.04%27 d=%27M769 -750Q784 -750 784 -735V-705Q784 -690 769 -690Q736 -690 704.5 -667Q673 -644 644 -594L490 -333Q485 -326 485 -314V-155Q485 -115 499.5 -87.5Q514 -60 552 -60H559Q574 -60 574 -45V-15Q574 0 559 0H251Q236 0 236 -15V-45Q236 -60 251 -60H257Q295 -60 310 -87.5Q325 -115 325 -155V-309Q325 -318 319 -327L139 -594Q105 -644 81 -667Q57 -690 25 -690Q10 -690 10 -705V-735Q10 -750 25 -750H372Q387 -750 387 -735V-705Q387 -690 372 -690Q345 -690 323.5 -679.5Q302 -669 302 -643Q302 -622 319 -594L436 -407L544 -594Q566 -634 566 -657Q566 -690 520 -690Q505 -690 505 -705V-735Q505 -750 520 -750ZM829 -179Q846 -137 883.5 -104Q921 -71 979 -71Q1011 -71 1046 -89Q1081 -107 1107 -145Q1110 -150 1115 -150Q1120 -150 1125.5 -147Q1131 -144 1155 -130Q1159 -127 1159 -122Q1159 -115 1153 -105Q1125 -53 1077 -20Q1029 13 952 13Q869 13 809 -24Q749 -61 716.5 -122Q684 -183 684 -255Q684 -324 704.5 -373.5Q725 -423 759 -453.5Q793 -484 835.5 -498.5Q878 -513 922 -513Q972 -513 1010 -493.5Q1048 -474 1074.5 -444Q1101 -414 1114.5 -380.5Q1128 -347 1128 -318Q1128 -310 1119 -306ZM978 -322Q978 -370 955 -401Q932 -432 897 -432Q856 -432 832 -399.5Q808 -367 808 -318Q808 -303 809.5 -281Q811 -259 817 -241ZM2070 -500Q2085 -500 2085 -485V-455Q2085 -440 2070 -440H2055Q2039 -440 2026.5 -428Q2014 -416 1997 -378L1838 -11Q1834 0 1823 0H1766Q1755 0 1750 -11L1618 -317L1486 -11Q1482 0 1470 0H1414Q1403 0 1398 -11L1240 -377Q1224 -415 1213 -427.5Q1202 -440 1182 -440H1180Q1165 -440 1165 -455V-485Q1165 -500 1180 -500H1411Q1426 -500 1426 -485V-455Q1426 -440 1411 -440H1409Q1390 -440 1382.5 -432.5Q1375 -425 1375 -411Q1375 -398 1381.5 -381Q1388 -364 1396 -345L1476 -158L1562 -371Q1575 -401 1575 -419Q1575 -440 1554 -440H1532Q1519 -440 1519 -455V-485Q1519 -500 1533 -500H1773Q1788 -500 1788 -485V-455Q1788 -440 1773 -440H1761Q1742 -440 1734.5 -432.5Q1727 -425 1727 -411Q1727 -398 1733 -381Q1739 -364 1747 -345L1828 -158L1914 -371Q1927 -401 1927 -419Q1927 -440 1906 -440H1886Q1871 -440 1871 -455V-485Q1871 -500 1886 -500Z%27/%3E%3C/svg%3E");
 }
 
 :root {
@@ -258,6 +261,205 @@ a {
 @keyframes mascot-float {
 	50% {
 		transform: translateY(-4px);
+	}
+}
+
+/* --- the mascot at the foot of the sidebar (blueprint, section 12) --- */
+
+.companion {
+	display: flex;
+	align-items: flex-end;
+	gap: 4px;
+	margin-bottom: 4px;
+	padding: 0 2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+	.companion-mascot {
+		animation:
+			companion-in 0.36s cubic-bezier(0.34, 1.56, 0.64, 1),
+			mascot-float 4.5s ease-in-out 0.36s infinite;
+	}
+}
+@keyframes companion-in {
+	from {
+		opacity: 0;
+		transform: translateY(6px) scale(0.92);
+	}
+}
+.companion-bubble {
+	position: relative;
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0 0 30px;
+	padding: 7px 10px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--surface);
+	box-shadow: var(--lift);
+	color: var(--text);
+	font: inherit;
+	font-size: var(--fs-s);
+	line-height: 1.45;
+	text-align: left;
+	overflow-wrap: anywhere;
+	text-wrap: pretty;
+}
+/* The tail points at her. */
+.companion-bubble::before {
+	content: "";
+	position: absolute;
+	left: -5px;
+	bottom: 12px;
+	width: 8px;
+	height: 8px;
+	border-bottom: 1px solid var(--border);
+	border-left: 1px solid var(--border);
+	background: inherit;
+	transform: rotate(45deg);
+}
+.companion-go {
+	cursor: pointer;
+}
+@media (hover: hover) {
+	.companion-go:hover {
+		background: var(--hover);
+	}
+}
+/* In a short window the sessions keep the room. */
+@media (max-height: 620px) {
+	.companion {
+		display: none;
+	}
+}
+
+/* --- the opening (blueprint, section 12) --- */
+
+.opening {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	display: grid;
+	place-content: center;
+	justify-items: center;
+	gap: 24px;
+	padding: 16px;
+	background: var(--bg);
+	animation: opening-fade 0.2s ease-out;
+}
+.opening-leaving {
+	opacity: 0;
+	transition: opacity 0.26s ease;
+}
+.opening-stage {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+.opening-mark {
+	flex: none;
+	overflow: visible;
+}
+.opening-ring {
+	fill: none;
+	stroke: var(--control);
+	stroke-width: 0.6;
+	stroke-dasharray: 1;
+	stroke-dashoffset: 1;
+	animation: opening-draw 0.7s ease-out forwards;
+}
+.opening-leaf {
+	fill: var(--mark-ink);
+	fill-opacity: 0;
+	stroke: var(--mark-ink);
+	stroke-width: 1.2;
+	stroke-dasharray: 1;
+	stroke-dashoffset: 1;
+	animation:
+		opening-draw 0.5s ease-out 0.1s forwards,
+		opening-fill 0.3s ease-out 0.45s forwards;
+}
+.opening-berry {
+	transform: scale(0);
+	transform-box: fill-box;
+	transform-origin: center;
+	animation: opening-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards;
+}
+.opening-seed {
+	opacity: 0;
+	animation: opening-show 0.2s ease-out 0.6s forwards;
+}
+.opening-word {
+	width: calc(52px * 2.091);
+	height: 52px;
+	fill: var(--mark-ink);
+	overflow: visible;
+	opacity: 0;
+	transform: translateX(-8px);
+	animation: opening-settle 0.4s ease-out 0.45s forwards;
+}
+.opening-mascot {
+	margin-left: 4px;
+	opacity: 0;
+	transform: translateY(10px) scale(0.9);
+	animation: opening-settle 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.6s forwards;
+}
+.opening-steps {
+	display: grid;
+	gap: 4px;
+	min-width: 240px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	color: var(--text-3);
+	font-size: var(--fs-s);
+}
+.opening-step {
+	display: flex;
+	gap: 8px;
+	opacity: 0.6;
+	transition: opacity 0.2s;
+}
+.opening-step.done {
+	color: var(--text-2);
+	opacity: 1;
+}
+.opening-tick {
+	width: 1em;
+	text-align: center;
+}
+.opening-skip {
+	color: var(--text-3);
+	font-size: var(--fs-s);
+}
+@keyframes opening-draw {
+	to {
+		stroke-dashoffset: 0;
+	}
+}
+@keyframes opening-fill {
+	to {
+		fill-opacity: 1;
+	}
+}
+@keyframes opening-pop {
+	to {
+		transform: scale(1);
+	}
+}
+@keyframes opening-fade {
+	from {
+		opacity: 0;
+	}
+}
+@keyframes opening-show {
+	to {
+		opacity: 1;
+	}
+}
+@keyframes opening-settle {
+	to {
+		opacity: 1;
+		transform: none;
 	}
 }
 .lockup-tenon {
@@ -1181,6 +1383,13 @@ body.scroll-locked {
 	min-height: 0;
 	overflow-y: auto;
 	background: var(--bg);
+}
+/* Sessions and the home page carry the faint wordmark; it stays put while the conversation scrolls. */
+.main:not(.center-main) {
+	background-image: var(--watermark);
+	background-repeat: no-repeat;
+	background-position: right 4% bottom 26%;
+	background-size: min(44%, 560px) auto;
 }
 
 /* Home: one composer in the middle of the page (spec 12.3: one primary action). */

@@ -50,6 +50,8 @@ export const SETTING_DEFAULTS = {
 	notify: { waiting: true, error: true, task: true, budget: true } as NotifySettings,
 	/** Skills switched off in the settings, each by its folder's real path (blueprint 6.10, item 35). */
 	disabledSkills: [] as string[],
+	/** The mascot at the foot of the sidebar and the opening animation (blueprint, section 12). */
+	mascot: true as boolean,
 };
 
 export interface RemoteSettings {
@@ -85,6 +87,7 @@ export function readSettings(store: Store): Settings {
 			: null,
 		notify: { ...SETTING_DEFAULTS.notify, ...store.getSetting("notify", SETTING_DEFAULTS.notify) },
 		disabledSkills: store.getSetting("disabledSkills", SETTING_DEFAULTS.disabledSkills),
+		mascot: store.getSetting("mascot", SETTING_DEFAULTS.mascot),
 	};
 }
 

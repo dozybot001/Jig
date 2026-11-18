@@ -80,6 +80,7 @@ import {
 	KeyIcon,
 	LanguageIcon,
 	MailIcon,
+	MascotIcon,
 	PhoneIcon,
 	PlusIcon,
 	PowerIcon,
@@ -805,6 +806,7 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 		void saveSettings(patch).catch(() => {});
 	const theme = settings?.theme ?? "system";
 	const language = settings?.language ?? "system";
+	const mascot = settings?.mascot !== false;
 	const languages = [
 		{ id: "language-system", label: t("language_system"), value: "system" as const },
 		{ id: "language-zh", label: "简体中文", value: "zh" as const },
@@ -832,6 +834,17 @@ export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
 				label,
 				checked: language === value,
 				onSelect: () => save({ language: value }),
+			})),
+		},
+		{
+			label: t("mascotMenu"),
+			detail: t(mascot ? "mascot_on" : "mascot_off"),
+			icon: <MascotIcon />,
+			items: [true, false].map((value) => ({
+				id: value ? "mascot-on" : "mascot-off",
+				label: t(value ? "mascot_on" : "mascot_off"),
+				checked: mascot === value,
+				onSelect: () => save({ mascot: value }),
 			})),
 		},
 		{ separator: true, id: "line-1" },

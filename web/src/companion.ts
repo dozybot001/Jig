@@ -1,0 +1,104 @@
+/**
+ * What the mascot at the foot of the sidebar says (blueprint, section 12): the one thing that matters
+ * most right now, in this order: things waiting for the person, a session that failed, a session that
+ * finished and waits for review, sessions at work; otherwise that nothing waits. In the first minute
+ * after Yew opens she greets first. Her pose follows what she says.
+ */
+import type { Session } from "../../src/shared/types.ts";
+import type { MascotPose } from "./poses.ts";
+
+export type Greeting = "morning" | "afternoon" | "evening";
+
+export type CompanionLine =
+	| { kind: "waiting"; count: number }
+	| { kind: "error" | "review" | "working"; count: number; name: string | null }
+	| { kind: "clear"; night: boolean };
+
+/** Where clicking the bubble goes; null when it names nothing to go to. */
+export type CompanionTarget = { kind: "center" } | { kind: "session"; id: string } | null;
+
+export interface CompanionMood {
+	pose: MascotPose;
+	greeting: Greeting | null;
+	line: CompanionLine;
+	target: CompanionTarget;
+}
+
+/** How long after Yew opens the mascot greets before what she says. */
+export const GREETING_MS = 60_000;
+
+/**
+ * The poses each line may take; one is picked per ten minutes, so she changes now and then but never
+ * flickers. New poses join these lists.
+ */
+const POSES: Record<"waiting" | "error" | "review" | "working" | "clear" | "night", MascotPose[]> =
+	{
+		waiting: ["greeting"],
+		error: ["sorry"],
+		review: ["gift"],
+		working: ["thinking", "writing"],
+		clear: ["happy"],
+		night: ["sleepy"],
+	};
+
+const SLOT_MS = 10 * 60_000;
+
+function pick(list: MascotPose[], now: number): MascotPose {
+	return list[Math.floor(now / SLOT_MS) % list.length] as MascotPose;
+}
+
+export function greetingFor(hour: number): Greeting | null {
+	if (hour >= 5 && hour < 12) return "morning";
+	if (hour >= 12 && hour < 18) return "afternoon";
+	if (hour >= 18 && hour < 23) return "evening";
+	return null;
+}
+
+export function isNight(hour: number): boolean {
+	return hour >= 23 || hour < 5;
+}
+
+export function companionMood(input: {
+	sessions: Iterable<Session>;
+	/** Approvals, questions, decision cards and held letters waiting for the person. */
+	waiting: number;
+	now: number;
+	/** The local hour, 0 to 23. */
+	hour: number;
+	/** When Yew opened in this tab. */
+	openedAt: number;
+}): CompanionMood {
+	const { now, hour } = input;
+	const greeting = now - input.openedAt < GREETING_MS ? greetingFor(hour) : null;
+	if (input.waiting > 0) {
+		return {
+			pose: greeting ? "greeting" : pick(POSES.waiting, now),
+			greeting,
+			line: { kind: "waiting", count: input.waiting },
+			target: { kind: "center" },
+		};
+	}
+	const live = [...input.sessions]
+		.filter((session) => session.archivedAt === null)
+		.sort((a, b) => b.updatedAt - a.updatedAt);
+	for (const kind of ["error", "review", "working"] as const) {
+		const status = kind === "review" ? "needs_review" : kind;
+		const matching = live.filter((session) => session.status === status);
+		const only = matching.length === 1 ? (matching[0] as Session) : null;
+		if (matching.length > 0) {
+			return {
+				pose: pick(POSES[kind], now),
+				greeting,
+				line: { kind, count: matching.length, name: only?.name ?? null },
+				target: only ? { kind: "session", id: only.id } : null,
+			};
+		}
+	}
+	const night = isNight(hour);
+	return {
+		pose: night ? pick(POSES.night, now) : greeting ? "greeting" : pick(POSES.clear, now),
+		greeting,
+		line: { kind: "clear", night },
+		target: null,
+	};
+}

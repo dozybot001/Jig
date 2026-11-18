@@ -5,6 +5,7 @@ import { ArtifactsPage } from "./components/artifacts.tsx";
 import { CenterPage } from "./components/center.tsx";
 import { MapPage } from "./components/map.tsx";
 import { Mascot } from "./components/mascot.tsx";
+import { Opening } from "./components/opening.tsx";
 import { SchedulesPage } from "./components/schedules.tsx";
 import { SessionView } from "./components/session.tsx";
 import { SettingsDialogs } from "./components/settings.tsx";
@@ -127,6 +128,7 @@ if (root) {
 	createRoot(root).render(
 		<StrictMode>
 			<App />
+			<Opening />
 		</StrictMode>,
 	);
 	void boot();

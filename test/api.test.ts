@@ -222,7 +222,11 @@ describe("api: groups, settings, search", () => {
 		).json();
 		assert.equal(saved.theme, "dark");
 		assert.equal(saved.language, "zh");
+		assert.equal(saved.mascot, true);
 		assert.equal((await call("PATCH", "/api/settings", { theme: "blue" })).status, 400);
+		const hidden = await (await call("PATCH", "/api/settings", { mascot: false })).json();
+		assert.equal(hidden.mascot, false);
+		assert.equal((await call("PATCH", "/api/settings", { mascot: "no" })).status, 400);
 	});
 
 	test("search caps the query length", async () => {
