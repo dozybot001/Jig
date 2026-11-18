@@ -892,6 +892,7 @@ export class Agents {
 				});
 				if (verdict.allow) {
 					this.#notePermission(row.id, { reviewed: verdict.reason });
+					this.#recordReview(sessionId, decision.request, verdict.reason);
 					approved.push({ row, tool });
 					continue;
 				}
@@ -1048,7 +1049,17 @@ export class Agents {
 		});
 		if (!verdict.allow) return { ...request, review: verdict.reason };
 		this.#notePermission(callId, { reviewed: verdict.reason });
+		this.#recordReview(sessionId, request, verdict.reason);
 		return true;
+	}
+
+	/** Each step the check let run stays in the session to look back on (the security group, 11-18). */
+	#recordReview(sessionId: string, request: PermissionRequest, reason: string): void {
+		notice(this.#store, sessionId, "reviewed", reason, {
+			tool: request.tool,
+			summary: request.summary.slice(0, 300),
+			reason,
+		});
 	}
 
 	/** After a restart: calls that were running get an honest "unknown" result; calls that never ran are checked again. */

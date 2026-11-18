@@ -102,6 +102,11 @@ export class PermissionEngine {
 	readRoots: () => string[] = () => [];
 	/** Folders the person keeps from sessions (the settings): refused like credential locations. */
 	hidden: () => string[] = () => [];
+	/**
+	 * Whether commands outside the sandbox run in the guard (guard.ts). Without it, running outside
+	 * the sandbox is asked about in every mode: such a command could answer a decision itself.
+	 */
+	guarded: () => boolean = () => false;
 
 	constructor(yewHome: string) {
 		this.#secrets = secretLocations(yewHome);
@@ -127,7 +132,9 @@ export class PermissionEngine {
 		const decision = this.#decide(subject, session, flagged);
 		if (decision.effect !== "ask") return decision;
 		const reasons = decision.request.reasons ?? [];
-		if (reasons.some((reason) => DECISION_REASONS.has(reason))) {
+		const always = (reason: ConfirmReason) =>
+			DECISION_REASONS.has(reason) || (reason === "outside-sandbox" && !this.guarded());
+		if (reasons.some(always)) {
 			decision.request.matter = true;
 			return decision;
 		}

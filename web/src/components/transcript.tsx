@@ -1259,6 +1259,13 @@ function EntryView({ entry }: { entry: Entry }) {
 						limit: formatCost(Number(data.limit ?? 0)),
 					},
 				);
+			} else if (notice.kind === "reviewed") {
+				text = data.reason
+					? t("notice_reviewed", {
+							summary: String(data.summary ?? ""),
+							reason: String(data.reason),
+						})
+					: t("notice_reviewed_plain", { summary: String(data.summary ?? "") });
 			} else if (notice.kind === "changed") {
 				const steps = (notice.data?.steps ?? []) as unknown as ChangeStep[];
 				text = t("notice_changed", {

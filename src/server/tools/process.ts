@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { guardedArgs } from "../guard.ts";
 import { newId } from "../ids.ts";
 import { activeSandbox, OUTSIDE_GIT, quote, type SiteQuestion, sandboxed } from "../sandbox.ts";
 
@@ -144,6 +145,7 @@ export async function startCommand(options: {
 		for (const name of box.unset) delete env[name];
 		Object.assign(env, box.env);
 	}
+	const guarded = box ? null : guardedArgs(shell, options.command);
 	const child = box
 		? spawn(box.line, {
 				shell: true,
@@ -152,7 +154,8 @@ export async function startCommand(options: {
 				detached: true,
 				stdio: ["ignore", "pipe", "pipe"],
 			})
-		: spawn(shell, ["-lc", options.command], {
+		: // Outside the sandbox it still runs in the guard, kept out of Yew's data (guard.ts).
+			spawn(guarded?.file ?? shell, guarded?.args ?? ["-lc", options.command], {
 				cwd: options.cwd,
 				env: outside ? { ...env, ...OUTSIDE_GIT } : env,
 				detached: true,

@@ -222,6 +222,8 @@ describe("sandbox configuration", () => {
 
 describe("a command outside the sandbox", () => {
 	const engine = new PermissionEngine(places.home);
+	// It runs in the guard (guard.ts), which keeps it out of Yew's data.
+	engine.guarded = () => true;
 	const session = (mode: string) =>
 		({
 			id: "s1",
@@ -247,6 +249,14 @@ describe("a command outside the sandbox", () => {
 		});
 		const reviewed = engine.decide(outside, session("review"));
 		assert.ok(reviewed.effect === "ask" && reviewed.review);
+	});
+
+	test("without the guard it is asked about in every mode, since it could answer a decision itself", () => {
+		const unguarded = new PermissionEngine(places.home);
+		for (const mode of ["default", "review", "skip"]) {
+			const decision = unguarded.decide(outside, session(mode));
+			assert.ok(decision.effect === "ask" && decision.request.matter, mode);
+		}
 	});
 });
 

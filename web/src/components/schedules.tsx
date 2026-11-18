@@ -88,10 +88,18 @@ function ScheduleItem({ schedule, onEdit }: { schedule: Schedule; onEdit: () => 
 	const heading = useId();
 	const name = t("quoted", { s: schedule.name });
 	const [first = ""] = schedule.message.split("\n");
+	// Runs in skip mode ask nothing; only decisions stop them (the security group, 11-18).
+	const skips =
+		(schedule.permissionMode ?? (session ? permissionModeOf(session.options) : null)) === "skip";
 	return (
 		<li className="card schedule-card">
 			<div className="schedule-head">
 				<h3 id={heading}>{schedule.name}</h3>
+				{skips && (
+					<span className="tag" title={t("scheduleSkipsHint")}>
+						{t("scheduleSkips")}
+					</span>
+				)}
 				<Switch
 					checked={schedule.enabled}
 					labelledBy={heading}

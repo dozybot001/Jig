@@ -3406,6 +3406,7 @@ button.about-row {
 	gap: 12px;
 }
 .schedule-head h3 {
+	flex: 1;
 	min-width: 0;
 	overflow-wrap: anywhere;
 	font-size: var(--fs-m);

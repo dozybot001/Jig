@@ -128,7 +128,9 @@ export interface Notice {
 		/** Another session changed this one with manage_yew; data has who and the changes. */
 		| "changed"
 		/** A daily spending limit: data has the code (budget-warning or budget-reached), scope, spent and limit. */
-		| "budget";
+		| "budget"
+		/** The automatic mode's check let a step run (blueprint 6.1, item 6): data has tool, summary, reason. */
+		| "reviewed";
 	text?: string;
 	data?: JsonObject;
 	timestamp: number;

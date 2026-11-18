@@ -168,6 +168,19 @@ export function serveCommand(): Command {
 						: `Sessions' commands run in the system sandbox (sandbox-runtime, ${started.kind === "macos" ? "Seatbelt" : "bubblewrap"}).\n${started.problems.map((line) => `sandbox: ${line}\n`).join("")}`,
 				);
 			}
+			// Commands that do not run in the sandbox still cannot reach Yew's data or the Mac app's
+			// sign-in (guard.ts; the security group, 11-18).
+			const { homedir: userHome } = await import("node:os");
+			const { startGuard, guardKind } = await import("../server/guard.ts");
+			const guardState = startGuard(
+				[home, ...sandbox.appWebData({ userHome: userHome() })],
+				(name) => sandbox.findProgram(name, io.env as NodeJS.ProcessEnv),
+			);
+			if (guardState.kind === "none") {
+				io.stderr.write(
+					`Commands outside the sandbox have no guard${guardState.problem ? ` (${guardState.problem})` : ""}, so running one is asked about in every permission mode.\n`,
+				);
+			}
 			const stuck = store.recoverAfterRestart();
 			if (stuck.length > 0) {
 				io.stderr.write(
@@ -213,10 +226,12 @@ export function serveCommand(): Command {
 				skillTool(home, homedir(), () => store.getSetting<string[]>("disabledSkills", [])),
 				saveArtifactTool(artifacts),
 			];
+			const permissions = new PermissionEngine(home);
+			permissions.guarded = () => guardKind() !== "none";
 			const agents = new Agents({
 				store,
 				gateway,
-				permissions: new PermissionEngine(home),
+				permissions,
 				home,
 				version: VERSION,
 				log,

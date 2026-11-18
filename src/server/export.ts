@@ -47,6 +47,7 @@ interface ExportStrings {
 	modelError: string;
 	compactFailed: string;
 	budgetReached: string;
+	reviewed: string;
 	budgetWarning: string;
 	budgetSession: string;
 	budgetAll: string;
@@ -93,6 +94,7 @@ const ZH: ExportStrings = {
 	modelError: "模型请求失败",
 	compactFailed: "压缩上下文失败",
 	budgetReached: "今天的费用到了{scope}每日上限（{spent} / {limit}），已停下",
+	reviewed: "自动检查放行了：{summary}（{reason}）",
 	budgetWarning: "今天的费用超过了{scope}每日上限的 80%（{spent} / {limit}）",
 	budgetSession: "这个会话的",
 	budgetAll: "全部会话的",
@@ -158,6 +160,7 @@ const EN: ExportStrings = {
 	modelError: "The model request failed",
 	compactFailed: "Could not compact the context",
 	budgetReached: "Stopped: today's spending reached {scope} daily limit ({spent} of {limit})",
+	reviewed: "Allowed by the check: {summary} ({reason})",
 	budgetWarning: "Today's spending passed 80% of {scope} daily limit ({spent} of {limit})",
 	budgetSession: "this session's",
 	budgetAll: "the shared",
@@ -372,6 +375,13 @@ function noticeLine(notice: Notice, strings: ExportStrings): string {
 				.replace("{scope}", data.scope === "session" ? strings.budgetSession : strings.budgetAll)
 				.replace("{spent}", () => amount(data.spent))
 				.replace("{limit}", () => amount(data.limit));
+		}
+		case "reviewed": {
+			const data = notice.data ?? {};
+			const text = (value: unknown) => (typeof value === "string" ? value : "");
+			return strings.reviewed
+				.replace("{summary}", () => text(data.summary))
+				.replace("{reason}", () => text(data.reason));
 		}
 		case "error": {
 			const code = typeof notice.data?.code === "string" ? notice.data.code : "";
