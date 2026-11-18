@@ -923,6 +923,7 @@ body.scroll-locked {
 /* --- layout --- */
 
 .app {
+	position: relative;
 	display: grid;
 	grid-template-columns: 260px minmax(0, 1fr);
 	height: 100dvh;
@@ -930,6 +931,55 @@ body.scroll-locked {
 }
 .app.app-collapsed {
 	grid-template-columns: 56px minmax(0, 1fr);
+}
+/*
+ * Yew at full length in the margin right of the 760 px column of sessions and the home page
+ * (blueprint, section 12). She looks left, toward the conversation; she shows only where the margin
+ * is at least about 200 px wide, so she never covers the column, and the header stays clear above
+ * her. Where she shows, the wordmark makes way and the home page leaves out its small greeting.
+ */
+.yew-backdrop {
+	display: none;
+	position: absolute;
+	grid-column: 2;
+	grid-row: 1;
+	right: 16px;
+	bottom: 0;
+	height: calc(100% - 72px);
+	max-width: calc((100vw - 260px - 760px) / 2 - 24px);
+	object-fit: contain;
+	object-position: right bottom;
+	pointer-events: none;
+	user-select: none;
+	-webkit-user-drag: none;
+}
+.app-collapsed .yew-backdrop {
+	max-width: calc((100vw - 56px - 760px) / 2 - 24px);
+}
+:root[data-theme="dark"] .yew-backdrop {
+	opacity: 0.86;
+}
+@media (min-width: 1468px) {
+	.app.with-yew:not(.app-collapsed) .yew-backdrop {
+		display: block;
+	}
+	.app.with-yew:not(.app-collapsed) .main:not(.center-main) {
+		background-image: none;
+	}
+	.app.with-yew:not(.app-collapsed) .home-mascot {
+		display: none;
+	}
+}
+@media (min-width: 1264px) {
+	.app.with-yew.app-collapsed .yew-backdrop {
+		display: block;
+	}
+	.app.with-yew.app-collapsed .main:not(.center-main) {
+		background-image: none;
+	}
+	.app.with-yew.app-collapsed .home-mascot {
+		display: none;
+	}
 }
 /*
  * The folded sidebar (as in ChatGPT): Yew's graphic, then the main actions as icons. Folding and

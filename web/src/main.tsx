@@ -27,6 +27,9 @@ function App() {
 	const waiting = useAppState((state) => centerCount(state.center));
 	const page = useAppState((state) => state.page);
 	const narrow = useNarrow();
+	const yewOn = useAppState((state) => state.settings?.mascot !== false);
+	// Sessions and the home page only; the stylesheet decides whether the window has room for her.
+	const backdrop = yewOn && page === null && !narrow;
 	// The tab's title carries the approval center's count, so it shows in the tab strip.
 	useEffect(() => {
 		document.title = waiting > 0 ? `(${waiting}) Yew` : "Yew";
@@ -80,7 +83,7 @@ function App() {
 				</div>
 			)}
 			<div
-				className={`app${!narrow && collapsed ? " app-collapsed" : ""}${narrow && drawerOpen ? " sidebar-open" : ""}`}
+				className={`app${!narrow && collapsed ? " app-collapsed" : ""}${narrow && drawerOpen ? " sidebar-open" : ""}${backdrop ? " with-yew" : ""}`}
 			>
 				{!narrow && collapsed ? <SidebarRail /> : <Sidebar />}
 				{narrow && drawerOpen && (
@@ -102,6 +105,17 @@ function App() {
 					<MapPage />
 				) : (
 					<SessionView />
+				)}
+				{backdrop && (
+					// Yew at full length beside the conversation (blueprint, section 12); the stylesheet
+					// shows her only where the margin beside the column has room for her.
+					<img
+						className="yew-backdrop"
+						src="/mascot/portrait.webp"
+						alt=""
+						aria-hidden="true"
+						draggable={false}
+					/>
 				)}
 				<SettingsDialogs />
 			</div>
