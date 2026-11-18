@@ -17,3 +17,4 @@ web/dist/
 ios/**/xcuserdata/
 *.xcuserstate
 ios/build/
+/build/

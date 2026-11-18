@@ -304,13 +304,15 @@ node scripts/mascot.ts --portrait ~/Pictures/素材/Yew/portrait/portrait-2.png
 | 情况 | 姿势 |
 | --- | --- |
 | 有事等你处理 | `greeting`、`stamp`、`pointing`、`halt`、`pout` |
+| 等你处理的事里有授权请求 | `permission`（不轮换） |
 | 会话出错 | `sorry`、`bow`、`teary` |
 | 做完了等你核对 | `gift`、`giftbox`、`proud` |
 | 会话在干活 | `thinking`、`writing`、`typing`、`clipboard`、`magnifier`、`books`、`fired-up` |
 | 没事 | `happy`、`tea`、`stretch`、`peek`、`branch` |
+| 没事，但有定时任务开着 | `on-duty`（不轮换，夜里也是它） |
 | 夜里没事 | `sleepy`、`nap`、`pajamas`、`dozing` |
 
-`letter-run`、`reading`、`alarm`、`phone`、`jump`、`paper-plane`、`mini`、`surprised` 已入库，侧栏不用，用处见第五节。`permission`、`on-duty` 11-18 入库，由 Yew Harness · 开发接进侧栏，接上后补进上表。
+`letter-run`、`reading`、`alarm`、`phone`、`jump`、`paper-plane`、`mini`、`surprised` 已入库，侧栏不用，用处见第五节。`lost` 等「交出去」做好后接上（蓝图第十一节）。
 
 ## 八、出图时要查的地方
 
