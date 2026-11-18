@@ -1,6 +1,6 @@
 # Yew 对外介绍
 
-版本 0.25（2026-11-18）。官网产品库、README、App Store 描述和各渠道介绍 Yew 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
+版本 0.26（2026-11-18）。官网产品库、README、App Store 描述和各渠道介绍 Yew 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
 
 ## 一、定义
 
@@ -32,7 +32,7 @@ Yew 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 
 已经实现的能力都能写，发布没发布写法一样：直接写能做什么，不加「目前」「暂未」「即将」。能不能下载看官网有没有入口（Yew 的产品页有安装命令、源代码和安卓版的下载，iPhone 版还没上架），文案里不逐句交代；没实现的不写，也不写成计划。写之前对照[更新记录](../CHANGELOG.md)：已发布的记在各版本下，已实现、还没发布的记在「未发布」下。
 
-- **已发布**（1.0.0，2026-11-15 开源，当时叫 Jig；1.3.0 起叫 Yew，npm 包 `@tenonai/yew`）：会话与团队、工作区；三种授权方式和「总是允许」；读写文件、命令、搜索、抓取网页和任务清单；上下文自动压缩；会话之间的信件；主对话和它替你改设置；审批中心（授权卡、提问卡、决定卡、待放行的信）；任务会话；`yew serve`、`yew send`；网页界面的中英文和深浅色；侧栏的吉祥物用气泡说眼下最要紧的一件事，说的是一件事或一个会话时点一下直接过去，打开时有一秒左右的开场，列出真实的启动步骤（1.4.0）。
+- **已发布**（1.0.0，2026-11-15 开源，当时叫 Jig；1.3.0 起叫 Yew，npm 包 `@tenonai/yew`）：会话与团队、工作区；三种授权方式和「总是允许」；读写文件、命令、搜索、抓取网页和任务清单；上下文自动压缩；会话之间的信件；主对话和它替你改设置；审批中心（授权卡、提问卡、决定卡、待放行的信）；任务会话；`yew serve`、`yew send`；网页界面的中英文和深浅色；侧栏底部的 Yew（红发女孩）用气泡说眼下最要紧的一件事，说的是一件事或一个会话时点一下直接过去，打开时有一秒左右的开场，列出真实的启动步骤（1.4.0）。
 - **已实现、还没发布**：无。
   - 手机审批：手机应用（iPhone、安卓）扫码和 Mac 配对，经中继连接，端到端加密，中继只转发密文。在手机上允许或拒绝操作、回答提问、做决定、放行或拒收暂存的信；也能看会话记录和信件、给会话发消息、让干活的会话停下。
   - 定时任务：按时以定时任务的名义给一个常设会话寄信，会话无人值守地做完，回报寄给主对话。讲主次结构时可以带上。
@@ -62,7 +62,7 @@ Yew 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 ## 五、不写什么
 
 - 不提 Claude、Claude Code 或 Anthropic 的产品来对比、说明来历或暗示合作（蓝图第十二节）。Anthropic 只作为服务商之一出现。
-- 产品页主张的第 1–5 条和界面那句是创始人 11-11 的定稿，照原样用（规范 14.2.1）；第 6 条吉祥物是创始人 11-18 定加上的（原话「加上」），文字由本文起草，在官网改版里请他确认。「坐进办公室当老板」「打破工位枷锁」是他定的说法。此外不另加比喻（规范 14.2）：不写「个人版某某」「AI 员工」「内阁」「指挥官」这类说法，博客里拿历史制度作对照是论述内容，产品文案不搬过来；要加新的比喻先问创始人。不写效率数字和没验证过的效果。
+- 产品页主张的第 1–5 条和界面那句是创始人 11-11 的定稿，照原样用（规范 14.2.1）；第 6 条是创始人 11-18 定加上的（原话「加上」），文字由本文起草，他看过官网预览后说「发布」。「坐进办公室当老板」「打破工位枷锁」是他定的说法。此外不另加比喻（规范 14.2）：不写「个人版某某」「AI 员工」「内阁」「指挥官」这类说法，博客里拿历史制度作对照是论述内容，产品文案不搬过来；要加新的比喻先问创始人。不写效率数字和没验证过的效果。
 - 不把 Session Engineering 写成小写：它是专有名词，两个词首字母都大写，中文里也这样写（创始人 11-11：「session engineering 换成 Session Engineering。专有名词」）。Prompt Engineering 这类同类术语也大写（官网 7302151）。
 - 不写「人完全不用进会话」这样绝对的话：方向要在主对话里说，会话也随时能点开看。写「不用逐个进入会话」。
 - Yew 已开源（MIT），可以写开源和 npm 安装；安卓版的安装包已发布在 Releases 里，可以写；iPhone 应用还没有上架，不写成可以下载。不写备案状态。
@@ -92,7 +92,7 @@ Yew 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 | 3 | 真正坐进办公室当老板 | 授权与决定都在审批中心，你的操作才有实权。 | `permission` |
 | 4 | 随时随地，打破工位枷锁 | 手机也能审批，人不在电脑前，授权和决定照样处理。 | `phone` |
 | 5 | 模型随你选 | 接入库用开源的 pi-ai，支持超级多家模型服务商。 | `models` |
-| 6 | 一眼看到要你处理的事 | 侧栏底部的吉祥物用气泡说眼下最要紧的一件事：几件事等你处理、哪个会话出错了或做完了，点一下直接过去。 | 吉祥物 |
+| 6 | 一眼看到要你处理的事 | 侧栏底部的 Yew 用气泡说眼下最要紧的一件事：几件事等你处理、哪个会话出错了或做完了，点一下直接过去。 | Yew |
 
 | | Title | Body |
 | --- | --- | --- |
@@ -101,7 +101,7 @@ Yew 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 | 3 | Take the boss’s chair for real | Approvals and decisions all sit in the approval center, and only your actions carry real authority. |
 | 4 | Anywhere, anytime, off the desk | Approve from your phone. Away from the computer, approvals and decisions still get handled. |
 | 5 | Your choice of model | Model access is built on the open-source pi-ai library, with a huge range of model providers supported. |
-| 6 | See what needs you at a glance | The mascot at the foot of the sidebar says the one thing that matters most right now: what is waiting for you, or which session failed or finished. One click takes you there. |
+| 6 | See what needs you at a glance | Yew, at the foot of the sidebar, says the one thing that matters most right now: what is waiting for you, or which session failed or finished. One click takes you there. |
 
 **界面那句**（有界面的 Tenon 产品共用）：优雅克制的交互界面，顺畅丝滑的用户体验。/ An elegant, restrained interface. A smooth, effortless experience.
 
@@ -113,7 +113,7 @@ Yew 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 
 ## 七、标识与截图
 
-- **产品图形**：一枝红豆杉，红色的果（`#C8323F`，带深绿的种子）和一片叶子；叶子浅色主题用深绿 `#1F3A2E`，深色主题用浅灰绿 `#E3E8E4`（蓝图第十二节）。文件是 `web/public/icons/yew-mark.svg`；字标是 Young Serif 描出的「Yew」（`web/src/components/icons.tsx` 的 `YewWordmark`），组合标志按规范第 1 节，右上是 Tenon 小标。吉祥物是红发女孩，十个姿势在 `web/public/mascot/`。
+- **产品图形**：一枝红豆杉，红色的果（`#C8323F`，带深绿的种子）和一片叶子；叶子浅色主题用深绿 `#1F3A2E`，深色主题用浅灰绿 `#E3E8E4`（蓝图第十二节）。文件是 `web/public/icons/yew-mark.svg`；字标是 Young Serif 描出的「Yew」（`web/src/components/icons.tsx` 的 `YewWordmark`），组合标志按规范第 1 节，右上是 Tenon 小标。红发女孩的名字也是 Yew（创始人 11-18：「不要说吉祥物，它的名字就是 Yew」），对外不叫吉祥物、mascot；她的姿势图在 `web/public/mascot/`。
 - **截图**：真实界面加本地演示数据：用临时数据目录，不读真实的 `~/.yew`；模型回复由脚本模拟，会话、信件和卡片都由 Yew 自己的代码生成。网页是 1280×720 的窗口按 2 倍截取，2560×1440 PNG；iPhone 是模拟器 iPhone 17 Pro 的竖屏原图，1206×2622 PNG，调试版应用直接连同一个演示服务，状态栏统一为 9:41、满格、满电。中英文、深浅色各一套，文件名 `yew-{画面}-{zh|en}-{light|dark}.png`。六种画面讲同一件事：你让统筹上线首页改版、修好登录问题，统筹分给网站和后端。官网页脚写明「界面截图使用本地演示数据，不代表生产记录。」；页面只给截图加一道淡边框，手机截图不画机身，交原图即可。
 - **文件**：六种画面的原图都在本仓库 [docs/screenshots/](screenshots/)，命名为 `yew-<画面>-<zh|en>-<light|dark>.png`，由 `node scripts/screenshots.ts` 生成（2026-11-18 按 Yew 的标识重拍；做法和参数见脚本开头）。
 
@@ -125,10 +125,11 @@ Yew 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 | `permission` | 主张 3 | Yew 代码会话：网站改好首页、跑完测试，推送前停下来等你授权 / A code session in Yew: Website finished the page and ran the tests, then stopped to ask before pushing |
 | `phone` | 主张 4 | Yew iPhone 应用的审批页：网站等你允许推送首页改版，后端提出的决定也在这里 / Approvals in Yew on iPhone: Website waiting for you to allow pushing the home page redesign, and a decision raised by Backend |
 | `models` | 主张 5 | Yew 给后端会话选服务商：国内、境外分组列出，没设密钥的会标出 / Choosing a provider for the Backend session in Yew: providers grouped into Chinese providers and Other providers, with the ones that have no key marked |
-| 吉祥物 | 主张 6 | Yew 的吉祥物：红发女孩，头上别着红豆杉发饰 / Yew's mascot: a red-haired girl with a yew-berry hair ornament |
+| Yew | 主张 6 | Yew：红发女孩，头上别着红豆杉发饰 / Yew: a red-haired girl with a yew-berry hair ornament |
 
 ## 修改记录
 
+- **0.26（2026-11-18）** 创始人（平台组转达）：「不要说吉祥物，它的名字就是 Yew」。正文里的吉祥物都改称 Yew，第 6 条主张和配图说明照官网改（website 2448a9a）。
 - **0.25（2026-11-18）** 创始人定产品页加一条吉祥物的主张（原话「加上」）：主张第 6 条和它的配图，文字在官网改版里请他确认。配图先用 `web/public/mascot` 的原图，高清立绘到了再换。
 - **0.24（2026-11-18）** 1.4.0 发布：侧栏吉祥物和开场挪到「已发布」。
 - **0.23（2026-11-18）** 官网切到 Yew 后：第四节写明产品页有安装命令、源代码和安卓版，「已实现、还没发布」补上侧栏吉祥物和开场；`url` 填上 GitHub 仓库（平台组提醒）。
