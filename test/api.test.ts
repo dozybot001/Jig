@@ -227,6 +227,11 @@ describe("api: groups, settings, search", () => {
 		const hidden = await (await call("PATCH", "/api/settings", { mascot: false })).json();
 		assert.equal(hidden.mascot, false);
 		assert.equal((await call("PATCH", "/api/settings", { mascot: "no" })).status, 400);
+		// How the opening leaves (blueprint 6.10, item 45): by itself by default, or on a click.
+		assert.equal(saved.opening, "auto");
+		const click = await (await call("PATCH", "/api/settings", { opening: "click" })).json();
+		assert.equal(click.opening, "click");
+		assert.equal((await call("PATCH", "/api/settings", { opening: "tap" })).status, 400);
 	});
 
 	test("search caps the query length", async () => {

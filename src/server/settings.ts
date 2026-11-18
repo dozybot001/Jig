@@ -52,7 +52,12 @@ export const SETTING_DEFAULTS = {
 	disabledSkills: [] as string[],
 	/** The mascot at the foot of the sidebar and the opening animation (blueprint, section 12). */
 	mascot: true as boolean,
+	/** Whether the opening leaves by itself once started, or waits for a click (blueprint 6.10, item 45). */
+	opening: "auto" as OpeningMode,
 };
+
+export const OPENING_MODES = ["auto", "click"] as const;
+export type OpeningMode = (typeof OPENING_MODES)[number];
 
 export interface RemoteSettings {
 	enabled: boolean;
@@ -88,6 +93,7 @@ export function readSettings(store: Store): Settings {
 		notify: { ...SETTING_DEFAULTS.notify, ...store.getSetting("notify", SETTING_DEFAULTS.notify) },
 		disabledSkills: store.getSetting("disabledSkills", SETTING_DEFAULTS.disabledSkills),
 		mascot: store.getSetting("mascot", SETTING_DEFAULTS.mascot),
+		opening: store.getSetting("opening", SETTING_DEFAULTS.opening),
 	};
 }
 

@@ -48,6 +48,7 @@ import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -255,10 +256,12 @@ fun AboutScreen(model: AppModel, close: () -> Unit) {
             }
             Spacer(Modifier.height(12.dp))
             Group {
+                // The small horizontal publisher mark (spec 1.4): the T at least 16dp, the name about 0.75 of
+                // it, semibold, 0.3 of it apart.
                 GroupRow(stringResource(R.string.publisher), leading = {
                     Image(painterResource(R.drawable.tenon_mark), null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.tenon), fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(18.dp * 0.3f))
+                    Text(stringResource(R.string.tenon), fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
                 })
                 GroupDivider()
                 GroupRow(stringResource(R.string.website), stringResource(R.string.website_host), onClick = {

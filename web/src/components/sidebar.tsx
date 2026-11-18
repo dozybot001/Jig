@@ -57,7 +57,7 @@ import {
 	UsageIcon,
 	YewMark,
 } from "./icons.tsx";
-import { SettingsMenu } from "./settings.tsx";
+import { SettingsButton } from "./settings.tsx";
 import { Button, describeError, ErrorBox, Menu, type MenuEntry, useAction, useNow } from "./ui.tsx";
 import { shortPath, useWorkspaces, WorkspaceDialog } from "./workspaces.tsx";
 
@@ -1002,7 +1002,7 @@ export function SidebarRail() {
 				<ComposeIcon />
 			</Button>
 			<span className="rail-spacer" />
-			<SettingsMenu variant="icon" />
+			<SettingsButton variant="icon" />
 			{dialog === "team" && <GroupDialog onClose={() => setDialog(null)} />}
 			{dialog === "workspace" && (
 				<WorkspaceDialog
@@ -1057,7 +1057,7 @@ export function Sidebar() {
 	return (
 		<nav className="sidebar" aria-label={t("sessions")}>
 			<div className="sidebar-top">
-				{/* The expanded sidebar carries the full lockup (spec 1.6); its name includes Tenon (1.7). */}
+				{/* The expanded sidebar carries the full lockup (spec 1.6), named by the product's name (1.7). */}
 				<button
 					type="button"
 					className="lockup lockup-button"
@@ -1069,16 +1069,7 @@ export function Sidebar() {
 					}}
 				>
 					<YewMark className="lockup-mark" size={22} />
-					<span className="lockup-word">
-						<ProductName />
-						<img
-							className="lockup-tenon"
-							src="/icons/tenon-mark.svg"
-							alt=""
-							width={14}
-							height={14}
-						/>
-					</span>
+					<ProductName />
 				</button>
 				{narrow ? (
 					<Button
@@ -1162,7 +1153,7 @@ export function Sidebar() {
 			</div>
 			<div className="sidebar-bottom">
 				<Companion />
-				<SettingsMenu variant="row" />
+				<SettingsButton variant="row" />
 			</div>
 			{newSession && <NewSessionDialog groupId={newSession} onClose={() => setNewSession(null)} />}
 		</nav>

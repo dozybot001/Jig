@@ -37,6 +37,8 @@ export interface Settings {
 	notify: Record<NotifyKind, boolean>;
 	/** The mascot at the foot of the sidebar and the opening (blueprint, section 12). */
 	mascot: boolean;
+	/** The opening leaves by itself once started, or waits for a click (blueprint 6.10, item 45). */
+	opening: "auto" | "click";
 }
 
 /** This browser remembers "off" here, so the opening knows before the settings arrive. */
@@ -223,7 +225,9 @@ export interface DataCleanup {
 	skippedFiles: number;
 }
 
+/** The settings window's sections (blueprint 6.10, item 45). */
 export type SettingsDialogName =
+	| "personal"
 	| "providers"
 	| "mcp"
 	| "skills"

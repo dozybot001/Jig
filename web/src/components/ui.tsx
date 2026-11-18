@@ -1,8 +1,10 @@
 import {
 	type ButtonHTMLAttributes,
+	createContext,
 	type KeyboardEvent,
 	type ReactNode,
 	useCallback,
+	useContext,
 	useEffect,
 	useId,
 	useLayoutEffect,
@@ -858,21 +860,50 @@ export function Menu({
 }
 
 /** A modal dialog with a fixed size tier; only the body scrolls (spec 9). */
-export function Dialog({
-	title,
-	size,
-	onClose,
-	children,
-	footer,
-	tabs,
-}: {
+interface DialogProps {
 	title: string;
 	size: "s" | "m" | "l";
 	onClose: () => void;
 	children: ReactNode;
 	footer?: ReactNode;
 	tabs?: ReactNode;
-}) {
+}
+
+/**
+ * Inside the settings window a settings dialog is not a dialog of its own: it fills the window's right
+ * side, with the same title, body and footer (blueprint 6.10, item 45). Dialogs opened from inside it
+ * (adding a server, confirming a deletion) are real dialogs again.
+ */
+const InWindow = createContext(false);
+
+export function InSettingsWindow({ children }: { children: ReactNode }) {
+	return <InWindow.Provider value={true}>{children}</InWindow.Provider>;
+}
+
+export function Dialog(props: DialogProps) {
+	return useContext(InWindow) ? <DialogPanel {...props} /> : <ModalDialog {...props} />;
+}
+
+function DialogPanel({ title, onClose, children, footer, tabs }: DialogProps) {
+	const titleId = useId();
+	return (
+		<section className="dialog-panel" aria-labelledby={titleId}>
+			<div className="dialog-header">
+				<h2 id={titleId}>{title}</h2>
+				<Button variant="icon" aria-label={t("close")} onClick={onClose}>
+					<CloseIcon />
+				</Button>
+			</div>
+			<InWindow.Provider value={false}>
+				{tabs}
+				<div className="dialog-body panel-body">{children}</div>
+				{footer && <div className="dialog-footer">{footer}</div>}
+			</InWindow.Provider>
+		</section>
+	);
+}
+
+function ModalDialog({ title, size, onClose, children, footer, tabs }: DialogProps) {
 	const ref = useRef<HTMLDialogElement>(null);
 	const titleId = useId();
 	useEffect(() => {
@@ -891,6 +922,8 @@ export function Dialog({
 			className={`dialog dialog-${size}`}
 			aria-labelledby={titleId}
 			onCancel={(event) => {
+				// React passes a dialog's cancel on to the dialogs around it; only the top one closes.
+				if (event.target !== event.currentTarget) return;
 				event.preventDefault();
 				onClose();
 			}}

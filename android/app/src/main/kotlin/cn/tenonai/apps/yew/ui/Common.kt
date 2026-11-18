@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -70,7 +69,6 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import cn.tenonai.apps.yew.R
 import cn.tenonai.apps.yew.api.Choice
@@ -112,12 +110,12 @@ fun Screen(
 }
 
 /**
- * The full lockup (spec 1.4–1.6) for the first screen and the About page: the mark, the wordmark with a
- * smaller "Harness" after it (the product's name is Yew Harness, blueprint section 12) and the Tenon
- * mark at its upper right, measured from the wordmark size [size] (S; the wordmark's drawable is one
- * em, so S high). The mark fills an S square .3S before the wordmark, centred on it; "Harness" is
- * .64S type .25S after the wordmark, on its baseline (.16S above the bottom of its box); the Tenon
- * mark is max(14dp, .58S) square, max(4dp, .18S) after the name, its top .04S above the wordmark's.
+ * The full lockup (spec 1.2, 1.6) for the first screen and the About page: the mark and the wordmark
+ * with a smaller "Harness" after it (the product's name is Yew Harness, blueprint section 12),
+ * measured from the wordmark size [size] (S; the wordmark's drawable is one em, so S high). The mark
+ * fills an S square .3S before the wordmark, centred on it; "Harness" is .64S type .25S after the
+ * wordmark, on its baseline (.16S above the bottom of its box). No Tenon mark: that appears only with
+ * "Tenon AI", where the publisher is named (spec 1.3–1.4).
  */
 @Composable
 fun Lockup(size: Dp = 40.dp) {
@@ -145,11 +143,6 @@ fun Lockup(size: Dp = 40.dp) {
                 modifier = Modifier.alignByBaseline(),
             )
         }
-        Spacer(Modifier.width(max(4.dp, size * 0.18f)))
-        Image(
-            painterResource(R.drawable.tenon_mark), null,
-            Modifier.align(Alignment.Top).offset(y = -size * 0.04f).size(max(14.dp, size * 0.58f)),
-        )
     }
 }
 

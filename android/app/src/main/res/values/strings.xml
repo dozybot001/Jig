@@ -2,7 +2,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name" translatable="false">Yew Harness</string>
     <string name="tagline">An AI-native multi-agent workbench</string>
-    <string name="lockup_label">Yew Harness, by Tenon AI</string>
+    <string name="lockup_label" translatable="false">Yew Harness</string>
 
     <!-- Navigation -->
     <string name="tab_sessions">Sessions</string>

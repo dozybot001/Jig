@@ -7,6 +7,7 @@ import {
 	ChartColumn,
 	Check,
 	CheckCheck,
+	ChevronLeft,
 	ChevronRight,
 	Circle,
 	CircleCheck,
@@ -84,6 +85,8 @@ export const ArrowUpIcon = () => <ArrowUp {...props} strokeWidth={2} />;
 export const StopIcon = () => <Square {...props} fill="currentColor" />;
 export const SearchIcon = () => <Search {...props} />;
 export const ChevronIcon = () => <ChevronRight {...props} size={14} className="chevron" />;
+/** Back to the list, where a narrow window shows one level at a time. */
+export const BackIcon = () => <ChevronLeft {...props} />;
 /** Marks a menu item that opens a submenu. */
 export const SubmenuIcon = () => <ChevronRight {...props} size={14} className="menu-arrow" />;
 export const PinIcon = () => <Pin {...props} size={13} className="pin-icon" />;

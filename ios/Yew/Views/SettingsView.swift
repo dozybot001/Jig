@@ -135,13 +135,15 @@ struct AboutView: View {
 				Text("Yew Harness on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions' questions and decide on cards, and you can follow and reply to sessions.")
 			}
 			Section {
+				// The small horizontal publisher mark (spec 1.4): the T at least 16 pt, the name about
+				// 0.75 of it, semibold, 0.3 of it apart.
 				LabeledContent("Publisher") {
-					HStack(spacing: 6) {
+					HStack(spacing: 18 * 0.3) {
 						Image("TenonMark")
 							.resizable()
 							.frame(width: 18, height: 18)
 							.accessibilityHidden(true)
-						Text("Tenon AI").bold()
+						Text("Tenon AI").font(.system(size: 18 * 0.75, weight: .semibold))
 					}
 				}
 				Link(destination: URL(string: "https://tenonai.cn/")!) {
@@ -187,10 +189,10 @@ struct PolicyView: View {
 	}
 }
 
-/// The full lockup for the first screen and the About page (spec 1.6, 2.2): the mark, the wordmark
-/// ("Yew" outlined from Young Serif, in the ink colour) with a smaller "Harness" after it, which make
-/// the product's name Yew Harness (blueprint, section 12), and the Tenon mark, all sized from the
-/// wordmark's size S (spec 1.4–1.5).
+/// The full lockup for the first screen and the About page (spec 1.2, 1.6, 2.2): the mark and the
+/// wordmark ("Yew" outlined from Young Serif, in the ink colour) with a smaller "Harness" after it,
+/// which make the product's name Yew Harness (blueprint, section 12), sized from the wordmark's size
+/// S. No Tenon mark: that appears only with "Tenon AI", where the publisher is named (spec 1.3–1.4).
 struct Lockup: View {
 	var size: CGFloat = 36
 
@@ -198,28 +200,22 @@ struct Lockup: View {
 		HStack(spacing: size * 0.3) {
 			YewMark()
 				.frame(width: size, height: size)
-			HStack(alignment: .top, spacing: max(4, size * 0.18)) {
-				HStack(alignment: .bottom, spacing: size * 0.25) {
-					// The wordmark's box is one em of the font, as wide as its viewBox says.
-					Image("YewWordmark")
-						.resizable()
-						.frame(width: size * 2.091, height: size)
-						.foregroundStyle(Color.yewInk)
-					// On the wordmark's baseline, 0.16 S above the bottom of its box.
-					Text(verbatim: "Harness")
-						.font(.system(size: size * 0.64, weight: .semibold))
-						.foregroundStyle(Color.yewInk)
-						.fixedSize()
-						.alignmentGuide(.bottom) { d in d[.lastTextBaseline] + size * 0.16 }
-				}
-				Image("TenonMark")
+			HStack(alignment: .bottom, spacing: size * 0.25) {
+				// The wordmark's box is one em of the font, as wide as its viewBox says.
+				Image("YewWordmark")
 					.resizable()
-					.frame(width: max(14, size * 0.58), height: max(14, size * 0.58))
-					.offset(y: -size * 0.04)
+					.frame(width: size * 2.091, height: size)
+					.foregroundStyle(Color.yewInk)
+				// On the wordmark's baseline, 0.16 S above the bottom of its box.
+				Text(verbatim: "Harness")
+					.font(.system(size: size * 0.64, weight: .semibold))
+					.foregroundStyle(Color.yewInk)
+					.fixedSize()
+					.alignmentGuide(.bottom) { d in d[.lastTextBaseline] + size * 0.16 }
 			}
 		}
 		.accessibilityElement(children: .ignore)
-		.accessibilityLabel("Yew Harness, by Tenon AI")
+		.accessibilityLabel(Text(verbatim: "Yew Harness"))
 	}
 }
 

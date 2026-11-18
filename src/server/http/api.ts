@@ -23,6 +23,7 @@ import { resolveWorkingFolder } from "../paths.ts";
 import {
 	type DefaultModel,
 	NOTIFY_KINDS,
+	OPENING_MODES,
 	readSettings,
 	resolveLogFile,
 	type Workspace,
@@ -419,6 +420,8 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		if (language) store.setSetting("language", language);
 		const mascot = optBoolean(fields, "mascot");
 		if (mascot !== undefined) store.setSetting("mascot", mascot);
+		const opening = optEnum(fields, "opening", OPENING_MODES);
+		if (opening) store.setSetting("opening", opening);
 		const workspaces = optArray(fields, "workspaces");
 		if (workspaces) {
 			store.setSetting("workspaces", parseWorkspaces(workspaces, readSettings(store).workspaces));

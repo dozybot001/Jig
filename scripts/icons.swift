@@ -3,7 +3,9 @@
 // root when the mark changes:
 //   swift scripts/icons.swift
 // It writes the launcher app's icon for macOS (a white rounded plate with the margins macOS icons
-// keep) and the iPhone app's icon, light and dark (full square, no transparency, as Apple asks).
+// keep), the iPhone app's icon, light and dark (full square, no transparency, as Apple asks), and the
+// web page's home-screen icon, which is the light iPhone icon at 180 px (spec 1.6, 1.9: the product's
+// own graphic, no Tenon badge).
 import AppKit
 
 let red = CGColor(srgbRed: 0xC8 / 255, green: 0x32 / 255, blue: 0x3F / 255, alpha: 1)
@@ -99,4 +101,13 @@ for (name, background, leaf) in [
 	context.fill(CGRect(x: 0, y: 0, width: 1024, height: 1024))
 	placeMark(context, size: 1024, width: 660, leaf: leaf)
 	try write(context, "ios/Yew/Assets.xcassets/AppIcon.appiconset/\(name)", opaque: true)
+}
+
+// The web page's home-screen icon (apple-touch-icon): the light iPhone icon at 180 by 180.
+do {
+	let context = canvas(180)
+	context.setFillColor(CGColor(gray: 1, alpha: 1))
+	context.fill(CGRect(x: 0, y: 0, width: 180, height: 180))
+	placeMark(context, size: 180, width: 180 * 660 / 1024, leaf: green)
+	try write(context, "web/public/icons/apple-touch-icon.png", opaque: true)
 }

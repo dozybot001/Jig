@@ -40,10 +40,11 @@ function Step({ done, text }: { done: boolean; text: string }) {
 }
 
 /**
- * The opening (blueprint, section 12): Yew's mark draws itself, the mascot waves, and the real steps
- * of the start are ticked off as they finish. A click or any key skips it; it never plays when the
- * system asks for less motion or the mascot is off. Decoration only: screen readers skip it, and it
- * takes no focus.
+ * The opening (blueprint, section 12): Yew's mark draws itself, Yew waves, and the real steps of the
+ * start are ticked off as they finish. It leaves by itself once they are done, or, with "click to
+ * enter" chosen in Personalization (blueprint 6.10, item 45), waits there for a click or a key. A
+ * click or any key skips it at any time; it never plays when the system asks for less motion or Yew is
+ * hidden. Decoration only: screen readers skip it, and it takes no focus.
  */
 export function Opening() {
 	useLang();
@@ -57,6 +58,8 @@ export function Opening() {
 	const waiting = useAppState((state) => centerCount(state.center));
 	const finished = phase === "signin" || phase === "failed" || (phase === "ready" && booted);
 	const mascotOff = settings?.mascot === false;
+	// Waits for the person only once the interface is there to enter; sign-in and failure pages go on.
+	const waitForClick = settings?.opening === "click" && phase === "ready";
 
 	useEffect(() => {
 		if (gone || leaving) return;
@@ -64,10 +67,10 @@ export function Opening() {
 			setGone(true);
 			return;
 		}
-		if (!finished) return;
+		if (!finished || waitForClick) return;
 		const timer = setTimeout(() => setLeaving(true), Math.max(0, STARTED_AT + MIN_MS - Date.now()));
 		return () => clearTimeout(timer);
-	}, [finished, mascotOff, gone, leaving]);
+	}, [finished, waitForClick, mascotOff, gone, leaving]);
 
 	useEffect(() => {
 		if (!leaving) return;
@@ -144,7 +147,11 @@ export function Opening() {
 					}
 				/>
 			</ol>
-			<p className="opening-skip">{t("boot_skip")}</p>
+			{finished && waitForClick ? (
+				<p className="opening-skip opening-enter">{t("boot_enter")}</p>
+			) : (
+				<p className="opening-skip">{t("boot_skip")}</p>
+			)}
 		</div>
 	);
 }

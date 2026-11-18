@@ -61,6 +61,7 @@ import {
 	type PingResult,
 	type ProviderSummary,
 	type SearchServiceView,
+	type SettingsDialogName,
 	type SkillList,
 	type SkillView,
 	type SystemStatus,
@@ -69,6 +70,7 @@ import {
 } from "../state.ts";
 import { ConfirmDialog, cleanAmount } from "./dialogs.tsx";
 import {
+	BackIcon,
 	CheckIcon,
 	ChevronIcon,
 	CloseIcon,
@@ -78,9 +80,7 @@ import {
 	GearIcon,
 	InfoIcon,
 	KeyIcon,
-	LanguageIcon,
 	MailIcon,
-	MascotIcon,
 	PhoneIcon,
 	PlusIcon,
 	PowerIcon,
@@ -99,13 +99,13 @@ import {
 } from "./icons.tsx";
 import { Mascot } from "./mascot.tsx";
 import { ModelPicker } from "./session.tsx";
+import { useNarrow } from "./sidebar.tsx";
 import {
 	Button,
 	Dialog,
 	ErrorBox,
 	Field,
-	Menu,
-	type MenuEntry,
+	InSettingsWindow,
 	Select,
 	SettingGroup,
 	SettingRow,
@@ -371,7 +371,6 @@ function ProvidersDialog({ onClose }: { onClose: () => void }) {
 			title={t("providers")}
 			size="l"
 			onClose={onClose}
-			footer={<Button onClick={onClose}>{t("close")}</Button>}
 			tabs={
 				<div className="panel-tabs dialog-tabs" role="tablist" aria-label={t("providers")}>
 					{KEY_TABS.map((name) => (
@@ -693,20 +692,11 @@ function About() {
 			</h2>
 			{/* In the order of spec 2.2: lockup, version, the text, publisher, website; then 2.3. */}
 			<div className="about-head">
-				{/* Full lockup on the About page (spec 1.6), with a name that includes Tenon (1.7). */}
+				{/* Full lockup on the About page (spec 1.6), named by the product's name (1.7). */}
 				<Mascot pose="gift" height={112} className="about-mascot" />
 				<div className="lockup" role="img" aria-label={t("lockupName")}>
 					<YewMark className="lockup-mark" size={22} />
-					<span className="lockup-word">
-						<ProductName />
-						<img
-							className="lockup-tenon"
-							src="/icons/tenon-mark.svg"
-							alt=""
-							width={14}
-							height={14}
-						/>
-					</span>
+					<ProductName />
 				</div>
 				<p className="about-version">
 					{t("version", { v: health?.version ?? "" })}
@@ -717,9 +707,10 @@ function About() {
 			<div className="about-list">
 				<div className="about-row">
 					<span className="about-label">{t("publisher")}</span>
-					<span className="about-value">
+					{/* The small horizontal publisher mark (spec 1.4), the only place with the Tenon mark. */}
+					<span className="publisher-mark">
 						<img src="/icons/tenon-mark.svg" alt="" width={18} height={18} />
-						<strong>{t("publisherName")}</strong>
+						{t("publisherName")}
 					</span>
 				</div>
 				<div className="about-row">
@@ -756,137 +747,236 @@ function About() {
 	);
 }
 
-/** The settings dialog that is open, if any; it covers the conversation without replacing it. */
+/** The settings window's sections, in order (blueprint 6.10, item 45). */
+const SECTIONS: { name: SettingsDialogName; label: MessageKey; icon: ReactNode }[] = [
+	{ name: "personal", label: "personalMenu", icon: <ThemeIcon /> },
+	{ name: "providers", label: "providersMenu", icon: <KeyIcon /> },
+	{ name: "defaults", label: "defaultsMenu", icon: <SlidersIcon /> },
+	{ name: "mcp", label: "mcpMenu", icon: <ToolsIcon /> },
+	{ name: "skills", label: "skillsMenu", icon: <SkillsIcon /> },
+	{ name: "phones", label: "phonesMenu", icon: <PhoneIcon /> },
+	{ name: "system", label: "systemMenu", icon: <PowerIcon /> },
+	{ name: "data", label: "dataMenu", icon: <DataIcon /> },
+	{ name: "about", label: "about", icon: <InfoIcon /> },
+];
+
+/** The section the settings open on: the one last looked at in this page. */
+let lastSection: SettingsDialogName = "personal";
+
+/** The settings window, when it is open; it covers the conversation without replacing it. */
 export function SettingsDialogs() {
 	useLang();
-	const which = useAppState((state) => state.settingsDialog);
-	const close = () => setState({ settingsDialog: null });
-	if (which === "defaults") return <DefaultsDialog onClose={close} />;
-	if (which === "phones") return <PhonesDialog onClose={close} />;
-	if (which === "mcp") return <McpDialog onClose={close} />;
-	if (which === "skills") return <SkillsDialog onClose={close} />;
-	if (which === "data") return <DataDialog onClose={close} />;
-	if (which === "system") return <SystemDialog onClose={close} />;
-	if (which === "providers") return <ProvidersDialog onClose={close} />;
-	if (which === "about") {
-		return (
-			<Dialog
-				title={t("about")}
-				size="l"
-				onClose={close}
-				footer={<Button onClick={close}>{t("close")}</Button>}
-			>
-				<About />
-			</Dialog>
-		);
-	}
-	return null;
+	const section = useAppState((state) => state.settingsDialog);
+	return section ? <SettingsWindow section={section} /> : null;
 }
 
 /**
- * The settings menu at the bottom of the sidebar (spec 10.3, 10.5): theme and language chosen right in
- * the menu, the rest in dialogs over the conversation, so the conversation is never replaced.
- * Cmd/Ctrl+, opens it, as in Claude.
+ * The settings window (blueprint 6.10, item 45): the sections on the left, the chosen one on the right.
+ * A narrow window shows one level at a time: the list first, then a section with a way back.
  */
-export function SettingsMenu({ variant }: { variant: "row" | "icon" }) {
+function SettingsWindow({ section }: { section: SettingsDialogName }) {
+	const ref = useRef<HTMLDialogElement>(null);
+	const titleId = useId();
+	const narrow = useNarrow();
+	const [listing, setListing] = useState(narrow);
+	const close = () => setState({ settingsDialog: null });
+	useEffect(() => {
+		const dialog = ref.current;
+		if (!dialog) return;
+		dialog.showModal();
+		document.body.classList.add("scroll-locked");
+		return () => {
+			document.body.classList.remove("scroll-locked");
+			if (dialog.open) dialog.close();
+		};
+	}, []);
+	useEffect(() => {
+		lastSection = section;
+	}, [section]);
+	const choose = (name: SettingsDialogName) => {
+		setState({ settingsDialog: name });
+		setListing(false);
+	};
+	const showList = !narrow || listing;
+	const showPanel = !narrow || !listing;
+	return (
+		<dialog
+			ref={ref}
+			className="dialog settings-window"
+			aria-labelledby={titleId}
+			onCancel={(event) => {
+				// React passes a dialog's cancel on to the dialogs around it; only the top one closes.
+				if (event.target !== event.currentTarget) return;
+				event.preventDefault();
+				close();
+			}}
+		>
+			<div className="settings-frame">
+				{showList && (
+					<nav className="settings-nav" aria-labelledby={titleId}>
+						<div className="settings-nav-head">
+							<h2 id={titleId}>{t("settings")}</h2>
+							{narrow && (
+								<Button variant="icon" aria-label={t("close")} onClick={close}>
+									<CloseIcon />
+								</Button>
+							)}
+						</div>
+						<ul className="settings-nav-list">
+							{SECTIONS.map(({ name, label, icon }) => (
+								<li key={name}>
+									<button
+										type="button"
+										className="settings-nav-item"
+										aria-current={!narrow && name === section ? "true" : undefined}
+										onClick={() => choose(name)}
+									>
+										{icon}
+										{t(label)}
+									</button>
+								</li>
+							))}
+						</ul>
+						<a className="settings-nav-item settings-feedback" href="mailto:support@tenonai.cn">
+							<MailIcon />
+							{t("sendFeedback")}
+						</a>
+					</nav>
+				)}
+				{showPanel && (
+					<div className="settings-pane">
+						{narrow && (
+							<Button className="settings-back" onClick={() => setListing(true)}>
+								<BackIcon />
+								{t("settings")}
+							</Button>
+						)}
+						<InSettingsWindow>
+							<SettingsSection name={section} onClose={close} />
+						</InSettingsWindow>
+					</div>
+				)}
+			</div>
+		</dialog>
+	);
+}
+
+function SettingsSection({ name, onClose }: { name: SettingsDialogName; onClose: () => void }) {
+	if (name === "personal") return <PersonalDialog onClose={onClose} />;
+	if (name === "defaults") return <DefaultsDialog onClose={onClose} />;
+	if (name === "phones") return <PhonesDialog onClose={onClose} />;
+	if (name === "mcp") return <McpDialog onClose={onClose} />;
+	if (name === "skills") return <SkillsDialog onClose={onClose} />;
+	if (name === "data") return <DataDialog onClose={onClose} />;
+	if (name === "system") return <SystemDialog onClose={onClose} />;
+	if (name === "providers") return <ProvidersDialog onClose={onClose} />;
+	return (
+		<Dialog title={t("about")} size="l" onClose={onClose}>
+			<About />
+		</Dialog>
+	);
+}
+
+/**
+ * Personalization (blueprint 6.10, item 45): theme, language, Yew in the interface and how the opening
+ * leaves. Each applies as soon as it is chosen.
+ */
+function PersonalDialog({ onClose }: { onClose: () => void }) {
 	useLang();
 	const settings = useAppState((state) => state.settings);
-	const [open, setOpen] = useState(false);
+	const themeId = useId();
+	const languageId = useId();
+	const mascotId = useId();
+	const openingId = useId();
+	const save = (patch: Parameters<typeof saveSettings>[0]) =>
+		void saveSettings(patch).catch(() => {});
+	const mascot = settings?.mascot !== false;
+	return (
+		<Dialog title={t("personalMenu")} size="l" onClose={onClose}>
+			<SettingGroup title={t("personal_look")}>
+				<SettingRow label={t("theme")} labelId={themeId}>
+					<Select
+						labelledBy={themeId}
+						value={settings?.theme ?? "system"}
+						options={(["system", "light", "dark"] as const).map((value) => ({
+							value,
+							label: t(`theme_${value}`),
+						}))}
+						onChange={(value) => save({ theme: value as "system" | "light" | "dark" })}
+					/>
+				</SettingRow>
+				<SettingRow label={t("language")} labelId={languageId}>
+					<Select
+						labelledBy={languageId}
+						value={settings?.language ?? "system"}
+						options={[
+							{ value: "system", label: t("language_system") },
+							{ value: "zh", label: "简体中文" },
+							{ value: "en", label: "English" },
+						]}
+						onChange={(value) => save({ language: value as "system" | "zh" | "en" })}
+					/>
+				</SettingRow>
+			</SettingGroup>
+			<SettingGroup title={t("personal_yew")}>
+				<SettingRow label={t("mascotMenu")} hint={t("mascotHint")} labelId={mascotId}>
+					<Switch checked={mascot} labelledBy={mascotId} onChange={(on) => save({ mascot: on })} />
+				</SettingRow>
+				<SettingRow label={t("opening")} info={t("openingHint")} labelId={openingId}>
+					<Select
+						labelledBy={openingId}
+						value={settings?.opening ?? "auto"}
+						disabled={!mascot}
+						options={(["auto", "click"] as const).map((value) => ({
+							value,
+							label: t(`opening_${value}`),
+						}))}
+						onChange={(value) => save({ opening: value as "auto" | "click" })}
+					/>
+				</SettingRow>
+			</SettingGroup>
+		</Dialog>
+	);
+}
+
+/**
+ * The settings entry at the bottom of the sidebar (spec 10.3, 10.5): it opens the settings window, as
+ * Cmd/Ctrl+, does.
+ */
+export function SettingsButton({ variant }: { variant: "row" | "icon" }) {
+	useLang();
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if ((event.metaKey || event.ctrlKey) && event.key === ",") {
 				event.preventDefault();
-				setOpen(true);
+				openSettings(lastSection);
 			}
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
 	}, []);
-	const save = (patch: Parameters<typeof saveSettings>[0]) =>
-		void saveSettings(patch).catch(() => {});
-	const theme = settings?.theme ?? "system";
-	const language = settings?.language ?? "system";
-	const mascot = settings?.mascot !== false;
-	const languages = [
-		{ id: "language-system", label: t("language_system"), value: "system" as const },
-		{ id: "language-zh", label: "简体中文", value: "zh" as const },
-		{ id: "language-en", label: "English", value: "en" as const },
-	];
-	// Theme and language open beside the menu, as the session menu's submenus do; each shows its value.
-	const items: MenuEntry[] = [
-		{
-			label: t("theme"),
-			detail: t(`theme_${theme}`),
-			icon: <ThemeIcon />,
-			items: (["system", "light", "dark"] as const).map((value) => ({
-				id: `theme-${value}`,
-				label: t(`theme_${value}`),
-				checked: theme === value,
-				onSelect: () => save({ theme: value }),
-			})),
-		},
-		{
-			label: t("language"),
-			detail: languages.find((option) => option.value === language)?.label ?? "",
-			icon: <LanguageIcon />,
-			items: languages.map(({ id, label, value }) => ({
-				id,
-				label,
-				checked: language === value,
-				onSelect: () => save({ language: value }),
-			})),
-		},
-		{
-			label: t("mascotMenu"),
-			detail: t(mascot ? "mascot_on" : "mascot_off"),
-			icon: <MascotIcon />,
-			items: [true, false].map((value) => ({
-				id: value ? "mascot-on" : "mascot-off",
-				label: t(value ? "mascot_on" : "mascot_off"),
-				checked: mascot === value,
-				onSelect: () => save({ mascot: value }),
-			})),
-		},
-		{ separator: true, id: "line-1" },
-		{ label: t("providersMenu"), icon: <KeyIcon />, onSelect: () => openSettings("providers") },
-		{ label: t("mcpMenu"), icon: <ToolsIcon />, onSelect: () => openSettings("mcp") },
-		{ label: t("skillsMenu"), icon: <SkillsIcon />, onSelect: () => openSettings("skills") },
-		{ label: t("defaultsMenu"), icon: <SlidersIcon />, onSelect: () => openSettings("defaults") },
-		{ label: t("phonesMenu"), icon: <PhoneIcon />, onSelect: () => openSettings("phones") },
-		{ label: t("systemMenu"), icon: <PowerIcon />, onSelect: () => openSettings("system") },
-		{ label: t("dataMenu"), icon: <DataIcon />, onSelect: () => openSettings("data") },
-		{ separator: true, id: "line-2" },
-		{ label: t("aboutMenu"), icon: <InfoIcon />, onSelect: () => openSettings("about") },
-		{
-			label: t("sendFeedback"),
-			icon: <MailIcon />,
-			onSelect: () => {
-				window.location.href = "mailto:support@tenonai.cn";
-			},
-		},
-	];
+	if (variant === "row") {
+		return (
+			<button
+				type="button"
+				className="nav-row"
+				title={`${t("settings")}（⌘,）`}
+				onClick={() => openSettings(lastSection)}
+			>
+				<GearIcon />
+				{t("settings")}
+			</button>
+		);
+	}
 	return (
-		<Menu
-			label={t("settings")}
-			items={items}
-			open={open}
-			onOpenChange={setOpen}
-			width={240}
-			trigger={
-				variant === "row"
-					? {
-							className: "nav-row",
-							title: `${t("settings")}（⌘,）`,
-							content: (
-								<>
-									<GearIcon />
-									{t("settings")}
-								</>
-							),
-						}
-					: { className: "btn btn-ghost btn-icon", title: t("settings"), content: <GearIcon /> }
-			}
-		/>
+		<Button
+			variant="icon"
+			aria-label={t("settings")}
+			title={t("settings")}
+			onClick={() => openSettings(lastSection)}
+		>
+			<GearIcon />
+		</Button>
 	);
 }
 
@@ -941,12 +1031,7 @@ function DataDialog({ onClose }: { onClose: () => void }) {
 	const temp = data?.temp;
 	const kept = temp ? temp.files - temp.removableFiles : 0;
 	return (
-		<Dialog
-			title={t("dataTitle")}
-			size="l"
-			onClose={onClose}
-			footer={<Button onClick={onClose}>{t("close")}</Button>}
-		>
+		<Dialog title={t("dataTitle")} size="l" onClose={onClose}>
 			{data === null && !loadError && <p className="hint">{t("loading")}</p>}
 			<ErrorBox error={loadError} />
 			{data && temp && (
@@ -1221,12 +1306,7 @@ function PhonesDialog({ onClose }: { onClose: () => void }) {
 	const paired = pairing && devices.length > pairing.before ? devices.at(-1) : null;
 	const expired = pairing && !paired && pairing.expiresAt < now;
 	return (
-		<Dialog
-			title={t("phones")}
-			size="l"
-			onClose={onClose}
-			footer={<Button onClick={onClose}>{t("close")}</Button>}
-		>
+		<Dialog title={t("phones")} size="l" onClose={onClose}>
 			<SettingGroup title={t("phoneAccess")}>
 				<SettingRow label={t("phoneAccessSwitch")} hint={t("phoneAccessHint")} labelId={switchId}>
 					<Switch
@@ -2012,12 +2092,7 @@ function McpDialog({ onClose }: { onClose: () => void }) {
 		return () => clearInterval(timer);
 	}, [reload]);
 	return (
-		<Dialog
-			title={t("mcpTitle")}
-			size="l"
-			onClose={onClose}
-			footer={<Button onClick={onClose}>{t("close")}</Button>}
-		>
+		<Dialog title={t("mcpTitle")} size="l" onClose={onClose}>
 			<p className="hint">{t("mcpHelp")}</p>
 			{(servers ?? []).some((server) => server.builtin) && (
 				<SettingGroup title={t("mcpBuiltin")}>
@@ -2192,12 +2267,7 @@ function SkillsDialog({ onClose }: { onClose: () => void }) {
 				: item.source.kind === "workspace" && item.source.path === source.path,
 		);
 	return (
-		<Dialog
-			title={t("skillsTitle")}
-			size="l"
-			onClose={onClose}
-			footer={<Button onClick={onClose}>{t("close")}</Button>}
-		>
+		<Dialog title={t("skillsTitle")} size="l" onClose={onClose}>
 			{list && (
 				<p className="hint">{t("skillsHelp", { global: globalPaths.join(t("listSeparator")) })}</p>
 			)}
@@ -2266,12 +2336,7 @@ function SystemDialog({ onClose }: { onClose: () => void }) {
 				? `${text} ${t("writtenTo", { path })}`
 				: text;
 	return (
-		<Dialog
-			title={t("systemTitle")}
-			size="l"
-			onClose={onClose}
-			footer={<Button onClick={onClose}>{t("close")}</Button>}
-		>
+		<Dialog title={t("systemTitle")} size="l" onClose={onClose}>
 			<SettingGroup title={t("systemTitle")}>
 				<SettingRow
 					label={t("startAtLogin")}
