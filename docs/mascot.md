@@ -250,7 +250,7 @@ She sits on the floor with a small open laptop on her lap, three-quarter view tu
 
 ## 六、立绘
 
-用作主界面的整幅背景，由 Yew 开发会话接进界面。入库文件是 `web/public/mascot/portrait.webp`：1108×2400，透明底，约 290 KB，原图在 `~/Pictures/素材/Yew/portrait/`。
+用作主界面的整幅背景，由 Yew Harness · 开发接进界面。入库文件是 `web/public/mascot/portrait.webp`：1108×2400，透明底，约 290 KB，原图在 `~/Pictures/素材/Yew/portrait/`。
 
 - 长边 2400 像素以上，透明底；ChatGPT 出的图不到 2400 时，入库前放大。
 - 三分之二身到全身。图里只有人物，裁到人物边缘；她朝画面左边看，适合放在界面右侧，左边留给内容。
