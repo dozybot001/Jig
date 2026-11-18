@@ -41,6 +41,7 @@ export function Companion() {
 	const enabled = useAppState((state) => state.settings?.mascot !== false);
 	const sessions = useAppState((state) => state.sessions);
 	const center = useAppState((state) => state.center);
+	const schedules = useAppState((state) => state.schedules);
 	const page = useAppState((state) => state.page);
 	const selectedId = useAppState((state) => state.selectedId);
 	// Often enough to end the greeting about on time; the pose itself changes every ten minutes.
@@ -49,6 +50,8 @@ export function Companion() {
 	const mood = companionMood({
 		sessions: Object.values(sessions),
 		waiting: centerCount(center),
+		permission: Object.values(center.approvals).some((approval) => approval.kind === "permission"),
+		onDuty: schedules?.some((schedule) => schedule.enabled) ?? false,
 		now,
 		hour: new Date(now).getHours(),
 		openedAt: OPENED_AT,

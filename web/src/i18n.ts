@@ -148,11 +148,11 @@ const zh = {
 	exporting: "正在导出…",
 	permissionMode: "授权方式",
 	perm_auto: "按需授权",
-	perm_auto_hint: "模型判断哪些操作要先问你",
+	perm_auto_hint: "模型判断哪些操作要先问你；不问就跑的命令以你的系统账户运行",
 	perm_manual: "逐项授权",
 	perm_manual_hint: "改文件、运行命令、访问网址前都先问你",
 	perm_skip: "完全授权",
-	perm_skip_hint: "直接执行；删除、推送等操作仍会问你",
+	perm_skip_hint: "直接执行，命令以你的系统账户运行；删除、推送等操作仍会问你",
 	loadEarlier: "加载更早的记录",
 	emptyTranscript: "发一条消息开始。",
 	composerPlaceholder: "给 {name} 发消息（Enter 发送，Shift+Enter 换行）",
@@ -978,7 +978,7 @@ const zh = {
 	notify_budget_hint: "到每日上限的 80% 和到上限时",
 	defaultPermission: "新会话的默认授权方式",
 	defaultPermissionHelp:
-		"新建的会话用这种授权方式，之后可以在会话里改。会话自己开的会话不会高于它本身的授权方式。已有的会话不受影响。",
+		"新建的会话用这种授权方式，之后可以在会话里改。会话自己开的会话不会高于它本身的授权方式。已有的会话不受影响。按需授权和完全授权下，不问就跑的命令以你的系统账户运行，能改 Yew Harness 自己的记录（包括决定和授权），也能读它保存的密钥。会话要处理网页、邮件、MCP 返回这类外来内容时，建议用逐项授权，让命令每次都先问你。",
 	defaultWorkspace: "新会话的默认工作区",
 	defaultWorkspaceHelp: "在首页和新建会话时先选中这个工作区，开始前可以改。",
 	defaultWorkspaceNone: "不选",
@@ -1143,11 +1143,13 @@ const en: Record<MessageKey, string> = {
 	exporting: "Exporting…",
 	permissionMode: "Permission mode",
 	perm_auto: "Ask when needed",
-	perm_auto_hint: "The model decides what to ask you about",
+	perm_auto_hint:
+		"The model decides what to ask you about; commands it runs without asking run as your user account",
 	perm_manual: "Ask each time",
 	perm_manual_hint: "Asks before edits, commands and web requests",
 	perm_skip: "Full access",
-	perm_skip_hint: "Runs without asking; still asks before deletes, pushes and the like",
+	perm_skip_hint:
+		"Runs without asking, as your user account; still asks before deletes, pushes and the like",
 	loadEarlier: "Load earlier messages",
 	emptyTranscript: "Send a message to start.",
 	composerPlaceholder: "Message {name} (Enter to send, Shift+Enter for a new line)",
@@ -2009,7 +2011,7 @@ const en: Record<MessageKey, string> = {
 	notify_budget_hint: "At 80% of a daily limit and at the limit",
 	defaultPermission: "Default permission mode for new sessions",
 	defaultPermissionHelp:
-		"New sessions start with this mode; you can change it in the session. A session opened by another session never gets more than that session has. Existing sessions are not affected.",
+		"New sessions start with this mode; you can change it in the session. A session opened by another session never gets more than that session has. Existing sessions are not affected. With Ask when needed and Full access, commands that run without asking run as your user account: they can change Yew Harness's own records, decisions and permissions included, and read the keys it keeps. For a session that handles outside content, such as web pages, mail or what MCP servers return, Ask each time makes each command ask you first.",
 	defaultWorkspace: "Default workspace for new sessions",
 	defaultWorkspaceHelp:
 		"Preselected on the home page and in the new session dialog; you can change it before you start.",

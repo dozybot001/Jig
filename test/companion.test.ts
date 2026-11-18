@@ -79,6 +79,24 @@ describe("the mascot at the foot of the sidebar", () => {
 		assert.equal(isNight(5), false);
 	});
 
+	test("she holds a card while a permission waits, and keeps watch while scheduled tasks are on", () => {
+		const asking = companionMood({ ...base, sessions: [], waiting: 1, permission: true });
+		assert.equal(asking.pose, "permission");
+		assert.deepEqual(asking.line, { kind: "waiting", count: 1 });
+		assert.notEqual(companionMood({ ...base, sessions: [], waiting: 1 }).pose, "permission");
+		const watching = companionMood({ ...base, sessions: [], waiting: 0, onDuty: true });
+		assert.equal(watching.pose, "on-duty");
+		assert.deepEqual(watching.line, { kind: "clear", night: false });
+		// A session at work comes first.
+		const busy = companionMood({
+			...base,
+			sessions: [session("w", "working")],
+			waiting: 0,
+			onDuty: true,
+		});
+		assert.ok(POSES.working.includes(busy.pose));
+	});
+
 	test("her pose changes at most every ten minutes", () => {
 		const at = (now: number) =>
 			companionMood({ ...base, now, sessions: [session("w", "working")], waiting: 0 }).pose;

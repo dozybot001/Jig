@@ -1,8 +1,9 @@
 /**
- * What the mascot at the foot of the sidebar says (blueprint, section 12): the one thing that matters
- * most right now, in this order: things waiting for the person, a session that failed, a session that
+ * What Yew at the foot of the sidebar says (blueprint, section 12): the one thing that matters most
+ * right now, in this order: things waiting for the person, a session that failed, a session that
  * finished and waits for review, sessions at work; otherwise that nothing waits. In the first minute
- * after Yew opens she greets first. Her pose follows what she says.
+ * after the interface opens she greets first. Her pose follows what she says: holding a card when a
+ * permission waits, and on duty when nothing does but scheduled tasks are on (blueprint, section 11).
  */
 import type { Session } from "../../src/shared/types.ts";
 import type { MascotPose } from "./poses.ts";
@@ -64,6 +65,10 @@ export function companionMood(input: {
 	sessions: Iterable<Session>;
 	/** Approvals, questions, decision cards and held letters waiting for the person. */
 	waiting: number;
+	/** Whether a permission request is among what waits. */
+	permission?: boolean;
+	/** Whether a scheduled task is on, so something is still watched when nothing else goes on. */
+	onDuty?: boolean;
 	now: number;
 	/** The local hour, 0 to 23. */
 	hour: number;
@@ -74,7 +79,7 @@ export function companionMood(input: {
 	const greeting = now - input.openedAt < GREETING_MS ? greetingFor(hour) : null;
 	if (input.waiting > 0) {
 		return {
-			pose: greeting ? "greeting" : pick(POSES.waiting, now),
+			pose: greeting ? "greeting" : input.permission ? "permission" : pick(POSES.waiting, now),
 			greeting,
 			line: { kind: "waiting", count: input.waiting },
 			target: { kind: "center" },
@@ -98,7 +103,13 @@ export function companionMood(input: {
 	}
 	const night = isNight(hour);
 	return {
-		pose: night ? pick(POSES.night, now) : greeting ? "greeting" : pick(POSES.clear, now),
+		pose: greeting
+			? "greeting"
+			: input.onDuty
+				? "on-duty"
+				: night
+					? pick(POSES.night, now)
+					: pick(POSES.clear, now),
 		greeting,
 		line: { kind: "clear", night },
 		target: null,
