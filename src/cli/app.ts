@@ -101,6 +101,8 @@ export function infoPlist(window: boolean): string {
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>LSFileQuarantineEnabled</key>
+	<true/>
 `
 		: `	<key>CFBundleIdentifier</key>
 	<string>cn.tenonai.apps.yew.launcher</string>

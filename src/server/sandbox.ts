@@ -181,6 +181,26 @@ function keychains(places: Pick<SandboxPlaces, "userHome">): string {
 }
 
 /**
+ * What WebKit keeps for the Mac app (macos/, `yew app install`) on macOS: the cookie that signs its
+ * window in to Yew Harness, the cache of the interface and its local storage. Closed like the data
+ * folder, for reading and writing (the security group, 11-18).
+ */
+export function appWebData(
+	places: Pick<SandboxPlaces, "userHome">,
+	platform: NodeJS.Platform = process.platform,
+): string[] {
+	if (platform !== "darwin") return [];
+	const library = join(real(places.userHome), "Library");
+	const id = "cn.tenonai.apps.yew.desktop";
+	return [
+		join(library, "HTTPStorages", id),
+		join(library, "HTTPStorages", `${id}.binarycookies`),
+		join(library, "WebKit", id),
+		join(library, "Caches", id),
+	];
+}
+
+/**
  * The usual credential files and folders (the ones file tools refuse), without the data folder and
  * the keychain files, which stay closed either way: what the setting for credentials opens.
  */
@@ -429,6 +449,7 @@ export function commandFilesystem(
 		allowWrite: [...writable, join(places.root, "cache"), ...temporary(platform)],
 		denyWrite: [
 			real(places.home),
+			...appWebData(places, platform),
 			real(places.install),
 			join(user, "Library", "LaunchAgents"),
 			join(user, "Applications", "Yew.app"),
@@ -439,6 +460,7 @@ export function commandFilesystem(
 		],
 		denyRead: [
 			real(places.home),
+			...appWebData(places, platform),
 			keychains(places),
 			...policy.hidden,
 			...(policy.credentials ? [] : credentialFiles(places)),

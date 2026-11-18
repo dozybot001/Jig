@@ -9,6 +9,7 @@ import { McpHub } from "../src/server/mcp.ts";
 import { PermissionEngine } from "../src/server/permissions/engine.ts";
 import {
 	activeSandbox,
+	appWebData,
 	checkRepositories,
 	commandFilesystem,
 	gitInternals,
@@ -148,10 +149,33 @@ describe("sandbox configuration", () => {
 		assert.equal(allowed.credentials, undefined);
 		// The keychain files and the folders kept from sessions stay closed with the setting on.
 		const keychains = join(homedir(), "Library", "Keychains");
-		assert.deepEqual(allowed.filesystem.denyRead, [places.home, keychains, hiddenFolder]);
+		assert.deepEqual(allowed.filesystem.denyRead, [
+			places.home,
+			...appWebData(places, "darwin"),
+			keychains,
+			hiddenFolder,
+		]);
 		assert.deepEqual(allowed.network.allowUnixSockets, ["/tmp/agent.sock"]);
 		assert.ok(config.filesystem.denyRead.includes(keychains));
 		assert.ok(!config.credentials?.files?.some((file) => file.path === keychains));
+	});
+
+	test("what WebKit keeps for the Mac app's window can be neither read nor changed on macOS", () => {
+		const library = join(homedir(), "Library");
+		const kept = [
+			join(library, "HTTPStorages", "cn.tenonai.apps.yew.desktop"),
+			join(library, "HTTPStorages", "cn.tenonai.apps.yew.desktop.binarycookies"),
+			join(library, "WebKit", "cn.tenonai.apps.yew.desktop"),
+			join(library, "Caches", "cn.tenonai.apps.yew.desktop"),
+		];
+		assert.deepEqual(appWebData(places, "darwin"), kept);
+		const mac = commandFilesystem(places, policy, { writable: [work] }, "darwin");
+		for (const path of kept) {
+			assert.ok(mac.denyRead.includes(path), path);
+			assert.ok(mac.denyWrite.includes(path), path);
+		}
+		// There is no Mac app on Linux: nothing to close.
+		assert.deepEqual(appWebData(places, "linux"), []);
 	});
 
 	test("folders the person keeps from sessions can be neither read nor changed", () => {

@@ -24,6 +24,8 @@ final class WebWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDel
 	private var titleWatch: NSKeyValueObservation?
 	/// The last address handed to the person's browser, so a redirect seen twice opens it once.
 	private var handedOut: URL?
+	/// Where each download in progress is being saved, to mark the file when it is done.
+	private var saving: [ObjectIdentifier: URL] = [:]
 
 	init(app: AppDelegate, configuration: WKWebViewConfiguration, primary: Bool) {
 		self.app = app
@@ -140,17 +142,28 @@ final class WebWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDel
 		_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
 		decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
 	) {
+		guard let url = navigationAction.request.url else {
+			decisionHandler(.cancel)
+			return
+		}
+		let ours = app.isYew(url) || isYewBlob(url)
+		// Only Yew Harness's own files are saved from the window; any other download link goes to the
+		// person's browser (the security group, 11-18).
 		if navigationAction.shouldPerformDownload {
-			decisionHandler(.download)
+			if ours {
+				decisionHandler(.download)
+			} else {
+				decisionHandler(.cancel)
+				handOut(url)
+			}
 			return
 		}
 		// Frames inside a page follow the page's own rules, as in a browser.
-		guard navigationAction.targetFrame?.isMainFrame ?? true, let url = navigationAction.request.url
-		else {
+		guard navigationAction.targetFrame?.isMainFrame ?? true else {
 			decisionHandler(.allow)
 			return
 		}
-		if app.isYew(url) || isYewBlob(url) || url.absoluteString == "about:blank" {
+		if ours || url.absoluteString == "about:blank" {
 			decisionHandler(.allow)
 			return
 		}
@@ -166,7 +179,14 @@ final class WebWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDel
 		_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
 		decisionHandler: @escaping @MainActor @Sendable (WKNavigationResponsePolicy) -> Void
 	) {
-		decisionHandler(navigationResponse.canShowMIMEType ? .allow : .download)
+		if navigationResponse.canShowMIMEType {
+			decisionHandler(.allow)
+		} else if let url = navigationResponse.response.url, app.isYew(url) || isYewBlob(url) {
+			decisionHandler(.download)
+		} else {
+			// Something a frame from elsewhere would make the window save: not from this window.
+			decisionHandler(.cancel)
+		}
 	}
 
 	/// A page of Yew Harness sent the window elsewhere, such as to an MCP server's sign-in:
@@ -282,11 +302,20 @@ final class WebWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDel
 			}
 			// The save panel asked before replacing a file; a download does not write over one.
 			try? FileManager.default.removeItem(at: url)
+			self.saving[ObjectIdentifier(download)] = url
 			completionHandler(url)
 		}
 	}
 
+	/// A saved file is marked as downloaded, so macOS checks it before it is opened: what a session
+	/// made could be anything (the security group, 11-18).
+	func downloadDidFinish(_ download: WKDownload) {
+		guard let file = saving.removeValue(forKey: ObjectIdentifier(download)) else { return }
+		Quarantine.mark(file, from: download.originalRequest?.url)
+	}
+
 	func download(_ download: WKDownload, didFailWithError error: any Error, resumeData: Data?) {
+		saving.removeValue(forKey: ObjectIdentifier(download))
 		NSSound.beep()
 	}
 

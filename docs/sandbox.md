@@ -8,7 +8,7 @@ What a session's commands can and cannot do in Yew Harness, and what happens whe
 
 Sessions' commands and the MCP servers you add run in a system sandbox. It is Anthropic's open-source [sandbox-runtime](https://github.com/anthropics/sandbox-runtime) (Apache-2.0), on Seatbelt on macOS and on bubblewrap on Linux. In the sandbox, a command:
 
-- can neither read nor change Yew Harness's data folder (your decisions, sign-in tokens and logs), and cannot read the keychain's items;
+- can neither read nor change Yew Harness's data folder (your decisions, sign-in tokens and logs) or what macOS keeps for the Mac app's window (its sign-in cookie and cache), and cannot read the keychain's items;
 - writes only in the session's workspace, temporary folders and the sandbox's own caches, not in files such as `~/.zshrc` or `~/.gitconfig`, nor in a repository's hooks and settings;
 - cannot change Yew Harness's program or what starts at login, and cannot reach its local port, other local ports or the local network;
 - reaches only the usual package registries, GitHub, Gitee and the model providers that have a key; for any other site you are asked first;
@@ -28,7 +28,7 @@ Letters from other sessions, web pages, mail and what MCP servers return are onl
 
 会话的命令和你自己加的 MCP 服务器在系统沙箱里运行。沙箱用的是 Anthropic 开源的 [sandbox-runtime](https://github.com/anthropics/sandbox-runtime)（Apache-2.0），macOS 上底层是系统的 Seatbelt，Linux 上是 bubblewrap。在沙箱里：
 
-- 读写不了 Yew Harness 的数据目录（里面有你的决定、登录令牌和日志），也读不到钥匙串里的条目；
+- 读写不了 Yew Harness 的数据目录（里面有你的决定、登录令牌和日志）和 macOS 替 Mac 应用的窗口存的登录 Cookie、缓存，也读不到钥匙串里的条目；
 - 只能写会话的工作区、临时文件夹和沙箱自己的缓存，写不了 `~/.zshrc`、`~/.gitconfig` 这类文件，也写不了仓库的钩子和配置；
 - 改不了 Yew Harness 的程序和开机启动项，连不上它的本机端口，也连不上别的本机端口和局域网；
 - 联网只放行常用的包管理源、GitHub、Gitee 和配了密钥的模型服务商，连别的网站时先问你；

@@ -77,6 +77,8 @@ describe("yew app", () => {
 		assert.match(plist, /<key>LSMinimumSystemVersion<\/key>\s*<string>13\.0<\/string>/);
 		// Plain http only to this computer, where Yew Harness answers.
 		assert.match(plist, /<key>NSAllowsLocalNetworking<\/key>\s*<true\/>/);
+		// Files it saves are marked as downloaded, so macOS checks them before they are opened.
+		assert.match(plist, /<key>LSFileQuarantineEnabled<\/key>\s*<true\/>/);
 		assert.match(plist, /<key>LSHasLocalizedDisplayName<\/key>\s*<true\/>/);
 		assert.equal(
 			readFileSync(join(app, "Contents", "Resources", "en.lproj", "InfoPlist.strings"), "utf8"),
