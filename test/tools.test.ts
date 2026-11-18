@@ -335,6 +335,16 @@ describe("open_url", () => {
 		assert.deepEqual(opened, ["https://example.com/a"]);
 		assert.equal((await tool.run({ url: "file:///etc/passwd" }, ctx)).isError, true);
 		assert.equal((await tool.run({ url: "javascript:alert(1)" }, ctx)).isError, true);
-		assert.deepEqual(opened, ["https://example.com/a"]);
+		// Not Yew Harness's own page; a development server on another port opens.
+		const { setOwnPort } = await import("../src/server/tools/web.ts");
+		setOwnPort(4777);
+		try {
+			assert.equal((await tool.run({ url: "http://127.0.0.1:4777/" }, ctx)).isError, true);
+			assert.equal((await tool.run({ url: "http://localhost:4777/#t=x" }, ctx)).isError, true);
+			assert.equal((await tool.run({ url: "http://localhost:5173/" }, ctx)).isError, undefined);
+		} finally {
+			setOwnPort(null);
+		}
+		assert.deepEqual(opened, ["https://example.com/a", "http://localhost:5173/"]);
 	});
 });

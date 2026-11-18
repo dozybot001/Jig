@@ -3,6 +3,7 @@ import { lookup as dnsLookup, type LookupAddress } from "node:dns";
 import http from "node:http";
 import https from "node:https";
 import { BlockList, isIP } from "node:net";
+import { namesHarness } from "../own-address.ts";
 import { htmlToMarkdown } from "./html.ts";
 import {
 	CONFIRM_ARGUMENT,
@@ -276,6 +277,13 @@ export const webFetchTool: ToolDefinition = {
 /** Opens an address in the person's default browser; tests give their own. */
 export type Opener = (url: string) => Promise<void>;
 
+let port: number | null = null;
+/** Yew Harness's own port, which open_url keeps off; `yew serve` sets it. */
+export function setOwnPort(value: number | null): void {
+	port = value;
+}
+const ownPort = () => port;
+
 const openInBrowser: Opener = (url) =>
 	new Promise((resolve, reject) => {
 		const [file, args] =
@@ -330,6 +338,13 @@ export function openUrlTool(open: Opener = openInBrowser): ToolDefinition {
 			}
 			if (url.protocol !== "http:" && url.protocol !== "https:") {
 				return errorResult("Only http and https addresses are opened.");
+			}
+			// Not Yew Harness's own page (the security group, 11-18), as with the browser tools.
+			const port = ownPort();
+			if (port !== null && namesHarness(url.href, port)) {
+				return errorResult(
+					"Yew Harness's own address is not opened for a session: its page is the person's to open.",
+				);
 			}
 			try {
 				await open(url.href);

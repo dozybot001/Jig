@@ -227,6 +227,8 @@ export function serveCommand(): Command {
 				skillTool(home, homedir(), () => store.getSetting<string[]>("disabledSkills", [])),
 				saveArtifactTool(artifacts),
 			];
+			const { setOwnPort } = await import("../server/tools/web.ts");
+			setOwnPort(port);
 			const permissions = new PermissionEngine(home);
 			permissions.guarded = () => guardKind() !== "none";
 			const agents = new Agents({
