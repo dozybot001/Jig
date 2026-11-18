@@ -1017,9 +1017,9 @@ const zh = {
 	startAtLoginHint:
 		"登录这台电脑后在后台启动 Yew Harness，不开终端手机和定时任务也能用。从下次登录起生效，现在运行着的 Yew Harness 不受影响。",
 	startAtLoginUnsupported: "只支持 macOS 和 Linux。",
-	launcher: "「应用程序」里的 Yew Harness 图标",
+	launcher: "「应用程序」里的 Yew Harness 应用",
 	launcherHint:
-		"点它会启动 Yew Harness 并打开界面。移动或升级 Node.js、Yew Harness 之后，关掉再打开这个开关一次。",
+		"在它自己的窗口里打开 Yew Harness，Dock 上有图标；Yew Harness 没在运行就先启动它。关掉窗口或退出应用，Yew Harness 照常运行。移动或升级 Node.js、Yew Harness 之后，关掉再打开这个开关一次。",
 	launcherUnsupported: "只支持 macOS。",
 	sandbox: "会话的命令",
 	sandbox_none: "没有进沙箱",
@@ -2096,9 +2096,9 @@ const en: Record<MessageKey, string> = {
 	startAtLoginHint:
 		"Starts Yew Harness in the background after you log in to this computer, so your phone and scheduled tasks work without a terminal open. Takes effect at the next login; the Yew Harness running now is not affected.",
 	startAtLoginUnsupported: "Works on macOS and Linux only.",
-	launcher: "Yew Harness icon in Applications",
+	launcher: "Yew Harness app in Applications",
 	launcherHint:
-		"Clicking it starts Yew Harness and opens the interface. After you move or update Node.js or Yew Harness, turn this off and on again.",
+		"Opens Yew Harness in a window of its own, with an icon in the Dock, starting Yew Harness first if it is not running. Closing the window or quitting the app leaves Yew Harness running. After you move or update Node.js or Yew Harness, turn this off and on again.",
 	launcherUnsupported: "Works on macOS only.",
 	sandbox: "Sessions' commands",
 	sandbox_none: "Not sandboxed",

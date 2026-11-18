@@ -1,6 +1,6 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { boot } from "./actions.ts";
+import { boot, openSettings } from "./actions.ts";
 import { ArtifactsPage } from "./components/artifacts.tsx";
 import { CenterPage } from "./components/center.tsx";
 import { MapPage } from "./components/map.tsx";
@@ -133,4 +133,8 @@ if (root) {
 	);
 	void boot();
 	watchPresence();
+	// The Mac app's menu (macos/): "About Yew Harness" opens that page of the settings.
+	window.addEventListener("yew-app", (event) => {
+		if ((event as CustomEvent<unknown>).detail === "about") openSettings("about");
+	});
 }

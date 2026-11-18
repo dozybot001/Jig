@@ -34,7 +34,7 @@ yew key set deepseek   # save an API key; DeepSeek is the default provider
 yew serve --open       # start the service and open the web interface
 ```
 
-The key goes into the system keychain only. For a new sign-in link later, run `yew open`. Optional: `yew service install` starts Yew Harness when you log in, and on macOS `yew app install` puts a Yew Harness icon in Applications.
+The key goes into the system keychain only. For a new sign-in link later, run `yew open`. Optional: `yew service install` starts Yew Harness when you log in, and on macOS `yew app install` puts Yew Harness in Applications, opening in a window of its own with an icon in the Dock.
 
 From source: clone the repository, then run `npm install`, `npm run build:web` and `npm link`.
 

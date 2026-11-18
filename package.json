@@ -49,9 +49,10 @@
 		"test": "node --test \"test/**/*.test.ts\"",
 		"format": "biome check --write .",
 		"build:web": "vite build --config web/vite.config.ts",
+		"build:mac": "node scripts/mac-app.mjs",
 		"watch:web": "vite build --config web/vite.config.ts --watch",
 		"relay:publish": "bash deploy/relay/publish.sh",
-		"build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && npm run build:web && node scripts/notices.mjs && tsc -p tsconfig.sim.json && node scripts/sim-types.mjs",
+		"build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && npm run build:web && npm run build:mac && node scripts/notices.mjs && tsc -p tsconfig.sim.json && node scripts/sim-types.mjs",
 		"prepack": "npm run build",
 		"audit:gate": "node scripts/audit-gate.mjs",
 		"audit:install": "node scripts/install-check.mjs"

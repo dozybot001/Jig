@@ -34,7 +34,7 @@ yew key set deepseek   # 存入 API Key，默认服务商是 DeepSeek
 yew serve --open       # 启动服务，打开网页界面
 ```
 
-Key 只存进系统钥匙串。以后需要新的登录链接，运行 `yew open`。可选：`yew service install` 让 Yew Harness 登录后自动启动；macOS 上 `yew app install` 在「应用程序」里放一个 Yew Harness 图标。
+Key 只存进系统钥匙串。以后需要新的登录链接，运行 `yew open`。可选：`yew service install` 让 Yew Harness 登录后自动启动；macOS 上 `yew app install` 在「应用程序」里放 Yew Harness 应用，在它自己的窗口里打开，Dock 上有图标。
 
 从源码运行：克隆仓库后 `npm install`、`npm run build:web`、`npm link`。
 

@@ -465,6 +465,7 @@ describe("settings: starting at login and the launcher icon", () => {
 			node: "/opt/node/bin/node",
 			entry: "/opt/yew/src/cli/main.ts",
 			icon: join(homeDir, "app-icon.png"),
+			program: null,
 			run,
 		};
 		const system = systemControl({

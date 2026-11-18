@@ -26,6 +26,7 @@
 | 常用服务里在本机运行的程序文件（Gitee、Notion、Sentry，不含个人数据） | 数据目录的 `mcp-presets` 文件夹，每个服务一个 | 第一次使用时按随 Yew Harness 发布的锁文件从 npm 安装 | 运行这几个 MCP 服务 | 直到用户删除；Yew Harness 更新后会重装 | 删除这个文件夹，下次使用时重装 |
 | 系统沙箱里命令的缓存（npm、pip、Go 等下载的包，不含个人数据） | macOS 的 `~/Library/Caches/yew-sandbox`，Linux 的 `~/.cache/yew-sandbox` | 系统沙箱打开时，会话的命令和 MCP 服务器装包、构建 | 让沙箱里的命令不用你自己的缓存 | 直到用户删除 | 删除这个文件夹 |
 | 自带浏览器的资料（在那个窗口里登录过的网站的 Cookie、缓存和历史；只在设置里选了「单独的窗口」时有，默认用你自己的 Chrome，这些留在 Chrome 里） | 数据目录的 `browser` 文件夹 | 用户在自带浏览器里的操作，和会话经浏览器工具的操作 | 让登录状态保持 | 直到用户删除 | 删除这个文件夹；在「MCP 服务」里停用浏览器 |
+| Mac 应用的网页数据（登录 Yew Harness 的 Cookie、网页缓存和本地存储）和窗口的位置、大小 | `~/Library/WebKit/cn.tenonai.apps.yew.desktop`、`~/Library/Caches/cn.tenonai.apps.yew.desktop`、`~/Library/HTTPStorages/cn.tenonai.apps.yew.desktop.binarycookies`、`~/Library/Preferences/cn.tenonai.apps.yew.desktop.plist`（macOS 的 WebKit 和系统替应用存的） | 用 `yew app install` 装的 Mac 应用打开界面 | 窗口下次打开时仍是登录状态、回到原来的位置 | 登录 Cookie 30 天，使用时顺延；其余直到删除 | 退出应用后删除这几处；`yew app uninstall` 只删应用本身 |
 | 回溯后留下的占位 | `yew.db` 的会话记录 | 你在界面上回溯 | 回溯时，之后的消息、回复和工具调用的内容、为它们发起的审批、搜索索引和这个会话的事件记录都删掉（删掉的内容在文件里清零），只留不含内容的一行，让序号和引用不断 | 随会话 | 删除会话 |
 | 截屏和网页内容（会话用浏览器或电脑操控工具时） | 作为工具结果记在会话记录里，并发给会话所用的模型服务商 | 自带的浏览器和电脑操控服务 | 让模型看到页面和屏幕 | 随会话记录 | 删除会话；停用这两个服务 |
 | 登录令牌 | `yew.db` 的 `auth_tokens` 表，只存 SHA-256 哈希 | `yew serve`、`yew open` 生成 | 浏览器登录 | 一次性令牌 10 分钟；浏览器令牌 30 天，使用时顺延 | 过期自动清理；删除数据目录 |

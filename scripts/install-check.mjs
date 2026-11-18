@@ -4,12 +4,14 @@
 // - the sandbox-runtime bundled in the package is the one the registry publishes, file for file, so
 //   nothing changed in node_modules after `npm ci` goes out with it;
 // - installed globally into a throwaway prefix (no install scripts run), the system sandbox gets the
-//   zod the lock file pins, and no high or critical advisory remains in what was installed.
+//   zod the lock file pins, and no high or critical advisory remains in what was installed;
+// - packed on macOS, it carries the Mac app's program (dist/mac/Yew, both architectures), so
+//   `yew app install` makes the window app and not the launcher that opens the browser.
 //
 //   npm run audit:install
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -81,6 +83,19 @@ try {
 			`install-check: the bundled ${runtime} differs from the registry's ${version} in ${differ.length} file(s): ${differ.slice(0, 10).join(", ")}`,
 		);
 		process.exit(1);
+	}
+
+	if (process.platform === "darwin") {
+		const program = join(work, "ours", "package", "dist", "mac", "Yew");
+		const kinds = existsSync(program)
+			? run("lipo", ["-archs", program], work).trim().split(" ")
+			: [];
+		if (!kinds.includes("arm64") || !kinds.includes("x86_64")) {
+			console.error(
+				"install-check: the package has no Mac app program for arm64 and x86_64 (dist/mac/Yew); run npm run build:mac",
+			);
+			process.exit(1);
+		}
 	}
 
 	const prefix = join(work, "prefix");
