@@ -2410,7 +2410,10 @@ function SystemDialog({ onClose }: { onClose: () => void }) {
 				</SettingGroup>
 			) : (
 				<SettingGroup title={t("sandbox")}>
-					<SettingRow label={t(`sandbox_${sandbox}`)} hint={t("sandboxHint")}>
+					<SettingRow
+						label={t(`sandbox_${sandbox}`)}
+						hint={t(sandbox === "linux" ? "sandboxHintLinux" : "sandboxHint")}
+					>
 						{null}
 					</SettingRow>
 					<SettingRow

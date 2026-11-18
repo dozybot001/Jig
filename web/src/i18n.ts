@@ -1019,6 +1019,8 @@ const zh = {
 	sandbox_linux: "在系统沙箱里运行（Linux）",
 	sandboxHint:
 		"读写不了 Yew Harness 的数据，读不到钥匙串里的条目，改不了 Yew Harness 的程序和开机启动项；只能写工作区、临时文件夹和沙箱自己的缓存。联网只放行常用的包管理源、代码托管网站和配了密钥的模型服务商，连别的网站时先问你。要在沙箱外跑的命令每次都问你。",
+	sandboxHintLinux:
+		"读写不了 Yew Harness 的数据，读不到钥匙串里的条目，改不了 Yew Harness 的程序和开机启动项；只能写工作区、临时文件夹和沙箱自己的缓存。联网只放行常用的包管理源、代码托管网站和配了密钥的模型服务商，连别的网站时先问你。要在沙箱外跑的命令每次都问你。命令运行中新建的仓库，它的钩子和配置在命令结束前不受保护；命令结束后，Yew Harness 把新出现的钩子挪开，并在命令的输出里告诉你。",
 	sandboxCredentials: "沙箱里可以用 SSH 和凭据文件",
 	sandboxCredentialsHint:
 		"打开后，沙箱里的命令可以读 ~/.ssh、~/.aws、~/.netrc 这类凭据文件，macOS 上还可以用 ssh-agent。钥匙串一直读不到：要用钥匙串里凭据的 git（HTTPS）和 gh，在沙箱外运行，每次都会问你。默认关闭，从下一条命令起生效。",
@@ -2086,6 +2088,8 @@ const en: Record<MessageKey, string> = {
 	sandbox_linux: "Run in the system sandbox (Linux)",
 	sandboxHint:
 		"They cannot read or change Yew Harness's data or read the keychain's items, cannot change Yew Harness's program or what starts at login, and write only in the workspace, temporary folders and the sandbox's own caches. They reach the usual package registries, code hosts and the model providers that have a key; for any other site you are asked first. A command that has to run outside asks you every time.",
+	sandboxHintLinux:
+		"They cannot read or change Yew Harness's data or read the keychain's items, cannot change Yew Harness's program or what starts at login, and write only in the workspace, temporary folders and the sandbox's own caches. They reach the usual package registries, code hosts and the model providers that have a key; for any other site you are asked first. A command that has to run outside asks you every time. A repository made while a command runs has unprotected hooks and settings until the command ends; then Yew Harness moves any new hook aside and says so in the command's output.",
 	sandboxCredentials: "Commands in the sandbox can use SSH and credential files",
 	sandboxCredentialsHint:
 		"When on, commands in the sandbox can read credential files such as ~/.ssh, ~/.aws and ~/.netrc, and on macOS use ssh-agent. The keychain stays closed: git over HTTPS with saved credentials and gh run outside the sandbox, which asks you every time. Off by default; applies from the next command.",

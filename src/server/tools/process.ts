@@ -175,7 +175,8 @@ export async function startCommand(options: {
 	}).then((result) => {
 		// When a command failed, what the sandbox kept from it goes after the output, so the session
 		// sees why.
-		const blocked = box?.finish() ?? [];
+		const { blocked, notes } = box?.finish() ?? { blocked: [], notes: [] };
+		if (notes.length > 0) output.push(`\n[Yew Harness, after the command]\n${notes.join("\n")}\n`);
 		if (blocked.length > 0 && result.exitCode !== 0) {
 			output.push(
 				`\n[Blocked by the sandbox: ${blocked.length} time(s). If the command needs this, run it again with outside_sandbox.]\n${blocked.slice(0, 10).join("\n")}\n`,

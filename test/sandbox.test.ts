@@ -9,6 +9,7 @@ import { McpHub } from "../src/server/mcp.ts";
 import { PermissionEngine } from "../src/server/permissions/engine.ts";
 import {
 	activeSandbox,
+	checkRepositories,
 	commandFilesystem,
 	gitInternals,
 	INSTALL_DIR,
@@ -18,6 +19,7 @@ import {
 	sandboxConfig,
 	sandboxEnvironment,
 	sandboxWanted,
+	snapshotRepositories,
 	startSandbox,
 	stopSandbox,
 } from "../src/server/sandbox.ts";
@@ -71,19 +73,60 @@ describe("sandbox configuration", () => {
 		assert.equal(files.allowGitConfig, false);
 	});
 
-	test("on macOS submodule and worktree git settings are covered by patterns; on Linux by the paths there", () => {
+	test("on macOS repositories' git settings are covered by patterns; on Linux every repository there is listed", () => {
 		assert.ok(gitInternals("/w", "darwin").includes("/w/.git/**/hooks"));
 		assert.ok(gitInternals("/w", "darwin").includes("/w/**/.git/**/config"));
 		const repo = join(base, "repo-linux");
+		// The working folder's own repository, with a submodule and a worktree.
+		mkdirSync(join(repo, ".git", "hooks"), { recursive: true });
+		writeFileSync(join(repo, ".git", "config"), "");
 		mkdirSync(join(repo, ".git", "modules", "lib", "hooks"), { recursive: true });
 		writeFileSync(join(repo, ".git", "modules", "lib", "config"), "");
 		mkdirSync(join(repo, ".git", "worktrees", "other"), { recursive: true });
 		writeFileSync(join(repo, ".git", "worktrees", "other", "config.worktree"), "");
+		// A repository further down, a submodule's checkout (its .git a file) and one in dependencies.
+		mkdirSync(join(repo, "tools", "inner", ".git", "hooks"), { recursive: true });
+		writeFileSync(join(repo, "tools", "inner", ".git", "config"), "");
+		mkdirSync(join(repo, "lib"), { recursive: true });
+		writeFileSync(join(repo, "lib", ".git"), "gitdir: ../.git/modules/lib\n");
+		mkdirSync(join(repo, "node_modules", "dep", ".git", "hooks"), { recursive: true });
 		assert.deepEqual(gitInternals(repo, "linux").sort(), [
+			join(repo, ".git", "config"),
+			join(repo, ".git", "hooks"),
 			join(repo, ".git", "modules", "lib", "config"),
 			join(repo, ".git", "modules", "lib", "hooks"),
 			join(repo, ".git", "worktrees", "other", "config.worktree"),
+			join(repo, "lib", ".git"),
+			join(repo, "tools", "inner", ".git", "config"),
+			join(repo, "tools", "inner", ".git", "hooks"),
 		]);
+	});
+
+	test("after a command, a hook it added or changed is moved aside, and what it made is said", () => {
+		const folder = join(base, "repo-after");
+		const git = join(folder, ".git");
+		mkdirSync(join(git, "hooks"), { recursive: true });
+		writeFileSync(join(git, "config"), "[core]\n\tbare = false\n");
+		writeFileSync(join(git, "hooks", "pre-commit.sample"), "#!/bin/sh\n");
+		writeFileSync(join(git, "hooks", "post-merge"), "#!/bin/sh\necho kept\n");
+		const before = snapshotRepositories([folder]);
+		// What a command could leave behind: a new hook, a repository it made with settings that run programs.
+		writeFileSync(join(git, "hooks", "pre-push"), "#!/bin/sh\n");
+		mkdirSync(join(folder, "made", ".git", "hooks"), { recursive: true });
+		writeFileSync(join(folder, "made", ".git", "config"), "[core]\n\thooksPath = ../../x\n");
+		writeFileSync(join(folder, "made", ".git", "hooks", "post-checkout"), "#!/bin/sh\n");
+		const notes = checkRepositories(before);
+		assert.ok(!existsSync(join(git, "hooks", "pre-push")));
+		assert.ok(existsSync(join(git, "hooks", "pre-push.blocked-by-yew")));
+		assert.ok(existsSync(join(git, "hooks", "post-merge")), "a hook from before stays");
+		assert.ok(existsSync(join(folder, "made", ".git", "hooks", "post-checkout.blocked-by-yew")));
+		assert.ok(notes.some((note) => note.includes("pre-push")));
+		assert.ok(
+			notes.some((note) => note.includes(join(folder, "made")) && note.includes("hookspath")),
+		);
+		assert.equal(notes.length, 3);
+		// Nothing new the second time.
+		assert.deepEqual(checkRepositories(snapshotRepositories([folder])), []);
 	});
 
 	test("the data folder cannot be read; credential files and the SSH agent only when the setting allows", () => {
@@ -316,6 +359,22 @@ describe("everyday work in the sandbox", { skip }, () => {
 			job.stop();
 			await job.done;
 		}
+	});
+
+	test("the hooks and settings of a repository further down the working folder stay as they are", async () => {
+		const cwd = folder("nested");
+		execFileSync("git", ["init", "-q", "-b", "main"], { cwd });
+		const inner = join(cwd, "packages", "inner");
+		mkdirSync(inner, { recursive: true });
+		execFileSync("git", ["init", "-q", "-b", "main"], { cwd: inner });
+		const config = readFileSync(join(inner, ".git", "config"), "utf8");
+		const result = await run(
+			"echo 'echo hi' > packages/inner/.git/hooks/pre-commit; printf '[core]\\n\\thooksPath = /tmp\\n' >> packages/inner/.git/config; true",
+			cwd,
+		);
+		assert.equal(result.code, 0, result.output);
+		assert.equal(readFileSync(join(inner, ".git", "config"), "utf8"), config);
+		assert.ok(!existsSync(join(inner, ".git", "hooks", "pre-commit")));
 	});
 
 	test("a folder the person keeps from sessions cannot be read", async () => {

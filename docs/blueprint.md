@@ -1,6 +1,6 @@
 # Yew Harness 产品蓝图
 
-版本 1.35（2026-11-18）。本文是 Yew Harness 的起点：为什么做、做什么、不做什么、怎么验收。开发以本文为准；需求有变时更新本文，并在文末记录。
+版本 1.36（2026-11-18）。本文是 Yew Harness 的起点：为什么做、做什么、不做什么、怎么验收。开发以本文为准；需求有变时更新本文，并在文末记录。
 
 ## 一、一句话定义
 
@@ -225,7 +225,7 @@ Yew Harness 本身就是 Agent 的运行框架（harness），可以借鉴递归
 **开放后要知道的**：从源码目录跑 `yew serve` 时，安装目录就是这个仓库，会话在仓库里跑的命令写不了它；要用 Yew Harness 改 Yew Harness，跑 npm 装的发布版（安全组 11-18：安装目录不开例外）。dev server、Xcode 和 swift 的构建、要用钥匙串凭据的 git 和 gh，都走 `outside_sandbox`，每次问你。
 
 - **是什么**：Anthropic 开源的 sandbox-runtime（github.com/anthropics/sandbox-runtime，npm 包 `@anthropic-ai/sandbox-runtime`，Apache-2.0），Claude Code 用的就是它，上游还标着 Beta。macOS 用 Seatbelt，Linux 用 bubblewrap。锁定精确版本（0.0.83），只用它 README 和类型定义里公开的接口，只在 `src/server/sandbox.ts` 里引用，外面这一层是 Yew Harness 自己的接口。`yew serve` 启动时 `SandboxManager.initialize` 一次、退出时 `reset`；会话的命令和 stdio MCP 服务器的启动命令先用 `wrapWithSandbox` 包起来再执行。权限引擎照旧自己写（第九节），沙箱只管系统这一层的隔离。
-- **写入**：只放行会话的工作目录、沙箱自己的缓存目录（macOS 在 `~/Library/Caches/yew-sandbox`，Linux 在 `~/.cache/yew-sandbox`）和临时目录（`/tmp`；macOS 上还有用户自己的临时文件夹，`mktemp` 只认它）。数据目录、安装目录、开机启动项（LaunchAgents、systemd 用户单元、autostart）和 `~/Applications/Yew.app` 不可写。仓库的钩子和配置不可写：库自带保护 `.git/hooks`、`.git/config` 和 shell 的配置文件，Yew Harness 另加子模块和 worktree 的（macOS 用通配，Linux 列出现有的路径）。
+- **写入**：只放行会话的工作目录、沙箱自己的缓存目录（macOS 在 `~/Library/Caches/yew-sandbox`，Linux 在 `~/.cache/yew-sandbox`）和临时目录（`/tmp`；macOS 上还有用户自己的临时文件夹，`mktemp` 只认它）。数据目录、安装目录、开机启动项（LaunchAgents、systemd 用户单元、autostart）和 `~/Applications/Yew.app` 不可写。仓库的钩子和配置不可写：库自带保护 `.git/hooks`、`.git/config` 和 shell 的配置文件，Yew Harness 另加工作区里各层仓库、子模块和 worktree 的（macOS 用通配，新建的也挡；Linux 每条命令前把工作区里现有的仓库都找出来逐个列上，跳过 node_modules 这类目录）。Linux 上命令运行中新建的仓库挡不住，命令结束后 Yew Harness 把新出现或改过的钩子挪开、不让 git 执行，新建的仓库和改过的配置在命令输出里写明（安全组 11-18 在 Linux 容器里复测发现下层仓库没保护到）。
 - **读取**：数据目录不可读。钥匙串文件（`~/Library/Keychains`）始终不可读，钥匙串里的条目因此读不到，不跟凭据开关走（安全组 11-18 复测确认，创始人选的 A 就此落实）；要用钥匙串里凭据的 git（HTTPS）和 gh 走 `outside_sandbox`。常见凭据文件（和文件工具拒绝的是同一份清单：`~/.ssh`、`~/.aws`、`~/.netrc`、`~/.npmrc` 等）和 ssh-agent 默认不给，用 `credentials`（`mode: "deny"`）配；设置「启动」里的开关打开才放行（创始人 11-18 在安全组会话：「按你建议即可」）。
 - **会话读不到的目录**：设置「默认设置」里的一项（安全组 11-18），放密钥、私人笔记这类文件夹，一行一个。会话的文件工具拒绝读写，搜索结果里去掉里面的文件；沙箱里不可读也不可写。根目录和家目录不能填。
 - **网络**：放行常用的包管理源、GitHub 和 Gitee、配了密钥的模型服务商。别的网址在命令运行时问你，卡片挂在这次调用上，审批中心里也有；命令先结束了，卡片就撤下。没人可问时（后台命令、MCP 服务器、无人值守的定时任务）或同时有几条命令都能问时，直接拒绝并写明原因。能问的命令在跑、同时还有后台命令或沙箱里的 MCP 服务器在跑时，卡片写明来源不确定，列出当时在跑的几项，放行只放这一次连接（安全组 11-18）。Yew Harness 的端口、本机端口、私网地址和 Unix 套接字不通。
@@ -346,6 +346,7 @@ Yew Harness 本身就是 Agent 的运行框架（harness），可以借鉴递归
 - **1.7（2026-11-16）** 创始人问「服务商与密钥是否加一个各服务商的连通性测试（显示延迟）、余额查看」。6.10 新增第 37 条。余额只接了文档里写明能用普通密钥查询的两家；OpenRouter 的余额接口要管理密钥，Anthropic、OpenAI 等没有按密钥查余额的接口，没有接。
 - **1.8（2026-11-16）** 余额查看做出来后只有两家服务商能查，创始人定「那不接余额」。6.10 第 37 条去掉余额，只留连接测试；相关代码、接口和界面一并删除。
 - **1.9（2026-11-16）** 创始人问能否把整个工作流迁到 Jig，缺口是浏览器和电脑操控，他定「可以默认装载浏览器 mcp 以及电脑控制 mcp」。6.10 新增第 38 条；第十节「v1 不做」里的电脑操控改为经自带的 MCP 服务提供。不自己实现，按原则 6「能用 MCP 接的不内置」。
+- **1.36（2026-11-18）** 安全组在 Linux 容器里复测：下层仓库和子模块的钩子、配置没保护到。改为每条命令前找出工作区里所有仓库逐个列上，命令结束后把新钩子挪开并写明；设置里 Linux 的说明写上命令运行中新建的仓库不受保护。
 - **1.35（2026-11-18）** 创始人：「Linux 上的沙箱也打开」。Linux 默认打开；在 Debian 12 容器里跑过全部测试；`yew serve` 启动沙箱后先跑一条测试命令，跑不通就不进沙箱并写明原因。README、对外介绍 0.33、更新记录和界面上没有沙箱时的说明同步改。
 - **1.34（2026-11-18）** 系统沙箱在 macOS 上对用户开放，创始人：「现在开放」。macOS 默认打开，`YEW_SANDBOX=off` 关掉；Linux 真机测过之前默认不开。第七节「你本人的标记」改为 macOS 上命令伪造不了，Linux 上照旧。界面上授权方式的说明、README「安全」、对外介绍和更新记录同步改。
 - **1.33（2026-11-18）** 安全组复测 bfcecd8 通过：macOS 上可以对用户开放，Linux 真机测过之前不开放；什么时候开放由创始人定。第十一节加「开放后要知道的」：从源码跑时会话的命令写不了仓库，要改 Harness 就跑发布版；哪些事要走 `outside_sandbox`。
