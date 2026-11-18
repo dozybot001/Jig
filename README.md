@@ -1,76 +1,147 @@
-# Yew Harness
+<p align="center">
+  <img src="https://raw.githubusercontent.com/dozybot001/Yew/main/web/public/icons/yew-mark.svg" width="80" height="80" alt="The Yew Harness logo: a red yew berry and a leaf">
+</p>
 
-AI 原生的多 Agent 工作台。
+<h1 align="center">Yew Harness</h1>
 
-按 Session Engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。
+<p align="center">An AI-native multi-agent workbench</p>
 
-每个会话有名字、职责、工作区、模型和权限，按团队组织：常设会话长期负责一块事，任务会话为一件事开设，做完回报，之后可以归档。会话之间用信件分派和回报。会话跑在你电脑上的 Yew Harness 服务里，网页关了也照常干活。
+<p align="center">
+  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a>
+</p>
 
-Yew Harness 以 MIT 许可证开源，当前版本 1.6.1。能做什么见[更新记录](CHANGELOG.md)，为什么这样做见[产品蓝图](docs/blueprint.md)。iPhone 应用的源码在 `ios/`，还没有上架；安卓版的源码在 `android/`，安装包见下面的「手机端」。
+<p align="center">
+  <a href="https://www.npmjs.com/package/@tenonai/yew"><img src="https://img.shields.io/npm/v/@tenonai/yew?label=npm" alt="npm version"></a>
+  <a href="https://github.com/dozybot001/Yew/releases"><img src="https://img.shields.io/github/v/release/dozybot001/Yew?label=release" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D24-339933" alt="Requires Node.js 24 or later">
+</p>
 
-## 安装与快速开始
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dozybot001/Yew/main/docs/assets/yew-approval-en-dark.png">
+  <img src="https://raw.githubusercontent.com/dozybot001/Yew/main/docs/assets/yew-approval-en-light.png" alt="The approval center: a session asks to push to a remote repository, and a decision card asks how long a sign-in should last, with a recommended option">
+</picture>
 
-需要 macOS 或 Linux、Node.js 24 或更高版本和 ripgrep（macOS：`brew install ripgrep`）；Linux 上还要 bubblewrap 和 socat（Debian、Ubuntu：`sudo apt install ripgrep bubblewrap socat`）。Windows 请在 WSL 里使用。
+Agent sessions organized the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center.
 
-1. 安装：`npm install -g @tenonai/yew`。
-2. 存入一个模型服务商的 API Key（默认服务商是 DeepSeek）：`yew key set deepseek`。Key 只存进系统钥匙串。
-3. 启动服务：`yew serve --open`，浏览器会打开网页界面。以后需要新的登录链接，运行 `yew open`。
-4. 可选：`yew service install` 让 Yew Harness 登录后自动启动；macOS 上 `yew app install` 在「应用程序」里放一个 Yew Harness 图标。
+Every session has a name, a responsibility, a workspace, a model and permissions, and sessions are organized in teams. Standing sessions own an area for the long run; a task session is opened for one job, reports back when it is done, and can then be archived. Sessions hand out work and report back through letters. They run in the Yew Harness service on your computer and keep working while the web page is closed.
 
-从源码运行：克隆仓库后 `npm install`、`npm run build:web`、`npm link`。
+Yew Harness is open source under the MIT license; the current version is 1.6.1. What it can do is in the [changelog](CHANGELOG.md); why it is built this way is in the [product blueprint](docs/blueprint.md) (in Chinese). The iPhone app's source is in `ios/` and is not in the App Store yet; the Android app's source is in `android/`, and its package is described under [Phone apps](#phone-apps).
 
-## 手机端
+## Born for Session Engineering
 
-手机上的 Yew Harness 只连接你自己电脑上的 Yew Harness：在电脑上显示二维码，手机扫码配对，之后在手机上看会话、处理审批中心里的事。两端经中继通信，内容端到端加密；默认用 Tenon AI 运行的中继，也可以自己部署（见 `relay/`）。
+Built on the idea and tuned for it throughout.
 
-- 安卓：安装包（apk）在 [GitHub](https://github.com/dozybot001/Yew/releases) 和 [Gitee](https://gitee.com/dozybot/yew/releases) 的 Releases 里，由长沙榫卯人工智能科技有限公司签名。签名证书的 SHA-256 指纹是 `9F:F5:6E:EA:A8:3C:DC:01:BA:66:D8:79:23:9C:DE:5A:2A:69:C3:AE:D2:60:5C:D8:E1:B9:34:8D:BF:28:61:B2`；这个指纹也公布在[官网的 Yew Harness 页面](https://tenonai.cn/zh/products/yew/#android)上，可以对照；每个版本的说明里有安装包的 SHA-256。更新时系统如果提示签名不一致，不要安装。
-- iPhone：还没有上架，之后经 TestFlight 和 App Store 发布。
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dozybot001/Yew/main/docs/assets/yew-main-en-dark.png">
+  <img src="https://raw.githubusercontent.com/dozybot001/Yew/main/docs/assets/yew-main-en-light.png" alt="The main conversation: the person asks the coordinator to ship a home page redesign and fix a sign-out bug; the coordinator writes letters to two sessions and sums up their reports">
+</picture>
 
-## 隐私
+## Multi-agent collaboration done well
 
-Yew Harness 不收集任何数据，也不含统计、遥测或上报代码。会话、消息和设置存在你自己的电脑上，API Key 存在系统钥匙串里。你选用的模型服务商会收到发给它的对话内容，这部分适用该服务商的隐私政策。
+Agents talk through A2A, an asynchronous mailbox, and you hardly notice it happening.
 
-## 安全
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dozybot001/Yew/main/docs/assets/yew-letters-en-dark.png">
+  <img src="https://raw.githubusercontent.com/dozybot001/Yew/main/docs/assets/yew-letters-en-light.png" alt="The letters in the approval center: requests, reports and notices passed between the coordinator and the Backend, Website and Content sessions">
+</picture>
 
-会话的命令和你自己加的 MCP 服务器在系统沙箱里运行。沙箱用的是 Anthropic 开源的 [sandbox-runtime](https://github.com/anthropics/sandbox-runtime)（Apache-2.0），macOS 上底层是系统的 Seatbelt，Linux 上是 bubblewrap。在沙箱里：
+## Take the boss’s chair for real
 
-- 读写不了 Yew Harness 的数据目录（里面有你的决定、登录令牌和日志），也读不到钥匙串里的条目；
-- 只能写会话的工作区、临时文件夹和沙箱自己的缓存，写不了 `~/.zshrc`、`~/.gitconfig` 这类文件，也写不了仓库的钩子和配置；
-- 改不了 Yew Harness 的程序和开机启动项，连不上它的本机端口，也连不上别的本机端口和局域网；
-- 联网只放行常用的包管理源、GitHub、Gitee 和配了密钥的模型服务商，连别的网站时先问你；
-- 读不到 `~/.ssh`、`~/.aws`、`~/.netrc` 这类凭据文件，也用不了 ssh-agent，除非你在设置的「启动」里打开；
-- 读不到你在「默认设置 → 会话读不到的目录」里列的文件夹，会话的文件工具也读不到；
-- Linux 上连不上本机的 Unix 套接字，包括 D-Bus 会话总线。
+Approvals and decisions all sit in the approval center, and only your actions carry real authority.
 
-Linux 上，命令运行中新建的仓库在命令结束前不受保护；命令结束后 Yew Harness 把新出现的钩子挪开，不让 git 执行，并在命令的输出里写明。
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dozybot001/Yew/main/docs/assets/yew-permission-en-dark.png">
+  <img src="https://raw.githubusercontent.com/dozybot001/Yew/main/docs/assets/yew-permission-en-light.png" alt="The Website session waits for permission to run git push origin main, with Allow and Decline; a push asks every time">
+</picture>
 
-要在沙箱外跑的命令（比如要用钥匙串里凭据的 `git push`、新建或克隆仓库、要监听本机端口的开发服务器、Xcode 构建），每次都先问你；在外面跑的 git 不执行仓库里的钩子。自带的浏览器和电脑操控不进沙箱：浏览器只能访问它自己的空文件夹，打不开 `file://` 网页，也连不上 Yew Harness 的端口。从源码目录运行 Yew Harness 时，这个目录在沙箱里写不了，要用 Yew Harness 改 Yew Harness，请运行 npm 安装的版本。
+## Anywhere, anytime, off the desk
 
-沙箱起不来时，Yew Harness 不进沙箱照常运行，并在 `yew serve` 的输出和设置的「启动」里写明原因：缺少要用的程序（macOS 要 ripgrep，Linux 要 bubblewrap、socat 和 ripgrep），系统不让 bubblewrap 建用户命名空间（比如 Ubuntu 24.04 起的默认设置，放开的办法见 sandbox-runtime 的说明），或起 `yew serve` 时设了 `YEW_SANDBOX=off`。这时按需授权和完全授权下，会话不问就跑的命令以你的系统账户运行，能做你在终端里能做的事，包括改 Yew Harness 自己的记录（决定和授权也在里面）、读它保存的 API Key。Linux 上的沙箱在 Debian 12 的容器里跑过日常的测试，还没在实机上测过。
+Approve from your phone. Away from the computer, approvals and decisions still get handled.
 
-别的会话的信、网页、邮件和 MCP 返回的内容，Yew Harness 只当作数据，不能替你授权；会话要处理这类外来内容时，仍建议给它用逐项授权，让命令每次都先问你。
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dozybot001/Yew/main/docs/assets/yew-phone-en-dark.png">
+    <img src="https://raw.githubusercontent.com/dozybot001/Yew/main/docs/assets/yew-phone-en-light.png" width="300" alt="The phone app’s approvals: the push request with Allow and Decline, and the decision on how long a sign-in should last">
+  </picture>
+</p>
 
-## 文档
+## Your choice of model
 
-- [产品蓝图](docs/blueprint.md)：为什么做、做什么、不做什么、怎么验收
-- [对外介绍](docs/introduction.md)：官网、商店和各渠道介绍 Yew Harness 时用的定义、简介和能写的能力
-- 实现计划：[M1](docs/archive/m1-plan.md)、[M2](docs/archive/m2-plan.md)、[M3](docs/archive/m3-plan.md)
-- [可借鉴的开源项目](docs/prior-art.md)
-- [数据清单](docs/data-inventory.md)：Yew Harness 在你电脑上存了哪些数据、怎么删除
-- [iPhone 应用上架](docs/app-store.md)：商店里填什么、进度
-- [更新记录](CHANGELOG.md)
-- [开发约定](AGENTS.md)
+Model access is built on the open-source pi-ai library, with a huge range of model providers supported.
 
-## 许可证
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dozybot001/Yew/main/docs/assets/yew-models-en-dark.png">
+  <img src="https://raw.githubusercontent.com/dozybot001/Yew/main/docs/assets/yew-models-en-light.png" alt="A session’s model provider menu: Chinese providers such as DeepSeek, Moonshot AI and Qwen, then other providers">
+</picture>
 
-[MIT](LICENSE)。运行时依赖和网页界面里用到的第三方包见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+## Quick start
 
-## 名称、标志和角色
+You need macOS or Linux, Node.js 24 or later, and ripgrep (macOS: `brew install ripgrep`). On Linux, also install bubblewrap and socat (Debian, Ubuntu: `sudo apt install ripgrep bubblewrap socat`). On Windows, use WSL.
 
-Yew Harness、Yew 和榫卯 Tenon 的名称和标志（包括 `web/public/icons/`、`ios/Yew/Assets.xcassets/` 里的图标），以及角色 Yew 的形象和图片（包括 `web/public/mascot/`、`android/app/src/main/res/drawable-nodpi/` 里的图片和 `ios/Yew/Assets.xcassets/` 里 Mascot 开头的图片），不在 MIT 许可证的授权范围内。你可以照原样提到这些名称，说明你在使用 Yew Harness 或基于它修改；但不要把这些名称和标志用作你自己产品的名称或标志，不要在你自己的产品里使用 Yew 的形象和图片，也不要让人以为你的产品来自榫卯 Tenon AI 或得到它的认可。
+1. Install: `npm install -g @tenonai/yew`.
+2. Save an API key for a model provider (DeepSeek is the default): `yew key set deepseek`. The key goes into the system keychain only.
+3. Start the service: `yew serve --open`. The browser opens the web interface. For a new sign-in link later, run `yew open`.
+4. Optional: `yew service install` starts Yew Harness when you log in; on macOS, `yew app install` puts a Yew Harness icon in Applications.
 
-Names, logos and the character: The Yew Harness, Yew and Tenon AI names and logos, including the icons in `web/public/icons/` and `ios/Yew/Assets.xcassets/`, and the design and images of the character Yew, including the images in `web/public/mascot/` and `android/app/src/main/res/drawable-nodpi/` and the Mascot images in `ios/Yew/Assets.xcassets/`, are not licensed under the MIT License. You may refer to the names as they are to say that you use Yew Harness or that your work is based on it, but do not use the names or logos as the name or logo of your own product, do not use the character's design or images in your own product, and do not suggest that your product comes from or is endorsed by Tenon AI.
+From source: clone the repository, then run `npm install`, `npm run build:web` and `npm link`.
 
-## 出品方
+## Phone apps
 
-榫卯 Tenon AI · [tenonai.cn](https://tenonai.cn/)
+The phone app connects only to the Yew Harness on your own computer: the computer shows a QR code, the phone scans it to pair, and from then on you can follow sessions and handle the approval center on the phone. The two talk through a relay with end-to-end encryption; by default it is the relay Tenon AI runs, and you can run your own (see `relay/`).
+
+- Android: the package (apk) is in the Releases on [GitHub](https://github.com/dozybot001/Yew/releases) and [Gitee](https://gitee.com/dozybot/yew/releases), signed by 长沙榫卯人工智能科技有限公司 (Tenon AI). The SHA-256 fingerprint of the signing certificate is `9F:F5:6E:EA:A8:3C:DC:01:BA:66:D8:79:23:9C:DE:5A:2A:69:C3:AE:D2:60:5C:D8:E1:B9:34:8D:BF:28:61:B2`; it is also published on the [Yew Harness page of the website](https://tenonai.cn/products/yew/#android) for comparison, and each release's notes give the package's SHA-256. If the system reports a signature mismatch when you update, do not install.
+- iPhone: not in the App Store yet; it will come through TestFlight and the App Store.
+
+## Documentation
+
+The documents are written in Chinese.
+
+- [Product blueprint](docs/blueprint.md): why, what, what not, and how it is accepted
+- [External introduction](docs/introduction.md): the definition, summary and capabilities used on the website, in stores and elsewhere
+- Implementation plans: [M1](docs/archive/m1-plan.md), [M2](docs/archive/m2-plan.md), [M3](docs/archive/m3-plan.md)
+- [Open-source projects worth learning from](docs/prior-art.md)
+- [Data inventory](docs/data-inventory.md): what Yew Harness keeps on your computer, and how to delete it
+- [iPhone app in the App Store](docs/app-store.md): what the listing says, and where it stands
+- [Changelog](CHANGELOG.md)
+- [Development conventions](AGENTS.md)
+
+## Where your data goes
+
+Yew Harness collects no data and contains no analytics, telemetry or reporting code. Sessions, messages and settings stay on your computer, and API keys stay in the system keychain. The model providers you choose receive the conversations sent to them; their privacy policies cover that part.
+
+## Security
+
+Sessions' commands and the MCP servers you add run in a system sandbox. It is Anthropic's open-source [sandbox-runtime](https://github.com/anthropics/sandbox-runtime) (Apache-2.0), on Seatbelt on macOS and on bubblewrap on Linux. In the sandbox, a command:
+
+- can neither read nor change Yew Harness's data folder (your decisions, sign-in tokens and logs), and cannot read the keychain's items;
+- writes only in the session's workspace, temporary folders and the sandbox's own caches, not in files such as `~/.zshrc` or `~/.gitconfig`, nor in a repository's hooks and settings;
+- cannot change Yew Harness's program or what starts at login, and cannot reach its local port, other local ports or the local network;
+- reaches only the usual package registries, GitHub, Gitee and the model providers that have a key; for any other site you are asked first;
+- cannot read credential files such as `~/.ssh`, `~/.aws` or `~/.netrc`, nor use ssh-agent, unless you allow it under Startup in the settings;
+- cannot read the folders listed under Default settings → Folders sessions cannot read, which sessions' file tools cannot read either;
+- on Linux, cannot reach local Unix sockets, the D-Bus session bus included.
+
+On Linux, a repository made while a command runs is not protected until the command ends; then Yew Harness moves any new hook aside, so git does not run it, and says so in the command's output.
+
+A command that has to run outside the sandbox (a `git push` with credentials from the keychain, creating or cloning a repository, a dev server that listens on a local port, an Xcode build) asks you every time, and git run outside runs no repository hooks. The built-in browser and computer control do not run in the sandbox: the browser can reach only its own empty folder, cannot open `file://` pages, and cannot reach Yew Harness's port. When Yew Harness runs from its source folder, that folder cannot be written in the sandbox; to change Yew Harness with Yew Harness, run the version installed from npm.
+
+If the sandbox cannot start, Yew Harness runs without it and says why in the output of `yew serve` and under Startup in the settings: a program it needs is missing (ripgrep on macOS; bubblewrap, socat and ripgrep on Linux), the system does not let bubblewrap create user namespaces (the default from Ubuntu 24.04; sandbox-runtime's documentation says how to allow it), or `yew serve` was started with `YEW_SANDBOX=off`. Then, with Ask when needed and Full access, commands that run without asking run as your user account and can do what you can do in a terminal, including changing Yew Harness's own records (decisions and permissions among them) and reading the API keys it keeps. The Linux sandbox has passed the everyday tests in a Debian 12 container and has not been tested on a real machine yet.
+
+Letters from other sessions, web pages, mail and what MCP servers return are only data to Yew Harness and cannot approve anything for you. For a session that handles such outside content, Ask each time is still the better mode: every command asks you first.
+
+To report a security problem, see [SECURITY.md](SECURITY.md).
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+[MIT](LICENSE). The third-party packages used at run time and in the web interface are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+Names, logos and the character: the Yew Harness, Yew and Tenon AI names and logos, including the icons in `web/public/icons/` and `ios/Yew/Assets.xcassets/`, and the design and images of the character Yew, including the images in `web/public/mascot/` and `android/app/src/main/res/drawable-nodpi/` and the Mascot images in `ios/Yew/Assets.xcassets/`, are not licensed under the MIT License. You may refer to the names as they are to say that you use Yew Harness or that your work is based on it, but do not use the names or logos as the name or logo of your own product, do not use the character's design or images in your own product, and do not suggest that your product comes from or is endorsed by Tenon AI.
+
+---
+
+Made by 榫卯 Tenon AI · [tenonai.cn](https://tenonai.cn/)

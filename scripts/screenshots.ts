@@ -1,6 +1,6 @@
 /**
  * The website's screenshots of Yew (docs/introduction.md, section 7): six pictures, each in Chinese and
- * English, light and dark, saved as docs/screenshots/yew-<picture>-<zh|en>-<light|dark>.png.
+ * English, light and dark, saved as docs/assets/yew-<picture>-<zh|en>-<light|dark>.png.
  *
  * Every picture is Yew's real interface over local demo data. For each language the script sets up a
  * throwaway Yew in a temporary folder (YEW_HOME there, YEW_KEYCHAIN=off, YEW_MCP_BUILTIN=off): a
@@ -1068,7 +1068,7 @@ async function main(): Promise<void> {
 	if (unknown.length > 0) throw new Error(`Unknown picture: ${unknown.join(", ")}`);
 	const langs = (values.lang ?? ["zh", "en"]) as Lang[];
 	if (langs.some((lang) => lang !== "zh" && lang !== "en")) throw new Error("--lang is zh or en.");
-	const out = resolve(values.out ?? join(ROOT, "docs/screenshots"));
+	const out = resolve(values.out ?? join(ROOT, "docs/assets"));
 	if (!existsSync(join(ROOT, "web/dist/index.html"))) {
 		throw new Error("web/dist is missing: run npm run build:web first.");
 	}

@@ -119,7 +119,7 @@ Yew Harness 的特点不在单个会话多能干，而在一组会话怎样组�
 
 - **产品图形**：一枝红豆杉，红色的果（`#C8323F`，带深绿的种子）和一片叶子；叶子浅色主题用深绿 `#1F3A2E`，深色主题用浅灰绿 `#E3E8E4`（蓝图第十二节）。文件是 `web/public/icons/yew-mark.svg`；字标是 Young Serif 描出的「Yew」（`web/src/components/icons.tsx` 的 `YewWordmark`），产品名的地方后面配一个小一号的「Harness」（`ProductName`）。组合标志不带 Tenon 标志，Tenon 标志只用在关于页的出品方（规范 2.35 第 1 节）。红发女孩的名字是 Yew（创始人 11-18：「不要说吉祥物，它的名字就是 Yew」），对外不叫吉祥物、mascot；她的 38 个姿势和一张高清立绘（`portrait.webp`，1108×2400，透明底）在 `web/public/mascot/`，清单见[出图清单](mascot.md)。
 - **截图**：真实界面加本地演示数据：用临时数据目录，不读真实的 `~/.yew`；模型回复由脚本模拟，会话、信件和卡片都由 Yew Harness 自己的代码生成。网页是 1280×720 的窗口按 2 倍截取，2560×1440 PNG；iPhone 是模拟器 iPhone 17 Pro 的竖屏原图，1206×2622 PNG，调试版应用直接连同一个演示服务，状态栏统一为 9:41、满格、满电。中英文、深浅色各一套，文件名 `yew-{画面}-{zh|en}-{light|dark}.png`。六种画面讲同一件事：你让统筹上线首页改版、修好登录问题，统筹分给网站和后端。官网页脚写明「界面截图使用本地演示数据，不代表生产记录。」；页面只给截图加一道淡边框，手机截图不画机身，交原图即可。
-- **文件**：六种画面的原图都在本仓库 [docs/screenshots/](screenshots/)，命名为 `yew-<画面>-<zh|en>-<light|dark>.png`，由 `node scripts/screenshots.ts` 生成（2026-11-18 按 Yew 的标识重拍，同日产品改名后、撤掉 Tenon 小标后，网页的五种又各重拍一次，手机那张不变；做法和参数见脚本开头）。
+- **文件**：六种画面的原图都在本仓库 [docs/assets/](assets/)（11-18 从 docs/screenshots/ 挪过来，开源仓库规范要求图片放在这里），命名为 `yew-<画面>-<zh|en>-<light|dark>.png`，由 `node scripts/screenshots.ts` 生成（2026-11-18 按 Yew 的标识重拍，同日产品改名后、撤掉 Tenon 小标后，网页的五种又各重拍一次，手机那张不变；做法和参数见脚本开头）。
 
 | 画面 | 官网上的位置 | alt |
 | --- | --- | --- |

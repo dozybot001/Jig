@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全问题 / Security problem
+    url: https://github.com/dozybot001/Yew/security/advisories/new
+    about: 私下报告，不要开公开的 issue / Report privately; do not open a public issue
+  - name: 邮件 / Email
+    url: https://tenonai.cn/security/#report
+    about: 也可以写信到 support@tenonai.cn / You can also write to support@tenonai.cn
