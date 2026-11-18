@@ -87,7 +87,7 @@ class ApiTest {
         assertNull(permission.session)
 
         val many = NoteText(checkNotNull(Note.parse("""{"v":1,"id":"n2","kind":"many","title":"","body":"","n":3,"badge":3}""")), text, count)
-        assertEquals("Yew", many.title)
+        assertEquals("Yew Harness", many.title)
         assertEquals("<${R.plurals.push_many}:3>", many.body)
 
         val failed = checkNotNull(Note.parse("""{"v":1,"id":"n3","kind":"task","title":"周报","body":"","session":"s1","code":"failed","badge":0}"""))
