@@ -1,5 +1,13 @@
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	closeSync,
+	existsSync,
+	mkdirSync,
+	openSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -101,11 +109,17 @@ function startReplacement(home: string): void {
 	closeSync(out);
 }
 
-/** The short commit of a source checkout; null when Yew does not run from a git checkout. */
-function shortCommit(): string | null {
+/**
+ * The short commit of Yew's own source checkout; null otherwise. An npm install can sit inside
+ * another repository (Homebrew's /opt/homebrew is one), where git would answer with that one's commit.
+ */
+export function shortCommit(
+	root: string = fileURLToPath(new URL("../..", import.meta.url)),
+): string | null {
+	if (!existsSync(join(root, ".git"))) return null;
 	try {
 		return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
-			cwd: fileURLToPath(new URL("../..", import.meta.url)),
+			cwd: root,
 			encoding: "utf8",
 			stdio: ["ignore", "pipe", "ignore"],
 		}).trim();

@@ -2,6 +2,12 @@
 
 本文件记录 Yew Harness（原名 Jig，1.3.0、1.4.0 叫 Yew）各版本中用户能感知的变化。格式参照 [Keep a Changelog 1.1.0](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [1.8.1] - 2026-11-19
+
+### 修复
+
+- 用 npm 装进另一个 git 仓库里的目录时（比如 Apple 芯片的 Mac 上 Homebrew 的 /opt/homebrew），关于页的构建号不再显示成那个仓库的提交号；npm 安装的不显示构建号，从源码运行时照旧显示。
+
 ## [1.8.0] - 2026-11-19
 
 ### 新增

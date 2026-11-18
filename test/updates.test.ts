@@ -1,8 +1,10 @@
 // Versions and updates (blueprint, "版本与更新"): no real npm, registry or restart.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, mock, test } from "node:test";
+import { shortCommit } from "../src/cli/serve.ts";
 import { startedByService } from "../src/cli/service.ts";
 import { createApp } from "../src/server/http/app.ts";
 import {
@@ -136,6 +138,21 @@ describe("versions", () => {
 		assert.equal(globalPrefix(root), prefix);
 		assert.equal(globalPrefix(`${root}/`), prefix);
 		assert.equal(installKind(realpathSync(tempDir("yew-other-"))), "other");
+	});
+
+	test("the build is the commit of Yew's own checkout, not of a repository around an install", () => {
+		const outer = realpathSync(tempDir("yew-brew-"));
+		const git = (...args: string[]) =>
+			execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], {
+				cwd: outer,
+				stdio: "ignore",
+			});
+		git("init", "-q");
+		git("commit", "-q", "--allow-empty", "-m", "brew");
+		const installed = join(outer, "lib", "node_modules", "@tenonai", "yew");
+		mkdirSync(installed, { recursive: true });
+		assert.equal(shortCommit(installed), null);
+		assert.match(shortCommit(outer) ?? "", /^[0-9a-f]{7,}$/);
 	});
 
 	test("a service older than what is installed asks for a restart", () => {
