@@ -42,6 +42,8 @@ export const MASCOT_POSES = [
 	"teary",
 	"fired-up",
 	"dozing",
+	"permission",
+	"on-duty",
 ] as const;
 
 export type MascotPose = (typeof MASCOT_POSES)[number];

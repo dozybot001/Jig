@@ -2,7 +2,7 @@
 
 界面里的红发女孩名字叫 Yew（产品叫 Yew Harness），对外不叫吉祥物（蓝图第十二节）；代码和素材目录沿用 mascot 这个内部名。本文写她的设定、姿势和立绘、出图和入库的做法。
 
-最早的 10 个姿势都是正面半身。2026-11-18 创始人说：「我觉得目前可能也有目前看板娘动作太少的原因，此外目前的图也都很相似，都是站着正面镜头，可以再多生成一些」。所以 11-18 这一批换角度、换动作，动作和 Yew 的功能对上，共 28 张，加一张高清立绘，都已入库。
+最早的 10 个姿势都是正面半身。2026-11-18 创始人说：「我觉得目前可能也有目前看板娘动作太少的原因，此外目前的图也都很相似，都是站着正面镜头，可以再多生成一些」。所以 11-18 这一批换角度、换动作，动作和 Yew 的功能对上，共 28 张，加一张高清立绘，都已入库。同日又为蓝图第十一节新加的两个状态出了 `permission`、`on-duty`，现在一共 40 个姿势。
 
 ## 一、最早的 10 个姿势
 
@@ -30,6 +30,7 @@
 - **衣着**：米色麻花毛衣，高领带荷叶边，袖子略长；外面一件带兜帽的深绿短披肩，边上一道米色细线，绣着米色小叶枝，领口系红色大蝴蝶结。露出下半身时照设定图：深绿长裙，裙摆上方一道红边，下面露出米色荷叶边；棕色系带短靴，红鞋带。送信时斜挎设定图里的棕色皮质小包。
 - **画风**：Q 版比例（露出全身时约 2.5 头身），深棕色干净线稿，平涂加一层柔和阴影和小高光，人物单独成图的贴纸风。现有十张没有白色描边，入库时白边也要去掉，所以提示词直接要无描边、透明底。
 - **符号**：现有图里只有 `happy` 的线、`thinking` 和 `lost` 的问号、`sleepy` 的 Zz、`waking` 的太阳留着。新图默认不带，`nap` 例外。
+- **定位**：只做工作助手的形象，每个姿势对应她在 Yew Harness 里的一种工作状态，不做陪伴或情感支持的场面（法务组，依据《人工智能拟人化互动服务管理暂行办法》）。
 
 ## 三、技术要求
 
@@ -40,12 +41,12 @@
 
 ## 四、出图办法
 
-在 ChatGPT 里新开一个对话：
+出图由常设的「Yew 角色素材」会话负责（创始人 11-18：「你来负责出图」），用 Claude in Chrome 在创始人的 Chrome 里操作 ChatGPT。每批新开一个对话：
 
-1. 上传参考图：角色设定图和 `greeting.webp`、`gift.webp`。
-2. 第一条消息发下面的「开场」，之后每张图发一段姿势提示词，一条消息一张。
-3. 每张下载原图 PNG，按姿势名命名（如 `stamp.png`），放进 `~/Pictures/素材/Yew/poses/`。
-4. 发饰换了边、衣服变了、多了文字或别的东西，就重出这一张。
+1. 上传参考图：角色设定图和 `greeting.webp`、`gift.webp`。webp 可以直接传，传到页面里「添加照片」那个文件输入。
+2. 第一条消息发下面的「开场」，之后每张图发一段姿势提示词，一条消息一张。一张要一到两分钟。
+3. 出来的是真透明底的 PNG，1254×1254。在看图窗口里点下载，文件进「下载」文件夹，名字是 ChatGPT 起的；选中的改成姿势名（如 `stamp.png`）放进 `~/Pictures/素材/Yew/poses/`，「下载」里不留。
+4. 和同类的现有姿势一起预览（第七节），按第八节逐张查；发饰换了边、衣服变了、头身比不对、多了文字或别的东西，就重出这一张。
 
 开场：
 
@@ -248,6 +249,22 @@ Waist-up, three-quarter view turned toward the viewer's left. She pushes up her 
 She sits on the floor with a small open laptop on her lap, three-quarter view turned toward the viewer's left, nodding off: head drooping, eyes closed, mouth slightly open, one hand still on the keyboard.
 ```
 
+### 第三批：等你授权和值守中
+
+蓝图第十一节（1.26）和《Yew 下一阶段开发指南》第六节给侧栏加了两个状态，各配一个新姿势，11-18 入库。侧栏什么时候用哪个，由 Yew Harness · 开发接进 `web/src/companion.ts`。
+
+**29. `permission` 等你授权**：正面半身，双手举着一张待批的卡片，卡片右下角是留给印章的红色虚线圈，认真地等你点头，不往前递。和 `stamp` 里盖好的红章前后对应。用在要你处理的事里有授权请求时。
+
+```text
+Only this one sticker. Waist-up, facing the viewer, her head tilted a little. With both hands she holds a small cream card up in front of her chest, its front turned toward the viewer: a thin dark green border, three short grey lines, and in the lower right corner an empty circle drawn with a dashed red line, where a stamp would go. She looks at the viewer with an earnest, patient face, eyebrows slightly raised and a small closed-mouth smile, quietly waiting for a nod. She stands upright and does not lean in or push the card forward. Same outfit and dark green needle-sprig hair ornament as the character sheet.
+```
+
+**30. `on-duty` 值守中**：坐在矮木凳上，四分之三侧，手放在膝上，脚边是 `alarm` 里那只红闹钟；神态放松，睁着眼看着前方，不看镜头。用在没有要你处理的事、也没有会话在干活、但有定时任务开着时。第一版头身比偏高，补了比例要求重出；下面是合在一起的提示词。
+
+```text
+Only this one sticker. Full body, in the chibi proportions of the attached stickers: a big head and a short body and legs, about 2.5 heads tall. Three-quarter view turned toward the viewer's left. She sits on a low round wooden stool, back straight but at ease, boots together, hands resting loosely on her knees. A small red twin-bell alarm clock stands right next to the stool legs on the viewer's left, touching them; its face has only two hands and small tick marks, no numbers. Nothing urgent is going on and she is quietly on watch: eyes open and calm, looking ahead toward the viewer's left, with a relaxed, soft smile. Same outfit and dark green needle-sprig hair ornament as the character sheet, with the long dark green skirt (red band, cream frill) reaching her calves and brown lace-up boots with red laces.
+```
+
 ## 六、立绘
 
 用作主界面的整幅背景，由 Yew Harness · 开发接进界面。入库文件是 `web/public/mascot/portrait.webp`：1108×2400，透明底，约 290 KB，原图在 `~/Pictures/素材/Yew/portrait/`。
@@ -275,7 +292,7 @@ node scripts/mascot.ts --preview ~/Desktop/yew-poses.png
 node scripts/mascot.ts --portrait ~/Pictures/素材/Yew/portrait/portrait-2.png
 ```
 
-- 不写姿势名时处理原图文件夹里的全部 PNG；写了只处理那几个。`--preview` 把结果画在 Yew Harness 界面的浅色、深色底上，入库前看一遍。
+- 不写姿势名时处理原图文件夹里的全部 PNG；写了只处理那几个。`--preview` 把结果画在 Yew Harness 界面的浅色、深色底上，入库前看一遍。要和现有姿势比大小和头身比，把它们的名字一起写上，再用 `--to` 指到一个临时文件夹，仓库里的文件就不会被改写，例如 `node scripts/mascot.ts tea typing on-duty --to <临时文件夹> --preview <预览图>`。
 - 去底：真透明的图把半透明的身体收实，边缘的淡雾去掉。纯色底的图按底色抠：纯蓝这种她身上没有的颜色整张抠；白、灰、黑只抠和边框连着的部分，再处理两个像素宽的软边，眼睛里的白和深色线稿不受影响。
 - 只留人物：比她小很多的零散小块（情绪符号、碎点）去掉，`nap` 留着 Zz。
 - 放进 373×400 的透明画布：裁到人物边缘，居中，站在底边上，能放多大放多大；`peek` 贴着左边。拿 `greeting`、`gift`、`thinking` 的原图试过，结果的位置和大小与现有文件一致。
@@ -293,7 +310,7 @@ node scripts/mascot.ts --portrait ~/Pictures/素材/Yew/portrait/portrait-2.png
 | 没事 | `happy`、`tea`、`stretch`、`peek`、`branch` |
 | 夜里没事 | `sleepy`、`nap`、`pajamas`、`dozing` |
 
-`letter-run`、`reading`、`alarm`、`phone`、`jump`、`paper-plane`、`mini`、`surprised` 已入库，侧栏不用，用处见第五节。
+`letter-run`、`reading`、`alarm`、`phone`、`jump`、`paper-plane`、`mini`、`surprised` 已入库，侧栏不用，用处见第五节。`permission`、`on-duty` 11-18 入库，由 Yew Harness · 开发接进侧栏，接上后补进上表。
 
 ## 八、出图时要查的地方
 
@@ -303,3 +320,4 @@ node scripts/mascot.ts --portrait ~/Pictures/素材/Yew/portrait/portrait-2.png
 - 衣服走样：同一个对话出到二十张左右，开始出现短裙、黑袜、毛边靴、米色鞋带，发饰的针叶变成宽叶子。提示词里重申设定图的衣服和针叶发饰；`proud`、`teary` 因此重出过。
 - 尺寸和底色：`nap` 第一版出成 2:1 的黑底图，人物在侧栏里太小，抠黑底也会伤到深色线稿，要求方形透明底重出。
 - 拼图：有时会把前几张拼进同一张图再用代码裁（`mini`），裁出来的图偏软；提示词写明「只出这一张」。
+- 头身比：坐着的全身像容易画高。`on-duty` 第一版坐着约 3.5 头身，和 `tea`、`typing` 放在一起不像一套；补一句「in the chibi proportions of the attached stickers: a big head and a short body and legs, about 2.5 heads tall」重出就对了。
