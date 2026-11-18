@@ -153,6 +153,8 @@ const zh = {
 	perm_manual_hint: "改文件、运行命令、访问网址前都先问你",
 	perm_skip: "完全授权",
 	perm_skip_hint: "直接执行，命令以你的系统账户运行；删除、推送等操作仍会问你",
+	perm_auto_hint_sandbox: "模型判断哪些操作要先问你；不问就跑的命令在沙箱里运行",
+	perm_skip_hint_sandbox: "直接执行，命令在沙箱里运行；删除、推送等操作仍会问你",
 	loadEarlier: "加载更早的记录",
 	emptyTranscript: "发一条消息开始。",
 	composerPlaceholder: "给 {name} 发消息（Enter 发送，Shift+Enter 换行）",
@@ -994,6 +996,8 @@ const zh = {
 	defaultPermission: "新会话的默认授权方式",
 	defaultPermissionHelp:
 		"新建的会话用这种授权方式，之后可以在会话里改。会话自己开的会话不会高于它本身的授权方式。已有的会话不受影响。按需授权和完全授权下，不问就跑的命令以你的系统账户运行，能改 Yew Harness 自己的记录（包括决定和授权），也能读它保存的密钥。会话要处理网页、邮件、MCP 返回这类外来内容时，建议用逐项授权，让命令每次都先问你。",
+	defaultPermissionHelpSandbox:
+		"新建的会话用这种授权方式，之后可以在会话里改。会话自己开的会话不会高于它本身的授权方式。已有的会话不受影响。按需授权和完全授权下，不问就跑的命令在系统沙箱里运行：读写不了 Yew Harness 的数据，读不到钥匙串，只能写工作区、临时文件夹和沙箱自己的缓存；要在沙箱外跑的命令每次都问你。会话要处理网页、邮件、MCP 返回这类外来内容时，仍建议用逐项授权，让命令每次都先问你。",
 	defaultWorkspace: "新会话的默认工作区",
 	defaultWorkspaceHelp: "在首页和新建会话时先选中这个工作区，开始前可以改。",
 	defaultWorkspaceNone: "不选",
@@ -1008,6 +1012,9 @@ const zh = {
 		"点它会启动 Yew Harness 并打开界面。移动或升级 Node.js、Yew Harness 之后，关掉再打开这个开关一次。",
 	launcherUnsupported: "只支持 macOS。",
 	sandbox: "会话的命令",
+	sandbox_none: "没有进沙箱",
+	sandbox_none_hint:
+		"Linux 上还没有沙箱；macOS 上没装 ripgrep，或起 yew serve 时设了 YEW_SANDBOX=off，也没有。这时不问就跑的命令以你的系统账户运行，能改 Yew Harness 自己的记录、读它保存的密钥。",
 	sandbox_macos: "在系统沙箱里运行（macOS）",
 	sandbox_linux: "在系统沙箱里运行（Linux）",
 	sandboxHint:
@@ -1173,6 +1180,10 @@ const en: Record<MessageKey, string> = {
 	perm_skip: "Full access",
 	perm_skip_hint:
 		"Runs without asking, as your user account; still asks before deletes, pushes and the like",
+	perm_auto_hint_sandbox:
+		"The model decides what to ask you about; commands it runs without asking run in the sandbox",
+	perm_skip_hint_sandbox:
+		"Runs without asking, commands in the sandbox; still asks before deletes, pushes and the like",
 	loadEarlier: "Load earlier messages",
 	emptyTranscript: "Send a message to start.",
 	composerPlaceholder: "Message {name} (Enter to send, Shift+Enter for a new line)",
@@ -2051,6 +2062,8 @@ const en: Record<MessageKey, string> = {
 	defaultPermission: "Default permission mode for new sessions",
 	defaultPermissionHelp:
 		"New sessions start with this mode; you can change it in the session. A session opened by another session never gets more than that session has. Existing sessions are not affected. With Ask when needed and Full access, commands that run without asking run as your user account: they can change Yew Harness's own records, decisions and permissions included, and read the keys it keeps. For a session that handles outside content, such as web pages, mail or what MCP servers return, Ask each time makes each command ask you first.",
+	defaultPermissionHelpSandbox:
+		"New sessions start with this mode; you can change it in the session. A session opened by another session never gets more than that session has. Existing sessions are not affected. With Ask when needed and Full access, commands that run without asking run in the system sandbox: they cannot read or change Yew Harness's data or read the keychain, and write only in the workspace, temporary folders and the sandbox's own caches; a command that has to run outside asks you every time. For a session that handles outside content, such as web pages, mail or what MCP servers return, Ask each time still makes each command ask you first.",
 	defaultWorkspace: "Default workspace for new sessions",
 	defaultWorkspaceHelp:
 		"Preselected on the home page and in the new session dialog; you can change it before you start.",
@@ -2066,6 +2079,9 @@ const en: Record<MessageKey, string> = {
 		"Clicking it starts Yew Harness and opens the interface. After you move or update Node.js or Yew Harness, turn this off and on again.",
 	launcherUnsupported: "Works on macOS only.",
 	sandbox: "Sessions' commands",
+	sandbox_none: "Not sandboxed",
+	sandbox_none_hint:
+		"There is no sandbox on Linux yet; on macOS there is none without ripgrep, or when yew serve was started with YEW_SANDBOX=off. Commands that run without asking then run as your user account and can change Yew Harness's own records and read the keys it keeps.",
 	sandbox_macos: "Run in the system sandbox (macOS)",
 	sandbox_linux: "Run in the system sandbox (Linux)",
 	sandboxHint:
@@ -2102,6 +2118,12 @@ export function getLang(): Lang {
 /** Whether a key built at run time, such as a tool's name, has a message. */
 export function hasMessage(key: string): key is MessageKey {
 	return Object.hasOwn(zh, key);
+}
+
+/** A permission mode's hint, as commands run now: in the system sandbox, or as the person. */
+export function permissionHint(mode: "auto" | "manual" | "skip", sandboxed: boolean): string {
+	if (mode === "manual" || !sandboxed) return t(`perm_${mode}_hint`);
+	return t(`perm_${mode}_hint_sandbox`);
 }
 
 export function t(key: MessageKey, params: Record<string, string | number> = {}): string {

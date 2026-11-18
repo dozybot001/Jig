@@ -17,6 +17,7 @@ import {
 	type SiteQuestion,
 	sandboxConfig,
 	sandboxEnvironment,
+	sandboxWanted,
 	startSandbox,
 	stopSandbox,
 } from "../src/server/sandbox.ts";
@@ -134,6 +135,13 @@ describe("sandbox configuration", () => {
 		assert.equal(config.enableWeakerNestedSandbox, false);
 		assert.equal(config.enableWeakerNetworkIsolation, false);
 		assert.equal(config.allowNestedUserNamespaces, false);
+	});
+
+	test("on by default on macOS only; YEW_SANDBOX turns it on or off", () => {
+		assert.equal(sandboxWanted(undefined, "darwin"), true);
+		assert.equal(sandboxWanted(undefined, "linux"), false);
+		assert.equal(sandboxWanted("on", "linux"), true);
+		assert.equal(sandboxWanted("off", "darwin"), false);
 	});
 
 	test("the usual tools keep their caches in the sandbox's own folder", () => {

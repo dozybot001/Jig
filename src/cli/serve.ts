@@ -130,13 +130,19 @@ export function serveCommand(): Command {
 			const runtime = openRuntime({ env: io.env });
 			const { store, bus, gateway, home } = runtime;
 			// Sessions' commands and the MCP servers people add go into the system sandbox, set up before
-			// anything can start one (blueprint, section 11). Off until the security group has tested it.
+			// anything can start one (blueprint, section 11): on macOS by default, on Linux once tested.
 			const sandbox = await import("../server/sandbox.ts");
 			let providerSites: string[] = [];
 			const refreshProviderSites = async () => {
 				providerSites = await modelSites(gateway);
 			};
-			if (io.env.YEW_SANDBOX === "on") {
+			if (!sandbox.sandboxWanted(io.env.YEW_SANDBOX)) {
+				io.stderr.write(
+					io.env.YEW_SANDBOX === "off"
+						? "The system sandbox is off (YEW_SANDBOX=off): sessions' commands run as your user account.\n"
+						: `No system sandbox on ${process.platform} yet: sessions' commands run as your user account.\n`,
+				);
+			} else {
 				const { homedir } = await import("node:os");
 				await refreshProviderSites();
 				const started = await sandbox

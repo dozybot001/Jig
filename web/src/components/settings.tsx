@@ -49,6 +49,7 @@ import {
 	formatCost,
 	hasMessage,
 	type MessageKey,
+	permissionHint,
 	t,
 	useLang,
 } from "../i18n.ts";
@@ -626,14 +627,18 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 					/>
 				</Field>
 			)}
-			<Field label={t("defaultPermission")} labelId={modeId} info={t("defaultPermissionHelp")}>
+			<Field
+				label={t("defaultPermission")}
+				labelId={modeId}
+				info={t(sandbox === "none" ? "defaultPermissionHelp" : "defaultPermissionHelpSandbox")}
+			>
 				<Select
 					labelledBy={modeId}
 					value={mode}
 					options={PERMISSION_MODES.map((value) => ({
 						value,
 						label: t(`perm_${value}`),
-						hint: t(`perm_${value}_hint`),
+						hint: permissionHint(value, sandbox !== "none"),
 					}))}
 					onChange={(value) => setMode(value as PermissionMode)}
 				/>
@@ -2396,8 +2401,14 @@ function SystemDialog({ onClose }: { onClose: () => void }) {
 					/>
 				</SettingRow>
 			</SettingGroup>
-			{/* Only while the system sandbox is on (blueprint, section 11). */}
-			{sandbox !== "none" && (
+			{/* Where sessions' commands run (blueprint, section 11); without a sandbox it says so. */}
+			{sandbox === "none" ? (
+				<SettingGroup title={t("sandbox")}>
+					<SettingRow label={t("sandbox_none")} hint={t("sandbox_none_hint")}>
+						{null}
+					</SettingRow>
+				</SettingGroup>
+			) : (
 				<SettingGroup title={t("sandbox")}>
 					<SettingRow label={t(`sandbox_${sandbox}`)} hint={t("sandboxHint")}>
 						{null}

@@ -20,7 +20,7 @@ import {
 	updateSession,
 	withdrawQueued,
 } from "../actions.ts";
-import { formatCost, formatNumber, t, useLang } from "../i18n.ts";
+import { formatCost, formatNumber, permissionHint, t, useLang } from "../i18n.ts";
 import { type ModelInfo, setState, type TranscriptState, useAppState } from "../state.ts";
 import { Capped } from "./content.tsx";
 import { NewSessionDialog } from "./dialogs.tsx";
@@ -327,6 +327,7 @@ function QueuedItem({ sessionId, id, text }: { sessionId: string; id: string; te
 /** The box at the bottom: your message, the model choice and a round send or stop button. */
 function Composer({ session, transcript }: { session: Session; transcript: TranscriptState }) {
 	useLang();
+	const sandboxed = useAppState((state) => (state.health?.sandbox ?? "none") !== "none");
 	const [text, setText] = useState("");
 	// A message taken back or forked from comes back here to be changed and sent again.
 	const waiting = useAppState((state) => state.prefill[session.id]);
@@ -404,7 +405,7 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 								options={PERMISSION_MODES.map((mode) => ({
 									value: mode,
 									label: t(`perm_${mode}`),
-									hint: t(`perm_${mode}_hint`),
+									hint: permissionHint(mode, sandboxed),
 								}))}
 								busy={change.busy}
 								onChange={(value) =>

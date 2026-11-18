@@ -24,8 +24,9 @@ import { secretLocations } from "./permissions/paths.ts";
  *   have a key; any other site is put to the person while the command runs. Yew Harness's own port,
  *   local ports, private networks and Unix sockets stay closed.
  *
- * Off unless `YEW_SANDBOX=on`: the security group tests it before it is on for everyone (blueprint,
- * section 11). When it is off, commands run as before.
+ * On by default on macOS (founder, 11-18: 「现在开放」, after the security group's tests passed).
+ * Linux waits until it has been tested on a real machine: there it runs only with `YEW_SANDBOX=on`.
+ * `YEW_SANDBOX=off` turns it off; commands then run as the person, as they did before.
  */
 
 /** Where the sandbox's commands run from, and what they must not touch. */
@@ -295,6 +296,19 @@ export function sandboxConfig(
 		allowNestedUserNamespaces: false,
 		...(options.ripgrep ? { ripgrep: { command: options.ripgrep } } : {}),
 	};
+}
+
+/**
+ * Whether `yew serve` starts the sandbox: `YEW_SANDBOX=on` or `off` decides; otherwise on macOS
+ * only, since Linux has not been tested on a real machine yet (the security group, 11-18).
+ */
+export function sandboxWanted(
+	setting: string | undefined,
+	platform: NodeJS.Platform = process.platform,
+): boolean {
+	if (setting === "on") return true;
+	if (setting === "off") return false;
+	return platform === "darwin";
 }
 
 /** A program's full path, from PATH and the usual places a service started at login may lack. */

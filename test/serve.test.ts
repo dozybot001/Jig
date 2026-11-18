@@ -32,6 +32,8 @@ describe("yew serve", () => {
 				NO_COLOR: "1",
 				YEW_MCP_BUILTIN: "off",
 				YEW_KEYCHAIN: "off",
+				// The sandbox has its own tests; this one is about starting and stopping.
+				YEW_SANDBOX: "off",
 			},
 			stdio: ["ignore", "pipe", "pipe"],
 		});
