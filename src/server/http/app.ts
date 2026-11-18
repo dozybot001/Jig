@@ -113,6 +113,12 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 			...(options.remote
 				? { onRemoteChanged: () => void options.remote?.sync().catch((e: Error) => log(e.message)) }
 				: {}),
+			...(options.mcp
+				? {
+						onBrowserChanged: () =>
+							void options.mcp?.hub.refresh().catch((e: Error) => log(`mcp: ${e.message}`)),
+					}
+				: {}),
 		}),
 	);
 	app.route("/api", deviceRoutes(store, options.remote));

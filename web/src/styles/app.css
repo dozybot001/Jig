@@ -2333,6 +2333,10 @@ body.scroll-locked {
 .setting-control .select-trigger {
 	width: 9em;
 }
+/* For options too long for the usual width, such as which browser the built-in one drives. */
+.setting-control .select-wide .select-trigger {
+	width: 12em;
+}
 .input-number {
 	width: 7em;
 	text-align: right;
@@ -2345,7 +2349,11 @@ body.scroll-locked {
 		gap: 8px;
 	}
 	.setting-control .select-trigger,
+	.setting-control .select-wide .select-trigger,
 	.input-number {
+		width: 100%;
+	}
+	.select-wide {
 		width: 100%;
 	}
 }

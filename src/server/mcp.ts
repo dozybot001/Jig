@@ -117,7 +117,9 @@ export function outward(tool: string): boolean {
  * - Computer control acts on the whole screen: it can type into a terminal or click in the person's
  *   own browser, past every rule Yew has. Each action is asked about, cannot be remembered, and an
  *   earlier "always allow" does not cover it. Looking (a screenshot, the pointer's place) can be.
- * - The browser acts only in its own window, so its actions can be remembered, with the scope said.
+ * - The browser acts only in the tabs it is given or opens (in the person's own Chrome by default,
+ *   with their sign-ins) or in a window of its own, so its actions can be remembered, with the scope
+ *   said.
  * - Any other server's tool that sends, publishes or deletes something in its service (spec 21.2) is
  *   asked about every time: one its name says does, one its server marks as destructive, and the
  *   ones a common server's preset names (a calendar event invites its attendees). A server's word
@@ -649,8 +651,11 @@ export interface McpHubOptions {
 	env?: NodeJS.ProcessEnv;
 	fetch?: typeof fetch;
 	log?: (line: string) => void;
-	/** Servers Yew sets up by itself, run unless mcp.json replaces or disables them. */
-	builtin?: Record<string, McpServerConfig>;
+	/**
+	 * Servers Yew sets up by itself, run unless mcp.json replaces or disables them; a function is
+	 * asked again at each refresh, so a changed setting (which browser) restarts the server.
+	 */
+	builtin?: Record<string, McpServerConfig> | (() => Record<string, McpServerConfig>);
 	/**
 	 * Installs a server Yew runs from its data folder (its own, or a preset) if it is not yet; awaited
 	 * before the server is started.
@@ -665,6 +670,8 @@ export class McpHub {
 	readonly #options: McpHubOptions;
 	readonly #servers = new Map<string, Server>();
 	#configAt = -1;
+	/** The built-in servers' configuration at the last refresh, to see a changed setting. */
+	#builtinSeen = "";
 	#definitions: ToolDefinition[] = [];
 	/** Settles when the servers being connected now have connected or failed. */
 	#connecting: Promise<void> = Promise.resolve();
@@ -675,18 +682,21 @@ export class McpHub {
 
 	/** The servers Yew sets up by itself. */
 	get builtin(): Record<string, McpServerConfig> {
-		return this.#options.builtin ?? {};
+		const builtin = this.#options.builtin;
+		return (typeof builtin === "function" ? builtin() : builtin) ?? {};
 	}
 
 	/** Reads the configuration again when the file changed; connects new servers, stops removed ones. */
 	async refresh(): Promise<void> {
 		const file = join(this.#options.yewHome, "mcp.json");
 		const stamp = existsSync(file) ? statSync(file).mtimeMs : 0;
-		if (stamp === this.#configAt) {
+		const builtin = JSON.stringify(this.builtin);
+		if (stamp === this.#configAt && builtin === this.#builtinSeen) {
 			await this.#connecting;
 			return;
 		}
 		this.#configAt = stamp;
+		this.#builtinSeen = builtin;
 		let configs: Record<string, McpServerConfig> = { ...this.builtin };
 		try {
 			configs = readMcpConfig(this.#options.yewHome, this.#options.env, this.builtin);

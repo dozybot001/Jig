@@ -1970,6 +1970,13 @@ function McpServerRow({
 		await signOutMcpServer(server.name);
 		await onChanged();
 	});
+	// Yew's own browser server: the person's Chrome, or a window of its own (blueprint 6.10, item 38).
+	const browserMode = useAppState((state) => state.settings?.browser ?? "own");
+	const browserId = useId();
+	const chooseBrowser = useAction(async (mode: "own" | "separate") => {
+		await saveSettings({ browser: mode });
+		await onChanged();
+	});
 	const state =
 		server.state === "ready"
 			? t("mcpState_ready", { n: server.tools.length })
@@ -2039,6 +2046,27 @@ function McpServerRow({
 					)}
 				</div>
 			</div>
+			{server.builtin && server.name === "browser" && (
+				<SettingRow
+					label={t("browserMode")}
+					hint={t(`browserModeHint_${browserMode}`)}
+					labelId={browserId}
+				>
+					<div className="select-wide">
+						<Select
+							labelledBy={browserId}
+							value={browserMode}
+							disabled={chooseBrowser.busy}
+							options={(["own", "separate"] as const).map((value) => ({
+								value,
+								label: t(`browserMode_${value}`),
+							}))}
+							onChange={(value) => void chooseBrowser.run(value as "own" | "separate")}
+						/>
+					</div>
+				</SettingRow>
+			)}
+			<ErrorBox error={chooseBrowser.error} />
 			{open && (
 				<div className="mcp-detail" id={detailId}>
 					<div className="mcp-line">

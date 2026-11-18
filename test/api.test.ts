@@ -232,6 +232,11 @@ describe("api: groups, settings, search", () => {
 		const click = await (await call("PATCH", "/api/settings", { opening: "click" })).json();
 		assert.equal(click.opening, "click");
 		assert.equal((await call("PATCH", "/api/settings", { opening: "tap" })).status, 400);
+		// Which browser the built-in browser drives (blueprint 6.10, item 38): the person's own Chrome.
+		assert.equal(saved.browser, "own");
+		const separate = await (await call("PATCH", "/api/settings", { browser: "separate" })).json();
+		assert.equal(separate.browser, "separate");
+		assert.equal((await call("PATCH", "/api/settings", { browser: "firefox" })).status, 400);
 	});
 
 	test("search caps the query length", async () => {

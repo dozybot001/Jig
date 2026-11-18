@@ -4,13 +4,15 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { McpServerConfig } from "./mcp.ts";
+import type { BrowserMode } from "./settings.ts";
 
 /**
  * The MCP servers Yew sets up by itself (blueprint 6.10, item 38): a browser and control of this
  * computer. Yew does not build these in; it runs two open-source servers.
  *
- * - browser: Playwright MCP by Microsoft (Apache-2.0). It opens its own Chrome window with a
- *   profile kept in Yew's data folder, so sign-ins made there stay, apart from the person's Chrome.
+ * - browser: Playwright MCP by Microsoft (Apache-2.0). By default it drives the person's own Chrome
+ *   through Playwright's extension, with their sign-ins, in the tabs they hand it (founder, 11-18);
+ *   set to a separate window, it opens a Chrome of its own with a profile kept in Yew's data folder.
  * - computer: computer-use-mcp by Adam Jones (MIT). Screenshots, mouse and keyboard for the whole
  *   screen; macOS asks once for Screen Recording and Accessibility for the program that runs Yew.
  *
@@ -69,6 +71,8 @@ export function builtinMcp(
 	env: NodeJS.ProcessEnv = process.env,
 	/** Yew Harness's own port, which the browser is kept from. */
 	port?: number,
+	/** The person's own Chrome (the settings' default), or a separate window of its own. */
+	browser: BrowserMode = "own",
 ): Record<string, McpServerConfig> {
 	if (env.YEW_MCP_BUILTIN === "off") return {};
 	const modules = join(installDir(yewHome), "node_modules");
@@ -77,8 +81,9 @@ export function builtinMcp(
 			command: process.execPath,
 			args: [
 				join(modules, "@playwright", "mcp", "cli.js"),
-				"--user-data-dir",
-				join(yewHome, "browser"),
+				// The person's Chrome, through Playwright's extension: they approve the connection there and
+				// choose the tabs it may use. Otherwise a Chrome of its own, its profile in the data folder.
+				...(browser === "own" ? ["--extension"] : ["--user-data-dir", join(yewHome, "browser")]),
 				// Page snapshots and screenshots it saves; otherwise they land in the folder Yew was started in.
 				"--output-dir",
 				join(yewHome, "tmp", "browser"),

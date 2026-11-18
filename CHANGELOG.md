@@ -2,6 +2,13 @@
 
 本文件记录 Yew Harness（原名 Jig，1.3.0、1.4.0 叫 Yew）各版本中用户能感知的变化。格式参照 [Keep a Changelog 1.1.0](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### 变更
+
+- 自带的浏览器默认用你自己的 Chrome，用你在 Chrome 里已有的登录。先在 Chrome 应用商店装上「Playwright Extension」扩展；会话第一次用浏览器时，Chrome 打开一页请你同意连接，并选给它用的标签页或标签页分组，之后它只碰这些标签页和它自己开的标签页，改不了 Cookie 和网站权限这类整个浏览器的设置。设置的「MCP 服务」里，浏览器一行可以改回「单独的窗口」，改了马上生效。
+- 隐私政策更新到 2.7：写明自带的浏览器默认用你自己的 Chrome，资料留在 Chrome 里，以及怎样断开它和 Chrome 的连接。
+
 ## [1.6.1] - 2026-11-18
 
 ### 安全

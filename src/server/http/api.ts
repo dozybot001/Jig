@@ -21,6 +21,7 @@ import { type ExportLanguage, exportFileName, sessionMarkdown } from "../export.
 import { pickFolder } from "../folder-picker.ts";
 import { resolveWorkingFolder } from "../paths.ts";
 import {
+	BROWSER_MODES,
 	type DefaultModel,
 	NOTIFY_KINDS,
 	OPENING_MODES,
@@ -60,6 +61,8 @@ export interface ApiDeps {
 	onArchived?: (sessionId: string) => void;
 	/** Phone access was turned on or off, or the relay changed. */
 	onRemoteChanged?: () => void;
+	/** The built-in browser server is to drive another browser: it is started again. */
+	onBrowserChanged?: () => void;
 }
 
 const RULE_EFFECTS = ["allow", "ask", "deny"] as const;
@@ -423,6 +426,11 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		if (mascot !== undefined) store.setSetting("mascot", mascot);
 		const opening = optEnum(fields, "opening", OPENING_MODES);
 		if (opening) store.setSetting("opening", opening);
+		const browser = optEnum(fields, "browser", BROWSER_MODES);
+		if (browser) {
+			store.setSetting("browser", browser);
+			deps.onBrowserChanged?.();
+		}
 		const credentials = optBoolean(fields, "sandboxCredentials");
 		if (credentials !== undefined) store.setSetting("sandboxCredentials", credentials);
 		const hidden = optArray(fields, "hiddenFolders");

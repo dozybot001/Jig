@@ -43,6 +43,8 @@ export interface Settings {
 	sandboxCredentials: boolean;
 	/** Folders sessions may not read: file tools refuse them, the system sandbox closes them. */
 	hiddenFolders: string[];
+	/** The built-in browser drives the person's own Chrome, or a separate window of its own. */
+	browser: "own" | "separate";
 }
 
 /** This browser remembers "off" here, so the opening knows before the settings arrive. */

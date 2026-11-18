@@ -191,7 +191,9 @@ export function serveCommand(): Command {
 				yewHome: home,
 				version: VERSION,
 				log,
-				builtin: builtinMcp(home, io.env as NodeJS.ProcessEnv, port),
+				// Asked again at each refresh: the settings say which browser it drives.
+				builtin: () =>
+					builtinMcp(home, io.env as NodeJS.ProcessEnv, port, store.getSetting("browser", "own")),
 				prepare: mcpInstaller({ yewHome: home, env: io.env as NodeJS.ProcessEnv, log }),
 				// Sign-ins to MCP servers: tokens in the keychain; the browser comes back to this port.
 				auth: new McpAuth({

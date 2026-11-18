@@ -65,7 +65,15 @@ export const SETTING_DEFAULTS = {
 	 * them, searches leave them out, and the system sandbox closes them (the security group, 11-18).
 	 */
 	hiddenFolders: [] as string[],
+	/**
+	 * Which browser the built-in browser server drives: the person's own Chrome through Playwright's
+	 * extension, with their sign-ins (founder, 11-18), or a separate window of its own.
+	 */
+	browser: "own" as BrowserMode,
 };
+
+export const BROWSER_MODES = ["own", "separate"] as const;
+export type BrowserMode = (typeof BROWSER_MODES)[number];
 
 export const OPENING_MODES = ["auto", "click"] as const;
 export type OpeningMode = (typeof OPENING_MODES)[number];
@@ -107,6 +115,7 @@ export function readSettings(store: Store): Settings {
 		opening: store.getSetting("opening", SETTING_DEFAULTS.opening),
 		sandboxCredentials: store.getSetting("sandboxCredentials", SETTING_DEFAULTS.sandboxCredentials),
 		hiddenFolders: store.getSetting("hiddenFolders", SETTING_DEFAULTS.hiddenFolders),
+		browser: store.getSetting("browser", SETTING_DEFAULTS.browser),
 	};
 }
 

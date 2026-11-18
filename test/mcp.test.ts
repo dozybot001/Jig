@@ -255,13 +255,22 @@ describe("servers Yew sets up by itself", () => {
 	test("are started with node from Yew's data folder, with their files kept there", () => {
 		const servers = builtinMcp("/data/yew", {});
 		assert.equal(servers.browser?.command, process.execPath);
+		// The person's own Chrome by default, through Playwright's extension.
 		assert.deepEqual(servers.browser?.args, [
+			"/data/yew/mcp-builtin/node_modules/@playwright/mcp/cli.js",
+			"--extension",
+			"--output-dir",
+			"/data/yew/tmp/browser",
+		]);
+		// A window of its own, its profile in the data folder.
+		assert.deepEqual(builtinMcp("/data/yew", {}, undefined, "separate").browser?.args, [
 			"/data/yew/mcp-builtin/node_modules/@playwright/mcp/cli.js",
 			"--user-data-dir",
 			"/data/yew/browser",
 			"--output-dir",
 			"/data/yew/tmp/browser",
 		]);
+		assert.equal(servers.browser?.cwd, "/data/yew/browser-files");
 		assert.deepEqual(servers.computer?.args, [
 			"/data/yew/mcp-builtin/node_modules/computer-use-mcp/dist/main.js",
 		]);
@@ -306,6 +315,32 @@ describe("servers Yew sets up by itself", () => {
 			}),
 			{ PATH: "/bin", HOME: "/h", HTTPS_PROXY: "http://p" },
 		);
+	});
+
+	test("start again when the settings change which browser", async () => {
+		let mode = "own";
+		const hub = new McpHub({
+			yewHome: tempDir("yew-home-"),
+			version: "0.0.0",
+			log: () => {},
+			builtin: () => ({ browser: { command: "node", args: [server], env: { MODE: mode } } }),
+		});
+		const modeNow = async () => {
+			const tool = hub.tools().find((t) => t.name === "mcp__browser__env");
+			assert.ok(tool);
+			return textOf(await tool.run({ name: "MODE" }, ctx));
+		};
+		try {
+			await hub.refresh();
+			assert.equal(await modeNow(), "own");
+			await hub.refresh();
+			assert.equal(await modeNow(), "own", "nothing changed: the same server");
+			mode = "separate";
+			await hub.refresh();
+			assert.equal(await modeNow(), "separate");
+		} finally {
+			hub.stop();
+		}
 	});
 
 	test("a failed install is the servers' error, and the person's own servers still start", async () => {
