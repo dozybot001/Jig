@@ -191,6 +191,8 @@ export function serveCommand(): Command {
 				yewHome: home,
 				version: VERSION,
 				log,
+				// The browser is kept off Yew Harness's own page.
+				port,
 				// Asked again at each refresh: the settings say which browser it drives.
 				builtin: () =>
 					builtinMcp(home, io.env as NodeJS.ProcessEnv, port, store.getSetting("browser", "own")),

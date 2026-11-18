@@ -65,6 +65,67 @@ const BROWSER_READS = new Set([
 	"browser_close",
 ]);
 
+/**
+ * Browser tools Yew does not offer, whoever runs the server (the security group, 11-18):
+ * browser_run_code_unsafe runs any JavaScript in the browser server's own Node process, which is
+ * outside the system sandbox, so one approval of it would be running code outside the sandbox.
+ */
+const BROWSER_REFUSED = new Set(["browser_run_code_unsafe"]);
+
+/**
+ * Whether the browser server drives the person's own Chrome through Playwright's extension: started
+ * with `--extension`, or told so by PLAYWRIGHT_MCP_EXTENSION in its environment.
+ */
+export function ownBrowser(
+	config: Pick<McpServerConfig, "args" | "env" | "ownEnv"> | undefined,
+	env: NodeJS.ProcessEnv = {},
+): boolean {
+	if (!config) return false;
+	if ((config.args ?? []).some((arg) => arg === "--extension" || arg.startsWith("--extension="))) {
+		return true;
+	}
+	const value =
+		config.env?.PLAYWRIGHT_MCP_EXTENSION ??
+		(config.ownEnv ? undefined : env.PLAYWRIGHT_MCP_EXTENSION);
+	return value !== undefined && value !== "" && value !== "0" && value.toLowerCase() !== "false";
+}
+
+/** A browser call that opens an address: browser_tabs opening a new tab at one counts. */
+function opensAddress(tool: string, args: JsonObject): boolean {
+	return tool === "browser_tabs" && args.action === "new" && typeof args.url === "string";
+}
+
+/** Hosts that are this computer, as a browser writes them: 127.0.0.0/8, localhost, [::1]. */
+const LOOPBACK =
+	/^(?:127(?:\.\d{1,3}){3}|localhost\.?|\[::1\]|\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\])$/i;
+
+/**
+ * Whether a text names an address of Yew Harness itself: this computer at Yew Harness's port, as
+ * written (127.0.0.1:4777, localhost:4777) or in a form a browser reads as the same place
+ * (http://127.1:4777, http:\\localhost:4777, view-source: and blob: addresses).
+ */
+export function namesHarness(text: string, port: number): boolean {
+	const plain = new RegExp(`(?:127(?:\\.\\d{1,3}){3}|localhost\\.?|\\[::1\\]):${port}(?!\\d)`, "i");
+	if (plain.test(text)) return true;
+	for (const [candidate] of text.matchAll(/[a-z][a-z0-9+.-]*:[/\\]{2}[^\s"'<>()]*/gi)) {
+		try {
+			const url = new URL(candidate);
+			if (url.port === String(port) && LOOPBACK.test(url.hostname)) return true;
+		} catch {
+			// Not an address a browser would open.
+		}
+	}
+	return false;
+}
+
+/** The text values in a tool call's arguments, however deep. */
+function textsIn(value: unknown): string[] {
+	if (typeof value === "string") return [value];
+	if (Array.isArray(value)) return value.flatMap(textsIn);
+	if (value && typeof value === "object") return Object.values(value).flatMap(textsIn);
+	return [];
+}
+
 /** Words in a tool's name that say it sends, publishes or deletes something in the service. */
 const OUTWARD = new Set([
 	"send",
@@ -117,9 +178,9 @@ export function outward(tool: string): boolean {
  * - Computer control acts on the whole screen: it can type into a terminal or click in the person's
  *   own browser, past every rule Yew has. Each action is asked about, cannot be remembered, and an
  *   earlier "always allow" does not cover it. Looking (a screenshot, the pointer's place) can be.
- * - The browser acts only in the tabs it is given or opens (in the person's own Chrome by default,
- *   with their sign-ins) or in a window of its own, so its actions can be remembered, with the scope
- *   said.
+ * - The browser in the person's own Chrome (the default) acts with their sign-ins in the tabs it
+ *   is given: each action is asked about and cannot be remembered, like computer control; looking
+ *   can be. In a window of its own, its actions can be remembered, with the scope said.
  * - Any other server's tool that sends, publishes or deletes something in its service (spec 21.2) is
  *   asked about every time: one its name says does, one its server marks as destructive, and the
  *   ones a common server's preset names (a calendar event invites its attendees). A server's word
@@ -150,13 +211,23 @@ export function special(
 	tool: string,
 	args: JsonObject = {},
 	destructive = false,
-	config?: Pick<McpServerConfig, "url" | "preset">,
+	config?: Pick<McpServerConfig, "url" | "preset" | "args" | "env" | "ownEnv">,
+	/** The environment the server was started with, which may say it drives the person's Chrome. */
+	env: NodeJS.ProcessEnv = {},
 ): { reasons?: ConfirmReason[]; warning?: "acts-as-you" } {
 	if (server === "computer") {
 		const action = typeof args.action === "string" ? args.action : "";
 		return COMPUTER_READS.has(action) ? {} : { reasons: ["computer-control"] };
 	}
-	if (server === "browser") return BROWSER_READS.has(tool) ? {} : { warning: "acts-as-you" };
+	if (server === "browser") {
+		if (BROWSER_READS.has(tool) && !opensAddress(tool, args)) return {};
+		// In the person's own Chrome, with their sign-ins: each action is asked about, cannot be
+		// remembered, and an earlier "always allow" does not cover it (the security group, 11-18).
+		if (ownBrowser(config, env)) {
+			return { reasons: [tool === "browser_evaluate" ? "browser-script" : "browser-action"] };
+		}
+		return { warning: "acts-as-you" };
+	}
 	const named = presetOf(server, config)?.asksEveryTime?.includes(tool);
 	return destructive || named || outward(tool) ? { reasons: ["service-action"] } : {};
 }
@@ -324,6 +395,8 @@ class StdioTransport implements Transport {
 		name: string,
 	): Promise<StdioTransport> {
 		const variables = { ...(config.ownEnv ? serverEnv(env) : env), ...config.env };
+		// The extension's token skips the page in Chrome where the person approves each connection.
+		if (name === "browser") delete variables.PLAYWRIGHT_MCP_EXTENSION_TOKEN;
 		if (config.cwd) mkdirSync(config.cwd, { recursive: true });
 		const own = config.ownEnv === true && config.preset === undefined;
 		const line = [config.command as string, ...(config.args ?? [])].map(quote).join(" ");
@@ -599,6 +672,8 @@ class Server {
 						annotations?: { destructiveHint?: unknown };
 					} => tool && typeof tool.name === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(tool.name),
 				)
+				// Not offered, whatever the server says it has.
+				.filter((tool) => !(this.name === "browser" && BROWSER_REFUSED.has(tool.name)))
 				.slice(0, 100)
 				.map((tool) => ({
 					name: tool.name,
@@ -625,6 +700,9 @@ class Server {
 	}
 
 	async call(tool: string, args: JsonObject, signal: AbortSignal): Promise<unknown> {
+		if (this.name === "browser" && BROWSER_REFUSED.has(tool)) {
+			throw new Error(`${tool} is not offered: it would run code outside the system sandbox.`);
+		}
 		if (!this.#transport) throw new Error("the server is not connected");
 		try {
 			return await this.#transport.request("tools/call", { name: tool, arguments: args }, signal);
@@ -663,6 +741,8 @@ export interface McpHubOptions {
 	prepare?: (config: McpServerConfig) => Promise<void>;
 	/** Signing in to HTTP servers in the browser; without it, a refusal is just an error. */
 	auth?: McpAuth;
+	/** Yew Harness's own port, which the browser is kept off. */
+	port?: number;
 }
 
 /** The configured servers, connected, and their tools as tools sessions can call. */
@@ -831,6 +911,49 @@ export class McpHub {
 		this.#configAt = -1;
 	}
 
+	get #env(): NodeJS.ProcessEnv {
+		return this.#options.env ?? process.env;
+	}
+
+	/**
+	 * Keeps the browser off Yew Harness itself (the security group, 11-18), whose page in the
+	 * person's Chrome is signed in: a call whose arguments name Yew Harness's address is refused; in
+	 * the person's own Chrome, so is every call while a tab shared with the session has Yew Harness
+	 * open, or when the shared tabs cannot be listed. Returns why, or null to go ahead.
+	 */
+	async #keepOffHarness(
+		server: Server,
+		args: JsonObject,
+		signal: AbortSignal,
+	): Promise<string | null> {
+		const port = this.#options.port;
+		if (port && textsIn(args).some((value) => namesHarness(value, port))) {
+			return "browser: Yew Harness's own address is not opened in the browser.";
+		}
+		if (!ownBrowser(server.config, this.#env)) return null;
+		if (!port) {
+			return "browser: Yew Harness does not know its own port here, so the shared tabs cannot be checked; the browser is not used.";
+		}
+		let listed: { content?: unknown; isError?: unknown };
+		try {
+			listed = (await server.call("browser_tabs", { action: "list" }, signal)) as typeof listed;
+		} catch (error) {
+			if (signal.aborted) throw error;
+			return `browser: the shared tabs could not be listed (${(error as Error).message}), so the browser is not used.`;
+		}
+		const blocks = Array.isArray(listed?.content) ? listed.content : [];
+		const tabs = blocks
+			.map((block) => (block?.type === "text" && typeof block.text === "string" ? block.text : ""))
+			.join("\n");
+		if (listed?.isError === true || !tabs) {
+			return "browser: the shared tabs could not be listed, so the browser is not used.";
+		}
+		if (namesHarness(tabs, port)) {
+			return "browser: a tab shared with this session has Yew Harness itself open, so the browser is not used. Ask the person to take that tab out of the shared tabs (or close it); the browser works again after that.";
+		}
+		return null;
+	}
+
 	#definition(server: Server, tool: McpToolInfo): ToolDefinition {
 		const name = `mcp__${server.name}__${tool.name}`.slice(0, 64);
 		const hub = this;
@@ -848,10 +971,21 @@ export class McpHub {
 					tool: name,
 					summary: `${server.name}: ${tool.name} ${shown.length > 300 ? `${shown.slice(0, 300)}…` : shown}`,
 					always: true,
-					...special(server.name, tool.name, args as JsonObject, tool.destructive, server.config),
+					...special(
+						server.name,
+						tool.name,
+						args as JsonObject,
+						tool.destructive,
+						server.config,
+						hub.#env,
+					),
 				};
 			},
 			async run(args, ctx): Promise<ToolResult> {
+				if (server.name === "browser") {
+					const refused = await hub.#keepOffHarness(server, args as JsonObject, ctx.signal);
+					if (refused) return errorResult(refused);
+				}
 				let result: { content?: unknown; isError?: unknown };
 				try {
 					result = (await server.call(tool.name, args, ctx.signal)) as typeof result;

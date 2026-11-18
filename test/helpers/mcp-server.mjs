@@ -1,5 +1,9 @@
 // A tiny MCP server on standard streams for tests: two tools, one of which reports an error.
+// EXTRA_TOOLS (names, comma-separated) offers more tools that say back their name and arguments;
+// browser_tabs among them answers with TABS, or as an error when TABS is "error".
 import { createInterface } from "node:readline";
+
+const extra = (process.env.EXTRA_TOOLS ?? "").split(",").filter(Boolean);
 
 const send = (message) =>
 	process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
@@ -42,6 +46,11 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 						annotations: { destructiveHint: true },
 					},
 					{ name: "bad name!", description: "Not offered." },
+					...extra.map((name) => ({
+						name,
+						description: `Extra tool ${name}.`,
+						inputSchema: { type: "object", properties: {} },
+					})),
 				],
 			},
 		});
@@ -55,6 +64,16 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 				isError: params.arguments.name === "FAIL",
 			},
 		});
+	} else if (
+		method === "tools/call" &&
+		params.name === "browser_tabs" &&
+		extra.includes("browser_tabs")
+	) {
+		const tabs = process.env.TABS ?? "";
+		send({ id, result: { content: [{ type: "text", text: tabs }], isError: tabs === "error" } });
+	} else if (method === "tools/call" && extra.includes(params.name)) {
+		const said = `${params.name} ${JSON.stringify(params.arguments ?? {})}`;
+		send({ id, result: { content: [{ type: "text", text: said }] } });
 	} else {
 		send({ id, error: { code: -32601, message: `no such method ${method}` } });
 	}

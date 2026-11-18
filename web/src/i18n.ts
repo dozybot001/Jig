@@ -268,6 +268,8 @@ const zh = {
 	"confirm_write-credentials": "写入密钥所在的位置",
 	confirm_admin: "用管理员权限运行",
 	"confirm_computer-control": "操作整个屏幕（点击、输入或按键），每次都要你确认",
+	"confirm_browser-action": "在你自己的浏览器里操作页面（点击、输入、打开网址等），每次都要你确认",
+	"confirm_browser-script": "在你自己的浏览器页面里运行脚本，每次都要你确认",
 	"confirm_service-action": "在你连接的服务里发送、发布或删除东西，每次都要你确认",
 	alwaysActsAsYou:
 		"选「总是允许」后，本会话内这个工具的所有调用都不再问，包括在浏览器里以你的登录身份发送、付款、删除这类操作。",
@@ -873,14 +875,14 @@ const zh = {
 	mcpBuiltin: "Yew Harness 自带",
 	mcpBuiltin_browser: "浏览器",
 	mcpBuiltinHelp_browser:
-		"会话可以打开网页、点击和填写。由微软的 Playwright MCP 提供，第一次使用时从 npm 安装到 Yew Harness 的数据目录。它的点击、输入可以选「总是允许」，只在当前会话有效。",
+		"会话可以打开网页、点击和填写。由微软的 Playwright MCP 提供，第一次使用时从 npm 安装到 Yew Harness 的数据目录。",
 	browserMode: "用哪个浏览器",
 	browserMode_own: "你自己的 Chrome",
 	browserMode_separate: "单独的窗口",
 	browserModeHint_own:
-		"先在 Chrome 应用商店装上「Playwright Extension」扩展。会话第一次用浏览器时，Chrome 会打开一页，请你同意连接，并选给它用的标签页或标签页分组；之后它只碰选给它的和它自己开的标签页，用的是你在 Chrome 里已有的登录。它改不了 Cookie 和网站权限这类整个浏览器的设置。",
+		"先在 Chrome 应用商店装上「Playwright Extension」扩展。会话第一次用浏览器时，Chrome 会打开一页，请你同意连接，并选给它用的标签页或标签页分组；之后它只碰选给它的和它自己开的标签页，用的是你在 Chrome 里已有的登录。它能读到整个 Chrome 的 Cookie，但改不了 Cookie 和网站权限这类整个浏览器的设置。点击、输入、打开网址这类动页面的操作每次都要你确认，不能选「总是允许」；共享的标签页里有开着 Yew Harness 的，它就停下，等你把那个标签页拿出来。它下载的文件进你自己的下载文件夹。",
 	browserModeHint_separate:
-		"开一个单独的 Chrome 窗口。在里面登录过的网站会一直保持登录，记录存在 Yew Harness 的数据目录里，和你平时用的 Chrome 分开。",
+		"开一个单独的 Chrome 窗口。在里面登录过的网站会一直保持登录，记录存在 Yew Harness 的数据目录里，和你平时用的 Chrome 分开。它的点击、输入可以选「总是允许」，只在当前会话有效。",
 	mcpBuiltin_computer: "电脑操控",
 	mcpBuiltinHelp_computer:
 		"会话可以看屏幕截图、移动鼠标、敲键盘，能操作这台电脑上的任何程序。第一次用时 macOS 会请你给运行 Yew Harness 的程序「屏幕录制」和「辅助功能」权限。由开源的 computer-use-mcp 提供，第一次使用时从 npm 安装到 Yew Harness 的数据目录。它能越过 Yew Harness 的其他授权规则，所以点击、输入和按键每一次都要你确认，不能选「总是允许」。",
@@ -1305,6 +1307,9 @@ const en: Record<MessageKey, string> = {
 	confirm_admin: "Run as administrator",
 	"confirm_computer-control":
 		"Act on the whole screen (click, type or press keys); asked every time",
+	"confirm_browser-action":
+		"Act on a page in your own browser (click, type, open an address and so on); asked every time",
+	"confirm_browser-script": "Run a script in a page in your own browser; asked every time",
 	"confirm_service-action":
 		"Send, publish or delete something in a service you connected; asked every time",
 	alwaysActsAsYou:
@@ -1934,14 +1939,14 @@ const en: Record<MessageKey, string> = {
 	mcpBuiltin: "Set up by Yew Harness",
 	mcpBuiltin_browser: "Browser",
 	mcpBuiltinHelp_browser:
-		"Sessions can open pages, click and fill in forms. Provided by Microsoft's Playwright MCP, installed from npm into Yew Harness's data folder the first time it is used. Its clicks and typing can be set to Always allow, for the current session only.",
+		"Sessions can open pages, click and fill in forms. Provided by Microsoft's Playwright MCP, installed from npm into Yew Harness's data folder the first time it is used.",
 	browserMode: "Which browser",
 	browserMode_own: "Your own Chrome",
 	browserMode_separate: "A separate window",
 	browserModeHint_own:
-		"First install “Playwright Extension” from the Chrome Web Store. The first time a session uses the browser, Chrome opens a page asking you to approve the connection and choose the tabs or tab group it may use; after that it touches only those tabs and the ones it opens, with the sign-ins you already have in Chrome. It cannot change browser-wide settings such as cookies and site permissions.",
+		"First install “Playwright Extension” from the Chrome Web Store. The first time a session uses the browser, Chrome opens a page asking you to approve the connection and choose the tabs or tab group it may use; after that it touches only those tabs and the ones it opens, with the sign-ins you already have in Chrome. It can read the cookies of your whole Chrome, but cannot change browser-wide settings such as cookies and site permissions. Actions on a page, such as clicking, typing and opening an address, are confirmed by you every time; Always allow is not offered. If a shared tab has Yew Harness open, it stops until you take that tab out. Files it downloads go to your own Downloads folder.",
 	browserModeHint_separate:
-		"Opens a Chrome window of its own. Sites you sign in to there stay signed in, kept in Yew Harness's data folder and apart from the Chrome you use.",
+		"Opens a Chrome window of its own. Sites you sign in to there stay signed in, kept in Yew Harness's data folder and apart from the Chrome you use. Its clicks and typing can be set to Always allow, for the current session only.",
 	mcpBuiltin_computer: "Computer control",
 	mcpBuiltinHelp_computer:
 		"Sessions can take screenshots, move the mouse and type, so they can use any program on this computer. The first time, macOS asks you to give the program that runs Yew Harness the Screen Recording and Accessibility permissions. Provided by the open-source computer-use-mcp, installed from npm into Yew Harness's data folder the first time it is used. It can get past Yew Harness's other permission rules, so every click, keystroke and typed text is confirmed by you; Always allow is not offered.",

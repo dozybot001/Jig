@@ -324,6 +324,10 @@ export type ConfirmReason =
 	| "connect-site-unsure"
 	// An action of the computer control tool: a click or keystroke anywhere on the screen.
 	| "computer-control"
+	// An action of the browser on a page in the person's own Chrome, with their sign-ins.
+	| "browser-action"
+	// A script the browser runs in a page in the person's own Chrome.
+	| "browser-script"
 	// An MCP tool that sends, publishes or deletes something in the service it connects to.
 	| "service-action"
 	// manage_yew changes that widen what a session may do (blueprint 6.2, item 10)

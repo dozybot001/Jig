@@ -5,7 +5,14 @@ import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { YewError } from "../src/server/errors.ts";
 import { decisionFromPhone } from "../src/server/http/agents.ts";
-import { McpHub, outward, readMcpConfig, special as specialFor } from "../src/server/mcp.ts";
+import {
+	McpHub,
+	namesHarness,
+	outward,
+	ownBrowser,
+	readMcpConfig,
+	special as specialFor,
+} from "../src/server/mcp.ts";
 import {
 	builtinInstaller,
 	builtinMcp,
@@ -534,6 +541,234 @@ describe("the browser and computer control", () => {
 			{ effect: "allow", tool: "shell", pattern: "npm test" },
 		];
 		assert.deepEqual(inheritableRules(rules), rules.slice(2));
+	});
+});
+
+describe("the browser in the person's own Chrome (the security group, 11-18)", () => {
+	const engine = new PermissionEngine(tempDir("yew-home-"));
+	const session = (rules: Session["rules"]) =>
+		({ id: "s1", cwd: null, rules, options: { permissionMode: "skip" } }) as unknown as Session;
+	const lookup = {} as Parameters<ToolDefinition["subject"]>[2];
+	const PORT = 4777;
+	const SAFE_TABS = "- 0: (current) [Mail](https://mail.example.com/)";
+	/** A server named browser with Playwright's tool names; `own` starts it with --extension. */
+	async function browser(
+		own: boolean,
+		env: Record<string, string> = {},
+		port: number | null = PORT,
+	) {
+		const hub = new McpHub({
+			yewHome: home({
+				browser: {
+					command: "node",
+					args: own ? [server, "--extension"] : [server],
+					env: {
+						EXTRA_TOOLS:
+							"browser_run_code_unsafe,browser_tabs,browser_click,browser_evaluate,browser_snapshot,browser_navigate",
+						TABS: SAFE_TABS,
+						...env,
+					},
+				},
+			}),
+			version: "0.0.0",
+			log: () => {},
+			...(port ? { port } : {}),
+		});
+		await hub.refresh();
+		const tool = (name: string) => {
+			const found = hub.tools().find((t) => t.name === `mcp__browser__${name}`);
+			assert.ok(found, name);
+			return found;
+		};
+		return { hub, tool };
+	}
+
+	test("browser_run_code_unsafe is not offered in either mode", async () => {
+		for (const own of [true, false]) {
+			const { hub } = await browser(own);
+			try {
+				const names = hub.tools().map((t) => t.name);
+				assert.ok(names.includes("mcp__browser__browser_click"));
+				// Not offered, so a session that calls it anyway is told there is no such tool.
+				assert.ok(!names.includes("mcp__browser__browser_run_code_unsafe"), `own: ${own}`);
+				assert.ok(!hub.status()[0]?.tools.includes("browser_run_code_unsafe"));
+			} finally {
+				hub.stop();
+			}
+		}
+	});
+
+	test("its own Chrome is told by --extension or PLAYWRIGHT_MCP_EXTENSION", () => {
+		assert.equal(ownBrowser({ args: ["cli.js", "--extension"] }), true);
+		assert.equal(ownBrowser({ args: ["cli.js", "--extension=chrome"] }), true);
+		assert.equal(ownBrowser({ env: { PLAYWRIGHT_MCP_EXTENSION: "1" } }), true);
+		assert.equal(ownBrowser({}, { PLAYWRIGHT_MCP_EXTENSION: "true" }), true);
+		assert.equal(ownBrowser({}, { PLAYWRIGHT_MCP_EXTENSION: "false" }), false);
+		// A server Yew runs from its data folder does not get Yew's environment.
+		assert.equal(ownBrowser({ ownEnv: true }, { PLAYWRIGHT_MCP_EXTENSION: "1" }), false);
+		assert.equal(ownBrowser({ args: ["cli.js", "--user-data-dir", "/x"] }), false);
+	});
+
+	test("an action on a page is asked about every time; a remembered allow does not cover it", async () => {
+		const { hub, tool } = await browser(true);
+		try {
+			const allowed = session([
+				{ effect: "allow", tool: "mcp__browser__browser_click" },
+				{ effect: "allow", tool: "mcp__browser__browser_evaluate" },
+				{ effect: "allow", tool: "mcp__browser__browser_tabs" },
+				{ effect: "allow", tool: "mcp__browser__browser_snapshot" },
+			]);
+			const asked = (name: string, args: JsonObject = {}) => {
+				const decision = engine.decide(tool(name).subject(args, allowed, lookup), allowed);
+				assert.ok(decision.effect === "ask", name);
+				assert.equal(decision.request.mustConfirm, true, name);
+				assert.equal(decision.request.rememberRules, undefined, name);
+				return decision.request.reasons;
+			};
+			assert.deepEqual(asked("browser_click"), ["browser-action"]);
+			assert.deepEqual(asked("browser_navigate", { url: "https://example.com/" }), [
+				"browser-action",
+			]);
+			assert.deepEqual(asked("browser_evaluate", { function: "() => 1" }), ["browser-script"]);
+			// Opening a new tab at an address is opening an address.
+			assert.deepEqual(asked("browser_tabs", { action: "new", url: "https://example.com/" }), [
+				"browser-action",
+			]);
+			// Looking can be remembered, and the remembered rule covers it.
+			assert.equal(
+				engine.decide(tool("browser_snapshot").subject({}, allowed, lookup), allowed).effect,
+				"allow",
+			);
+			assert.equal(
+				engine.decide(tool("browser_tabs").subject({ action: "list" }, allowed, lookup), allowed)
+					.effect,
+				"allow",
+			);
+			const fresh = session([]);
+			const look = engine.decide(tool("browser_snapshot").subject({}, fresh, lookup), fresh);
+			assert.ok(look.effect === "ask" && look.request.rememberRules?.length === 1);
+		} finally {
+			hub.stop();
+		}
+		// In a window of its own, an action can still be remembered, with the warning.
+		const separate = await browser(false);
+		try {
+			const fresh = session([]);
+			const click = engine.decide(separate.tool("browser_click").subject({}, fresh, lookup), fresh);
+			assert.ok(click.effect === "ask" && click.request.warning === "acts-as-you");
+			assert.equal(click.request.rememberRules?.length, 1);
+		} finally {
+			separate.hub.stop();
+		}
+	});
+
+	test("Yew Harness's address is found however it is written", () => {
+		for (const text of [
+			"- 1: (current) [Yew Harness](http://127.0.0.1:4777/)",
+			"http://localhost:4777",
+			"localhost.:4777/api",
+			"view-source:http://127.0.0.1:4777/",
+			"blob:http://localhost:4777/0b3e",
+			"ws://127.0.0.1:4777/api/events",
+			"http://127.1:4777/",
+			"http://0x7f000001:4777/",
+			"http:\\\\127.0.0.1:4777",
+			"http://[::1]:4777/",
+			"https://someone@LOCALHOST:4777/",
+		]) {
+			assert.equal(namesHarness(text, PORT), true, text);
+		}
+		for (const text of [
+			"http://127.0.0.1:47770/",
+			"http://127.0.0.1:4778/",
+			"https://example.com/?page=4777",
+			"http://192.168.1.2:4777/",
+			"- 0: (current) [Mail](https://mail.example.com/)",
+		]) {
+			assert.equal(namesHarness(text, PORT), false, text);
+		}
+	});
+
+	test("no browser tool runs while a shared tab has Yew Harness open", async () => {
+		const harness = `${SAFE_TABS}\n- 1: [Yew Harness](http://127.0.0.1:${PORT}/)`;
+		const open = await browser(true, { TABS: harness });
+		try {
+			const result = await open.tool("browser_click").run({ ref: "e1" }, ctx);
+			assert.equal(result.isError, true);
+			assert.match(textOf(result), /take that tab out of the shared tabs/);
+		} finally {
+			open.hub.stop();
+		}
+		// Without it, the call goes through.
+		const shared = await browser(true);
+		try {
+			const result = await shared.tool("browser_click").run({ ref: "e1" }, ctx);
+			assert.equal(result.isError, undefined);
+			assert.equal(textOf(result), 'browser_click {"ref":"e1"}');
+		} finally {
+			shared.hub.stop();
+		}
+		// Tabs that cannot be listed, or a port Yew Harness does not know: the browser is not used.
+		const failing = await browser(true, { TABS: "error" });
+		try {
+			const result = await failing.tool("browser_click").run({ ref: "e1" }, ctx);
+			assert.equal(result.isError, true);
+			assert.match(textOf(result), /could not be listed/);
+		} finally {
+			failing.hub.stop();
+		}
+		const unknown = await browser(true, {}, null);
+		try {
+			const result = await unknown.tool("browser_click").run({ ref: "e1" }, ctx);
+			assert.equal(result.isError, true);
+			assert.match(textOf(result), /does not know its own port/);
+		} finally {
+			unknown.hub.stop();
+		}
+		// A window of its own does not hold Yew Harness's sign-in: its tabs are not listed first.
+		const separate = await browser(false, { TABS: harness });
+		try {
+			const result = await separate.tool("browser_click").run({ ref: "e1" }, ctx);
+			assert.equal(result.isError, undefined);
+		} finally {
+			separate.hub.stop();
+		}
+	});
+
+	test("a call whose arguments name Yew Harness's address is refused, in either mode", async () => {
+		for (const own of [true, false]) {
+			const { hub, tool } = await browser(own);
+			try {
+				for (const url of [
+					`http://127.0.0.1:${PORT}/`,
+					`http://localhost:${PORT}/#t=abc`,
+					`http://127.1:${PORT}`,
+					`view-source:http://[::1]:${PORT}/`,
+				]) {
+					const result = await tool("browser_navigate").run({ url }, ctx);
+					assert.equal(result.isError, true, url);
+					assert.match(textOf(result), /own address is not opened/);
+				}
+				const elsewhere = await tool("browser_navigate").run({ url: "https://example.com/" }, ctx);
+				assert.equal(elsewhere.isError, undefined);
+			} finally {
+				hub.stop();
+			}
+		}
+	});
+
+	test("the extension's token does not reach the browser server", async () => {
+		const { hub, tool } = await browser(false, {
+			PLAYWRIGHT_MCP_EXTENSION_TOKEN: "t0",
+			GREETING: "hi",
+		});
+		try {
+			const read = async (name: string) => textOf(await tool("env").run({ name }, ctx));
+			assert.equal(await read("PLAYWRIGHT_MCP_EXTENSION_TOKEN"), "(unset)");
+			assert.equal(await read("GREETING"), "hi");
+		} finally {
+			hub.stop();
+		}
 	});
 });
 
