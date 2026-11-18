@@ -1260,6 +1260,11 @@ function EntryView({ entry }: { entry: Entry }) {
 						limit: formatCost(Number(data.limit ?? 0)),
 					},
 				);
+			} else if (notice.kind === "hook") {
+				text = t(data.kind === "blocked" ? "notice_hook_blocked" : "notice_hook_error", {
+					event: String(data.event ?? ""),
+					text: String(data.text ?? ""),
+				});
 			} else if (notice.kind === "reviewed") {
 				text = data.reason
 					? t("notice_reviewed", {

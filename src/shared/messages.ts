@@ -130,7 +130,9 @@ export interface Notice {
 		/** A daily spending limit: data has the code (budget-warning or budget-reached), scope, spent and limit. */
 		| "budget"
 		/** The automatic mode's check let a step run (blueprint 6.1, item 6): data has tool, summary, reason. */
-		| "reviewed";
+		| "reviewed"
+		/** One of the person's hooks failed or stopped a message: data has event, kind and text. */
+		| "hook";
 	text?: string;
 	data?: JsonObject;
 	timestamp: number;

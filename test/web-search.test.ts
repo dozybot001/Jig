@@ -121,3 +121,56 @@ describe("web_search", () => {
 		assert.match((await empty.textOf({ query: "冷门" })).text, /No results for "冷门"/);
 	});
 });
+
+describe("web_search with the DeepSeek key", () => {
+	test("is built in: the DeepSeek key for the model is enough, and DeepSeek's Search API answers", async () => {
+		const { access, tool, calls, textOf } = setup(
+			{ deepseek: "sk-deepseek-test" },
+			{
+				body: {
+					results: [
+						{
+							title: "DeepSeek V4",
+							url: "https://api-docs.deepseek.com/news",
+							summary: "发布说明",
+						},
+					],
+				},
+			},
+		);
+		await access.refresh();
+		assert.equal(tool.offered?.(session, roles), true);
+		assert.deepEqual(tool.subject({ query: "x" }, session), {
+			kind: "url",
+			tool: "web_search",
+			url: "https://api.deepseek.com",
+		});
+		const long = "查".repeat(200);
+		const { text } = await textOf({ query: long, count: 2 });
+		const [call] = calls;
+		assert.equal(call?.url, "https://api.deepseek.com/v1/tools/search");
+		assert.ok(call);
+		assert.equal(
+			(call.init.headers as Record<string, string>).Authorization,
+			"Bearer sk-deepseek-test",
+		);
+		// It takes queries of up to 128 characters.
+		assert.deepEqual(JSON.parse(call?.init.body as string), { query: "查".repeat(128), count: 2 });
+		assert.match(
+			text,
+			/1\. DeepSeek V4\n {3}https:\/\/api-docs\.deepseek\.com\/news\n {3}发布说明/,
+		);
+	});
+
+	test("a search service's own key comes first; DeepSeek's key is not saved or deleted from search", async () => {
+		const { access } = setup({ deepseek: "sk", "search-brave": "brave" }, { body: {} });
+		await access.refresh();
+		assert.equal(access.service?.id, "search-brave");
+		const { SEARCH_SERVICES } = await import("../src/server/tools/web-search.ts");
+		const deepseek = SEARCH_SERVICES.find((service) => service.id === "search-deepseek");
+		assert.ok(deepseek);
+		await assert.rejects(access.saveKey(deepseek, "other"), /uses the deepseek key/);
+		await assert.rejects(access.deleteKey(deepseek), /uses the deepseek key/);
+		assert.equal(await access.hasKey(deepseek), true);
+	});
+});

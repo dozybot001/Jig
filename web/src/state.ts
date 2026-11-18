@@ -115,6 +115,8 @@ export interface SearchServiceView {
 	hasKey: boolean;
 	/** The one web search uses now. */
 	active: boolean;
+	/** It uses this model provider's key, set under Providers and keys. */
+	provider: string | null;
 }
 
 /** Starting at login and the launcher icon on this computer. */

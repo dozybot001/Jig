@@ -231,10 +231,13 @@ export function serveCommand(): Command {
 			setOwnPort(port);
 			const permissions = new PermissionEngine(home);
 			permissions.guarded = () => guardKind() !== "none";
+			// The person's hooks, from hooks.json in the data folder (hooks.ts).
+			const { Hooks } = await import("../server/hooks.ts");
 			const agents = new Agents({
 				store,
 				gateway,
 				permissions,
+				hooks: new Hooks(home),
 				home,
 				version: VERSION,
 				log,

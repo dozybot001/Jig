@@ -301,6 +301,9 @@ function searchName(service: SearchServiceView): string {
 	return hasMessage(key) ? t(key) : service.name;
 }
 
+/** A model provider as a search service names it: DeepSeek's search uses the DeepSeek key. */
+const providerName = (id: string) => (id === "deepseek" ? "DeepSeek" : id);
+
 /**
  * The search services (blueprint 6.10, item 30): which have a key, and saving, replacing and
  * deleting it. Each row says who provides the service, since the query is sent to them.
@@ -322,14 +325,21 @@ function SearchServices() {
 						key={service.id}
 						name={searchName(service)}
 						note={[
-							service.hasKey ? t("keySaved") : t("noKey"),
+							// DeepSeek's search uses the model's key: it is saved under Providers and keys.
+							service.provider
+								? t(service.hasKey ? "searchUsesProviderKey" : "searchNeedsProviderKey", {
+										provider: providerName(service.provider),
+									})
+								: service.hasKey
+									? t("keySaved")
+									: t("noKey"),
 							service.active ? t("searchInUse") : null,
 							t(`search_${service.region}`),
 						]
 							.filter(Boolean)
 							.join(t("hintSeparator"))}
 						hasKey={service.hasKey}
-						takesKey
+						takesKey={!service.provider}
 						deleteBody={t("deleteSearchKeyBody", { name: searchName(service) })}
 						onSave={async (key) => {
 							await saveSearchKey(service.id, key);

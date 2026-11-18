@@ -130,12 +130,25 @@ describe("settings: search services", () => {
 	test("the list says which services have a key and which one is used, never the key", async () => {
 		const { call } = setup({ "search-tavily": "tvly-test-value" });
 		const listed = await call("GET", "/api/search-services");
+		const row = (id: string, name: string, region: string, hasKey: boolean, active: boolean) => ({
+			id,
+			name,
+			region,
+			hasKey,
+			provider: null,
+			active,
+		});
 		assert.deepEqual(listed.body.items, [
-			{ id: "search-bocha", name: "Bocha web search", region: "cn", hasKey: false, active: false },
-			{ id: "search-tavily", name: "Tavily search", region: "global", hasKey: true, active: true },
-			{ id: "search-brave", name: "Brave Search", region: "global", hasKey: false, active: false },
+			row("search-bocha", "Bocha web search", "cn", false, false),
+			row("search-tavily", "Tavily search", "global", true, true),
+			row("search-brave", "Brave Search", "global", false, false),
+			// Built in with the model's DeepSeek key, which is set under Providers and keys.
+			{ ...row("search-deepseek", "DeepSeek search", "cn", false, false), provider: "deepseek" },
 		]);
 		assert.doesNotMatch(listed.text, /tvly-test-value/);
+		// Its key is the model provider's: not saved or deleted from here.
+		const refused = await call("PUT", "/api/search-services/search-deepseek/key", { key: "sk" });
+		assert.equal(refused.status, 400);
 	});
 
 	test("a key is saved to the key store, replaces the old one, and can be deleted", async () => {

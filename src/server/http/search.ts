@@ -13,6 +13,13 @@ export function searchRoutes(search: SearchAccess): Hono<AppEnv> {
 	const service = (id: string) => {
 		const found = SEARCH_SERVICES.find((item) => item.id === id);
 		if (!found) throw notFound("Search service", id);
+		// Its key is the model provider's, set under Providers and keys.
+		if (found.provider) {
+			throw invalid(
+				`${found.name} uses the ${found.provider} key; set it under Providers and keys.`,
+				"id",
+			);
+		}
 		return found;
 	};
 
@@ -24,6 +31,8 @@ export function searchRoutes(search: SearchAccess): Hono<AppEnv> {
 				name: item.name,
 				region: item.region,
 				hasKey: await search.hasKey(item),
+				// Uses this model provider's key; set under Providers and keys, not here.
+				provider: item.provider ?? null,
 				// The one web search uses: the first in this order that has a key.
 				active: search.service?.id === item.id,
 			})),

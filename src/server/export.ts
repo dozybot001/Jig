@@ -48,6 +48,8 @@ interface ExportStrings {
 	compactFailed: string;
 	budgetReached: string;
 	reviewed: string;
+	hookError: string;
+	hookBlocked: string;
 	budgetWarning: string;
 	budgetSession: string;
 	budgetAll: string;
@@ -95,6 +97,8 @@ const ZH: ExportStrings = {
 	compactFailed: "压缩上下文失败",
 	budgetReached: "今天的费用到了{scope}每日上限（{spent} / {limit}），已停下",
 	reviewed: "自动检查放行了：{summary}（{reason}）",
+	hookError: "hook 出错了（{event}）：{text}",
+	hookBlocked: "hook 拦下了这条消息：{text}",
 	budgetWarning: "今天的费用超过了{scope}每日上限的 80%（{spent} / {limit}）",
 	budgetSession: "这个会话的",
 	budgetAll: "全部会话的",
@@ -161,6 +165,8 @@ const EN: ExportStrings = {
 	compactFailed: "Could not compact the context",
 	budgetReached: "Stopped: today's spending reached {scope} daily limit ({spent} of {limit})",
 	reviewed: "Allowed by the check: {summary} ({reason})",
+	hookError: "A hook failed ({event}): {text}",
+	hookBlocked: "A hook stopped this message: {text}",
 	budgetWarning: "Today's spending passed 80% of {scope} daily limit ({spent} of {limit})",
 	budgetSession: "this session's",
 	budgetAll: "the shared",
@@ -375,6 +381,13 @@ function noticeLine(notice: Notice, strings: ExportStrings): string {
 				.replace("{scope}", data.scope === "session" ? strings.budgetSession : strings.budgetAll)
 				.replace("{spent}", () => amount(data.spent))
 				.replace("{limit}", () => amount(data.limit));
+		}
+		case "hook": {
+			const data = notice.data ?? {};
+			const text = (value: unknown) => (typeof value === "string" ? value : "");
+			return (data.kind === "blocked" ? strings.hookBlocked : strings.hookError)
+				.replace("{event}", () => text(data.event))
+				.replace("{text}", () => text(data.text));
 		}
 		case "reviewed": {
 			const data = notice.data ?? {};

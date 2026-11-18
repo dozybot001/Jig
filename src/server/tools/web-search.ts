@@ -2,10 +2,11 @@ import type { KeyStore } from "../keys.ts";
 import { errorResult, int, str, type ToolDefinition, type ToolResult, text } from "./types.ts";
 
 /**
- * Web search through a search service the person chose and holds a key for (M4 plan, section 3).
- * The key is in the system keychain; the request carries the query and nothing of the conversation.
- * Bocha is run by a Chinese company and comes first; Tavily and Brave are run abroad and are the person's own
- * choice (spec 21.6).
+ * Web search (M4 plan, section 3; blueprint 6.10, item 30). It is built in: with the DeepSeek key
+ * the person saved for the model, DeepSeek's own search answers (its Search API), with nothing more
+ * to set up. A search service the person holds a key for comes first: Bocha, run by a Chinese
+ * company, then Tavily and Brave, run abroad and the person's own choice (spec 21.6). Keys are in
+ * the system keychain; the request carries the query and nothing of the conversation.
  */
 
 export interface SearchHit {
@@ -17,6 +18,11 @@ export interface SearchHit {
 export interface SearchService {
 	/** The name its key is saved under: `yew key set search-bocha`. */
 	id: string;
+	/**
+	 * A model provider whose key it uses, saved under Providers and keys (`yew key set deepseek`):
+	 * the search settings neither save nor delete it.
+	 */
+	provider?: string;
 	name: string;
 	region: "cn" | "global";
 	origin: string;
@@ -99,7 +105,33 @@ export const SEARCH_SERVICES: SearchService[] = [
 				snippet: field(item, "description"),
 			})),
 	},
+	{
+		// DeepSeek's Search API (api-docs.deepseek.com/guides/search, 2026-11-13): the model's key.
+		id: "search-deepseek",
+		provider: "deepseek",
+		name: "DeepSeek search",
+		region: "cn",
+		origin: "https://api.deepseek.com",
+		request: (query, count, key) => ({
+			url: "https://api.deepseek.com/v1/tools/search",
+			init: {
+				method: "POST",
+				headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+				// It takes queries of up to 128 characters.
+				body: JSON.stringify({ query: query.slice(0, 128), count }),
+			},
+		}),
+		hits: (body) =>
+			list(at(body, "results")).map((item) => ({
+				title: field(item, "title"),
+				url: field(item, "url"),
+				snippet: field(item, "summary", "content"),
+			})),
+	},
 ];
+
+/** The keychain name a service's key is under: its own, or its model provider's. */
+const keyName = (service: SearchService) => service.provider ?? service.id;
 
 const TIMEOUT_MS = 20_000;
 const SNIPPET_MAX = 600;
@@ -122,7 +154,7 @@ export class SearchAccess {
 
 	async refresh(): Promise<void> {
 		for (const service of SEARCH_SERVICES) {
-			if (await this.#keys.get(service.id)) {
+			if (await this.#keys.get(keyName(service))) {
 				this.#service = service;
 				return;
 			}
@@ -131,20 +163,22 @@ export class SearchAccess {
 	}
 
 	key(service: SearchService): Promise<string | null> {
-		return this.#keys.get(service.id);
+		return this.#keys.get(keyName(service));
 	}
 
 	async hasKey(service: SearchService): Promise<boolean> {
-		return Boolean(await this.#keys.get(service.id));
+		return Boolean(await this.#keys.get(keyName(service)));
 	}
 
 	/** Saves a service's key in the keychain; web search is offered from the next turn on. */
 	async saveKey(service: SearchService, key: string): Promise<void> {
+		if (service.provider) throw new Error(`${service.name} uses the ${service.provider} key.`);
 		await this.#keys.set(service.id, key);
 		await this.refresh();
 	}
 
 	async deleteKey(service: SearchService): Promise<void> {
+		if (service.provider) throw new Error(`${service.name} uses the ${service.provider} key.`);
 		await this.#keys.delete(service.id);
 		await this.refresh();
 	}
@@ -196,7 +230,7 @@ export function webSearchTool(
 			const key = service ? await access.key(service) : null;
 			if (!service || !key) {
 				return errorResult(
-					"No search service is set up. The person can save a key with: yew key set search-bocha",
+					"No search service is set up. Web search works with the DeepSeek key (yew key set deepseek), or with a search service's own key (yew key set search-bocha).",
 				);
 			}
 			const { url, init } = service.request(query, count, key);
@@ -219,7 +253,7 @@ export function webSearchTool(
 				// The body may repeat the key or the account; only the status goes to the model.
 				return errorResult(
 					response.status === 401 || response.status === 403
-						? `${service.name} refused the key (HTTP ${response.status}). The person can replace it with: yew key set ${service.id}`
+						? `${service.name} refused the key (HTTP ${response.status}). The person can replace it with: yew key set ${keyName(service)}`
 						: `${service.name} answered HTTP ${response.status}.`,
 				);
 			}

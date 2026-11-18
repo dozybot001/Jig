@@ -34,6 +34,7 @@ import {
 	reached,
 } from "../budget.ts";
 import { conflict, invalid, YewError } from "../errors.ts";
+import type { HookEvent, HookOutcome, Hooks } from "../hooks.ts";
 import { PostOffice } from "../mail/post.ts";
 import { Manager } from "../manage.ts";
 import type { ModelGateway, ModelInfo } from "../model/gateway.ts";
@@ -125,7 +126,12 @@ export interface AgentsOptions {
 	userHome?: string | null;
 	/** The most model requests one turn makes before Yew stops it; tests lower it. */
 	maxSteps?: number;
+	/** The person's hooks (hooks.ts); none when not given. */
+	hooks?: Hooks;
 }
+
+/** How many times the Stop hooks may send a session back to work in one turn. */
+const MAX_STOP_HOOKS = 3;
 
 const MAX_MESSAGE_CHARS = 100_000;
 const MAX_STEPS = 500;
@@ -199,6 +205,9 @@ export class Agents {
 	readonly #jobs = new Map<string, Jobs>();
 	/** Messages from Yew itself (such as "a background job ended") waiting to reach the model. */
 	readonly #notes = new Map<string, string[]>();
+	readonly #hooks: Hooks | null;
+	/** By session: what the person wrote that the UserPromptSubmit hooks have not seen yet. */
+	readonly #prompts = new Map<string, string[]>();
 	/** By tool call: what ran without being asked about (skip mode) or was allowed by the check. */
 	readonly #permissionNotes = new Map<string, PermissionNote>();
 	/** Tool calls since each session last changed its task list. */
@@ -245,6 +254,7 @@ export class Agents {
 		this.#userHome = options.userHome ?? null;
 		this.#held = new Held(options.store);
 		this.#maxSteps = options.maxSteps ?? MAX_STEPS;
+		this.#hooks = options.hooks ?? null;
 		this.#context = new ContextKeeper({
 			store: this.#store,
 			gateway: this.#gateway,
@@ -325,6 +335,7 @@ export class Agents {
 		if (this.isRunning(sessionId)) return { queued: this.#store.enqueue(sessionId, text) };
 		this.#dropLeftovers(sessionId, "Not run: the person sent a new message instead of continuing.");
 		const entry = this.#store.appendEntry(sessionId, userEntry(text));
+		this.#prompted(sessionId, [text]);
 		this.#start(sessionId, { byPerson: true });
 		return { entry };
 	}
@@ -527,6 +538,7 @@ export class Agents {
 		try {
 			let retriedOverflow = false;
 			let cutReplies = 0;
+			let stopHooks = 0;
 			if (resume) await this.#resumeCalls(sessionId, live);
 			this.#deliver(sessionId);
 			for (let step = 0; ; step++) {
@@ -557,6 +569,9 @@ export class Agents {
 					}
 					break;
 				}
+				if (signal.aborted) break;
+				// The person's hooks: at the start of a session and for what they wrote (hooks.ts).
+				if (await this.#promptHooks(sessionId)) break;
 				if (signal.aborted) break;
 
 				const final = await this.#ask(this.#store.getSession(sessionId), model, snapshot, signal);
@@ -621,6 +636,18 @@ export class Agents {
 							sessionId,
 							"Your reply was cut off at the output limit. Go on from where it stopped; write long content to a file in parts.",
 						);
+					}
+					// The person's Stop hooks may send it back to work, a few times at most.
+					if (this.#hooks?.has("Stop") && stopHooks < MAX_STOP_HOOKS) {
+						const stopped = await this.#hook("Stop", sessionId, {
+							stop_hook_active: stopHooks > 0,
+						});
+						if (stopped.block) {
+							stopHooks++;
+							this.#note(sessionId, `The person's Stop hook asks you to go on: ${stopped.block}`);
+							this.#deliver(sessionId);
+							continue;
+						}
 					}
 					// The model is done; anything the person sent meanwhile starts the next round.
 					if (this.#deliver(sessionId)) continue;
@@ -858,6 +885,18 @@ export class Agents {
 				continue;
 			}
 			const session = this.#store.getSession(sessionId);
+			// The person's PreToolUse hooks can stop a call before anything else (hooks.ts).
+			if (this.#hooks?.has("PreToolUse", row.tool)) {
+				const before = await this.#hook("PreToolUse", sessionId, {}, row.tool, row.args);
+				if (before.block) {
+					results.set(row.id, {
+						result: failure(`Stopped by the person's hook: ${before.block}`),
+						status: "denied",
+						started,
+					});
+					continue;
+				}
+			}
 			let decision: ReturnType<PermissionEngine["decide"]>;
 			try {
 				// In the automatic mode the model asks for a person's approval itself, with `confirm`.
@@ -968,6 +1007,29 @@ export class Agents {
 						: `The tool failed: ${(error as Error).message}`,
 				);
 			}
+			// The person's PostToolUse hooks see what it did, and may add a word for the model (hooks.ts).
+			if (!result.isError && this.#hooks?.has("PostToolUse", row.tool)) {
+				const said = result.content
+					.map((block) => (block.type === "text" ? block.text : ""))
+					.join("\n")
+					.slice(0, 10_000);
+				const after = await this.#hook(
+					"PostToolUse",
+					sessionId,
+					{ tool_response: { content: said } },
+					row.tool,
+					row.args,
+				);
+				if (after.block) {
+					result = {
+						...result,
+						content: [
+							...result.content,
+							{ type: "text", text: `[The person's hook says] ${after.block}` },
+						],
+					};
+				}
+			}
 			results.set(row.id, { result, status: result.isError ? "error" : "done", started });
 		};
 		if (approved.every(({ tool }) => tool.readOnly)) await Promise.all(approved.map(execute));
@@ -1006,6 +1068,77 @@ export class Agents {
 		// A letter this call waited for is now in the transcript, inside the result.
 		const handed = this.#mail.takeHanded(row.id);
 		if (handed) this.post.mail.setLetterEntry(handed, entry.id);
+	}
+
+	/** What the person wrote, for the UserPromptSubmit hooks of the next step. */
+	#prompted(sessionId: string, texts: string[]): void {
+		const wanted = texts.filter((text) => text.trim());
+		if (!this.#hooks || wanted.length === 0) return;
+		this.#prompts.set(sessionId, [...(this.#prompts.get(sessionId) ?? []), ...wanted]);
+	}
+
+	/** Runs one event's hooks; a hook that failed is a notice for the person. */
+	async #hook(
+		event: HookEvent,
+		sessionId: string,
+		fields: JsonObject,
+		tool?: string,
+		args?: JsonObject,
+	): Promise<HookOutcome> {
+		const hooks = this.#hooks;
+		if (!hooks) return { block: null, context: "", errors: [] };
+		const session = this.#store.getSession(sessionId);
+		const outcome = await hooks.run(event, fields, {
+			sessionId,
+			cwd: session.cwd,
+			...(tool !== undefined ? { tool } : {}),
+			...(args !== undefined ? { args } : {}),
+		});
+		for (const error of outcome.errors) {
+			this.#notice(sessionId, "hook", error, { event, kind: "error", text: error });
+		}
+		return outcome;
+	}
+
+	/**
+	 * SessionStart for a session's first turn, UserPromptSubmit for each thing the person wrote.
+	 * What they print goes to the model as Yew's note; true when one stopped what the person wrote.
+	 */
+	async #promptHooks(sessionId: string): Promise<boolean> {
+		if (!this.#hooks) return false;
+		const first = !this.#store
+			.contextEntries(sessionId)
+			.some((entry) => entry.role === "assistant");
+		if (first && this.#hooks.has("SessionStart")) {
+			const started = await this.#hook("SessionStart", sessionId, { source: "startup" });
+			if (started.context) {
+				this.#store.appendEntry(sessionId, userEntry(`${YEW_NOTE} ${started.context}`));
+			}
+		}
+		const prompts = this.#prompts.get(sessionId) ?? [];
+		this.#prompts.delete(sessionId);
+		if (!this.#hooks.has("UserPromptSubmit")) return false;
+		for (const prompt of prompts) {
+			const checked = await this.#hook("UserPromptSubmit", sessionId, { prompt });
+			if (checked.block) {
+				this.#store.appendEntry(
+					sessionId,
+					userEntry(
+						`${YEW_NOTE} The person's hook stopped the message above, so it is not to be acted on: ${checked.block}`,
+					),
+				);
+				this.#notice(sessionId, "hook", checked.block, {
+					event: "UserPromptSubmit",
+					kind: "blocked",
+					text: checked.block,
+				});
+				return true;
+			}
+			if (checked.context) {
+				this.#store.appendEntry(sessionId, userEntry(`${YEW_NOTE} ${checked.context}`));
+			}
+		}
+		return false;
 	}
 
 	/** Adds to what a call's row says about how it was allowed. */
@@ -1415,7 +1548,12 @@ export class Agents {
 			this.#store.appendEntry(sessionId, userEntry(`${YEW_NOTE} ${note}`));
 		}
 		const letters = this.#mail.deliver(sessionId, this.#mail.firstDelivery(sessionId));
-		const fromPerson = this.#store.deliverQueue(sessionId, userEntry).length;
+		const delivered = this.#store.deliverQueue(sessionId, userEntry);
+		this.#prompted(
+			sessionId,
+			delivered.map((entry) => (entry.role === "user" ? messageText(entry.message) : "")),
+		);
+		const fromPerson = delivered.length;
 		if (fromPerson > 0) {
 			// What the person wrote starts a new chain of hand-offs, and they are watching now.
 			this.post.resetChain(sessionId);
