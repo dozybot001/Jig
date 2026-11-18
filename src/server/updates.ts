@@ -312,8 +312,47 @@ export class Updates {
 		return this.state();
 	}
 
+	/** A version's integrity as a registry gives it; null when it cannot be read. */
+	async #integrity(registry: string, version: string): Promise<string | null> {
+		const fetcher = this.#o.fetch ?? fetch;
+		try {
+			const response = await fetcher(new URL(`${PACKAGE}/${version}`, registry), {
+				headers: { "User-Agent": `yew/${this.#o.version}`, Accept: "application/json" },
+				signal: AbortSignal.timeout(15_000),
+			});
+			if (!response.ok) return null;
+			const body = (await response.json()) as {
+				name?: unknown;
+				version?: unknown;
+				dist?: { integrity?: unknown };
+			};
+			if (body.name !== PACKAGE || body.version !== version) return null;
+			return typeof body.dist?.integrity === "string" ? body.dist.integrity : null;
+		} catch {
+			return null;
+		}
+	}
+
 	async #install(version: string): Promise<void> {
 		const prefix = globalPrefix(this.#o.root);
+		const registry = await this.#registryUrl();
+		// From a mirror, the package must be the one npm's own registry has (the security group, 11-19):
+		// a different one is not installed. When npm's registry cannot be reached, it goes ahead.
+		if (registry !== DEFAULT_REGISTRY) {
+			const [mirror, official] = await Promise.all([
+				this.#integrity(registry, version),
+				this.#integrity(DEFAULT_REGISTRY, version),
+			]);
+			if (official !== null && mirror !== official) {
+				this.#job = {
+					state: "failed",
+					version,
+					output: `${registry} gives a different package for ${PACKAGE}@${version} than ${DEFAULT_REGISTRY} does, so it was not installed.`,
+				};
+				this.#o.log(`update: ${PACKAGE}@${version} from ${registry} does not match npm's`);
+				return;
+			}
+		}
 		this.#o.log(`update: installing ${PACKAGE}@${version}`);
 		const result = await this.#run(
 			this.#o.node,
@@ -334,6 +373,22 @@ export class Updates {
 		if (result.code !== 0) {
 			this.#job = { state: "failed", version, output: result.output };
 			this.#o.log(`update: npm ended with ${result.code ?? "no exit code"}`);
+			return;
+		}
+		// What npm put there must be the package and version asked for before its app is run.
+		let installed: { name?: unknown; version?: unknown } = {};
+		try {
+			installed = JSON.parse(readFileSync(join(this.#o.root, "package.json"), "utf8"));
+		} catch {
+			// Checked just below.
+		}
+		if (installed.name !== PACKAGE || installed.version !== version) {
+			this.#job = {
+				state: "failed",
+				version,
+				output: `${result.output}\nAfter npm ran, ${this.#o.root} does not hold ${PACKAGE}@${version}; the Mac app was left as it was.`,
+			};
+			this.#o.log(`update: ${this.#o.root} does not hold ${PACKAGE}@${version} after npm`);
 			return;
 		}
 		let output = result.output;

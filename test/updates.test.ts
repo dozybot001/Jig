@@ -35,6 +35,11 @@ function setup(options: Partial<UpdateOptions> = {}, version = "1.7.0") {
 	const runs: { file: string; args: string[] }[] = [];
 	const requests: { url: string; agent: string | null }[] = [];
 	let latest = "1.8.0";
+	/** The integrity each registry gives for a version; null for one that cannot be reached. */
+	const integrity: Record<string, string | null> = {
+		"registry.npmmirror.com": "sha512-same",
+		"registry.npmjs.org": "sha512-same",
+	};
 	let busy = 0;
 	let restarts = 0;
 	let refreshed = 0;
@@ -57,11 +62,25 @@ function setup(options: Partial<UpdateOptions> = {}, version = "1.7.0") {
 				url: String(url),
 				agent: new Headers(init?.headers).get("User-Agent"),
 			});
-			return Response.json({ name: "@tenonai/yew", version: latest });
+			if (url.pathname.endsWith("/latest")) {
+				return Response.json({ name: "@tenonai/yew", version: latest });
+			}
+			const known = integrity[url.hostname];
+			if (known === null) throw new TypeError("fetch failed");
+			const version = url.pathname.split("/").at(-1);
+			return Response.json({ name: "@tenonai/yew", version, dist: { integrity: known } });
 		}) as typeof fetch,
 		run: async (file, args): Promise<Run> => {
 			runs.push({ file, args });
 			if (args.includes("config")) return { code: 0, output: "https://registry.npmmirror.com\n" };
+			// npm puts the version asked for in place.
+			const asked = args.find((arg) => arg.startsWith("@tenonai/yew@"));
+			if (asked) {
+				writeFileSync(
+					join(made.root, "package.json"),
+					JSON.stringify({ name: "@tenonai/yew", version: asked.slice("@tenonai/yew@".length) }),
+				);
+			}
 			return { code: 0, output: "added 1 package" };
 		},
 		writable: () => true,
@@ -81,6 +100,7 @@ function setup(options: Partial<UpdateOptions> = {}, version = "1.7.0") {
 		},
 		restarts: () => restarts,
 		refreshed: () => refreshed,
+		integrity,
 	};
 }
 
@@ -200,6 +220,44 @@ describe("installing an update", () => {
 		assert.equal(state.manual, "npm install --global @tenonai/yew@1.8.0");
 		assert.throws(() => updates.install("1.8.0"), /cannot install it here/);
 		assert.equal(runs.filter((run) => run.args.includes("install")).length, 0);
+	});
+
+	test("from a mirror, a package that differs from npm's own is not installed", async () => {
+		const { updates, runs, integrity } = setup();
+		await updates.check();
+		integrity["registry.npmmirror.com"] = "sha512-changed";
+		updates.install("1.8.0");
+		await settle();
+		await settle();
+		const job = updates.state().job;
+		assert.equal(job?.state, "failed");
+		assert.match(job?.output ?? "", /gives a different package/);
+		assert.equal(runs.filter((run) => run.args.includes("install")).length, 0);
+	});
+
+	test("when npm's own registry cannot be reached, the mirror's package is installed", async () => {
+		const { updates, integrity } = setup();
+		await updates.check();
+		integrity["registry.npmjs.org"] = null;
+		updates.install("1.8.0");
+		for (let i = 0; i < 5; i++) await settle();
+		assert.equal(updates.state().job?.state, "installed");
+	});
+
+	test("after npm, a package that is not the one asked for leaves the Mac app alone", async () => {
+		const { updates, refreshed } = setup({
+			run: async (_file, args) =>
+				args.includes("config")
+					? { code: 0, output: "https://registry.npmjs.org/" }
+					: { code: 0, output: "added 1 package" },
+		});
+		await updates.check();
+		updates.install("1.8.0");
+		for (let i = 0; i < 5; i++) await settle();
+		const job = updates.state().job;
+		assert.equal(job?.state, "failed");
+		assert.match(job?.output ?? "", /does not hold @tenonai\/yew@1\.8\.0/);
+		assert.equal(refreshed(), 0);
 	});
 
 	test("an install that fails says so, with npm's output", async () => {
