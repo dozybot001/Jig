@@ -5,6 +5,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { type PermissionMode, permissionModeOf, type Session } from "../../shared/types.ts";
 import { isInside } from "../permissions/paths.ts";
 import { findSkills, memoryIndex, memoryNote, skillsNote } from "../skills.ts";
+import { loginShell } from "../tools/process.ts";
 
 /** Inputs of the system prompt, saved per session so the prompt stays the same between turns (prompt caching). */
 export interface ContextSnapshot {
@@ -194,7 +195,7 @@ export function takeSnapshot(
 	return {
 		date: today(),
 		platform: platformName(),
-		shell: process.env.SHELL ?? "/bin/sh",
+		shell: loginShell(),
 		cwd: session.cwd,
 		git: session.cwd ? gitStatus(session.cwd) : null,
 		instructions: loadInstructions(session.cwd, yewHome, extras),
@@ -357,7 +358,7 @@ export function helperPrompt(sender: string, cwd: string | null, now = new Date(
 		"",
 		"Environment:",
 		`- Date: ${today(now)}`,
-		`- System: ${platformName()}; shell: ${process.env.SHELL || "/bin/sh"}`,
+		`- System: ${platformName()}; shell: ${loginShell()}`,
 		cwd ? `- Working folder: ${cwd}` : "- No working folder: no file or shell tools.",
 	].join("\n");
 }

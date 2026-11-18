@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { newId } from "../ids.ts";
 import { activeSandbox, OUTSIDE_GIT, quote, type SiteQuestion, sandboxed } from "../sandbox.ts";
@@ -84,6 +84,22 @@ export function commandEnvironment(sessionId: string): NodeJS.ProcessEnv {
 	};
 }
 
+/** Shells tried in order when SHELL is not set, or names a program that is not there. */
+const SHELLS = ["/bin/zsh", "/usr/bin/zsh", "/bin/bash", "/usr/bin/bash", "/bin/sh"];
+
+/**
+ * The shell commands run in: the person's SHELL when it is there; otherwise zsh, then bash, then sh,
+ * whichever this computer has. A service started at login or in a container often has no SHELL,
+ * and Linux often has no zsh.
+ */
+export function loginShell(
+	env: NodeJS.ProcessEnv = process.env,
+	exists: (path: string) => boolean = existsSync,
+): string {
+	if (env.SHELL && exists(env.SHELL)) return env.SHELL;
+	return SHELLS.find((shell) => exists(shell)) ?? "/bin/sh";
+}
+
 export interface RunningCommand {
 	child: ChildProcess;
 	output: OutputTail;
@@ -110,7 +126,7 @@ export async function startCommand(options: {
 	/** Started in the background (shell_job), as a card listing what runs in the sandbox says. */
 	background?: boolean;
 }): Promise<RunningCommand> {
-	const shell = process.env.SHELL || "/bin/zsh";
+	const shell = loginShell();
 	const env = commandEnvironment(options.sessionId);
 	const outside = options.outsideSandbox === true && activeSandbox() !== "none";
 	const box = outside

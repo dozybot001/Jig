@@ -9,7 +9,7 @@ import { htmlToMarkdown } from "../src/server/tools/html.ts";
 import { Jobs } from "../src/server/tools/jobs.ts";
 import { findUnique } from "../src/server/tools/match.ts";
 import { todoTool } from "../src/server/tools/misc.ts";
-import { commandEnvironment } from "../src/server/tools/process.ts";
+import { commandEnvironment, loginShell } from "../src/server/tools/process.ts";
 import { ReadState } from "../src/server/tools/read-state.ts";
 import { globTool, grepTool } from "../src/server/tools/search.ts";
 import { shellJobTool, shellTool } from "../src/server/tools/shell.ts";
@@ -180,6 +180,18 @@ describe("search tools", () => {
 });
 
 describe("shell tool", () => {
+	test("commands run in SHELL when it is there, else zsh, bash or sh, whichever there is", () => {
+		const has =
+			(...paths: string[]) =>
+			(path: string) =>
+				paths.includes(path);
+		assert.equal(loginShell({ SHELL: "/opt/fish" }, has("/opt/fish", "/bin/zsh")), "/opt/fish");
+		// A container or a service started at login: no SHELL, and on Linux often no zsh.
+		assert.equal(loginShell({}, has("/bin/bash", "/bin/sh")), "/bin/bash");
+		assert.equal(loginShell({ SHELL: "/bin/zsh" }, has("/bin/sh")), "/bin/sh");
+		assert.equal(loginShell({}, has("/usr/bin/zsh", "/bin/bash")), "/usr/bin/zsh");
+	});
+
 	test("commands get neither provider keys nor an evaluation's switches", () => {
 		const saved = { ...process.env };
 		process.env.DEEPSEEK_API_KEY = "sk-test";
