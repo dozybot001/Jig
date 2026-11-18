@@ -1,0 +1,45 @@
+# The system sandbox / 系统沙箱
+
+What a session's commands can and cannot do in Yew Harness, and what happens when the sandbox cannot start. English first, Chinese below. To report a security problem, see [SECURITY.md](../SECURITY.md).
+
+会话的命令在 Yew Harness 里能做什么、不能做什么，以及沙箱起不来时怎样。先英文、后中文。报告安全问题见 [SECURITY.md](../SECURITY.md)。
+
+## English
+
+Sessions' commands and the MCP servers you add run in a system sandbox. It is Anthropic's open-source [sandbox-runtime](https://github.com/anthropics/sandbox-runtime) (Apache-2.0), on Seatbelt on macOS and on bubblewrap on Linux. In the sandbox, a command:
+
+- can neither read nor change Yew Harness's data folder (your decisions, sign-in tokens and logs), and cannot read the keychain's items;
+- writes only in the session's workspace, temporary folders and the sandbox's own caches, not in files such as `~/.zshrc` or `~/.gitconfig`, nor in a repository's hooks and settings;
+- cannot change Yew Harness's program or what starts at login, and cannot reach its local port, other local ports or the local network;
+- reaches only the usual package registries, GitHub, Gitee and the model providers that have a key; for any other site you are asked first;
+- cannot read credential files such as `~/.ssh`, `~/.aws` or `~/.netrc`, nor use ssh-agent, unless you allow it under Startup in the settings;
+- cannot read the folders listed under Default settings → Folders sessions cannot read, which sessions' file tools cannot read either;
+- on Linux, cannot reach local Unix sockets, the D-Bus session bus included.
+
+On Linux, a repository made while a command runs is not protected until the command ends; then Yew Harness moves any new hook aside, so git does not run it, and says so in the command's output.
+
+A command that has to run outside the sandbox (a `git push` with credentials from the keychain, creating or cloning a repository, a dev server that listens on a local port, an Xcode build) asks you every time, and git run outside runs no repository hooks. The built-in browser and computer control do not run in the sandbox: the browser can reach only its own empty folder, cannot open `file://` pages, and cannot reach Yew Harness's port. When Yew Harness runs from its source folder, that folder cannot be written in the sandbox; to change Yew Harness with Yew Harness, run the version installed from npm.
+
+If the sandbox cannot start, Yew Harness runs without it and says why in the output of `yew serve` and under Startup in the settings: a program it needs is missing (ripgrep on macOS; bubblewrap, socat and ripgrep on Linux), the system does not let bubblewrap create user namespaces (the default from Ubuntu 24.04; sandbox-runtime's documentation says how to allow it), or `yew serve` was started with `YEW_SANDBOX=off`. Then, with Ask when needed and Full access, commands that run without asking run as your user account and can do what you can do in a terminal, including changing Yew Harness's own records (decisions and permissions among them) and reading the API keys it keeps. The Linux sandbox has passed the everyday tests in a Debian 12 container and has not been tested on a real machine yet.
+
+Letters from other sessions, web pages, mail and what MCP servers return are only data to Yew Harness and cannot approve anything for you. For a session that handles such outside content, Ask each time is still the better mode: every command asks you first.
+
+## 中文
+
+会话的命令和你自己加的 MCP 服务器在系统沙箱里运行。沙箱用的是 Anthropic 开源的 [sandbox-runtime](https://github.com/anthropics/sandbox-runtime)（Apache-2.0），macOS 上底层是系统的 Seatbelt，Linux 上是 bubblewrap。在沙箱里：
+
+- 读写不了 Yew Harness 的数据目录（里面有你的决定、登录令牌和日志），也读不到钥匙串里的条目；
+- 只能写会话的工作区、临时文件夹和沙箱自己的缓存，写不了 `~/.zshrc`、`~/.gitconfig` 这类文件，也写不了仓库的钩子和配置；
+- 改不了 Yew Harness 的程序和开机启动项，连不上它的本机端口，也连不上别的本机端口和局域网；
+- 联网只放行常用的包管理源、GitHub、Gitee 和配了密钥的模型服务商，连别的网站时先问你；
+- 读不到 `~/.ssh`、`~/.aws`、`~/.netrc` 这类凭据文件，也用不了 ssh-agent，除非你在设置的「启动」里打开；
+- 读不到你在「默认设置 → 会话读不到的目录」里列的文件夹，会话的文件工具也读不到；
+- Linux 上连不上本机的 Unix 套接字，包括 D-Bus 会话总线。
+
+Linux 上，命令运行中新建的仓库在命令结束前不受保护；命令结束后 Yew Harness 把新出现的钩子挪开，不让 git 执行，并在命令的输出里写明。
+
+要在沙箱外跑的命令（比如要用钥匙串里凭据的 `git push`、新建或克隆仓库、要监听本机端口的开发服务器、Xcode 构建），每次都先问你；在外面跑的 git 不执行仓库里的钩子。自带的浏览器和电脑操控不进沙箱：浏览器只能访问它自己的空文件夹，打不开 `file://` 网页，也连不上 Yew Harness 的端口。从源码目录运行 Yew Harness 时，这个目录在沙箱里写不了，要用 Yew Harness 改 Yew Harness，请运行 npm 安装的版本。
+
+沙箱起不来时，Yew Harness 不进沙箱照常运行，并在 `yew serve` 的输出和设置的「启动」里写明原因：缺少要用的程序（macOS 要 ripgrep，Linux 要 bubblewrap、socat 和 ripgrep），系统不让 bubblewrap 建用户命名空间（比如 Ubuntu 24.04 起的默认设置，放开的办法见 sandbox-runtime 的说明），或起 `yew serve` 时设了 `YEW_SANDBOX=off`。这时按需授权和完全授权下，会话不问就跑的命令以你的系统账户运行，能做你在终端里能做的事，包括改 Yew Harness 自己的记录（决定和授权也在里面）、读它保存的 API Key。Linux 上的沙箱在 Debian 12 的容器里跑过日常的测试，还没在实机上测过。
+
+别的会话的信、网页、邮件和 MCP 返回的内容，Yew Harness 只当作数据，不能替你授权；会话要处理这类外来内容时，仍建议给它用逐项授权，让命令每次都先问你。
