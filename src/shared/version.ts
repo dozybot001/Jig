@@ -10,5 +10,11 @@ export const NAME = "yew";
 /** The product's name where people read it (blueprint, section 12); `NAME` is the command's. */
 export const PRODUCT = "Yew Harness";
 export const VERSION: string = pkg.version;
+/**
+ * The version of the protocol sessions speak: the fields of letters, decision cards, permission
+ * requests and finish_task. It goes up whenever one of them changes, so an evaluation can tell which
+ * protocol a run used (blueprint, section 11: working with the Yew model).
+ */
+export const PROTOCOL_VERSION = 1;
 export const PUBLISHER = "Tenon AI";
 export const WEBSITE = "https://tenonai.cn/";

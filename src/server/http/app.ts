@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import type { RemoteAccess } from "../../remote/access.ts";
-import { VERSION } from "../../shared/version.ts";
+import { PROTOCOL_VERSION, VERSION } from "../../shared/version.ts";
 import type { Agents } from "../agent/runner.ts";
 import type { ArtifactStore } from "../artifacts.ts";
 import type { EventBus } from "../events.ts";
@@ -93,7 +93,12 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 	}
 	app.use("*", deviceLimits());
 	app.get("/api/health", (c) =>
-		c.json({ ok: true, version: VERSION, build: options.build ?? null }),
+		c.json({
+			ok: true,
+			version: VERSION,
+			build: options.build ?? null,
+			protocol: PROTOCOL_VERSION,
+		}),
 	);
 	app.route(
 		"/api",

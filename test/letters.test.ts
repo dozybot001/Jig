@@ -371,7 +371,7 @@ describe("task sessions", () => {
 		]);
 		// The child's script is keyed by the name it will get.
 		script({ name: "统计 TODO" } as Session, [
-			toolUse(fauxToolCall("finish_task", { result: "done" }, { id: "k1" })),
+			toolUse(fauxToolCall("finish_task", { result: "done", next: "没有剩下的事" }, { id: "k1" })),
 			fauxAssistantMessage("完成：0 个 TODO"),
 		]);
 		agents.send(parent.id, "开个子任务统计 TODO");
@@ -384,6 +384,11 @@ describe("task sessions", () => {
 		assert.equal(child.options.permissionMode, "skip");
 		assert.deepEqual(child.rules, [{ effect: "deny", tool: "web_fetch" }]);
 		assert.equal(child.outcome, "done");
+		// What is left stays with the call, for an evaluation to read (PROTOCOL_VERSION 1).
+		const finished = store
+			.toolCallsForSession(child.id)
+			.find((call) => call.tool === "finish_task");
+		assert.equal(finished?.args.next, "没有剩下的事");
 		assert.match(lastTool(seen.get("Yew · 开发")?.[1]), /完成：0 个 TODO/);
 		const prompt = String(seen.get("统计 TODO")?.[0]?.messages[0]?.content ?? "");
 		assert.match(prompt, /"Yew · 开发" \(id [^)]+\) opened you for this task/);

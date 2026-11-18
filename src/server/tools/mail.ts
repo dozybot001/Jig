@@ -501,7 +501,13 @@ export const finishTaskTool: ToolDefinition = {
 		"Record how your task ended: done, given_up or failed. Then end your turn with your report: the result, what changed, how you checked it, and what is left.",
 	parameters: {
 		type: "object",
-		properties: { result: { type: "string", enum: [...TASK_OUTCOMES] } },
+		properties: {
+			result: { type: "string", enum: [...TASK_OUTCOMES] },
+			next: {
+				type: "string",
+				description: "What is left, and who does it next. Leave it out when nothing is.",
+			},
+		},
 		required: ["result"],
 		additionalProperties: false,
 	},
@@ -514,6 +520,10 @@ export const finishTaskTool: ToolDefinition = {
 	async run(args, ctx): Promise<ToolResult> {
 		const outcome = choice(args, "result", TASK_OUTCOMES) as TaskOutcome;
 		if (!outcome) throw new ToolInputError("result is required.");
+		// What is left is kept with the call itself, where an evaluation reads it (PROTOCOL_VERSION 1).
+		if (args.next !== undefined && typeof args.next !== "string") {
+			throw new ToolInputError("next is text: what is left, and who does it next.");
+		}
 		const session = ctx.mail.finish(outcome);
 		const to = session.parentId
 			? `It goes to ${nameOf(ctx.mail, session.parentId)}.`
