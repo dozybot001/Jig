@@ -49,6 +49,8 @@ export interface Settings {
 
 /** This browser remembers "off" here, so the opening knows before the settings arrive. */
 export const MASCOT_KEY = "yew.mascot";
+/** This browser remembers a chosen light or dark here, so the first frame is already in it. */
+export const THEME_KEY = "yew.theme";
 
 export const NOTIFY_KINDS = ["waiting", "error", "task", "budget"] as const;
 export type NotifyKind = (typeof NOTIFY_KINDS)[number];

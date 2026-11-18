@@ -13,6 +13,7 @@ import { Sidebar, SidebarRail, useNarrow } from "./components/sidebar.tsx";
 import { Button } from "./components/ui.tsx";
 import { UsagePage } from "./components/usage.tsx";
 import { t, useLang } from "./i18n.ts";
+import { watchInput } from "./input.ts";
 import { watchPresence } from "./presence.ts";
 import { centerCount, setState, useAppState } from "./state.ts";
 import "./styles/app.css";
@@ -46,7 +47,7 @@ function App() {
 	if (phase === "loading") {
 		return (
 			<div className="center-page" aria-busy="true">
-				<p>{t("loading")}</p>
+				<p className="loading-word">{t("loading")}</p>
 			</div>
 		);
 	}
@@ -131,6 +132,7 @@ if (root) {
 			<Opening />
 		</StrictMode>,
 	);
+	watchInput();
 	void boot();
 	watchPresence();
 	// The Mac app's menu (macos/): "About Yew Harness" opens that page of the settings.

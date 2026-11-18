@@ -22,6 +22,9 @@ final class WebWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDel
 	private let primary: Bool
 	private let waiting = NSStackView()
 	private var titleWatch: NSKeyValueObservation?
+	private var themeWatch: NSKeyValueObservation?
+	/// The page has loaded; until then a `theme-color` that is not there yet means nothing.
+	private var loaded = false
 	/// The last address handed to the person's browser, so a redirect seen twice opens it once.
 	private var handedOut: URL?
 	/// Where each download in progress is being saved, to mark the file when it is done.
@@ -39,6 +42,7 @@ final class WebWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDel
 		)
 		super.init()
 		window.title = "Yew Harness"
+		window.backgroundColor = Appearance.page
 		window.minSize = NSSize(width: 720, height: 480)
 		window.isReleasedWhenClosed = false
 		window.tabbingMode = .disallowed
@@ -69,16 +73,21 @@ final class WebWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDel
 		waiting.addArrangedSubview(spinner)
 		waiting.addArrangedSubview(label)
 		waiting.isHidden = true
+		// Shown once the page has drawn itself: until then a web view is white, which flashes in dark.
+		webView.alphaValue = 0
 
 		webView.navigationDelegate = self
 		webView.uiDelegate = self
 		webView.allowsBackForwardNavigationGestures = false
-		webView.underPageBackgroundColor = .windowBackgroundColor
+		webView.underPageBackgroundColor = Appearance.page
 		if #available(macOS 13.3, *) {
 			webView.isInspectable = ProcessInfo.processInfo.environment["YEW_APP_INSPECT"] == "1"
 		}
 		titleWatch = webView.observe(\.title, options: [.new]) { [weak self] webView, _ in
 			MainActor.assumeIsolated { self?.titleChanged(webView.title ?? "") }
+		}
+		themeWatch = webView.observe(\.themeColor, options: [.new]) { [weak self] webView, _ in
+			MainActor.assumeIsolated { self?.themeChanged(webView.themeColor) }
 		}
 
 		if primary {
@@ -93,12 +102,37 @@ final class WebWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDel
 		window.makeKeyAndOrderFront(nil)
 	}
 
-	/// Shown while Yew Harness starts, before its page has loaded.
+	/// While Yew Harness starts, before its page has loaded: the window in the page's color, and a
+	/// spinner once it takes a moment (a start that takes no time shows none).
 	func showWaiting() {
-		if webView.url == nil {
-			webView.isHidden = true
-			waiting.isHidden = false
+		guard webView.url == nil else { return }
+		Task { [weak self] in
+			try? await Task.sleep(for: .milliseconds(800))
+			guard let self, self.webView.alphaValue < 1 else { return }
+			self.waiting.isHidden = false
 		}
+	}
+
+	/// Shows the page once it has drawn a frame. A second is the most it waits.
+	private func reveal() {
+		guard webView.alphaValue < 1 else { return }
+		Task { [weak self] in
+			// When the second frame is asked for, the first has been drawn.
+			_ = try? await self?.webView.callAsyncJavaScript(
+				"await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))",
+				contentWorld: .defaultClient
+			)
+			self?.showPage()
+		}
+		Task { [weak self] in
+			try? await Task.sleep(for: .seconds(1))
+			self?.showPage()
+		}
+	}
+
+	private func showPage() {
+		waiting.isHidden = true
+		webView.alphaValue = 1
 	}
 
 	func load(_ url: URL) {
@@ -111,6 +145,11 @@ final class WebWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDel
 
 	func zoom(by step: CGFloat) {
 		webView.pageZoom = min(3, max(0.5, webView.pageZoom + step))
+	}
+
+	/// The main window's page chose light or dark, or went back to the system's.
+	private func themeChanged(_ color: NSColor?) {
+		if primary, loaded { Appearance.follow(color) }
 	}
 
 	private func titleChanged(_ title: String) {
@@ -200,9 +239,14 @@ final class WebWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDel
 		if !primary { window.close() }
 	}
 
+	func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+		loaded = false
+	}
+
 	func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-		waiting.isHidden = true
-		webView.isHidden = false
+		loaded = true
+		themeChanged(webView.themeColor)
+		reveal()
 	}
 
 	func webView(

@@ -152,6 +152,13 @@ a {
 	outline: 2px solid var(--accent);
 	outline-offset: 2px;
 }
+/*
+ * After a click the ring waits for the keyboard: WebKit draws it on what a dialog or menu focuses as
+ * it opens, and on the button focus goes back to (web/src/input.ts).
+ */
+:root[data-input="pointer"] :focus-visible {
+	outline: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
 	*,
@@ -355,8 +362,8 @@ a {
 	justify-items: center;
 	gap: 24px;
 	padding: 16px;
+	/* There from the first frame, so nothing under it shows while it comes in; what is on it moves. */
 	background: var(--bg);
-	animation: opening-fade 0.2s ease-out;
 }
 .opening-leaving {
 	opacity: 0;
@@ -468,11 +475,6 @@ a {
 @keyframes opening-pop {
 	to {
 		transform: scale(1);
-	}
-}
-@keyframes opening-fade {
-	from {
-		opacity: 0;
 	}
 }
 @keyframes opening-show {
@@ -763,6 +765,9 @@ a.btn {
 .menu [role^="menuitem"]:focus-visible {
 	background: var(--hover);
 	outline: none;
+}
+:root[data-input="pointer"] .menu [role^="menuitem"]:focus-visible:not(:hover) {
+	background: none;
 }
 .listbox .option-text {
 	display: flex;
@@ -1181,6 +1186,15 @@ body.scroll-locked {
 	height: 100dvh;
 	padding: 16px;
 	text-align: center;
+}
+/* A start that takes no time shows no "Loading": the word comes only after a moment. */
+.loading-word {
+	animation: loading-word 0s 0.5s both;
+}
+@keyframes loading-word {
+	from {
+		visibility: hidden;
+	}
 }
 .center-page > div {
 	max-width: 440px;
@@ -2806,6 +2820,9 @@ button.about-row {
 .decision-option:has(input:focus-visible) {
 	outline: 2px solid var(--accent);
 	outline-offset: 2px;
+}
+:root[data-input="pointer"] .decision-option:has(input:focus-visible) {
+	outline: none;
 }
 .decision-radio {
 	flex: none;

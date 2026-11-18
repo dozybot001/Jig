@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		NSApp.mainMenu = Menus.make(target: self)
+		Appearance.restore()
 		let window = WebWindow(app: self, configuration: WebWindow.configuration(), primary: true)
 		main = window
 		window.show()
