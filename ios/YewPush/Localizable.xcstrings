@@ -75,13 +75,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Something in Yew needs you."
+            "value": "Something in Yew Harness needs you."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Yew 里有事等你。"
+            "value": "Yew Harness 里有事等你。"
           }
         }
       }
@@ -160,13 +160,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Was working when Yew restarted; check it"
+            "value": "Was working when Yew Harness restarted; check it"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Yew 重启时它在干活，等你核对"
+            "value": "Yew Harness 重启时它在干活，等你核对"
           }
         }
       }

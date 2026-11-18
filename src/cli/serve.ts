@@ -16,8 +16,9 @@ const REMOTE_SYNC_MS = 5000;
 
 const SERVE_HELP = `Usage: yew serve [options]
 
-Start Yew's local service. It listens on 127.0.0.1 only, keeps running while
-the browser is closed, and prints a one-time link to open the web interface.
+Start Yew Harness's local service. It listens on 127.0.0.1 only, keeps running
+while the browser is closed, and prints a one-time link to open the web
+interface.
 
 Options:
   -p, --port <n>  Port to listen on (default ${DEFAULT_PORT})
@@ -27,7 +28,8 @@ Options:
 
 const OPEN_HELP = `Usage: yew open [options]
 
-Open the web interface of the running Yew service with a new one-time link.
+Open the web interface of the running Yew Harness service with a new one-time
+link.
 
 Options:
       --print  Print the link instead of opening a browser
@@ -68,7 +70,7 @@ export function openBrowser(url: string): void {
 export function serveCommand(): Command {
 	return {
 		name: "serve",
-		summary: "Start Yew's local service",
+		summary: "Start Yew Harness's local service",
 		async run(args: string[], io: CliIo): Promise<number> {
 			const { values } = parseArgs({
 				args,
@@ -102,7 +104,7 @@ export function serveCommand(): Command {
 			const stuck = store.recoverAfterRestart();
 			if (stuck.length > 0) {
 				io.stderr.write(
-					`${stuck.length} session(s) were working when Yew last stopped. They are marked for review; nothing was redone.\n`,
+					`${stuck.length} session(s) were working when Yew Harness last stopped. They are marked for review; nothing was redone.\n`,
 				);
 			}
 			store.pruneEvents(Date.now() - EVENT_RETENTION_MS);
@@ -157,7 +159,7 @@ export function serveCommand(): Command {
 				version: VERSION,
 				log,
 				handle: async (request, device) => {
-					if (!handle) throw new Error("Yew is still starting.");
+					if (!handle) throw new Error("Yew Harness is still starting.");
 					return handle(request, device.id);
 				},
 			});
@@ -204,7 +206,7 @@ export function serveCommand(): Command {
 				server.once("error", (error: NodeJS.ErrnoException) => {
 					io.stderr.write(
 						error.code === "EADDRINUSE"
-							? `yew: port ${port} is in use. Is Yew already running? Try 'yew open', or pick another port with --port.\n`
+							? `yew: port ${port} is in use. Is Yew Harness already running? Try 'yew open', or pick another port with --port.\n`
 							: `yew: could not start: ${error.message}\n`,
 					);
 					resolve(false);
@@ -235,13 +237,13 @@ export function serveCommand(): Command {
 
 			const url = `http://127.0.0.1:${port}/#t=${issueLoginToken(store)}`;
 			io.stdout.write(
-				`Yew ${VERSION} is running at http://127.0.0.1:${port}/\nSign in with this link (works once, within 10 minutes):\n${url}\nStop with Ctrl-C. For a new link later, run: yew open\n`,
+				`Yew Harness ${VERSION} is running at http://127.0.0.1:${port}/\nSign in with this link (works once, within 10 minutes):\n${url}\nStop with Ctrl-C. For a new link later, run: yew open\n`,
 			);
 			if (values.open) openBrowser(url);
 
 			return await new Promise<number>((resolve) => {
 				const stop = () => {
-					io.stderr.write("Stopping Yew…\n");
+					io.stderr.write("Stopping Yew Harness…\n");
 					clearInterval(sweep);
 					clearInterval(remoteSweep);
 					scheduler.stop();
@@ -295,7 +297,7 @@ export function openCommand(): Command {
 				info = JSON.parse(readFileSync(serveFile(home), "utf8")) as ServeFile;
 				process.kill(info.pid, 0);
 			} catch {
-				io.stderr.write("yew: Yew is not running. Start it with: yew serve\n");
+				io.stderr.write("yew: Yew Harness is not running. Start it with: yew serve\n");
 				return EXIT_ERROR;
 			}
 			const { openDatabase } = await import("../server/db/database.ts");
@@ -310,7 +312,7 @@ export function openCommand(): Command {
 					io.stdout.write(`${url}\n`);
 				} else {
 					openBrowser(url);
-					io.stdout.write(`Opened Yew in the browser (http://127.0.0.1:${info.port}/).\n`);
+					io.stdout.write(`Opened Yew Harness in the browser (http://127.0.0.1:${info.port}/).\n`);
 				}
 				return EXIT_OK;
 			} finally {

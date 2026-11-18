@@ -63,7 +63,7 @@ describe("yew send", () => {
 		assert.match(result.stdout.text(), /^Sent letter [\w-]+ to 平台组\.\n$/);
 		assert.match(
 			result.stderr.text(),
-			/Yew is not running; the letter is delivered when it starts/,
+			/Yew Harness is not running; the letter is delivered when it starts/,
 		);
 		const [letter] = letters();
 		assert.equal(letter?.fromKind, "cli");

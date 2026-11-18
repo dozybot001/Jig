@@ -84,6 +84,7 @@ import {
 	PhoneIcon,
 	PlusIcon,
 	PowerIcon,
+	ProductName,
 	PulseIcon,
 	RenameIcon,
 	RetryIcon,
@@ -95,7 +96,6 @@ import {
 	ToolsIcon,
 	TrashIcon,
 	YewMark,
-	YewWordmark,
 } from "./icons.tsx";
 import { Mascot } from "./mascot.tsx";
 import { ModelPicker } from "./session.tsx";
@@ -698,7 +698,7 @@ function About() {
 				<div className="lockup" role="img" aria-label={t("lockupName")}>
 					<YewMark className="lockup-mark" size={22} />
 					<span className="lockup-word">
-						<YewWordmark className="wordmark" />
+						<ProductName />
 						<img
 							className="lockup-tenon"
 							src="/icons/tenon-mark.svg"

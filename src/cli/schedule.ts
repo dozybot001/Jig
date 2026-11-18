@@ -7,8 +7,8 @@ import { serviceRunning } from "./serve.ts";
 const HELP = `Usage: yew schedule <list|run> [options] [<task>]
 
 Scheduled tasks send a standing session a letter at set times; the session's
-last reply goes to the main conversation as the report. Set them up in Yew's
-web interface, or ask the main conversation.
+last reply goes to the main conversation as the report. Set them up in Yew
+Harness's web interface, or ask the main conversation.
 
 Commands:
   list         List the scheduled tasks with their next and last runs
@@ -125,7 +125,7 @@ export function scheduleCommand(): Command {
 					);
 				}
 				if (!serviceRunning(home)) {
-					io.stderr.write("Yew is not running; the letter is delivered when it starts.\n");
+					io.stderr.write("Yew Harness is not running; the letter is delivered when it starts.\n");
 				}
 				return EXIT_OK;
 			} finally {

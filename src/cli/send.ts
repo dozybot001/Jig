@@ -11,8 +11,8 @@ Send a letter to a session, from a script, CI or a git hook. <session> is the
 session's id or name. Use - as the message to read it from standard input; the
 first line is the summary. The letter is marked as coming from the command
 line, not from you; run inside a session's shell, it comes from that session
-and counts against its letters. A running Yew delivers it within a few
-seconds; otherwise it waits until Yew starts.
+and counts against its letters. A running Yew Harness delivers it within a few
+seconds; otherwise it waits until Yew Harness starts.
 
 Options:
   -k, --kind <kind>  notice, request or report (default: notice)
@@ -116,9 +116,9 @@ export function sendCommand(): Command {
 					io.stdout.write(`Sent letter ${letter.id} to ${session.name}.\n`);
 				}
 				if (letter.status === "held") {
-					io.stderr.write("It is held until you release it in Yew's approval center.\n");
+					io.stderr.write("It is held until you release it in Yew Harness's approval center.\n");
 				} else if (!serviceRunning(home)) {
-					io.stderr.write("Yew is not running; the letter is delivered when it starts.\n");
+					io.stderr.write("Yew Harness is not running; the letter is delivered when it starts.\n");
 				}
 				return EXIT_OK;
 			} finally {

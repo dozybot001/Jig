@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { t, useLang } from "../i18n.ts";
 import { centerCount, MASCOT_KEY, useAppState } from "../state.ts";
-import { YewWordmark } from "./icons.tsx";
+import { ProductName } from "./icons.tsx";
 import { Mascot } from "./mascot.tsx";
 
 /** The opening plays once per tab: a reload in the same tab goes straight in. */
@@ -117,7 +117,7 @@ export function Opening() {
 						fill="#1F3A2E"
 					/>
 				</svg>
-				<YewWordmark className="opening-word" />
+				<ProductName className="opening-word" />
 				<Mascot pose="greeting" height={112} className="opening-mascot" />
 			</div>
 			<ol className="opening-steps">

@@ -222,10 +222,27 @@ a {
 	fill: var(--mark-ink);
 }
 .wordmark {
-	width: calc(22px * 2.091);
-	height: 22px;
+	width: calc(var(--word-h, 22px) * 2.091);
+	height: var(--word-h, 22px);
 	fill: var(--mark-ink);
 	overflow: visible;
+}
+/* "Yew" and a smaller "Harness" on the wordmark's baseline, which sits 0.16 of its height above
+   the bottom of the SVG (flex puts an SVG's baseline at its bottom edge). */
+.product-name {
+	--word-h: 22px;
+	display: inline-flex;
+	align-items: baseline;
+	gap: calc(var(--word-h) * 0.25);
+}
+.product-harness {
+	color: var(--mark-ink);
+	font-size: calc(var(--word-h) * 0.64);
+	font-weight: 600;
+	line-height: 1;
+	letter-spacing: 0.01em;
+	white-space: nowrap;
+	transform: translateY(calc(var(--word-h) * -0.16));
 }
 
 /* --- the mascot: decoration only, never in the way --- */
@@ -389,10 +406,7 @@ a {
 	animation: opening-show 0.2s ease-out 0.6s forwards;
 }
 .opening-word {
-	width: calc(52px * 2.091);
-	height: 52px;
-	fill: var(--mark-ink);
-	overflow: visible;
+	--word-h: 52px;
 	opacity: 0;
 	transform: translateX(-8px);
 	animation: opening-settle 0.4s ease-out 0.45s forwards;
@@ -402,6 +416,16 @@ a {
 	opacity: 0;
 	transform: translateY(10px) scale(0.9);
 	animation: opening-settle 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.6s forwards;
+}
+/* A narrow window: the name gets smaller and Yew moves under it. */
+@media (max-width: 560px) {
+	.opening-stage {
+		flex-wrap: wrap;
+		justify-content: center;
+	}
+	.opening-word {
+		--word-h: 40px;
+	}
 }
 .opening-steps {
 	display: grid;

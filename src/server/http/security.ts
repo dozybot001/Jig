@@ -44,7 +44,7 @@ export function localOnly(port: number): MiddlewareHandler<AppEnv> {
 				421,
 				"wrong-host",
 				titleFor(421),
-				"Yew only answers on 127.0.0.1 and localhost.",
+				"Yew Harness only answers on 127.0.0.1 and localhost.",
 			);
 		}
 		for (const header of [
@@ -76,7 +76,13 @@ export function localOnly(port: number): MiddlewareHandler<AppEnv> {
 			}
 			const dest = c.req.header("Sec-Fetch-Dest");
 			if (dest === "iframe" || dest === "frame" || dest === "embed" || dest === "object") {
-				return problemResponse(c, 403, "embedded", titleFor(403), "Yew cannot be embedded.");
+				return problemResponse(
+					c,
+					403,
+					"embedded",
+					titleFor(403),
+					"Yew Harness cannot be embedded.",
+				);
 			}
 			if (c.req.method !== "GET" && c.req.method !== "HEAD") {
 				const origin = c.req.header("Origin");
@@ -86,7 +92,7 @@ export function localOnly(port: number): MiddlewareHandler<AppEnv> {
 						403,
 						"bad-origin",
 						titleFor(403),
-						"This request did not come from Yew's own page.",
+						"This request did not come from Yew Harness's own page.",
 					);
 				}
 			}
@@ -134,7 +140,7 @@ export function requireBrowser(store: Store, port: number): MiddlewareHandler<Ap
 				401,
 				"sign-in-required",
 				titleFor(401),
-				"Open Yew with the link from `yew serve` or `yew open`.",
+				"Open Yew Harness with the link from `yew serve` or `yew open`.",
 			);
 		}
 		await next();
@@ -217,7 +223,7 @@ export function deviceLimits(): MiddlewareHandler<AppEnv> {
 				403,
 				"mac-only",
 				titleFor(403),
-				"Only Yew on the Mac can do this: API keys, devices and remote access stay there.",
+				"Only Yew Harness on the Mac can do this: API keys, devices and remote access stay there.",
 			);
 		}
 		await next();

@@ -71,10 +71,10 @@ export interface AppOptions {
 	system?: SystemControl;
 }
 
-const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Yew</title>
+const NOT_BUILT = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Yew Harness</title>
 <meta name="color-scheme" content="light dark"></head><body>
-<p>网页界面还没有构建。在 Yew 的目录运行 npm run build:web，然后刷新这个页面。</p>
-<p lang="en">The web interface has not been built yet. In the Yew folder, run npm run build:web, then reload this page.</p>
+<p>网页界面还没有构建。在 Yew Harness 的目录运行 npm run build:web，然后刷新这个页面。</p>
+<p lang="en">The web interface has not been built yet. In the Yew Harness folder, run npm run build:web, then reload this page.</p>
 </body></html>`;
 
 export function createApp(options: AppOptions): Hono<AppEnv> {

@@ -10,15 +10,15 @@ import { serviceRunning } from "./serve.ts";
 
 const HELP = `Usage: yew service <install|uninstall|status> [options]
 
-Start Yew when you log in, so your phone and scheduled tasks can reach it
-without a terminal open. On macOS this is a LaunchAgent for your user, on
-Linux a systemd user unit. Yew is restarted if it exits with an error, and
-its log goes to the logs folder in Yew's data directory. Nothing is changed
-on your system until you run install.
+Start Yew Harness when you log in, so your phone and scheduled tasks can reach
+it without a terminal open. On macOS this is a LaunchAgent for your user, on
+Linux a systemd user unit. Yew Harness is restarted if it exits with an error,
+and its log goes to the logs folder in Yew Harness's data directory. Nothing
+is changed on your system until you run install.
 
 Commands:
-  install    Start Yew at login, and start it now
-  uninstall  Stop starting Yew at login, and stop it now
+  install    Start Yew Harness at login, and start it now
+  uninstall  Stop starting Yew Harness at login, and stop it now
   status     Show whether it is installed and running
 
 Options:
@@ -107,7 +107,7 @@ export function systemdUnit(host: ServiceHost, env: Record<string, string>, log:
 		.map(([key, value]) => `Environment=${quoted(`${key}=${value}`)}`)
 		.join("\n");
 	return `[Unit]
-Description=Yew, an AI-native multi-agent workbench
+Description=Yew Harness, an AI-native multi-agent workbench
 
 [Service]
 ExecStart=${quoted(host.node)} ${quoted(host.entry)} serve
@@ -223,7 +223,7 @@ export function uninstallService(host: ServiceHost, options: { stop: boolean }):
 export function serviceCommand(host: ServiceHost = realServiceHost()): Command {
 	return {
 		name: "service",
-		summary: "Start Yew when you log in",
+		summary: "Start Yew Harness when you log in",
 		async run(args: string[], io: CliIo): Promise<number> {
 			const { values, positionals } = parseArgs({
 				args,
@@ -261,8 +261,8 @@ export function serviceCommand(host: ServiceHost = realServiceHost()): Command {
 				else {
 					io.stdout.write(
 						had
-							? "Yew no longer starts at login, and was stopped.\n"
-							: "Yew was not set to start at login.\n",
+							? "Yew Harness no longer starts at login, and was stopped.\n"
+							: "Yew Harness was not set to start at login.\n",
 					);
 				}
 				return EXIT_OK;
@@ -270,7 +270,7 @@ export function serviceCommand(host: ServiceHost = realServiceHost()): Command {
 
 			if (!serviceLoaded(host) && serviceRunning(home)) {
 				io.stderr.write(
-					"yew: Yew is already running, started by hand. Stop that 'yew serve' first, then run this again.\n",
+					"yew: Yew Harness is already running, started by hand. Stop that 'yew serve' first, then run this again.\n",
 				);
 				return EXIT_ERROR;
 			}
@@ -284,7 +284,7 @@ export function serviceCommand(host: ServiceHost = realServiceHost()): Command {
 			if (values.json) io.stdout.write(`${JSON.stringify({ installed: true, file, log })}\n`);
 			else {
 				io.stdout.write(
-					`Yew now starts when you log in, and was started.\nLog: ${log}\nOpen the web interface with 'yew open'.\n`,
+					`Yew Harness now starts when you log in, and was started.\nLog: ${log}\nOpen the web interface with 'yew open'.\n`,
 				);
 			}
 			return EXIT_OK;

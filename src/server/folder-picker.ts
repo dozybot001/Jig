@@ -26,7 +26,7 @@ export async function pickFolder(
 		throw new YewError(
 			"not-supported",
 			501,
-			"Yew cannot open a folder picker on this computer. Type the folder's path instead.",
+			"Yew Harness cannot open a folder picker on this computer. Type the folder's path instead.",
 		);
 	}
 	try {

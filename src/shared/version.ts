@@ -7,6 +7,8 @@ const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.ur
 };
 
 export const NAME = "yew";
+/** The product's name where people read it (blueprint, section 12); `NAME` is the command's. */
+export const PRODUCT = "Yew Harness";
 export const VERSION: string = pkg.version;
 export const PUBLISHER = "Tenon AI";
 export const WEBSITE = "https://tenonai.cn/";

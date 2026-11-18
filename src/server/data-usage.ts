@@ -116,7 +116,7 @@ function scanTemp(home: string, inUse: InUse): TempScan {
 
 const outside = () =>
 	conflict(
-		"The tmp folder in Yew's data folder is a link to somewhere else. Yew does not delete through it.",
+		"The tmp folder in Yew Harness's data folder is a link to somewhere else. Yew Harness does not delete through it.",
 		undefined,
 		"temp-outside",
 	);

@@ -32,7 +32,7 @@ function App() {
 	const backdrop = yewOn && page === null && !narrow;
 	// The tab's title carries the approval center's count, so it shows in the tab strip.
 	useEffect(() => {
-		document.title = waiting > 0 ? `(${waiting}) Yew` : "Yew";
+		document.title = waiting > 0 ? `(${waiting}) Yew Harness` : "Yew Harness";
 	}, [waiting]);
 	// The drawer closes with Escape, like a dialog.
 	useEffect(() => {

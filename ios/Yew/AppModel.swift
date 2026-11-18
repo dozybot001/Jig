@@ -123,7 +123,7 @@ final class AppModel {
 	/// Pairs with the Mac whose QR code (or its link) this is: handshake with its secret, then keep it.
 	func pair(with text: String) async {
 		guard let link = PairingLink(text.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-			problem = String(localized: "That is not a Yew pairing link.")
+			problem = String(localized: "That is not a Yew Harness pairing link.")
 			return
 		}
 		var pairing = Pairing(relay: link.relay, desktop: link.desktop, desktopKey: link.key, desktopName: link.name)
@@ -140,7 +140,7 @@ final class AppModel {
 			await refreshAll()
 			await notifications()
 		} catch RelayError.macOffline {
-			problem = String(localized: "The Mac is not online. Keep Yew running on the Mac with phone access on, then scan again.")
+			problem = String(localized: "The Mac is not online. Keep Yew Harness running on the Mac with phone access on, then scan again.")
 		} catch {
 			problem = String(localized: "Pairing did not work. Show a new QR code on the Mac and scan it again.")
 		}

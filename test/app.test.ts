@@ -51,6 +51,12 @@ describe("yew app", () => {
 		const plist = readFileSync(join(app, "Contents", "Info.plist"), "utf8");
 		assert.match(plist, /<key>CFBundleExecutable<\/key>\s*<string>yew-launcher<\/string>/);
 		assert.match(plist, /<key>CFBundleIconFile<\/key>\s*<string>AppIcon<\/string>/);
+		// Finder and the Dock show the product's name, while the file stays Yew.app.
+		assert.match(plist, /<key>LSHasLocalizedDisplayName<\/key>\s*<true\/>/);
+		assert.equal(
+			readFileSync(join(app, "Contents", "Resources", "en.lproj", "InfoPlist.strings"), "utf8"),
+			'CFBundleDisplayName = "Yew Harness";\nCFBundleName = "Yew Harness";\n',
+		);
 		const launcher = join(app, "Contents", "MacOS", "yew-launcher");
 		assert.equal(statSync(launcher).mode & 0o111, 0o111);
 		const script = readFileSync(launcher, "utf8");

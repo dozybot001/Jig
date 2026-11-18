@@ -48,6 +48,7 @@ import {
 	NewTeamIcon,
 	NewWorkspaceIcon,
 	PinIcon,
+	ProductName,
 	RenameIcon,
 	ScheduleIcon,
 	SearchIcon,
@@ -55,7 +56,6 @@ import {
 	TeamIcon,
 	UsageIcon,
 	YewMark,
-	YewWordmark,
 } from "./icons.tsx";
 import { SettingsMenu } from "./settings.tsx";
 import { Button, describeError, ErrorBox, Menu, type MenuEntry, useAction, useNow } from "./ui.tsx";
@@ -1070,7 +1070,7 @@ export function Sidebar() {
 				>
 					<YewMark className="lockup-mark" size={22} />
 					<span className="lockup-word">
-						<YewWordmark className="wordmark" />
+						<ProductName />
 						<img
 							className="lockup-tenon"
 							src="/icons/tenon-mark.svg"

@@ -569,7 +569,7 @@ describe("decision cards", () => {
 		assert.match(text, /^# 审批记录/);
 		assert.match(
 			text,
-			/#1 · Yew 的许可证用 MIT 还是 Apache-2\.0？ · 选择：MIT · 备注：先用 MIT · 提出：产品会话 · 本人在 Yew 里决定/,
+			/#1 · Yew 的许可证用 MIT 还是 Apache-2\.0？ · 选择：MIT · 备注：先用 MIT · 提出：产品会话 · 本人在 Yew Harness 里决定/,
 		);
 		assert.equal(
 			code(() => post.decide(card.id, 1, null)),

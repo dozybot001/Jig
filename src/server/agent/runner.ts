@@ -656,7 +656,7 @@ export class Agents {
 			detail =
 				error instanceof YewError
 					? error.message
-					: `Yew hit an internal error: ${(error as Error).message}`;
+					: `Yew Harness hit an internal error: ${(error as Error).message}`;
 			if (!(error instanceof YewError))
 				this.#log(`session ${sessionId}: ${(error as Error).stack ?? error}`);
 			// The code lets the interface explain the problem in the person's language.

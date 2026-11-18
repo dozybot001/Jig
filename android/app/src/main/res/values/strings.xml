@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="app_name" translatable="false">Yew</string>
+    <string name="app_name" translatable="false">Yew Harness</string>
     <string name="tagline">An AI-native multi-agent workbench</string>
-    <string name="lockup_label">Yew, by Tenon AI</string>
+    <string name="lockup_label">Yew Harness, by Tenon AI</string>
 
     <!-- Navigation -->
     <string name="tab_sessions">Sessions</string>
@@ -10,7 +10,7 @@
     <string name="tab_letters">Letters</string>
     <string name="tab_artifacts">Artifacts</string>
     <string name="settings">Settings</string>
-    <string name="about">About Yew</string>
+    <string name="about">About Yew Harness</string>
     <string name="back">Back</string>
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
@@ -19,18 +19,18 @@
 
     <!-- Not paired yet -->
     <string name="connect_scan">Scan the QR code on your computer</string>
-    <string name="connect_scan_help">In Yew on your computer, open Settings → Phone access, click Add phone, then scan the QR code it shows.</string>
+    <string name="connect_scan_help">In Yew Harness on your computer, open Settings → Phone access, click Add phone, then scan the QR code it shows.</string>
     <string name="connect_paste_title">Or paste the pairing link</string>
     <string name="connect_paste_hint" translatable="false">yew://pair?…</string>
     <string name="pair">Pair</string>
     <string name="demo_try">Try the demo</string>
     <string name="demo_help">Look around with sample data, without a computer.</string>
     <string name="scan_title">Scan the QR code</string>
-    <string name="scan_hint">Point the camera at the QR code Yew shows on your computer.</string>
-    <string name="camera_denied">Yew uses the camera only to scan the pairing QR code. Allow the camera in system settings, or paste the pairing link instead.</string>
+    <string name="scan_hint">Point the camera at the QR code Yew Harness shows on your computer.</string>
+    <string name="camera_denied">Yew Harness uses the camera only to scan the pairing QR code. Allow the camera in system settings, or paste the pairing link instead.</string>
     <string name="open_system_settings">Open system settings</string>
-    <string name="not_pairing_link">That is not a Yew pairing link.</string>
-    <string name="pair_offline">The computer is not online. Keep Yew running on the computer with phone access on, then scan again.</string>
+    <string name="not_pairing_link">That is not a Yew Harness pairing link.</string>
+    <string name="pair_offline">The computer is not online. Keep Yew Harness running on the computer with phone access on, then scan again.</string>
     <string name="pair_failed">Pairing did not work. Show a new QR code on the computer and scan it again.</string>
 
     <!-- Sessions -->
@@ -140,9 +140,9 @@
 
     <!-- Connection banner -->
     <string name="banner_demo">Sample data: nothing reaches a computer.</string>
-    <string name="banner_offline">The computer is offline. Keep Yew running there with phone access on.</string>
+    <string name="banner_offline">The computer is offline. Keep Yew Harness running there with phone access on.</string>
     <string name="banner_refused">The computer no longer knows this phone. Pair again to keep using it.</string>
-    <string name="banner_unreachable">Can\'t connect. Check the network; Yew keeps trying.</string>
+    <string name="banner_unreachable">Can\'t connect. Check the network; Yew Harness keeps trying.</string>
     <string name="leave">Leave</string>
     <string name="pair_again">Pair again</string>
 
@@ -161,7 +161,7 @@
     <string name="leave_demo">Leave the demo</string>
     <string name="unpair">Unpair</string>
     <string name="unpair_title">Unpair this phone?</string>
-    <string name="unpair_message">The computer removes this phone from its list. To use Yew here again, show a new QR code on the computer and scan it.</string>
+    <string name="unpair_message">The computer removes this phone from its list. To use Yew Harness here again, show a new QR code on the computer and scan it.</string>
 
     <!-- Notifications -->
     <string name="notifications">Notifications</string>
@@ -170,22 +170,22 @@
     <string name="notifications_off">Not turned on</string>
     <string name="notifications_turn_on">Turn on notifications</string>
     <string name="notifications_turn_off">Turn off notifications</string>
-    <string name="after_close">After you close Yew</string>
+    <string name="after_close">After you close Yew Harness</string>
     <string name="after_close_stop">Disconnects</string>
     <string name="after_close_keep">Keeps receiving</string>
-    <string name="after_close_turn_on">Keep receiving after Yew is closed</string>
-    <string name="after_close_turn_off">Disconnect when Yew is closed</string>
+    <string name="after_close_turn_on">Keep receiving after Yew Harness is closed</string>
+    <string name="after_close_turn_off">Disconnect when Yew Harness is closed</string>
     <string name="background">Running in the background</string>
     <string name="background_allowed">Allowed</string>
     <string name="background_limited">Limited by battery optimization</string>
-    <string name="background_allow">Allow Yew to run in the background</string>
-    <string name="notifications_note">Yew notifies this phone when something needs you (a permission, a question, a decision or a held letter), when a session stops with an error, and when a task finishes. Notifications come through the encrypted channel; the relay cannot read them.</string>
-    <string name="background_note">Yew does not use a push service. With notifications on, the app keeps one connection to the relay while Yew is open, also when it is not on screen, and Android shows a standing notification for it. When you close Yew (swipe it away from recent apps) the connection ends, and notifications arrive again once you open Yew; what was waiting then shows in Approvals. Turn on \"Keep receiving after Yew is closed\" to keep the connection after that too, and after the phone starts or Yew is updated: notifications then arrive without opening Yew, and the standing notification stays. Either way the system may stop Yew to save power; to make that less likely, allow Yew to run without battery optimization, and on some phones allow auto-start and background running for Yew in their own settings.</string>
+    <string name="background_allow">Allow Yew Harness to run in the background</string>
+    <string name="notifications_note">Yew Harness notifies this phone when something needs you (a permission, a question, a decision or a held letter), when a session stops with an error, and when a task finishes. Notifications come through the encrypted channel; the relay cannot read them.</string>
+    <string name="background_note">Yew Harness does not use a push service. With notifications on, the app keeps one connection to the relay while Yew Harness is open, also when it is not on screen, and Android shows a standing notification for it. When you close Yew Harness (swipe it away from recent apps) the connection ends, and notifications arrive again once you open Yew Harness; what was waiting then shows in Approvals. Turn on \"Keep receiving after Yew Harness is closed\" to keep the connection after that too, and after the phone starts or Yew Harness is updated: notifications then arrive without opening Yew Harness, and the standing notification stays. Either way the system may stop Yew Harness to save power; to make that less likely, allow Yew Harness to run without battery optimization, and on some phones allow auto-start and background running for Yew Harness in their own settings.</string>
     <string name="channel_needs">What needs you</string>
     <string name="channel_link">Connection to your computer</string>
-    <string name="service_title">Yew is listening for notifications</string>
+    <string name="service_title">Yew Harness is listening for notifications</string>
     <string name="service_online">Connected to %s.</string>
-    <string name="service_waiting">Not connected to %s right now; Yew keeps trying.</string>
+    <string name="service_waiting">Not connected to %s right now; Yew Harness keeps trying.</string>
 
     <!-- What a notification says (src/server/push.ts) -->
     <string name="push_permission">Needs your approval</string>
@@ -193,7 +193,7 @@
     <string name="push_card">Waiting for your decision</string>
     <string name="push_letter">A letter is held for you</string>
     <string name="push_error">Stopped with an error</string>
-    <string name="push_review">Was working when Yew restarted; check it</string>
+    <string name="push_review">Was working when Yew Harness restarted; check it</string>
     <string name="push_task_done">Task finished</string>
     <string name="push_task_failed">Task failed</string>
     <string name="push_task_given_up">Task given up</string>
@@ -205,13 +205,13 @@
         <item quantity="one">%d thing needs you</item>
         <item quantity="other">%d things need you</item>
     </plurals>
-    <string name="push_fallback">Something in Yew needs you.</string>
+    <string name="push_fallback">Something in Yew Harness needs you.</string>
     <string name="push_separator">": "</string>
 
     <!-- About -->
     <string name="about_version">Version %1$s · Build %2$s</string>
-    <string name="about_what">An AI-native multi-agent workbench. Yew organizes agent sessions the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center. The sessions run in Yew on your computer.</string>
-    <string name="about_phone">Yew on Android connects to your computer through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions\' questions and decide on cards, and you can follow and reply to sessions.</string>
+    <string name="about_what">An AI-native multi-agent workbench. Yew Harness organizes agent sessions the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center. The sessions run in Yew Harness on your computer.</string>
+    <string name="about_phone">Yew Harness on Android connects to your computer through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions\' questions and decide on cards, and you can follow and reply to sessions.</string>
     <string name="publisher">Publisher</string>
     <string name="tenon">Tenon AI</string>
     <string name="website">Website</string>

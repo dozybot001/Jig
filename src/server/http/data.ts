@@ -61,7 +61,11 @@ export function dataRoutes(store: Store, options: DataRoutesOptions): Hono<AppEn
 		}
 		const dir = target === "home" ? options.home : exported;
 		if (dir === null) {
-			throw conflict("Nothing was exported since Yew started.", { field: "target" }, "no-export");
+			throw conflict(
+				"Nothing was exported since Yew Harness started.",
+				{ field: "target" },
+				"no-export",
+			);
 		}
 		// The folder itself is opened, so its contents are what the person sees.
 		await showInFileManager(dir, { platform, run: options.run, inside: true, field: "target" });

@@ -267,7 +267,7 @@
 				DEVELOPMENT_TEAM = 3U6LT38JKB;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Yew;
+				INFOPLIST_KEY_CFBundleDisplayName = "Yew Harness";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Yew uses the camera to scan the pairing QR code on your Mac.";
@@ -304,7 +304,7 @@
 				DEVELOPMENT_TEAM = 3U6LT38JKB;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Yew;
+				INFOPLIST_KEY_CFBundleDisplayName = "Yew Harness";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Yew uses the camera to scan the pairing QR code on your Mac.";
@@ -339,7 +339,7 @@
 				DEVELOPMENT_TEAM = 3U6LT38JKB;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Config/YewPush-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Yew;
+				INFOPLIST_KEY_CFBundleDisplayName = "Yew Harness";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -365,7 +365,7 @@
 				DEVELOPMENT_TEAM = 3U6LT38JKB;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Config/YewPush-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Yew;
+				INFOPLIST_KEY_CFBundleDisplayName = "Yew Harness";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

@@ -293,13 +293,15 @@ export class McpAuth {
 		const pending = this.#pending.get(state);
 		this.#pending.delete(state);
 		if (!pending || this.#now() - pending.createdAt > PENDING_MS) {
-			throw new Error("This sign-in is not valid any more. Start it again from Yew.");
+			throw new Error("This sign-in is not valid any more. Start it again from Yew Harness.");
 		}
 		const { saved } = pending;
 		// RFC 9207: a return that names a sign-in server, or that should and does not, comes from the
 		// one the browser was sent to, or it is not used.
 		if (iss !== null ? !same(iss, saved.endpoints.issuer) : saved.endpoints.namesItself) {
-			throw new Error("The sign-in came back from another server than the one Yew sent you to.");
+			throw new Error(
+				"The sign-in came back from another server than the one Yew Harness sent you to.",
+			);
 		}
 		if (error || !code) throw new Error(`The sign-in was not completed (${error ?? "no code"}).`);
 		const body = new URLSearchParams({
@@ -313,7 +315,7 @@ export class McpAuth {
 		if (saved.client.secret) body.set("client_secret", saved.client.secret);
 		const answer = await this.#post(saved.endpoints.token, body);
 		if (!answer || typeof answer.access_token !== "string") {
-			throw new Error("The server did not give Yew a token.");
+			throw new Error("The server did not give Yew Harness a token.");
 		}
 		await this.#save(pending.server, { ...saved, tokens: tokensFrom(answer, this.#now()) });
 		return pending.server;
@@ -410,7 +412,7 @@ export class McpAuth {
 		const at = new URL(resource);
 		const local = at.protocol === "http:" && LOOPBACK.has(at.hostname);
 		if (!usable(resource, local)) {
-			throw new Error("Yew signs in only to servers at https addresses.");
+			throw new Error("Yew Harness signs in only to servers at https addresses.");
 		}
 		const named = param(challenge, "resource_metadata");
 		if (named !== null && !usable(named, local)) {
@@ -512,7 +514,7 @@ export class McpAuth {
 		const answer = await this.#post(
 			endpoints.registration,
 			JSON.stringify({
-				client_name: "Yew",
+				client_name: "Yew Harness",
 				redirect_uris: [this.#redirect],
 				grant_types: ["authorization_code", "refresh_token"],
 				response_types: ["code"],
@@ -521,7 +523,7 @@ export class McpAuth {
 			}),
 		);
 		if (!answer || typeof answer.client_id !== "string") {
-			throw new Error("The server did not let Yew register to sign in.");
+			throw new Error("The server did not let Yew Harness register to sign in.");
 		}
 		return {
 			id: answer.client_id,

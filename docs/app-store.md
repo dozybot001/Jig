@@ -1,6 +1,6 @@
-# Yew iPhone 应用上架
+# Yew Harness iPhone 应用上架
 
-版本 0.12（2026-11-18）。创始人 2026-11-15 定「Jig iPhone 应用推进上架」（产品组转达）。本文记上架要填的内容和进度；文案以[对外介绍](introduction.md)为准，规范见第 17 节。提交审核和首次上线前请创始人确认一次。
+版本 0.13（2026-11-18）。创始人 2026-11-15 定「Jig iPhone 应用推进上架」（产品组转达）。本文记上架要填的内容和进度；文案以[对外介绍](introduction.md)为准，规范见第 17 节。提交审核和首次上线前请创始人确认一次。
 
 ## 一、进度
 
@@ -8,12 +8,12 @@
 
 | 步骤 | 状态 |
 | --- | --- |
-| App Store Connect 里的应用记录 | 11-18 建好，Apple ID `6836027493`，SKU `yew-ios`，主要语言英语（美国），另有简体中文的本地化。「Yew」单独一个词已被别的应用占用，名称用「Yew — Multi-Agent Workbench」，中文「Yew — 多 Agent 工作台」 |
+| App Store Connect 里的应用记录 | 11-18 建好，Apple ID `6836027493`，SKU `yew-ios`，主要语言英语（美国），另有简体中文的本地化。名称 11-18 改成「Yew Harness」，中英相同（蓝图 1.23；之前「Yew」单独一个词被占，用的是「Yew — Multi-Agent Workbench」） |
 | 应用信息：名称、副标题、类别（开发者工具）、内容版权（不含第三方内容）、隐私政策网址 | 已填，照 Jig 的记录，网址换成官网 `/products/yew/` 下的页面（官网切换前这些地址会跳到 Jig 的页面） |
 | 年龄分级问卷 | 已填，答案和 Jig 的记录相同，算出来是 4+ |
 | 版本页：版本号 1.4.0、描述、关键词、技术支持和营销网址、版权；发布方式「自动发布」 | 英文和简体中文已填；截图已传，中英各 5 张，放在「带灵动岛的 iPhone（中等显示屏）」一档 |
-| 审核信息 | 联系人照 Jig 的记录；备注照 4.1 换成 Yew 的名字、安装命令和仓库地址；录像还没录 |
-| 构建 | 1.4.0（1）对应提交 be3dfa4（标签 v1.4.0），11-18 上传，处理完挂到 1.4.0 版本上，替下之前挂的 1.3.0（1）；出口合规按工程里的设置自动答「不使用」；内部测试组可以装 |
+| 审核信息 | 联系人照 Jig 的记录；备注照 4.1 换成新的名字、安装命令和仓库地址（11-18 产品名改成 Yew Harness，备注和描述跟着改了）；录像还没录 |
+| 构建 | 1.4.0（1）对应提交 be3dfa4（标签 v1.4.0），11-18 上传，处理完挂到 1.4.0 版本上，替下之前挂的 1.3.0（1）；出口合规按工程里的设置自动答「不使用」；内部测试组可以装。这个构建的应用名和界面还写 Yew，提交审核前换上下一版的构建（应用名 Yew Harness），和商店的名字一致 |
 | 价格和销售范围 | 照 Jig 的记录：免费；174 个国家和地区，不含中国大陆；以后新增的国家和地区自动上架 |
 | App 隐私 | 照 Jig 的记录：一项「设备 ID」，用途「App 功能」，不关联身份，不用于跟踪；答复已发布 |
 | TestFlight | 内部测试组「Team」，只有创始人，能看到所有构建；邀请已发，创始人接受后在 iPhone 的 TestFlight 里装审核的构建、录审核录像 |
@@ -44,7 +44,7 @@
 
 | 项 | 中文 | English |
 | --- | --- | --- |
-| 名称 | Yew — 多 Agent 工作台（「Yew」单独一个词已被别的应用占用） | Yew — Multi-Agent Workbench |
+| 名称 | Yew Harness | Yew Harness |
 | 副标题（限 30 个字符） | AI 原生的多 Agent 工作台 | Approve your agents' requests |
 | 类别 | 开发者工具 | Developer Tools |
 | 年龄分级 | 4+（照问卷如实答的结果） | 4+ |
@@ -58,13 +58,13 @@
 >
 > 按 Session Engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。
 >
-> Yew 运行在你自己的电脑上。这个应用是它的手机端：离开电脑时，在手机上允许或拒绝操作、回答会话的提问、做决定、放行或拒收暂存的信；也能看会话记录、信件和产物，给会话发消息，让干活的会话停下。有事要你处理、会话出错、任务做完时会通知你。
+> Yew Harness 运行在你自己的电脑上。这个应用是它的手机端：离开电脑时，在手机上允许或拒绝操作、回答会话的提问、做决定、放行或拒收暂存的信；也能看会话记录、信件和产物，给会话发消息，让干活的会话停下。有事要你处理、会话出错、任务做完时会通知你。
 >
-> 使用前要在电脑上安装 Yew（npm install -g @tenonai/yew），打开「手机访问」，用手机扫码配对。手机经中继连到你的电脑，两端之间端到端加密，中继只转发密文。电脑上要开着 Yew。
+> 使用前要在电脑上安装 Yew Harness（npm install -g @tenonai/yew），打开「手机访问」，用手机扫码配对。手机经中继连到你的电脑，两端之间端到端加密，中继只转发密文。电脑上要开着 Yew Harness。
 >
 > 没有电脑也可以点「看演示」，用内置的演示数据看一遍。
 >
-> Yew 以 MIT 许可证开源。
+> Yew Harness 以 MIT 许可证开源。
 
 Description (English):
 
@@ -72,13 +72,13 @@ Description (English):
 >
 > Agent sessions organized the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center.
 >
-> Yew runs on your own computer. This app is its phone side: away from the computer, allow or decline an operation, answer a session's question, make a decision, release or refuse a held letter; read sessions, letters and artifacts, send a session a message, or stop one that is working. You are notified when something needs you, a session fails, or a task is done.
+> Yew Harness runs on your own computer. This app is its phone side: away from the computer, allow or decline an operation, answer a session's question, make a decision, release or refuse a held letter; read sessions, letters and artifacts, send a session a message, or stop one that is working. You are notified when something needs you, a session fails, or a task is done.
 >
-> First install Yew on your computer (npm install -g @tenonai/yew), turn on phone access, and scan the pairing code with your phone. The phone reaches your computer through a relay; the two ends are encrypted end to end and the relay only passes ciphertext along. Yew has to be running on the computer.
+> First install Yew Harness on your computer (npm install -g @tenonai/yew), turn on phone access, and scan the pairing code with your phone. The phone reaches your computer through a relay; the two ends are encrypted end to end and the relay only passes ciphertext along. Yew Harness has to be running on the computer.
 >
 > Without a computer, tap "Try the demo" to look around with built-in demo data.
 >
-> Yew is open source under the MIT License.
+> Yew Harness is open source under the MIT License.
 
 关键词：`Agent,AI,多Agent,审批,会话,开发者,Session Engineering` / `agent,AI,multi-agent,approval,sessions,developer,session engineering`
 
@@ -94,11 +94,11 @@ Description (English):
 
 ### 4.1 11-18 改写的审核备注（英文，填在「App 审核信息 → 备注」）
 
-按苹果 11-16 的要求分六段：录像说明、用途和用户、怎样审核（不用 Mac 时点「Try the demo」；用 Mac 时装 Yew 并扫码配对）、外部服务（中继、Apple 推送、模型服务商由用户在电脑上自选、相机只扫码）、地区（各地一样，暂不在中国大陆提供）、监管（不适用）。全文以 App Store Connect 里保存的为准。
+按苹果 11-16 的要求分六段：录像说明、用途和用户、怎样审核（不用 Mac 时点「Try the demo」；用 Mac 时装 Yew Harness 并扫码配对）、外部服务（中继、Apple 推送、模型服务商由用户在电脑上自选、相机只扫码）、地区（各地一样，暂不在中国大陆提供）、监管（不适用）。全文以 App Store Connect 里保存的为准。
 
 ### 4.2 审核录像怎样录
 
-苹果要求在真机、最新系统上录，从启动应用开始。电脑端用 `node scripts/review-demo.ts <新文件夹>`：一个临时的 Yew，不碰 `~/.yew` 和钥匙串，用 `scripts/demo-model.ts` 这个按脚本应答的本地模型代替真实模型，起来后 Website 会话在等删除草稿页的审批，Docs 会话在问发布说明写哪个版本。手机在 TestFlight 装审核的构建，录的顺序：启动 → 「Try the demo」看一遍 → 退出演示 → 扫 Mac 上的配对二维码 → 批准删除、回答问题 → 在 Website 会话里发「Run the tests」→ 看产物和信件 → 设置里的隐私政策 → 断开配对。
+苹果要求在真机、最新系统上录，从启动应用开始。电脑端用 `node scripts/review-demo.ts <新文件夹>`：一个临时的 Yew Harness，不碰 `~/.yew` 和钥匙串，用 `scripts/demo-model.ts` 这个按脚本应答的本地模型代替真实模型，起来后 Website 会话在等删除草稿页的审批，Docs 会话在问发布说明写哪个版本。手机在 TestFlight 装审核的构建，录的顺序：启动 → 「Try the demo」看一遍 → 退出演示 → 扫 Mac 上的配对二维码 → 批准删除、回答问题 → 在 Website 会话里发「Run the tests」→ 看产物和信件 → 设置里的隐私政策 → 断开配对。
 
 ### 4.3 原来的说明（11-15）
 
@@ -106,6 +106,7 @@ Description (English):
 
 ## 修改记录
 
+- **0.13（2026-11-18）** 产品名改成 Yew Harness（蓝图 1.23）：App Store Connect 里的名称中英都改成「Yew Harness」，版本页的描述和审核备注里指产品的地方跟着改，仓库地址不动；提交前要换上应用名已改的下一版构建。
 - **0.12（2026-11-18）** 发布 1.4.0（隐私政策 2.5，去掉 Jig 兼容）：商店里的版本号改成 1.4.0，构建换成 1.4.0（1）。提交审核的构建要和官网上的隐私政策同一版（法务组）。
 - **0.11（2026-11-18）** 创始人确认后，Jig 的旧记录已删除；记下删除前要做的三步。
 - **0.10（2026-11-18）** 创始人在 Xcode 里登录后，1.3.0（1）已上传并挂到版本上；第二节补上版权一栏（公司英文全称，法务组提醒核对）。

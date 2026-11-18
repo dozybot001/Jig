@@ -79,7 +79,7 @@ class NoteText(note: Note, text: (Int) -> String, count: (Int, Int) -> String) {
             else -> text(R.string.push_fallback)
         }
         val detail = note.body.orEmpty()
-        title = note.title.orEmpty().ifEmpty { "Yew" }
+        title = note.title.orEmpty().ifEmpty { "Yew Harness" }
         body = if (detail.isEmpty()) label else label + text(R.string.push_separator) + detail
     }
 }

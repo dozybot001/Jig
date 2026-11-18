@@ -157,7 +157,7 @@ export function builtinInstaller(options: InstallOptions): () => Promise<void> {
 		options,
 		options.source ?? SOURCE,
 		installDir(options.yewHome),
-		"Yew's own servers (browser, computer control)",
+		"Yew Harness's own servers (browser, computer control)",
 	);
 }
 

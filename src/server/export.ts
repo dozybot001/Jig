@@ -87,7 +87,7 @@ const ZH: ExportStrings = {
 	image: "图片",
 	stopped: "已停止",
 	modelChanged: "换了模型",
-	restarted: "Yew 重启时这个会话在干活，已标为待核对。检查过后点「继续」接着运行。",
+	restarted: "Yew Harness 重启时这个会话在干活，已标为待核对。检查过后点「继续」接着运行。",
 	changed: "{by} 改了这个会话的设置",
 	compacted: "较早的记录已压成摘要",
 	modelError: "模型请求失败",
@@ -152,7 +152,7 @@ const EN: ExportStrings = {
 	stopped: "Stopped",
 	modelChanged: "Model changed",
 	restarted:
-		"Yew restarted while this session was working, so it is marked for review. Check it, then choose Continue.",
+		"Yew Harness restarted while this session was working, so it is marked for review. Check it, then choose Continue.",
 	changed: "{by} changed this session's settings",
 	compacted: "Earlier messages were summarized",
 	modelError: "The model request failed",

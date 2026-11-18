@@ -87,7 +87,7 @@ function readFile(yewHome: string): McpFile {
 	if (!isObject(doc)) {
 		// Not overwritten: the person may have servers in it that a typo is hiding.
 		throw conflict(
-			"mcp.json in Yew's data folder is not valid JSON. Correct it by hand first.",
+			"mcp.json in Yew Harness's data folder is not valid JSON. Correct it by hand first.",
 			undefined,
 			"mcp-unreadable",
 		);
@@ -261,7 +261,8 @@ export function addMcpEntry(yewHome: string, input: NewMcpServer): McpEntryView 
 	}
 	let entry: Raw;
 	if (preset) {
-		if (!presetPackage(preset)) throw invalid(`Yew has no preset named ${preset}.`, "preset");
+		if (!presetPackage(preset))
+			throw invalid(`Yew Harness has no preset named ${preset}.`, "preset");
 		const env = input.env ?? {};
 		checkValues(env, ENV_NAME, "env");
 		entry = { preset, ...(Object.keys(env).length > 0 ? { env } : {}) };
@@ -321,7 +322,7 @@ export function patchMcpEntry(
 	if (builtin[name] && (!Object.hasOwn(servers, name) || turnsOff(servers[name]))) {
 		// One of Yew's own: the file only records that it is off.
 		if (patch.env || patch.headers) {
-			throw invalid("A server Yew sets up by itself has no variables to set.", "env");
+			throw invalid("A server Yew Harness sets up by itself has no variables to set.", "env");
 		}
 		if (patch.disabled === true) servers[name] = { disabled: true };
 		else if (patch.disabled === false) delete servers[name];
@@ -361,7 +362,7 @@ export function removeMcpEntry(yewHome: string, name: string, builtin: BuiltinSe
 	const { doc, servers } = readFile(yewHome);
 	if (builtin[name] && (!Object.hasOwn(servers, name) || turnsOff(servers[name]))) {
 		throw conflict(
-			`${name} is set up by Yew itself. It can be turned off, not removed.`,
+			`${name} is set up by Yew Harness itself. It can be turned off, not removed.`,
 			undefined,
 			"mcp-builtin",
 		);

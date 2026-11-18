@@ -8,13 +8,13 @@
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Yew uses the camera to scan the pairing QR code on your Mac."
+            "value": "Yew Harness uses the camera to scan the pairing QR code on your Mac."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Yew 用相机扫描 Mac 上的配对二维码。"
+            "value": "Yew Harness 用相机扫描 Mac 上的配对二维码。"
           }
         }
       }

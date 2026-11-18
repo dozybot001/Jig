@@ -42,7 +42,7 @@ function notices(): Plugin {
 			this.emitFile({
 				type: "asset",
 				fileName: "THIRD-PARTY-NOTICES.txt",
-				source: `Yew's web interface is built from these packages. Each stays under its own license.\n\n${entries
+				source: `Yew Harness's web interface is built from these packages. Each stays under its own license.\n\n${entries
 					.map(
 						(entry) =>
 							`${"=".repeat(72)}\n${entry.name} ${entry.version} (${entry.license ?? "see below"})\n${"=".repeat(72)}\n${entry.text}\n`,

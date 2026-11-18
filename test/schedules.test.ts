@@ -494,7 +494,7 @@ describe("scheduled tasks over the API and the command line", () => {
 		const ran = await cli(["run", "每周周报"]);
 		assert.equal(ran.code, 0);
 		assert.match(ran.out, /^Sent 每周周报 to 周报 \(letter /);
-		assert.match(ran.err, /Yew is not running/);
+		assert.match(ran.err, /Yew Harness is not running/);
 		const busy = await cli(["run", "每周周报"]);
 		assert.equal(busy.code, 1);
 		assert.match(busy.err, /not finished yet/);

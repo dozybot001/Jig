@@ -5,10 +5,10 @@ import type { Command } from "./run.ts";
 
 const HELP = `Usage: yew export <folder> [options]
 
-Write everything Yew keeps into a folder, as files you can read without Yew:
-each session as Markdown; letters, decision cards, scheduled tasks and
-settings as JSON; and every version of every artifact. The folder must be new
-or empty.
+Write everything Yew Harness keeps into a folder, as files you can read
+without Yew Harness: each session as Markdown; letters, decision cards,
+scheduled tasks and settings as JSON; and every version of every artifact. The
+folder must be new or empty.
 
 API keys stay in the system keychain and are not exported; neither are paired
 phones or sign-in tokens.
@@ -21,7 +21,7 @@ Options:
 export function exportCommand(): Command {
 	return {
 		name: "export",
-		summary: "Write all of Yew's data into a folder",
+		summary: "Write all of Yew Harness's data into a folder",
 		async run(args: string[], io: CliIo): Promise<number> {
 			const { values, positionals } = parseArgs({
 				args,

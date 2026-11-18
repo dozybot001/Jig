@@ -191,7 +191,7 @@ export function oauthCallbackRoute(hub: McpHub, log?: (line: string) => void): H
 			return c.html(
 				page(
 					"已登录 · Signed in",
-					`已登录 ${html(name)}，可以关掉这个页面回到 Yew。<br>Signed in to ${html(name)}. You can close this page and go back to Yew.`,
+					`已登录 ${html(name)}，可以关掉这个页面回到 Yew Harness。<br>Signed in to ${html(name)}. You can close this page and go back to Yew Harness.`,
 				),
 			);
 		} catch (error) {
@@ -199,7 +199,7 @@ export function oauthCallbackRoute(hub: McpHub, log?: (line: string) => void): H
 			return c.html(
 				page(
 					"没有登录 · Not signed in",
-					`${html((error as Error).message)}<br>回到 Yew 的「MCP 服务」再试一次。Go back to MCP servers in Yew and try again.`,
+					`${html((error as Error).message)}<br>回到 Yew Harness 的「MCP 服务」再试一次。Go back to MCP servers in Yew Harness and try again.`,
 				),
 				400,
 			);

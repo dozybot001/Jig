@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import { NAME, PUBLISHER, VERSION, WEBSITE } from "../shared/version.ts";
+import { NAME, PRODUCT, PUBLISHER, VERSION, WEBSITE } from "../shared/version.ts";
 import { type CliIo, EXIT_ERROR, EXIT_OK, EXIT_USAGE, paint, UsageError } from "./io.ts";
 
 export interface Command {
@@ -11,7 +11,7 @@ export interface Command {
 function helpText(io: CliIo, commands: Command[]): string {
 	const bold = (s: string) => paint("bold", s, io.stdout, io.env);
 	const lines = [
-		`${NAME} ${VERSION}`,
+		`${PRODUCT} ${VERSION}`,
 		"An AI-native multi-agent workbench.",
 		"",
 		`${bold("Usage:")} ${NAME} <command> [options]`,
@@ -38,7 +38,7 @@ function versionText(json: boolean): string {
 	if (json) {
 		return `${JSON.stringify({ name: NAME, version: VERSION, publisher: PUBLISHER, website: WEBSITE })}\n`;
 	}
-	return `${NAME} ${VERSION}\n${PUBLISHER} · ${WEBSITE}\n`;
+	return `${PRODUCT} ${VERSION}\n${PUBLISHER} · ${WEBSITE}\n`;
 }
 
 export async function run(argv: string[], io: CliIo, commands: Command[] = []): Promise<number> {

@@ -1645,12 +1645,12 @@ export class Store {
 			for (const session of affected) {
 				this.#q(
 					"UPDATE sessions SET status = 'needs_review', status_detail = ?, updated_at = ? WHERE id = ?",
-				).run("Yew restarted while this session was working.", now, session.id);
+				).run("Yew Harness restarted while this session was working.", now, session.id);
 				this.appendEntry(session.id, {
 					role: "notice",
 					notice: {
 						kind: "restarted",
-						text: "Yew restarted while this session was working.",
+						text: "Yew Harness restarted while this session was working.",
 						timestamp: now,
 					},
 				});

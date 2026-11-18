@@ -64,7 +64,7 @@ struct PushText {
 		default: label = String(localized: "push.fallback")
 		}
 		let name = note.title ?? ""
-		title = name.isEmpty ? "Yew" : name
+		title = name.isEmpty ? "Yew Harness" : name
 		body = detail.isEmpty ? label : label + String(localized: "push.separator") + detail
 	}
 }

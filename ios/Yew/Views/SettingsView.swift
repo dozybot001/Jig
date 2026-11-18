@@ -45,7 +45,7 @@ struct SettingsView: View {
 						}
 					} footer: {
 						Text(
-							"Yew notifies this iPhone when something needs you (a permission, a question, a decision or a held letter), when a session stops with an error, and when a task finishes. What a notification says is encrypted for this iPhone; the relay and Apple cannot read it."
+							"Yew Harness notifies this iPhone when something needs you (a permission, a question, a decision or a held letter), when a session stops with an error, and when a task finishes. What a notification says is encrypted for this iPhone; the relay and Apple cannot read it."
 						)
 					}
 				}
@@ -58,7 +58,7 @@ struct SettingsView: View {
 					}
 				}
 				Section {
-					NavigationLink("About Yew", value: "about")
+					NavigationLink("About Yew Harness", value: "about")
 				}
 			}
 			.navigationDestination(for: String.self) { _ in AboutView() }
@@ -76,7 +76,7 @@ struct SettingsView: View {
 					Task { await model.unpair() }
 				}
 			} message: {
-				Text("The Mac removes this iPhone from its list. To use Yew here again, show a new QR code on the Mac and scan it.")
+				Text("The Mac removes this iPhone from its list. To use Yew Harness here again, show a new QR code on the Mac and scan it.")
 			}
 		}
 		#if DEBUG
@@ -107,7 +107,7 @@ enum LinkText {
 	}
 }
 
-/// "About Yew" (spec 2.2–2.3): the lockup, version and build, what Yew is, the publisher and website,
+/// "About Yew Harness" (spec 2.2–2.3): the lockup, version and build, what Yew is, the publisher and website,
 /// then the privacy policy, terms and feedback.
 struct AboutView: View {
 	private var version: String {
@@ -131,8 +131,8 @@ struct AboutView: View {
 				.padding(.vertical, 8)
 			}
 			Section {
-				Text("An AI-native multi-agent workbench. Yew organizes agent sessions the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center. The sessions run in Yew on your Mac.")
-				Text("Yew on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions' questions and decide on cards, and you can follow and reply to sessions.")
+				Text("An AI-native multi-agent workbench. Yew Harness organizes agent sessions the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center. The sessions run in Yew Harness on your Mac.")
+				Text("Yew Harness on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions' questions and decide on cards, and you can follow and reply to sessions.")
 			}
 			Section {
 				LabeledContent("Publisher") {
@@ -157,7 +157,7 @@ struct AboutView: View {
 			}
 		}
 		.tint(.primary)
-		.navigationTitle("About Yew")
+		.navigationTitle("About Yew Harness")
 		.navigationBarTitleDisplayMode(.inline)
 	}
 }
@@ -187,9 +187,10 @@ struct PolicyView: View {
 	}
 }
 
-/// Yew's full lockup for the first screen and the About page (spec 1.6, 2.2): the mark, the wordmark
-/// ("Yew" outlined from Young Serif, in the ink colour) and the Tenon mark, all sized from the wordmark's
-/// size S (spec 1.4–1.5).
+/// The full lockup for the first screen and the About page (spec 1.6, 2.2): the mark, the wordmark
+/// ("Yew" outlined from Young Serif, in the ink colour) with a smaller "Harness" after it, which make
+/// the product's name Yew Harness (blueprint, section 12), and the Tenon mark, all sized from the
+/// wordmark's size S (spec 1.4–1.5).
 struct Lockup: View {
 	var size: CGFloat = 36
 
@@ -198,11 +199,19 @@ struct Lockup: View {
 			YewMark()
 				.frame(width: size, height: size)
 			HStack(alignment: .top, spacing: max(4, size * 0.18)) {
-				// The wordmark's box is one em of the font, as wide as its viewBox says.
-				Image("YewWordmark")
-					.resizable()
-					.frame(width: size * 2.091, height: size)
-					.foregroundStyle(Color.yewInk)
+				HStack(alignment: .bottom, spacing: size * 0.25) {
+					// The wordmark's box is one em of the font, as wide as its viewBox says.
+					Image("YewWordmark")
+						.resizable()
+						.frame(width: size * 2.091, height: size)
+						.foregroundStyle(Color.yewInk)
+					// On the wordmark's baseline, 0.16 S above the bottom of its box.
+					Text(verbatim: "Harness")
+						.font(.system(size: size * 0.64, weight: .semibold))
+						.foregroundStyle(Color.yewInk)
+						.fixedSize()
+						.alignmentGuide(.bottom) { d in d[.lastTextBaseline] + size * 0.16 }
+				}
 				Image("TenonMark")
 					.resizable()
 					.frame(width: max(14, size * 0.58), height: max(14, size * 0.58))
@@ -210,7 +219,7 @@ struct Lockup: View {
 			}
 		}
 		.accessibilityElement(children: .ignore)
-		.accessibilityLabel("Yew, by Tenon AI")
+		.accessibilityLabel("Yew Harness, by Tenon AI")
 	}
 }
 
@@ -254,7 +263,7 @@ private struct Banner: View {
 			switch model.link {
 			case .macOffline:
 				line(
-					"The Mac is offline. Keep Yew running there with phone access on.",
+					"The Mac is offline. Keep Yew Harness running there with phone access on.",
 					action: ("Retry", { Task { await model.refreshAll() } })
 				)
 			case .refused:
@@ -264,7 +273,7 @@ private struct Banner: View {
 				)
 			case .unreachable:
 				line(
-					"Can't connect. Check the network; Yew keeps trying.",
+					"Can't connect. Check the network; Yew Harness keeps trying.",
 					action: ("Retry", { Task { await model.refreshAll() } })
 				)
 			case .connecting, .online:

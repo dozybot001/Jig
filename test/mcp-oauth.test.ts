@@ -169,7 +169,7 @@ describe("signing in to an MCP server", () => {
 			assert.equal(params.resource, `${server.base}/mcp`);
 			assert.equal(params.scope, "read", "the scope the server named");
 			assert.deepEqual(server.seen.registrations[0], {
-				client_name: "Yew",
+				client_name: "Yew Harness",
 				redirect_uris: [REDIRECT],
 				grant_types: ["authorization_code", "refresh_token"],
 				response_types: ["code"],
@@ -331,7 +331,7 @@ describe("signing in to an MCP server", () => {
 			server.expect(url);
 			await assert.rejects(
 				hub.completeSignIn(url.searchParams.get("state") as string, "code-1", null),
-				/did not give Yew a token/,
+				/did not give Yew Harness a token/,
 			);
 			assert.deepEqual(server.seen.moved, []);
 			assert.equal(status()?.state, "sign-in");

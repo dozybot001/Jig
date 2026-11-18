@@ -6,9 +6,9 @@ import { serviceRunning } from "./serve.ts";
 
 const HELP = `Usage: yew remote <on|off|status|pair> [options]
 
-Let your phone reach Yew on this Mac through Yew's relay. Both sides connect
-out to the relay, so this Mac opens no port; everything between them is
-end-to-end encrypted, and the relay sees only ciphertext.
+Let your phone reach Yew Harness on this Mac through the relay. Both sides
+connect out to the relay, so this Mac opens no port; everything between them
+is end-to-end encrypted, and the relay sees only ciphertext.
 
 Commands:
   on      Turn on phone access
@@ -72,7 +72,8 @@ export function remoteCommand(): Command {
 					else
 						io.stdout.write(`Phone access is ${next.enabled ? "on" : "off"} (${next.relayUrl}).\n`);
 					// The running service picks the setting up within a few seconds.
-					if (!running) io.stderr.write("yew: Yew is not running; start it with 'yew serve'.\n");
+					if (!running)
+						io.stderr.write("yew: Yew Harness is not running; start it with 'yew serve'.\n");
 					return EXIT_OK;
 				}
 				if (action === "status") {
@@ -108,9 +109,10 @@ export function remoteCommand(): Command {
 				}
 				const { renderUnicodeCompact } = await import("uqr");
 				io.stdout.write(
-					`${renderUnicodeCompact(link)}\nScan this with Yew on your phone within 5 minutes.\n`,
+					`${renderUnicodeCompact(link)}\nScan this with Yew Harness on your phone within 5 minutes.\n`,
 				);
-				if (!running) io.stderr.write("yew: Yew is not running; start it with 'yew serve'.\n");
+				if (!running)
+					io.stderr.write("yew: Yew Harness is not running; start it with 'yew serve'.\n");
 				return EXIT_OK;
 			} finally {
 				db.close();

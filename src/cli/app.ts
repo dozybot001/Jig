@@ -4,22 +4,23 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { VERSION } from "../shared/version.ts";
+import { PRODUCT, VERSION } from "../shared/version.ts";
 import { type CliIo, EXIT_ERROR, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
 
 const HELP = `Usage: yew app <install|uninstall|status> [options]
 
-Put a Yew icon in your Applications folder (macOS). Clicking it starts Yew in
-the background if it is not running, then opens the web interface, signed in.
+Put a Yew Harness icon in your Applications folder (macOS). Clicking it starts
+Yew Harness in the background if it is not running, then opens the web
+interface, signed in.
 
-The icon is a small launcher for this installation of Yew: it runs the same
-yew you run in a terminal, with the Node.js found now. Run install again after
-you move or update Node.js or Yew.
+The icon is a small launcher for this installation of Yew Harness: it runs the
+same yew you run in a terminal, with the Node.js found now. Run install again
+after you move or update Node.js or Yew Harness.
 
 Commands:
   install    Create ~/Applications/Yew.app
-  uninstall  Remove it; Yew itself and your data stay
+  uninstall  Remove it; Yew Harness itself and your data stay
   status     Show whether it is there
 
 Options:
@@ -59,6 +60,9 @@ const xml = (text: string) =>
 /** A value inside single quotes in a shell script. */
 const quoted = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
 
+/** Shown for the launcher in every language: macOS falls back to the development region's. */
+export const DISPLAY_NAME = `CFBundleDisplayName = "${PRODUCT}";\nCFBundleName = "${PRODUCT}";\n`;
+
 export function infoPlist(): string {
 	return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -68,6 +72,10 @@ export function infoPlist(): string {
 	<string>Yew</string>
 	<key>CFBundleDisplayName</key>
 	<string>Yew</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>LSHasLocalizedDisplayName</key>
+	<true/>
 	<key>CFBundleIdentifier</key>
 	<string>cn.tenonai.apps.yew.launcher</string>
 	<key>CFBundleExecutable</key>
@@ -109,7 +117,7 @@ while [ "$tries" -lt 60 ]; do
 	if ${yew} open >/dev/null 2>&1; then exit 0; fi
 	tries=$((tries + 1))
 done
-osascript -e 'display alert "Yew did not start" message "Run yew serve in a terminal to see why."' >/dev/null 2>&1
+osascript -e 'display alert "Yew Harness did not start" message "Run yew serve in a terminal to see why."' >/dev/null 2>&1
 exit 1
 `;
 }
@@ -137,6 +145,9 @@ export function installApp(
 	mkdirSync(join(contents, "MacOS"), { recursive: true });
 	mkdirSync(join(contents, "Resources"), { recursive: true });
 	writeFileSync(join(contents, "Info.plist"), infoPlist());
+	// Finder, Launchpad and the Dock show the product's name; the file keeps the short one.
+	mkdirSync(join(contents, "Resources", "en.lproj"));
+	writeFileSync(join(contents, "Resources", "en.lproj", "InfoPlist.strings"), DISPLAY_NAME);
 	const launcher = join(contents, "MacOS", "yew-launcher");
 	writeFileSync(launcher, launcherScript(host, vars, join(home, "logs", "serve.log")));
 	chmodSync(launcher, 0o755);
@@ -183,7 +194,7 @@ export function uninstallApp(host: AppHost): void {
 export function appCommand(host: AppHost = realAppHost()): Command {
 	return {
 		name: "app",
-		summary: "Put a Yew icon in Applications (macOS)",
+		summary: "Put a Yew Harness icon in Applications (macOS)",
 		async run(args: string[], io: CliIo): Promise<number> {
 			const { values, positionals } = parseArgs({
 				args,
@@ -205,13 +216,16 @@ export function appCommand(host: AppHost = realAppHost()): Command {
 
 			if (action === "status") {
 				if (values.json) io.stdout.write(`${JSON.stringify({ installed, app })}\n`);
-				else io.stdout.write(`Yew icon: ${installed ? app : "not installed"}\n`);
+				else io.stdout.write(`Yew Harness icon: ${installed ? app : "not installed"}\n`);
 				return EXIT_OK;
 			}
 			if (action === "uninstall") {
 				uninstallApp(host);
 				if (values.json) io.stdout.write(`${JSON.stringify({ installed: false, app })}\n`);
-				else io.stdout.write(installed ? `Removed ${app}.\n` : "The Yew icon was not installed.\n");
+				else
+					io.stdout.write(
+						installed ? `Removed ${app}.\n` : "The Yew Harness icon was not installed.\n",
+					);
 				return EXIT_OK;
 			}
 
@@ -220,7 +234,7 @@ export function appCommand(host: AppHost = realAppHost()): Command {
 			if (values.json) io.stdout.write(`${JSON.stringify({ installed: true, app, icon })}\n`);
 			else {
 				io.stdout.write(
-					`Yew is in your Applications folder: ${app}\nOpen it from Launchpad or Spotlight, or drag it to the Dock.\n`,
+					`Yew Harness is in your Applications folder: ${app}\nOpen it from Launchpad or Spotlight, or drag it to the Dock.\n`,
 				);
 				if (!icon) io.stderr.write("yew: the icon could not be made; the app has a plain one.\n");
 			}

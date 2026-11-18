@@ -7,12 +7,12 @@
 - **不 fork，也不在现成项目上构建。** 按 [M1 实现计划](archive/m1-plan.md)自己写服务、Agent 循环、工具、权限和界面，参照下面这些项目的设计，没有复制代码。
   - 产品形态最接近的 Paseo、T3 Code 只包装 Claude Code、Codex 等外部命令行，没有自己的 Agent 循环。
   - 技术形态最接近的 OpenCode 自带循环、模型可换，但新版绑定 Effect 和 Bun，界面用 SolidJS，约 1.1 万个文件；fork 等于接手它的循环。
-  - OpenClaw 是多渠道的个人助理网关，体量过大。pi 的 `apps/p2` 技术栈和 Yew 最像（Node、React 19、pi），但 README 写明是原型，很快删除。
+  - OpenClaw 是多渠道的个人助理网关，体量过大。pi 的 `apps/p2` 技术栈和 Yew Harness 最像（Node、React 19、pi），但 README 写明是原型，很快删除。
 - **pi-agent-core 不作依赖，照它的循环改写。** 它是唯一认真考虑过的依赖：MIT，274 KB，钩子正好对上权限、排队和打断。不直接用它，原因有四：
   1. 1.0.0（10-01）到 1.5.0（11-02）发了 10 版，1.5.0 只升次版本号，却改了 `AgentTool` 的参数类型。
   2. 它精确锁定同版本的 pi-ai，模型层和循环只能一起升级。
   3. 它的消息和工具类型会铺满循环、工具、权限和存储，打破「pi-ai 只在 `src/server/model/` 引用」的约定。
-  4. Yew 的审批可能挂几个小时、跨重启，循环要在每个工具调用上落库和恢复，这一层要自己掌握。
+  4. Yew Harness 的审批可能挂几个小时、跨重启，循环要在每个工具调用上落库和恢复，这一层要自己掌握。
 
   它的循环文件 959 行，连同 Agent 类和类型约 2100 行，照着改写的成本不高。
 - **设计主要参照这几处**：pi（MIT）、OpenCode（MIT）、Gemini CLI（Apache-2.0）、Kimi Code（MIT）、OpenClaw（MIT）、T3 Code（MIT）。都是参照设计自己写，没有复制代码；2026-11-14 法务组把只读命令名单、「允许并记住」的前缀和剥包装命令三处和原文比过，不构成复制。
@@ -20,7 +20,7 @@
 ## 二、复制规则
 
 - MIT 的代码保留原版权和许可声明；Apache-2.0 的附上 LICENSE 和 NOTICE，并在文件头标明改动。每次复制都记进仓库根目录的 `THIRD_PARTY_NOTICES.md`，第一次复制时建立这个文件。
-- 只复制代码。任何项目的系统提示词和工具说明都不复制，Yew 的自己写（AGENTS.md「净室开发」）。
+- 只复制代码。任何项目的系统提示词和工具说明都不复制，Yew Harness 的自己写（AGENTS.md「净室开发」）。
 - GPL、AGPL、FSL、带品牌限制或附加条款的项目，只看思路，不复制代码。
 - 第三节排除的仓库，代码和文档都不读。
 - 包装 Claude Code 的项目里，面向 Claude Code 的适配层和分析文档不读，例如 Happy 的 `docs/competition/claude/`、OpenCode 的 `packages/core/src/plugin/provider/claude-agent/`。
@@ -29,7 +29,7 @@
 
 - 不读、不用泄露、逆向或转载的 Claude Code 源码和提示词。
 - 许可证带附加条款的项目不读代码，只看公开的说明文档。
-- Yew 接 Anthropic 只用 API Key，不做账号登录，不发送其他客户端的标识。
+- Yew Harness 接 Anthropic 只用 API Key，不做账号登录，不发送其他客户端的标识。
 
 ## 四、M1：Agent 循环与工具
 
@@ -41,11 +41,11 @@
   - `beforeToolCall` 返回 `{block, reason}` 时，生成一条出错的工具结果，拒绝理由由此交给模型。
   - 两种排队：steer 的消息在整批工具结果写回后、下一次请求模型前送达；followUp 的消息等循环停下再送。
   - 打断后，已生成的部分留在记录里（stopReason 为 aborted），发新消息就能接着说。
-  - `packages/agent/test/agent-loop.test.ts`（66 KB）可以当测试用例清单。2026-11-16 对照过一遍，补上一条：回复在输出上限处被截断时，里面的工具调用一律不执行（参数可能被截断却仍能通过校验），给模型一条出错结果让它重发。Yew 的对应测试在 `test/long-run.test.ts`。
-  - pi-ai 的 `isRetryableAssistantError`、`retryDelayMs`（MIT，作依赖调用）：判断一次失败值不值得重试、算退避时间。Yew 在模型层（`src/server/model/gateway.ts`）用它们做唯一一层重试，服务商 SDK 自带的重试关掉；另加空闲超时，流 5 分钟没有数据就放弃这一次并重试。
+  - `packages/agent/test/agent-loop.test.ts`（66 KB）可以当测试用例清单。2026-11-16 对照过一遍，补上一条：回复在输出上限处被截断时，里面的工具调用一律不执行（参数可能被截断却仍能通过校验），给模型一条出错结果让它重发。Yew Harness 的对应测试在 `test/long-run.test.ts`。
+  - pi-ai 的 `isRetryableAssistantError`、`retryDelayMs`（MIT，作依赖调用）：判断一次失败值不值得重试、算退避时间。Yew Harness 在模型层（`src/server/model/gateway.ts`）用它们做唯一一层重试，服务商 SDK 自带的重试关掉；另加空闲超时，流 5 分钟没有数据就放弃这一次并重试。
 - **OpenCode `packages/core/src/session/inbox.ts`**（MIT，照设计重写）：排队的消息存在表里，分「步骤之间送达」和「空闲时送达」两种。转成正式消息和删除排队记录在同一个事务里完成，重启不丢，也不重复。会话忙时，排队的消息可改可撤。
 - 模型接口要求工具结果紧跟在工具调用后面，所以「两次工具调用之间送达」只能落在一整批结果写回之后。
-- pi 的工具可以声明结果未知时能否重放（`replay`）。Yew 不重做，重启后一律标「待核对」。
+- pi 的工具可以声明结果未知时能否重放（`replay`）。Yew Harness 不重做，重启后一律标「待核对」。
 
 ### 4.2 工具
 
@@ -75,15 +75,15 @@
   - 命令拆段后逐段判定；有重定向或命令替换，就把放行降为询问；解析失败时询问。
 - **Kimi Code `packages/agent-core-v2/src/agent/permissionPolicy/`**（MIT）：十余条小策略按顺序判定，第一条给出结论的生效。`policies/dangerous-command-ask.ts` 先剥掉 sudo、doas、env、exec、`bash -c`、eval（最多嵌套 4 层）再判断是否危险，解析不了就询问。必须确认的命令清单可以从它和 Gemini CLI 的 `isDangerousCommand` 起步。
 - **Codex `codex-rs/execpolicy/`**（Apache-2.0，Rust，只看设计）：前缀规则可以附命中和不命中的示例，加载时自检；多条规则命中时取最严的。
-- **git**：仓库配置能让只读的 git 命令也执行辅助程序，Codex 因此在 2026-08 把 git 移出了安全名单。Yew 没有沙箱，git 的只读命令只在会话的工作文件夹内放行。
+- **git**：仓库配置能让只读的 git 命令也执行辅助程序，Codex 因此在 2026-08 把 git 移出了安全名单。Yew Harness 没有沙箱，git 的只读命令只在会话的工作文件夹内放行。
 - 不学 Goose 的智能审批：它让模型判断操作是否只读，判断结果会被提示注入左右。
 
 ### 4.4 上下文压缩
 
-- **pi `packages/coding-agent/src/core/compaction/compaction.ts`、`docs/compaction.md`**（MIT）：保留最近约 2 万 token，不在工具调用和它的结果之间切；喂给摘要的工具结果截到 2000 字符；服务商报上下文超长时，压缩后重试一次；压缩记录标出保留部分从哪一条开始。 Yew 的切点是任意一条消息或模型的一步的开头（2026-11-16 起；原先只能切在用户消息处，一条消息后连做几百步时切不了），代码在 `src/server/agent/compaction.ts`。切在一轮中间时，被移走部分里用户最近的那条消息原文存进压缩记录，随摘要一起发给模型（摘要会丢掉原话里的约束；用 `scripts/soak.ts` 对真实模型跑长任务时发现的）。
+- **pi `packages/coding-agent/src/core/compaction/compaction.ts`、`docs/compaction.md`**（MIT）：保留最近约 2 万 token，不在工具调用和它的结果之间切；喂给摘要的工具结果截到 2000 字符；服务商报上下文超长时，压缩后重试一次；压缩记录标出保留部分从哪一条开始。 Yew Harness 的切点是任意一条消息或模型的一步的开头（2026-11-16 起；原先只能切在用户消息处，一条消息后连做几百步时切不了），代码在 `src/server/agent/compaction.ts`。切在一轮中间时，被移走部分里用户最近的那条消息原文存进压缩记录，随摘要一起发给模型（摘要会丢掉原话里的约束；用 `scripts/soak.ts` 对真实模型跑长任务时发现的）。
 - **OpenCode `session/compaction.ts`**（只看思路）：离阈值还差一段时，在后台预先生成摘要，到点直接换上，不让用户等。
 - **Goose `crates/goose/src/context_mgmt/mod.rs`**（只看思路）：比例阈值（默认 80%）之外再设 token 上限，先到哪个算哪个。
-- 各家的阈值：Codex 90%，Kimi Code 85% 且另外留出 5 万，Gemini CLI 50%，Goose 80%。DeepSeek V4 Pro 的窗口是 100 万，只按 80% 要到 80 万 token 才压缩，单次请求很贵，所以 Yew 同时设 token 上限（M1 计划第六节）。
+- 各家的阈值：Codex 90%，Kimi Code 85% 且另外留出 5 万，Gemini CLI 50%，Goose 80%。DeepSeek V4 Pro 的窗口是 100 万，只按 80% 要到 80 万 token 才压缩，单次请求很贵，所以 Yew Harness 同时设 token 上限（M1 计划第六节）。
 
 ### 4.5 说明文件
 
@@ -109,7 +109,7 @@
   - 每 15 秒发一条 SSE 注释保活；客户端按静默时长识别手机休眠后的半开连接。
 - **Paseo `docs/timeline-sync.md`**（Apache-2.0）：实时增量和权威历史分两条路；发现序号缺口就按游标分页补齐；单条大小封顶截断，工具项 64 KiB，其他 256 KiB。
 - **Codex `codex-rs/app-server/README.md` 的 Thread read state 一节**：已读状态用 `{firstUnread, revision}` 表示，只有持久、可见的终态结果才推进它。
-- Yew 的做法见 M1 计划第四节。
+- Yew Harness 的做法见 M1 计划第四节。
 
 ### 5.2 本机接口安全
 
@@ -174,7 +174,7 @@ assistant-ui、ai-elements 不整体引入，只按需参考结构，符合「�
   2. 信封补 `in_reply_to`、`deadline`、`origin`（这条链起于哪个本人决定或定时任务）、`auto`、`delivery` 五个字段。只有请求、决定和本人消息在工具调用之间插入，通知和回报等本轮结束再送。（发信人，requestId）唯一。
   3. 防循环收成三条：额度按你的每次动作计算；自动生成的信不能回复；转发次数在每个本人决定处重新计，同一对会话在一条链里往返超过上限就转暂存。
   4. 期限到了只提醒，不替你选。暂存设上限，满了就拒收新信并告知发信人。
-  5. Shell 子进程和你是同一个系统用户，能运行 `yew send`、访问本机接口。Yew 给子进程设会话标记，`yew send` 见到标记就把信记在该会话名下并扣它的额度。审批和决定接口只认浏览器配对得到的 Cookie，命令行凭据只能发信。
+  5. Shell 子进程和你是同一个系统用户，能运行 `yew send`、访问本机接口。Yew Harness 给子进程设会话标记，`yew send` 见到标记就把信记在该会话名下并扣它的额度。审批和决定接口只认浏览器配对得到的 Cookie，命令行凭据只能发信。
   6. 同一项审批不重复出卡，参数相同的待批请求合并成一张（Hermes `tools/approval.py`）。
   7. 「A2A 信箱」改叫「会话信箱」，免得被当成实现了 A2A 协议。
 
@@ -193,14 +193,14 @@ assistant-ui、ai-elements 不整体引入，只按需参考结构，符合「�
   - 技能清单进系统提示，技能内容不被压缩掉。
   - `allowed-tools` 只当提示，不当放行（规范 21.2 不许规则整体放行）。
 - **MCP**：官方 TypeScript SDK v2（`@modelcontextprotocol/client` 2.4.0，Apache-2.0）作依赖，备选 `@earendil-works/pi-mcp`（MIT）。
-- **自带的 MCP 服务**（2026-11-16，不是 Yew 本身的依赖，不复制代码；整棵依赖树锁在 `mcp-builtin/package-lock.json`，第一次使用时用 `npm ci --ignore-scripts` 装进数据目录）：浏览器用 microsoft/playwright-mcp（`@playwright/mcp`，Apache-2.0）；电脑操控用 domdomegg/computer-use-mcp（MIT）。比较过的：chrome-devtools-mcp（Apache-2.0，偏调试）；mediar-ai/mcp-server-macos-use（MIT，npm 包里带 posthog 等与功能无关的依赖，不用）。版本写在 `mcp-builtin/package.json`，升级时重新生成锁文件、看它们的更新记录，并对 `mcp-builtin` 运行 `npm audit`。2026-11-16 的审计：sharp 的高危（libvips 等）用 `overrides` 固定到已修复的 0.35.5；剩下 8 条中危都是 file-type 在解析恶意构造的文件时死循环（GHSA-5v7r-6r5c-r473），经 jimp 被 nut-js 带入。豁免理由：这里处理的只有本机截下的屏幕图像，没有外来文件；上游修复后随版本升级去掉。
+- **自带的 MCP 服务**（2026-11-16，不是 Yew Harness 本身的依赖，不复制代码；整棵依赖树锁在 `mcp-builtin/package-lock.json`，第一次使用时用 `npm ci --ignore-scripts` 装进数据目录）：浏览器用 microsoft/playwright-mcp（`@playwright/mcp`，Apache-2.0）；电脑操控用 domdomegg/computer-use-mcp（MIT）。比较过的：chrome-devtools-mcp（Apache-2.0，偏调试）；mediar-ai/mcp-server-macos-use（MIT，npm 包里带 posthog 等与功能无关的依赖，不用）。版本写在 `mcp-builtin/package.json`，升级时重新生成锁文件、看它们的更新记录，并对 `mcp-builtin` 运行 `npm audit`。2026-11-16 的审计：sharp 的高危（libvips 等）用 `overrides` 固定到已修复的 0.35.5；剩下 8 条中危都是 file-type 在解析恶意构造的文件时死循环（GHSA-5v7r-6r5c-r473），经 jimp 被 nut-js 带入。豁免理由：这里处理的只有本机截下的屏幕图像，没有外来文件；上游修复后随版本升级去掉。
   - 只做 stdio 和 Streamable HTTP。
   - stdio 子进程默认只继承 HOME、LOGNAME、PATH、SHELL、TERM、USER，密钥显式传入；关闭时杀整个进程组。
   - OAuth 令牌按 issuer 分开存进钥匙串，回调地址用 `http://127.0.0.1:<端口>/callback`。
   - 项目级的 MCP 配置先经信任才读；新增 stdio 服务器要你确认。
 - **产物**：pi `apps/p2/plugins/artifacts/server.ts`、`preview.tsx`（MIT），OpenCode `packages/server/src/handlers/artifact.ts`（MIT）。
   - 产物响应头的 CSP 自带 `sandbox allow-scripts`；iframe 不给 `allow-same-origin`，得到不透明源。
-  - 另加 `frame-ancestors 'self'`、`form-action 'none'`、`connect-src 'none'`。p2 放开了 `https:`，Yew 不照抄这一点。
+  - 另加 `frame-ancestors 'self'`、`form-action 'none'`、`connect-src 'none'`。p2 放开了 `https:`，Yew Harness 不照抄这一点。
   - 每个产物新建一个 iframe。
   - Sandpack 默认用 codesandbox.io 的打包器，safe-content-frame 的外壳托管在第三方域名，都不符合「数据在本机」。
 - **记忆**：常设会话换新上下文时，身份从数据库和文件重建，包括职责和说明文件、固定读的记忆文件、未读信件和未了结的请求与审批、它自己写的交接说明、已激活的技能。参考 Hermes 的记忆上限和开局冻结（`website/docs/user-guide/features/memory.md`）、OpenClaw 压缩前先静默写一轮记忆（`docs/concepts/compaction.md`）。

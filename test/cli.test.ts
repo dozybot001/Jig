@@ -13,7 +13,7 @@ describe("yew cli", () => {
 	test("--version prints version, publisher and website to stdout", async () => {
 		const { io, stdout, stderr } = fakeIo();
 		assert.equal(await run(["--version"], io), 0);
-		assert.equal(stdout.text(), `yew ${VERSION}\nTenon AI · https://tenonai.cn/\n`);
+		assert.equal(stdout.text(), `Yew Harness ${VERSION}\nTenon AI · https://tenonai.cn/\n`);
 		assert.equal(stderr.text(), "");
 	});
 
@@ -33,7 +33,7 @@ describe("yew cli", () => {
 			const { io, stdout } = fakeIo();
 			assert.equal(await run(argv, io), 0);
 			// The one-line definition, as everywhere else (spec 1.8).
-			assert.match(stdout.text(), /^yew \S+\nAn AI-native multi-agent workbench\.\n/);
+			assert.match(stdout.text(), /^Yew Harness \S+\nAn AI-native multi-agent workbench\.\n/);
 			assert.match(stdout.text(), /Usage: yew <command>/);
 		}
 	});
@@ -61,6 +61,6 @@ describe("yew cli", () => {
 
 	test("the entry point runs under plain node", async () => {
 		const { stdout } = await promisify(execFile)(process.execPath, [main, "--version"]);
-		assert.match(stdout, /^yew \d+\.\d+\.\d+/);
+		assert.match(stdout, /^Yew Harness \d+\.\d+\.\d+/);
 	});
 });

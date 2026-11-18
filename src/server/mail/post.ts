@@ -590,7 +590,7 @@ export class PostOffice {
 					`Chosen: ${chosen ?? "(note only)"}`,
 					...(card.note ? [`Note: ${oneLine(card.note)}`] : []),
 					...(requester ? [`Requested by: ${requester}`] : []),
-					"Decided by the person in Yew",
+					"Decided by the person in Yew Harness",
 				]
 			: [
 					stamp,
@@ -599,7 +599,7 @@ export class PostOffice {
 					`选择：${chosen ?? "（只写了备注）"}`,
 					...(card.note ? [`备注：${oneLine(card.note)}`] : []),
 					...(requester ? [`提出：${requester}`] : []),
-					"本人在 Yew 里决定",
+					"本人在 Yew Harness 里决定",
 				];
 		try {
 			const header = existsSync(path) ? "" : english ? "# Approval log\n\n" : "# 审批记录\n\n";

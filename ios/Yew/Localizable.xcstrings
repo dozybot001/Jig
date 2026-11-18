@@ -68,12 +68,12 @@
         }
       }
     },
-    "About Yew": {
+    "About Yew Harness": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "关于 Yew"
+            "value": "关于 Yew Harness"
           }
         }
       }
@@ -138,12 +138,12 @@
         }
       }
     },
-    "An AI-native multi-agent workbench. Yew organizes agent sessions the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center. The sessions run in Yew on your Mac.": {
+    "An AI-native multi-agent workbench. Yew Harness organizes agent sessions the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center. The sessions run in Yew Harness on your Mac.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI 原生的多 Agent 工作台。Yew 按 Session Engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。会话跑在你 Mac 上的 Yew 里。"
+            "value": "AI 原生的多 Agent 工作台。Yew Harness 按 Session Engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。会话跑在你 Mac 上的 Yew Harness 里。"
           }
         }
       }
@@ -248,12 +248,12 @@
         }
       }
     },
-    "Can't connect. Check the network; Yew keeps trying.": {
+    "Can't connect. Check the network; Yew Harness keeps trying.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连不上。请检查网络，Yew 会一直重试。"
+            "value": "连不上。请检查网络，Yew Harness 会一直重试。"
           }
         }
       }
@@ -514,32 +514,32 @@
         }
       }
     },
-    "In Yew on your Mac, open Settings → Phone access, click Add phone, then scan the QR code it shows.": {
+    "In Yew Harness on your Mac, open Settings → Phone access, click Add phone, then scan the QR code it shows.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在 Mac 上的 Yew 里打开 设置 → 手机访问，点「添加手机」，再扫描出现的二维码。"
+            "value": "在 Mac 上的 Yew Harness 里打开 设置 → 手机访问，点「添加手机」，再扫描出现的二维码。"
           }
         }
       }
     },
-    "Yew on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions' questions and decide on cards, and you can follow and reply to sessions.": {
+    "Yew Harness on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions' questions and decide on cards, and you can follow and reply to sessions.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone 上的 Yew 经中继连接你的 Mac，两端之间端到端加密。离开电脑时，你在这里处理要你做的事：授权操作、回答会话的提问、处理决定卡，也能看会话的进展并回复。"
+            "value": "iPhone 上的 Yew Harness 经中继连接你的 Mac，两端之间端到端加密。离开电脑时，你在这里处理要你做的事：授权操作、回答会话的提问、处理决定卡，也能看会话的进展并回复。"
           }
         }
       }
     },
-    "Yew, by Tenon AI": {
+    "Yew Harness, by Tenon AI": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Yew，榫卯 Tenon AI 出品"
+            "value": "Yew Harness，榫卯 Tenon AI 出品"
           }
         }
       }
@@ -1244,12 +1244,12 @@
         }
       }
     },
-    "That is not a Yew pairing link.": {
+    "That is not a Yew Harness pairing link.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这不是 Yew 的配对链接。"
+            "value": "这不是 Yew Harness 的配对链接。"
           }
         }
       }
@@ -1264,22 +1264,22 @@
         }
       }
     },
-    "The Mac is not online. Keep Yew running on the Mac with phone access on, then scan again.": {
+    "The Mac is not online. Keep Yew Harness running on the Mac with phone access on, then scan again.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac 不在线。请让 Mac 上的 Yew 保持运行并打开手机访问，再扫一次。"
+            "value": "Mac 不在线。请让 Mac 上的 Yew Harness 保持运行并打开手机访问，再扫一次。"
           }
         }
       }
     },
-    "The Mac is offline. Keep Yew running there with phone access on.": {
+    "The Mac is offline. Keep Yew Harness running there with phone access on.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac 不在线。请让 Mac 上的 Yew 保持运行，并打开手机访问。"
+            "value": "Mac 不在线。请让 Mac 上的 Yew Harness 保持运行，并打开手机访问。"
           }
         }
       }
@@ -1304,12 +1304,12 @@
         }
       }
     },
-    "The Mac removes this iPhone from its list. To use Yew here again, show a new QR code on the Mac and scan it.": {
+    "The Mac removes this iPhone from its list. To use Yew Harness here again, show a new QR code on the Mac and scan it.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac 会把这台 iPhone 从列表里移除。之后要在这里用 Yew，需要在 Mac 上重新显示二维码再扫描。"
+            "value": "Mac 会把这台 iPhone 从列表里移除。之后要在这里用 Yew Harness，需要在 Mac 上重新显示二维码再扫描。"
           }
         }
       }
@@ -1737,12 +1737,12 @@
         }
       }
     },
-    "Yew notifies this iPhone when something needs you (a permission, a question, a decision or a held letter), when a session stops with an error, and when a task finishes. What a notification says is encrypted for this iPhone; the relay and Apple cannot read it.": {
+    "Yew Harness notifies this iPhone when something needs you (a permission, a question, a decision or a held letter), when a session stops with an error, and when a task finishes. What a notification says is encrypted for this iPhone; the relay and Apple cannot read it.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有事要你处理（授权、提问、决定、待放行的信）、会话出错停下、任务做完时，Yew 通知这台 iPhone。通知的内容为这台 iPhone 加密，中继和 Apple 都读不到。"
+            "value": "有事要你处理（授权、提问、决定、待放行的信）、会话出错停下、任务做完时，Yew Harness 通知这台 iPhone。通知的内容为这台 iPhone 加密，中继和 Apple 都读不到。"
           }
         }
       }
@@ -1753,13 +1753,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Something in Yew needs you."
+            "value": "Something in Yew Harness needs you."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Yew 里有事等你。"
+            "value": "Yew Harness 里有事等你。"
           }
         }
       }

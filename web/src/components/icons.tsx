@@ -178,6 +178,19 @@ export function YewWordmark({ className }: { className?: string }) {
 		</svg>
 	);
 }
+
+/**
+ * The product's name where the lockup shows it (blueprint, section 12): the "Yew" wordmark with a
+ * smaller "Harness" after it on the same baseline. Single "Yew" is the red-haired girl's name.
+ */
+export function ProductName({ className }: { className?: string }) {
+	return (
+		<span className={`product-name${className ? ` ${className}` : ""}`} aria-hidden="true">
+			<YewWordmark className="wordmark" />
+			<span className="product-harness">Harness</span>
+		</span>
+	);
+}
 /** Delete or remove for good. */
 export const TrashIcon = () => <Trash2 {...props} />;
 /** Test a connection: is it alive, and how fast. */

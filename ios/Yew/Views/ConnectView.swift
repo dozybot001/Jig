@@ -32,7 +32,7 @@ struct ConnectView: View {
 					}
 					.disabled(!ScannerView.available || busy)
 				} footer: {
-					Text("In Yew on your Mac, open Settings → Phone access, click Add phone, then scan the QR code it shows.")
+					Text("In Yew Harness on your Mac, open Settings → Phone access, click Add phone, then scan the QR code it shows.")
 				}
 				Section("Or paste the pairing link") {
 					TextField("yew://pair?…", text: $pairLink, axis: .vertical)
@@ -79,7 +79,7 @@ struct ConnectView: View {
 					}
 				}
 				Section {
-					NavigationLink("About Yew") { AboutView() }
+					NavigationLink("About Yew Harness") { AboutView() }
 				}
 			}
 			.sheet(isPresented: $scanning) {

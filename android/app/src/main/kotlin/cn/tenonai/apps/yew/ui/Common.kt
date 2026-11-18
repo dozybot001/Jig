@@ -45,6 +45,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -110,21 +112,39 @@ fun Screen(
 }
 
 /**
- * Yew's full lockup (spec 1.4–1.6) for the first screen and the About page: the mark, the wordmark and
- * the Tenon mark at its upper right, measured from the wordmark size [size] (S; the wordmark's drawable
- * is one em, so S high). The mark fills an S square .3S before the wordmark, centred on it; the Tenon
- * mark is max(14dp, .58S) square, max(4dp, .18S) after the wordmark, its top .04S above the wordmark's.
+ * The full lockup (spec 1.4–1.6) for the first screen and the About page: the mark, the wordmark with a
+ * smaller "Harness" after it (the product's name is Yew Harness, blueprint section 12) and the Tenon
+ * mark at its upper right, measured from the wordmark size [size] (S; the wordmark's drawable is one
+ * em, so S high). The mark fills an S square .3S before the wordmark, centred on it; "Harness" is
+ * .64S type .25S after the wordmark, on its baseline (.16S above the bottom of its box); the Tenon
+ * mark is max(14dp, .58S) square, max(4dp, .18S) after the name, its top .04S above the wordmark's.
  */
 @Composable
 fun Lockup(size: Dp = 40.dp) {
     val label = stringResource(R.string.lockup_label)
+    val harness = with(LocalDensity.current) { (size * 0.64f).toSp() }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.clearAndSetSemantics { contentDescription = label },
     ) {
         Image(painterResource(R.drawable.yew_mark), null, Modifier.size(size))
         Spacer(Modifier.width(size * 0.3f))
-        Image(painterResource(R.drawable.yew_wordmark), null, Modifier.size(size * 2.091f, size))
+        Row {
+            Image(
+                painterResource(R.drawable.yew_wordmark), null,
+                Modifier.size(size * 2.091f, size).alignBy { it.measuredHeight * 84 / 100 },
+            )
+            Spacer(Modifier.width(size * 0.25f))
+            Text(
+                "Harness",
+                color = colorResource(R.color.mark_ink),
+                fontSize = harness,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.alignByBaseline(),
+            )
+        }
         Spacer(Modifier.width(max(4.dp, size * 0.18f)))
         Image(
             painterResource(R.drawable.tenon_mark), null,
