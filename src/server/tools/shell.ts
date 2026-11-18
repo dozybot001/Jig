@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { activeSandbox } from "../sandbox.ts";
+import { activeSandbox, type SiteQuestion } from "../sandbox.ts";
 import { startCommand } from "./process.ts";
 import {
 	bool,
@@ -109,14 +109,18 @@ export const shellTool: ToolDefinition = {
 			// A site outside the sandbox's list is put to the person on this call's card.
 			...(permit
 				? {
-						ask: (host: string, port?: number) =>
+						ask: (question: SiteQuestion) =>
 							permit(
 								{
 									tool: "shell",
-									summary: port === undefined ? host : `${host}:${port}`,
+									summary:
+										question.port === undefined
+											? question.host
+											: `${question.host}:${question.port}`,
 									mustConfirm: false,
-									reasons: ["connect-site"],
+									reasons: [question.unsure ? "connect-site-unsure" : "connect-site"],
 									description: command.slice(0, 300),
+									...(question.unsure ? { running: question.unsure } : {}),
 								},
 								asking.signal,
 							),

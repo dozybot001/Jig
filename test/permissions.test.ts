@@ -281,6 +281,26 @@ describe("file permissions", () => {
 		assert.equal(write(join(homedir(), ".aws", "credentials")).effect, "deny");
 	});
 
+	test("folders the person keeps from sessions are refused the same way, even inside a read root", () => {
+		const kept = new PermissionEngine(yewHome);
+		const notes = join(outsideDir, "memory");
+		kept.readRoots = () => [notes];
+		kept.hidden = () => [join(notes, ".private")];
+		const decide = (kind: "read" | "write", path: string) =>
+			kept.decide({ kind, tool: kind, paths: [path], summary: path }, session()).effect;
+		assert.equal(decide("read", join(notes, "index.md")), "allow");
+		assert.equal(decide("read", join(notes, ".private", "keys.md")), "deny");
+		assert.equal(decide("write", join(notes, ".private", "keys.md")), "deny");
+		assert.ok(kept.offLimits(join(notes, ".private", "a", "b.txt")));
+		assert.ok(!kept.offLimits(join(notes, "public.md")));
+		// A command that names one asks every time, like one that names credentials.
+		const request = kept.decide(
+			{ kind: "command", tool: "shell", command: `cat ${join(notes, ".private", "keys.md")}` },
+			session({ options: { permissionMode: "skip" } }),
+		);
+		assert.ok(request.effect === "ask" && request.request.mustConfirm);
+	});
+
 	test("in the manual mode writes ask; outside the folder they must be confirmed", () => {
 		assert.deepEqual(askOf(write(join(cwd, "a.ts")))?.rememberRules, [
 			{ effect: "allow", tool: "write", pattern: "**" },

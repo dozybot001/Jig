@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { loadInstructions } from "../src/server/agent/prompt.ts";
@@ -183,5 +184,28 @@ describe("instructions, memory folders and what may be read", () => {
 		assert.deepEqual(saved.memoryDirs, [memory]);
 		assert.equal((await patch({ memoryDirs: [join(memory, "missing")] })).status, 400);
 		assert.equal((await patch({ memoryDirs: ["relative"] })).status, 400);
+	});
+
+	test("folders kept from sessions: absolute or ~, may not exist yet, never the root or the home folder", async () => {
+		const { store } = newStore();
+		const app = createApp({ store, log: () => {} });
+		const patch = (body: unknown) =>
+			app.request("/api/settings", {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
+			});
+		const memory = real("yew-memory-");
+		const saved = (await (
+			await patch({ hiddenFolders: [join(memory, ".private"), `${join(memory, ".private")} `] })
+		).json()) as { hiddenFolders: string[] };
+		assert.deepEqual(saved.hiddenFolders, [join(memory, ".private")]);
+		const home = (await (await patch({ hiddenFolders: ["~/.yew-test-hidden"] })).json()) as {
+			hiddenFolders: string[];
+		};
+		assert.deepEqual(home.hiddenFolders, [join(homedir(), ".yew-test-hidden")]);
+		for (const bad of ["/", "~", "relative"]) {
+			assert.equal((await patch({ hiddenFolders: [bad] })).status, 400, bad);
+		}
 	});
 });

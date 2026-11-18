@@ -157,6 +157,25 @@ describe("search tools", () => {
 		);
 		assert.equal(out(await run(grepTool, { pattern: "absent" }, ctx)), "No matches.");
 	});
+
+	test("searches leave out what sessions may not read", async () => {
+		const cwd = realpathSync(tempDir());
+		mkdirSync(join(cwd, ".private"));
+		writeFileSync(join(cwd, "open.md"), "needle in the open\n");
+		writeFileSync(join(cwd, ".private", "keys.md"), "needle in the keys\n");
+		const ctx = makeContext(cwd, {
+			offLimits: (path) => path.startsWith(join(cwd, ".private")),
+		});
+		assert.equal(out(await run(globTool, { pattern: "**/*.md" }, ctx)), "open.md");
+		assert.equal(
+			out(await run(grepTool, { pattern: "needle" }, ctx)),
+			"open.md\n1: needle in the open",
+		);
+		assert.equal(
+			out(await run(grepTool, { pattern: "keys", path: join(cwd, ".private") }, ctx)),
+			"No matches.",
+		);
+	});
 });
 
 describe("shell tool", () => {

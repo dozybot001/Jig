@@ -394,6 +394,19 @@ export function PermissionCard({ approval, session }: { approval: Approval; sess
 					{request.summary}
 				</ScrollBlock>
 			)}
+			{/* A site asked about while other things ran in the sandbox: what ran, and a yes is for once. */}
+			{request.running && request.running.length > 0 && (
+				<>
+					<p className="hint">{t("siteRunning")}</p>
+					<ul className="request-list">
+						{request.running.map((item, index) => (
+							// biome-ignore lint/suspicious/noArrayIndexKey: the list is fixed and in order
+							<li key={index}>{t(`siteRunning_${item.kind}`, { text: item.text })}</li>
+						))}
+					</ul>
+					<p className="hint request-warning">{t("siteOnce")}</p>
+				</>
+			)}
 			{request.diff && <Diff patch={request.diff} />}
 			{denying && (
 				<input

@@ -151,6 +151,7 @@ export function serveCommand(): Command {
 						() => ({
 							sites: providerSites,
 							credentials: store.getSetting("sandboxCredentials", false),
+							hidden: store.getSetting<string[]>("hiddenFolders", []),
 						}),
 						io.env as NodeJS.ProcessEnv,
 					)

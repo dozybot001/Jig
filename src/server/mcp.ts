@@ -319,6 +319,7 @@ class StdioTransport implements Transport {
 		config: McpServerConfig,
 		env: NodeJS.ProcessEnv,
 		yewHome: string,
+		name: string,
 	): Promise<StdioTransport> {
 		const variables = { ...(config.ownEnv ? serverEnv(env) : env), ...config.env };
 		if (config.cwd) mkdirSync(config.cwd, { recursive: true });
@@ -335,9 +336,10 @@ class StdioTransport implements Transport {
 						],
 					},
 					text: line,
+					label: { kind: "mcp", text: name },
 				});
 		if (box) {
-			for (const name of box.unset) delete variables[name];
+			for (const variable of box.unset) delete variables[variable];
 			Object.assign(variables, box.env);
 		}
 		const options = {
@@ -706,7 +708,7 @@ export class McpHub {
 						this.#options.fetch ?? fetch,
 						auth ? () => auth.bearer(name, config.url as string) : null,
 					)
-				: StdioTransport.start(config, env, this.#options.yewHome);
+				: StdioTransport.start(config, env, this.#options.yewHome, name);
 		const offer = () => {
 			this.#definitions = [...this.#servers.values()].flatMap((server) =>
 				server.tools.map((tool) => this.#definition(server, tool)),

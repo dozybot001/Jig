@@ -554,6 +554,10 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 	const savedMemory = (settings?.memoryDirs ?? []).join("\n");
 	const [memory, setMemory] = useState(savedMemory);
 	const memoryId = useId();
+	const savedHidden = (settings?.hiddenFolders ?? []).join("\n");
+	const [hidden, setHidden] = useState(savedHidden);
+	const hiddenId = useId();
+	const sandbox = useAppState((state) => state.health?.sandbox ?? "none");
 	const save = useAction(async () => {
 		await saveSettings({
 			...(model ? { defaultModel: model } : {}),
@@ -562,6 +566,14 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 			...(memory !== savedMemory
 				? {
 						memoryDirs: memory
+							.split("\n")
+							.map((line) => line.trim())
+							.filter(Boolean),
+					}
+				: {}),
+			...(hidden !== savedHidden
+				? {
+						hiddenFolders: hidden
 							.split("\n")
 							.map((line) => line.trim())
 							.filter(Boolean),
@@ -578,7 +590,8 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 		workspace !== savedWorkspace ||
 		log.trim() !== (settings?.decisionLog ?? "") ||
 		budget !== savedBudget ||
-		memory !== savedMemory;
+		memory !== savedMemory ||
+		hidden !== savedHidden;
 	return (
 		<Dialog
 			title={t("defaultsTitle")}
@@ -659,6 +672,21 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 					placeholder={t("memoryDirsPlaceholder")}
 					value={memory}
 					onChange={(event) => setMemory(event.target.value)}
+				/>
+			</Field>
+			<Field
+				label={t("hiddenFolders")}
+				htmlFor={hiddenId}
+				info={t(sandbox === "none" ? "hiddenFoldersHelp" : "hiddenFoldersHelpSandbox")}
+			>
+				<textarea
+					id={hiddenId}
+					className="textarea"
+					spellCheck={false}
+					rows={2}
+					placeholder={t("hiddenFoldersPlaceholder")}
+					value={hidden}
+					onChange={(event) => setHidden(event.target.value)}
 				/>
 			</Field>
 			<Field label={t("dailyBudgetAll")} htmlFor={budgetId} info={t("dailyBudgetAllHelp")}>

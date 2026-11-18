@@ -245,6 +245,8 @@ export class Agents {
 			placement: (session) => this.#placement(session),
 			extras: () => this.#extras(),
 		});
+		// Folders the person keeps from sessions are refused like credential locations.
+		this.#permissions.hidden = () => this.#store.getSetting<string[]>("hiddenFolders", []);
 		// Memory folders and the person's skill folders are read without asking, like the working folder.
 		this.#permissions.readRoots = () => [
 			...this.#store.getSetting<string[]>("memoryDirs", []),
@@ -1036,6 +1038,7 @@ export class Agents {
 				}, 200);
 			},
 			setTodos: (todos) => this.#store.setTodos(sessionId, todos),
+			offLimits: (path) => this.#permissions.offLimits(path),
 			ask: async (request) => {
 				const run = this.#mail.run(sessionId);
 				if (run?.unattended) {

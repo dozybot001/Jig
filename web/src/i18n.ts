@@ -273,6 +273,12 @@ const zh = {
 	"confirm_outside-sandbox":
 		"在沙箱外运行：能读写 Yew Harness 自己的数据和钥匙串，项目里的脚本（npm run、make、构建脚本）也会在沙箱外跑",
 	"confirm_connect-site": "让命令连接这个网站",
+	"confirm_connect-site-unsure": "有连接要去这个网站，不确定是哪一个发起的",
+	siteRunning: "当时在沙箱里运行的：",
+	siteRunning_command: "命令：{text}",
+	siteRunning_job: "后台命令：{text}",
+	siteRunning_mcp: "MCP 服务器：{text}",
+	siteOnce: "只放行这一次连接。",
 	"confirm_widen-permission": "调高会话的授权方式",
 	"confirm_change-folder": "改会话的工作区",
 	"confirm_open-letters": "让会话直接收信",
@@ -780,6 +786,12 @@ const zh = {
 	memoryDirsHelp:
 		"你跨会话保存笔记的文件夹，一行一个。会话能直接读这些文件夹，每个文件夹的索引（index.md、MEMORY.md 或 README.md）会随说明一起给它；写这些文件夹仍然要问你。",
 	memoryDirsPlaceholder: "例如 ~/memory",
+	hiddenFolders: "会话读不到的目录",
+	hiddenFoldersHelp:
+		"放密钥、私人笔记这类内容的文件夹，一行一个。会话的文件工具读不到、也改不了这些文件夹，搜索结果里也没有里面的文件；会话的命令仍以你的系统账户运行，读得到。凭据文件和 Yew Harness 自己的数据本来就读不到，不用写在这里。",
+	hiddenFoldersHelpSandbox:
+		"放密钥、私人笔记这类内容的文件夹，一行一个。会话的文件工具和沙箱里的命令都读不到、也改不了这些文件夹，搜索结果里也没有里面的文件。凭据文件和 Yew Harness 自己的数据本来就读不到，不用写在这里。",
+	hiddenFoldersPlaceholder: "例如 ~/memory/.private",
 	dailyBudgetAll: "全部会话的每日费用上限（美元）",
 	dailyBudgetAllHelp:
 		"所有会话一天加起来最多花这么多，按服务商的价格估算。到上限时，正在干活的会话在下一次请求模型前停下。留空不设。",
@@ -999,10 +1011,10 @@ const zh = {
 	sandbox_macos: "在系统沙箱里运行（macOS）",
 	sandbox_linux: "在系统沙箱里运行（Linux）",
 	sandboxHint:
-		"读写不了 Yew Harness 的数据，改不了它的程序和开机启动项；只能写工作区、临时文件夹和沙箱自己的缓存。联网只放行常用的包管理源、代码托管网站和配了密钥的模型服务商，连别的网站时先问你。要在沙箱外跑的命令每次都问你。",
+		"读写不了 Yew Harness 的数据，读不到钥匙串里的条目，改不了 Yew Harness 的程序和开机启动项；只能写工作区、临时文件夹和沙箱自己的缓存。联网只放行常用的包管理源、代码托管网站和配了密钥的模型服务商，连别的网站时先问你。要在沙箱外跑的命令每次都问你。",
 	sandboxCredentials: "沙箱里可以用 SSH 和凭据文件",
 	sandboxCredentialsHint:
-		"打开后，沙箱里的命令可以读 ~/.ssh、~/.aws、~/.netrc 这类凭据文件，macOS 上还可以用 ssh-agent。默认关闭，从下一条命令起生效。",
+		"打开后，沙箱里的命令可以读 ~/.ssh、~/.aws、~/.netrc 这类凭据文件，macOS 上还可以用 ssh-agent。钥匙串一直读不到：要用钥匙串里凭据的 git（HTTPS）和 gh，在沙箱外运行，每次都会问你。默认关闭，从下一条命令起生效。",
 	writtenTo: "已写到 {path}",
 	err_notOnThisSystem: "这台电脑的系统不支持这一项。",
 	err_serviceFailed: "系统没有接受这个启动项。在终端运行 yew service install 看具体原因。",
@@ -1281,6 +1293,13 @@ const en: Record<MessageKey, string> = {
 	"confirm_outside-sandbox":
 		"Runs outside the sandbox, where it can read and change Yew Harness's own data and the keychain; the project's scripts (npm run, make, build scripts) run outside too",
 	"confirm_connect-site": "Let the command connect to this site",
+	"confirm_connect-site-unsure":
+		"A connection wants to reach this site; it is not clear which of these made it",
+	siteRunning: "Running in the sandbox at the time:",
+	siteRunning_command: "Command: {text}",
+	siteRunning_job: "Background command: {text}",
+	siteRunning_mcp: "MCP server: {text}",
+	siteOnce: "Allows this one connection only.",
 	"confirm_widen-permission": "Raise a session's permission mode",
 	"confirm_change-folder": "Change a session's working folder",
 	"confirm_open-letters": "Let a session receive letters directly",
@@ -1804,6 +1823,12 @@ const en: Record<MessageKey, string> = {
 	memoryDirsHelp:
 		"Folders where you keep notes across sessions, one per line. Sessions can read these folders directly, and each folder's index (index.md, MEMORY.md or README.md) is given to them with your instructions; writing there still asks you.",
 	memoryDirsPlaceholder: "For example ~/memory",
+	hiddenFolders: "Folders sessions cannot read",
+	hiddenFoldersHelp:
+		"Folders with keys, private notes and the like, one per line. Sessions' file tools can neither read nor change them, and searches leave out the files in them; sessions' commands still run as your user account and can read them. Credential files and Yew Harness's own data are closed already and need not be listed.",
+	hiddenFoldersHelpSandbox:
+		"Folders with keys, private notes and the like, one per line. Neither sessions' file tools nor commands in the sandbox can read or change them, and searches leave out the files in them. Credential files and Yew Harness's own data are closed already and need not be listed.",
+	hiddenFoldersPlaceholder: "For example ~/memory/.private",
 	dailyBudgetAll: "Daily spending limit for all sessions (USD)",
 	dailyBudgetAllHelp:
 		"The most all sessions together may spend in a day, estimated from the providers' prices. At the limit, working sessions stop before their next model request. Leave empty for no limit.",
@@ -2044,10 +2069,10 @@ const en: Record<MessageKey, string> = {
 	sandbox_macos: "Run in the system sandbox (macOS)",
 	sandbox_linux: "Run in the system sandbox (Linux)",
 	sandboxHint:
-		"They cannot read or change Yew Harness's data, its program or what starts at login, and write only in the workspace, temporary folders and the sandbox's own caches. They reach the usual package registries, code hosts and the model providers that have a key; for any other site you are asked first. A command that has to run outside asks you every time.",
+		"They cannot read or change Yew Harness's data or read the keychain's items, cannot change Yew Harness's program or what starts at login, and write only in the workspace, temporary folders and the sandbox's own caches. They reach the usual package registries, code hosts and the model providers that have a key; for any other site you are asked first. A command that has to run outside asks you every time.",
 	sandboxCredentials: "Commands in the sandbox can use SSH and credential files",
 	sandboxCredentialsHint:
-		"When on, commands in the sandbox can read credential files such as ~/.ssh, ~/.aws and ~/.netrc, and on macOS use ssh-agent. Off by default; applies from the next command.",
+		"When on, commands in the sandbox can read credential files such as ~/.ssh, ~/.aws and ~/.netrc, and on macOS use ssh-agent. The keychain stays closed: git over HTTPS with saved credentials and gh run outside the sandbox, which asks you every time. Off by default; applies from the next command.",
 	writtenTo: "Written to {path}",
 	err_notOnThisSystem: "This computer's system does not support this.",
 	err_serviceFailed:

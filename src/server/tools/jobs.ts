@@ -27,7 +27,7 @@ export class Jobs {
 		outsideSandbox?: boolean;
 	}): Promise<Job> {
 		const id = `job-${this.#next++}`;
-		const running = await startCommand(options);
+		const running = await startCommand({ ...options, background: true });
 		const job: Job = {
 			id,
 			command: options.command,

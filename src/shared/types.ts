@@ -320,6 +320,8 @@ export type ConfirmReason =
 	| "outside-sandbox"
 	// A command in the sandbox connecting to a site that is not on its list; asked while it runs.
 	| "connect-site"
+	// The same while other things run in the sandbox, so the connection may be theirs: allowed once.
+	| "connect-site-unsure"
 	// An action of the computer control tool: a click or keystroke anywhere on the screen.
 	| "computer-control"
 	// An MCP tool that sends, publishes or deletes something in the service it connects to.
@@ -357,6 +359,11 @@ export interface PermissionRequest {
 	diff?: string;
 	/** The changes manage_yew would make, with names in place of ids, for the interface to word. */
 	changes?: ChangeStep[];
+	/**
+	 * What ran in the system sandbox when a command asked to reach a site and the connection could
+	 * have been any of them ("connect-site-unsure"): commands, background commands, MCP servers.
+	 */
+	running?: { kind: "command" | "job" | "mcp"; text: string }[];
 }
 
 /**

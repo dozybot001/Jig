@@ -25,6 +25,7 @@ import {
 	NOTIFY_KINDS,
 	OPENING_MODES,
 	readSettings,
+	resolveHiddenFolder,
 	resolveLogFile,
 	type Workspace,
 } from "../settings.ts";
@@ -424,6 +425,20 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		if (opening) store.setSetting("opening", opening);
 		const credentials = optBoolean(fields, "sandboxCredentials");
 		if (credentials !== undefined) store.setSetting("sandboxCredentials", credentials);
+		const hidden = optArray(fields, "hiddenFolders");
+		if (hidden) {
+			if (
+				hidden.length > 20 ||
+				hidden.some((dir) => typeof dir !== "string" || dir.length > 4096)
+			) {
+				throw invalid("hiddenFolders is a list of up to 20 folders.", "hiddenFolders");
+			}
+			store.setSetting("hiddenFolders", [
+				...new Set(
+					(hidden as string[]).filter((dir) => dir.trim()).map((dir) => resolveHiddenFolder(dir)),
+				),
+			]);
+		}
 		const workspaces = optArray(fields, "workspaces");
 		if (workspaces) {
 			store.setSetting("workspaces", parseWorkspaces(workspaces, readSettings(store).workspaces));

@@ -95,7 +95,7 @@ export const globTool: ToolDefinition = {
 		if (result.code === 2) return errorResult(result.stderr.trim() || "The search failed.");
 		const files = result.stdout
 			.split("\n")
-			.filter(Boolean)
+			.filter((file) => file && !ctx.offLimits?.(file))
 			.map((file) => display(file, ctx.session));
 		if (files.length === 0) return { content: [text("No files matched.")] };
 		const shown = files.slice(0, MAX_FILES).join("\n");
@@ -174,6 +174,9 @@ export const grepTool: ToolDefinition = {
 				continue;
 			}
 			if (event.type !== "match" && event.type !== "context") continue;
+			const file = event.data.path?.text ?? "";
+			// What sessions may not read stays out, though the search reached it.
+			if (ctx.offLimits?.(file)) continue;
 			if (event.type === "match") {
 				if (matches >= MAX_MATCHES) {
 					matches++;
@@ -181,7 +184,6 @@ export const grepTool: ToolDefinition = {
 				}
 				matches++;
 			}
-			const file = event.data.path?.text ?? "";
 			if (file !== lastFile) {
 				if (lines.length > 0) lines.push("");
 				lines.push(display(file, ctx.session));

@@ -41,6 +41,8 @@ export interface Settings {
 	opening: "auto" | "click";
 	/** Whether commands in the system sandbox may use SSH and credential files (blueprint, section 11). */
 	sandboxCredentials: boolean;
+	/** Folders sessions may not read: file tools refuse them, the system sandbox closes them. */
+	hiddenFolders: string[];
 }
 
 /** This browser remembers "off" here, so the opening knows before the settings arrive. */

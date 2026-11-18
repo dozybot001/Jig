@@ -14,12 +14,13 @@ import {
 	INSTALL_DIR,
 	PACKAGE_SITES,
 	type SandboxPlaces,
+	type SiteQuestion,
 	sandboxConfig,
 	sandboxEnvironment,
 	startSandbox,
 	stopSandbox,
 } from "../src/server/sandbox.ts";
-import { startCommand } from "../src/server/tools/process.ts";
+import { type RunningCommand, startCommand } from "../src/server/tools/process.ts";
 import type { Session } from "../src/shared/types.ts";
 import { tempDir } from "./helpers/store.ts";
 
@@ -37,7 +38,10 @@ const places: SandboxPlaces = {
 	root: join(base, "sandbox"),
 };
 mkdirSync(places.home);
-const policy = { sites: ["api.deepseek.com"], credentials: false };
+const hiddenFolder = join(base, "kept");
+mkdirSync(hiddenFolder);
+writeFileSync(join(hiddenFolder, "keys.txt"), "secret\n");
+const policy = { sites: ["api.deepseek.com"], credentials: false, hidden: [hiddenFolder] };
 
 describe("sandbox configuration", () => {
 	const config = sandboxConfig(places, policy, { platform: "darwin" });
@@ -98,8 +102,17 @@ describe("sandbox configuration", () => {
 			{ platform: "darwin", agentSocket: "/tmp/agent.sock" },
 		);
 		assert.equal(allowed.credentials, undefined);
-		assert.deepEqual(allowed.filesystem.denyRead, [places.home]);
+		// The keychain files and the folders kept from sessions stay closed with the setting on.
+		const keychains = join(homedir(), "Library", "Keychains");
+		assert.deepEqual(allowed.filesystem.denyRead, [places.home, keychains, hiddenFolder]);
 		assert.deepEqual(allowed.network.allowUnixSockets, ["/tmp/agent.sock"]);
+		assert.ok(config.filesystem.denyRead.includes(keychains));
+		assert.ok(!config.credentials?.files?.some((file) => file.path === keychains));
+	});
+
+	test("folders the person keeps from sessions can be neither read nor changed", () => {
+		assert.ok(files.denyRead.includes(hiddenFolder));
+		assert.ok(files.denyWrite.includes(hiddenFolder));
 	});
 
 	test("package registries and model providers with a key are reachable; Yew Harness's port and private networks are not", () => {
@@ -164,7 +177,7 @@ const skip = started.kind === "none" ? `no sandbox here: ${started.problems.join
 async function run(
 	command: string,
 	cwd: string,
-	ask?: (host: string, port?: number) => Promise<boolean>,
+	ask?: (question: SiteQuestion) => Promise<boolean>,
 ): Promise<{ code: number | null; output: string }> {
 	const running = await startCommand({
 		command,
@@ -257,14 +270,49 @@ describe("everyday work in the sandbox", { skip }, () => {
 		const result = await run(
 			"curl -sS https://unlisted.example.invalid/",
 			folder("ask"),
-			async (host, port) => {
-				asked.push(`${host}:${port}`);
+			async (question) => {
+				asked.push(`${question.host}:${question.port}${question.unsure ? " unsure" : ""}`);
 				return false;
 			},
 		);
 		assert.deepEqual(asked, ["unlisted.example.invalid:443"]);
 		assert.notEqual(result.code, 0);
 		assert.match(result.output, /did not allow unlisted\.example\.invalid/);
+	});
+
+	test("while something else runs in it, the question says so and lists it, and a yes is for one connection", async () => {
+		const cwd = folder("unsure");
+		const job: RunningCommand = await startCommand({
+			command: "sleep 20",
+			cwd,
+			sessionId: "s1",
+			logDir: join(base, "logs"),
+			background: true,
+		});
+		try {
+			const asked: SiteQuestion[] = [];
+			const command =
+				"curl -sS https://twice.example.invalid/; curl -sS https://twice.example.invalid/";
+			await run(command, cwd, async (question) => {
+				asked.push(question);
+				return true;
+			});
+			// Asked for each connection: a yes did not carry over to the next one.
+			assert.equal(asked.length, 2);
+			assert.deepEqual(asked[0]?.unsure, [
+				{ kind: "command", text: command },
+				{ kind: "job", text: "sleep 20" },
+			]);
+		} finally {
+			job.stop();
+			await job.done;
+		}
+	});
+
+	test("a folder the person keeps from sessions cannot be read", async () => {
+		const result = await run(`cat ${hiddenFolder}/keys.txt`, folder("kept-read"));
+		assert.notEqual(result.code, 0);
+		assert.doesNotMatch(result.output, /secret/);
 	});
 
 	test("a preset MCP server runs in it from its own folder in the data folder", async () => {

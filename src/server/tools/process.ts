@@ -2,7 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { newId } from "../ids.ts";
-import { activeSandbox, OUTSIDE_GIT, quote, sandboxed } from "../sandbox.ts";
+import { activeSandbox, OUTSIDE_GIT, quote, type SiteQuestion, sandboxed } from "../sandbox.ts";
 
 export const MAX_LINES = 2000;
 export const MAX_BYTES = 50 * 1024;
@@ -105,7 +105,9 @@ export async function startCommand(options: {
 	logDir: string;
 	onOutput?: (chunk: string) => void;
 	outsideSandbox?: boolean;
-	ask?: (host: string, port?: number) => Promise<boolean>;
+	ask?: (question: SiteQuestion) => Promise<boolean>;
+	/** Started in the background (shell_job), as a card listing what runs in the sandbox says. */
+	background?: boolean;
 }): Promise<RunningCommand> {
 	const shell = process.env.SHELL || "/bin/zsh";
 	const env = commandEnvironment(options.sessionId);
@@ -115,6 +117,10 @@ export async function startCommand(options: {
 		: await sandboxed(`exec ${quote(shell)} -lc ${quote(options.command)}`, {
 				grant: { writable: [options.cwd] },
 				text: options.command,
+				label: {
+					kind: options.background ? "job" : "command",
+					text: options.command.slice(0, 300),
+				},
 				...(options.ask ? { ask: options.ask } : {}),
 			});
 	if (box) {

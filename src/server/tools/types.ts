@@ -33,6 +33,11 @@ export interface ToolContext {
 	/** Live output for the interface while the tool runs. */
 	output(text: string): void;
 	setTodos(todos: Todo[]): void;
+	/**
+	 * Whether sessions may never read `path` (an absolute path): credentials, Yew's own data, the
+	 * folders the person keeps from sessions. Searches leave such files out of their results.
+	 */
+	offLimits?(path: string): boolean;
 	/** Asks the person a question in Yew and waits for the answer. */
 	/** Puts questions to the person and waits; resolves with the answer as the session reads it. */
 	ask(request: QuestionRequest): Promise<string>;

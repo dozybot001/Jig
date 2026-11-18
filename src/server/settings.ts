@@ -1,8 +1,9 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { DEFAULT_RELAY_URL, type PermissionMode, type ThinkingLevel } from "../shared/types.ts";
 import { invalid } from "./errors.ts";
+import { canonical } from "./permissions/paths.ts";
 import type { Store } from "./store.ts";
 
 /** Yew's settings: what the settings menu and new sessions read, shared by the API and manage_yew. */
@@ -59,6 +60,11 @@ export const SETTING_DEFAULTS = {
 	 * off by default (founder, 11-18, on the security group's advice; blueprint, section 11).
 	 */
 	sandboxCredentials: false as boolean,
+	/**
+	 * Folders sessions may not read, besides credentials and Yew Harness's own data: file tools refuse
+	 * them, searches leave them out, and the system sandbox closes them (the security group, 11-18).
+	 */
+	hiddenFolders: [] as string[],
 };
 
 export const OPENING_MODES = ["auto", "click"] as const;
@@ -100,7 +106,26 @@ export function readSettings(store: Store): Settings {
 		mascot: store.getSetting("mascot", SETTING_DEFAULTS.mascot),
 		opening: store.getSetting("opening", SETTING_DEFAULTS.opening),
 		sandboxCredentials: store.getSetting("sandboxCredentials", SETTING_DEFAULTS.sandboxCredentials),
+		hiddenFolders: store.getSetting("hiddenFolders", SETTING_DEFAULTS.hiddenFolders),
 	};
+}
+
+/**
+ * A folder kept from sessions, as saved: absolute, `~` expanded, links resolved where it exists. It
+ * may not exist yet. The root and the home folder are refused: they would hide everything.
+ */
+export function resolveHiddenFolder(path: string, userHome = homedir()): string {
+	const trimmed = path.trim();
+	const expanded =
+		trimmed === "~" || trimmed.startsWith("~/") ? join(userHome, trimmed.slice(2)) : trimmed;
+	if (!isAbsolute(expanded)) {
+		throw invalid("A folder kept from sessions must be an absolute path.", "hiddenFolders");
+	}
+	const resolved = canonical(resolve(expanded));
+	if (resolved === "/" || resolved === canonical(userHome)) {
+		throw invalid(`${path} would hide everything; name a folder inside it.`, "hiddenFolders");
+	}
+	return resolved;
 }
 
 /** The decision log must be a Markdown file in an existing folder; `~` is expanded. */

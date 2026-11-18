@@ -7,7 +7,14 @@ import {
 	type RuleEffect,
 	type Session,
 } from "../../shared/types.ts";
-import { isInside, isSecretPath, pathMatches, resolvePath, secretLocations } from "./paths.ts";
+import {
+	canonical,
+	isInside,
+	isSecretPath,
+	pathMatches,
+	resolvePath,
+	secretLocations,
+} from "./paths.ts";
 import {
 	isReadOnly,
 	matchesPrefix,
@@ -76,9 +83,21 @@ export class PermissionEngine {
 	readonly #secrets: string[];
 	/** Folders outside the working folder that may be read without asking: memory and skill folders. */
 	readRoots: () => string[] = () => [];
+	/** Folders the person keeps from sessions (the settings): refused like credential locations. */
+	hidden: () => string[] = () => [];
 
 	constructor(yewHome: string) {
 		this.#secrets = secretLocations(yewHome);
+	}
+
+	/** Credential locations, Yew's own data and the folders the person keeps from sessions. */
+	#offLimits(): string[] {
+		return [...this.#secrets, ...this.hidden().map(canonical)];
+	}
+
+	/** Whether sessions may never read or change `path` (an absolute path). */
+	offLimits(path: string): boolean {
+		return isSecretPath(path, this.#offLimits());
 	}
 
 	/**
@@ -135,11 +154,17 @@ export class PermissionEngine {
 	): Decision {
 		const cwd = session.cwd;
 		for (const path of subject.paths) {
+			const verb = subject.kind === "read" ? "read" : "change";
 			if (isSecretPath(path, this.#secrets)) {
-				const verb = subject.kind === "read" ? "read" : "change";
 				return {
 					effect: "deny",
 					reason: `${path} holds credentials or Yew's own data; sessions cannot ${verb} it.`,
+				};
+			}
+			if (this.offLimits(path)) {
+				return {
+					effect: "deny",
+					reason: `${path} is in a folder the person keeps from sessions; sessions cannot ${verb} it.`,
 				};
 			}
 		}
@@ -221,7 +246,7 @@ export class PermissionEngine {
 			// File tools cannot touch these places at all; a command that names one asks every time.
 			const secret = pathArguments(argv).some((arg) => {
 				const path = resolvePath(arg, cwd);
-				return path !== null && isSecretPath(path, this.#secrets);
+				return path !== null && isSecretPath(path, this.#offLimits());
 			});
 			if (secret) reasons.add("credentials");
 		}
@@ -230,7 +255,7 @@ export class PermissionEngine {
 		for (const target of redirectTargets) {
 			const path = resolvePath(target, cwd);
 			if (!path || !cwd || !isInside(path, cwd)) reasons.add("write-outside");
-			else if (isSecretPath(path, this.#secrets)) reasons.add("write-credentials");
+			else if (isSecretPath(path, this.#offLimits())) reasons.add("write-credentials");
 		}
 
 		const ruleFor = (argv: string[]) =>
@@ -270,7 +295,7 @@ export class PermissionEngine {
 		if (!cwd || !isReadOnly(argv)) return false;
 		return pathArguments(argv).every((arg) => {
 			const path = resolvePath(arg, cwd);
-			return path !== null && isInside(path, cwd) && !isSecretPath(path, this.#secrets);
+			return path !== null && isInside(path, cwd) && !isSecretPath(path, this.#offLimits());
 		});
 	}
 

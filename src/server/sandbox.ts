@@ -17,8 +17,9 @@ import { secretLocations } from "./permissions/paths.ts";
  *   folders; never in Yew Harness's data folder, its program, what starts at login, or the hooks and
  *   settings of a git repository (the library protects shell profiles and `.git/hooks`,
  *   `.git/config` itself; this adds those of submodules and worktrees);
- * - read what the person can, except Yew Harness's data folder and, unless a setting allows them,
- *   the usual credential files and the SSH agent;
+ * - read what the person can, except Yew Harness's data folder, the keychain files, the folders the
+ *   person keeps from sessions (a setting) and, unless a setting allows them, the usual credential
+ *   files and the SSH agent;
  * - reach the package registries, the code hosts packages come from and the model providers that
  *   have a key; any other site is put to the person while the command runs. Yew Harness's own port,
  *   local ports, private networks and Unix sockets stay closed.
@@ -47,6 +48,8 @@ export interface SandboxPolicy {
 	sites: string[];
 	/** Whether commands may use the SSH agent and the usual credential files (a setting, off by default). */
 	credentials: boolean;
+	/** Folders the person keeps from sessions (a setting): neither read nor written in the sandbox. */
+	hidden: string[];
 }
 
 /** What one command may do besides the usual. */
@@ -155,10 +158,22 @@ export function sandboxEnvironment(places: Pick<SandboxPlaces, "root">): Record<
 	};
 }
 
-/** The usual credential files and folders (the ones file tools refuse), without the data folder. */
-function credentialFiles(places: Pick<SandboxPlaces, "home">): string[] {
-	const home = real(places.home);
-	return secretLocations(places.home).filter((path) => path !== home);
+/**
+ * The keychain files: never readable, whatever the setting for credentials says (the security group,
+ * 11-18), so the keychain's items cannot be read from the sandbox. git over HTTPS with saved
+ * credentials and gh run outside the sandbox.
+ */
+function keychains(places: Pick<SandboxPlaces, "userHome">): string {
+	return join(real(places.userHome), "Library", "Keychains");
+}
+
+/**
+ * The usual credential files and folders (the ones file tools refuse), without the data folder and
+ * the keychain files, which stay closed either way: what the setting for credentials opens.
+ */
+function credentialFiles(places: Pick<SandboxPlaces, "home" | "userHome">): string[] {
+	const closed = new Set([real(places.home), keychains(places)]);
+	return secretLocations(places.home).filter((path) => !closed.has(path));
 }
 
 /**
@@ -233,8 +248,14 @@ export function commandFilesystem(
 			join(user, ".config", "systemd", "user"),
 			join(user, ".config", "autostart"),
 			...writable.flatMap((folder) => gitInternals(folder, platform)),
+			...policy.hidden,
 		],
-		denyRead: [real(places.home), ...(policy.credentials ? [] : credentialFiles(places))],
+		denyRead: [
+			real(places.home),
+			keychains(places),
+			...policy.hidden,
+			...(policy.credentials ? [] : credentialFiles(places)),
+		],
 		allowRead: (grant.readable ?? []).map(real),
 		allowGitConfig: false,
 	};
@@ -293,10 +314,30 @@ export function findProgram(name: string, env: NodeJS.ProcessEnv = process.env):
 
 type Manager = typeof import("@anthropic-ai/sandbox-runtime")["SandboxManager"];
 
+/** Something running in the sandbox, as a card names it. */
+export interface RunningItem {
+	kind: "command" | "job" | "mcp";
+	/** The command line, or the MCP server's name. */
+	text: string;
+}
+
+/** A site a command wants to reach, put to the person. */
+export interface SiteQuestion {
+	host: string;
+	port?: number;
+	/**
+	 * Present when the connection may come from something else that runs in the sandbox: everything
+	 * running then, this command first. Allowing it then lets this one connection through.
+	 */
+	unsure?: RunningItem[];
+}
+
 /** A command in the sandbox while it runs. */
 interface Running {
+	/** What it is, for a card. */
+	label: RunningItem;
 	/** Puts a site to the person; absent where nobody can be asked (background jobs, MCP servers). */
-	ask?: (host: string, port?: number) => Promise<boolean>;
+	ask?: (question: SiteQuestion) => Promise<boolean>;
 	/** Sites it may reach: granted when it started, or allowed by the person since. */
 	allowed: string[];
 	/** Sites the person turned down for it: not asked again. */
@@ -330,7 +371,9 @@ const refuse = (reason: string) => ({ allow: false as const, reason });
 /**
  * Asked about a site no rule decides. The library does not say which command is connecting, so the
  * question goes to the one command that can ask (a session's command the person is there for); with
- * none or several, the site is turned down and the reason says why.
+ * none or several, the site is turned down and the reason says why. While anything else runs in the
+ * sandbox too (a background command, an MCP server), the card says the source is unsure and lists
+ * what runs, and a yes lets only this connection through.
  */
 const decideSite: SandboxAskCallback = async ({ host, port }) => {
 	const site = siteOf(host, port);
@@ -348,10 +391,17 @@ const decideSite: SandboxAskCallback = async ({ host, port }) => {
 	const [id, command] = askers[0] as [string, Running];
 	if (command.allowed.includes(site)) return true;
 	if (command.refused.has(site)) return refuse(`The person did not allow ${host} for this command`);
+	const others = [...running.entries()].filter(([other]) => other !== id);
+	const unsure =
+		others.length > 0 ? [command.label, ...others.map(([, other]) => other.label)] : undefined;
 	let question = command.asking.get(site);
 	if (!question) {
-		const ask = command.ask as (host: string, port?: number) => Promise<boolean>;
-		question = ask(host, port).catch(() => false);
+		const ask = command.ask as (question: SiteQuestion) => Promise<boolean>;
+		question = ask({
+			host,
+			...(port === undefined ? {} : { port }),
+			...(unsure ? { unsure } : {}),
+		}).catch(() => false);
 		command.asking.set(site, question);
 	}
 	const allowed = await question;
@@ -360,6 +410,8 @@ const decideSite: SandboxAskCallback = async ({ host, port }) => {
 		command.refused.add(site);
 		return refuse(`The person did not allow ${host} for this command`);
 	}
+	// Unsure whose connection it was: this one goes through, and the next one is asked about again.
+	if (unsure) return true;
 	if (!command.allowed.includes(site)) command.allowed.push(site);
 	// The rest of this command's connections there go through without asking again.
 	if (running.has(id))
@@ -435,9 +487,11 @@ export async function sandboxed(
 	command: string,
 	options: {
 		grant?: SandboxGrant;
-		ask?: (host: string, port?: number) => Promise<boolean>;
+		ask?: (question: SiteQuestion) => Promise<boolean>;
 		/** What the command is, for the sandbox's reports, when `command` is a wrapper around it. */
 		text?: string;
+		/** What it is on a card that lists what runs in the sandbox; a command by default. */
+		label?: RunningItem;
 	} = {},
 ): Promise<Sandboxed | null> {
 	const current = active;
@@ -461,6 +515,7 @@ export async function sandboxed(
 	);
 	const allowed = [...(options.grant?.sites ?? [])];
 	running.set(id, {
+		label: options.label ?? { kind: "command", text: (options.text ?? command).slice(0, 300) },
 		...(options.ask ? { ask: options.ask } : {}),
 		allowed,
 		refused: new Set(),
