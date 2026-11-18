@@ -26,6 +26,10 @@
 	"bin": {
 		"yew": "bin/yew.js"
 	},
+	"exports": {
+		"./sim": "./dist/sim/index.js",
+		"./package.json": "./package.json"
+	},
 	"files": [
 		"bin",
 		"dist",
