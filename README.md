@@ -138,10 +138,14 @@ Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and
 
 ## License
 
-[MIT](LICENSE). The third-party packages used at run time and in the web interface are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+[MIT](LICENSE). Copyright (c) 2026 Changsha Tenon Artificial Intelligence Technology Co., Ltd.
+
+The third-party packages used at run time and in the web interface are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 Names, logos and the character: the Yew Harness, Yew and Tenon AI names and logos, including the icons in `web/public/icons/` and `ios/Yew/Assets.xcassets/`, and the design and images of the character Yew, including the images in `web/public/mascot/` and `android/app/src/main/res/drawable-nodpi/` and the Mascot images in `ios/Yew/Assets.xcassets/`, are not licensed under the MIT License. You may refer to the names as they are to say that you use Yew Harness or that your work is based on it, but do not use the names or logos as the name or logo of your own product, do not use the character's design or images in your own product, and do not suggest that your product comes from or is endorsed by Tenon AI.
 
 ---
 
-Made by 榫卯 Tenon AI · [tenonai.cn](https://tenonai.cn/)
+<p align="center">
+  Publisher&emsp;<a href="https://tenonai.cn/"><img src="https://raw.githubusercontent.com/dozybot001/Yew/main/web/public/icons/tenon-mark.svg" width="16" height="16" alt="Tenon AI logo"> Tenon AI</a>
+</p>

@@ -136,10 +136,14 @@ Linux 上，命令运行中新建的仓库在命令结束前不受保护；命�
 
 ## 许可证
 
-[MIT](LICENSE)。运行时依赖和网页界面里用到的第三方包见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+[MIT](LICENSE)。Copyright (c) 2026 Changsha Tenon Artificial Intelligence Technology Co., Ltd.（长沙榫卯人工智能科技有限公司）
+
+运行时依赖和网页界面里用到的第三方包见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 
 名称、标志和角色：Yew Harness、Yew 和榫卯 Tenon 的名称和标志（包括 `web/public/icons/`、`ios/Yew/Assets.xcassets/` 里的图标），以及角色 Yew 的形象和图片（包括 `web/public/mascot/`、`android/app/src/main/res/drawable-nodpi/` 里的图片和 `ios/Yew/Assets.xcassets/` 里 Mascot 开头的图片），不在 MIT 许可证的授权范围内。你可以照原样提到这些名称，说明你在使用 Yew Harness 或基于它修改；但不要把这些名称和标志用作你自己产品的名称或标志，不要在你自己的产品里使用 Yew 的形象和图片，也不要让人以为你的产品来自榫卯 Tenon AI 或得到它的认可。
 
 ---
 
-出品方：榫卯 Tenon AI · [tenonai.cn](https://tenonai.cn/)
+<p align="center">
+  出品方　<a href="https://tenonai.cn/"><img src="web/public/icons/tenon-mark.svg" width="16" height="16" alt="榫卯 Tenon AI 的标志"> 榫卯 Tenon AI</a>
+</p>
