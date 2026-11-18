@@ -1,5 +1,6 @@
 // Writes THIRD-PARTY-NOTICES.md: the packages Yew needs at run time (npm installs them beside Yew;
-// they are not inside Yew's package), with version and license, from the lock file. Packages built
+// sandbox-runtime and its dependencies are bundled inside Yew's package), with version and license,
+// from the lock file. Packages built
 // into the web interface are listed with their license texts in web/dist/THIRD-PARTY-NOTICES.txt,
 // which the web build writes. Run by `npm run build`.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -37,7 +38,8 @@ writeFileSync(
 	`# Third-party notices
 
 Yew is published under the MIT license. It depends on the packages below, which npm installs
-beside it; each stays under its own license, found in that package's folder. This list is
+beside it; @anthropic-ai/sandbox-runtime and its dependencies come inside Yew's package, in its
+node_modules folder. Each stays under its own license, found in that package's folder. This list is
 generated from \`package-lock.json\` by \`scripts/notices.mjs\`.
 
 The web interface is built from further packages; they are listed with their license texts in

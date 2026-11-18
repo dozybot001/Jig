@@ -1,7 +1,8 @@
 # Third-party notices
 
 Yew is published under the MIT license. It depends on the packages below, which npm installs
-beside it; each stays under its own license, found in that package's folder. This list is
+beside it; @anthropic-ai/sandbox-runtime and its dependencies come inside Yew's package, in its
+node_modules folder. Each stays under its own license, found in that package's folder. This list is
 generated from `package-lock.json` by `scripts/notices.mjs`.
 
 The web interface is built from further packages; they are listed with their license texts in

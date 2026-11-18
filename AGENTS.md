@@ -13,7 +13,7 @@
 - 本地服务：Hono；服务端向界面推送用 SSE。网页界面：React + Vite。
 - iPhone 应用：Swift 6、SwiftUI，iOS 17 起，工程在 `ios/`，Bundle ID `cn.tenonai.apps.yew`；文案用 String Catalog（中英）。中继服务：TypeScript，在 `relay/`，按 `~/memory/server-deployment.md` 部署。
 - 密钥：系统钥匙串（`@napi-rs/keyring`）。
-- 系统沙箱：`@anthropic-ai/sandbox-runtime`，锁定精确版本，只在 `src/server/sandbox.ts` 里引用，只用它 README 和类型定义里公开的接口（蓝图第十一节）。macOS 和 Linux 上默认打开（2026-11-18 起），`YEW_SANDBOX=off` 关掉；起不来或跑不了测试命令时不进沙箱，并写明原因。改沙箱配置或升级它，把提交号发给安全组复测。`package.json` 的 `overrides` 把它用的 zod 定到 4.6.6：它声明 `^3.25.0`，而 zod 3.x 有高危公告 GHSA-mrhx-c7xc-m3w5、没有修复版，生产依赖的门禁不放行；它导入的是 zod 4 也带的 `zod/v3`，上游 README 写明可以这样用。升级 sandbox-runtime 时复核这条覆盖，能去掉就去掉。
+- 系统沙箱：`@anthropic-ai/sandbox-runtime`，锁定精确版本，只在 `src/server/sandbox.ts` 里引用，只用它 README 和类型定义里公开的接口（蓝图第十一节）。macOS 和 Linux 上默认打开（2026-11-18 起），`YEW_SANDBOX=off` 关掉；起不来或跑不了测试命令时不进沙箱，并写明原因。改沙箱配置或升级它，把提交号发给安全组复测。`package.json` 的 `overrides` 把它用的 zod 定到 4.6.6：它声明 `^3.25.0`，而 zod 3.x 有高危公告 GHSA-mrhx-c7xc-m3w5、没有修复版，生产依赖的门禁不放行；它导入的是 zod 4 也带的 `zod/v3`，上游 README 写明可以这样用。`overrides` 只在本仓库生效，用户全局安装时不认，所以 npm 包用 `bundleDependencies` 自带 sandbox-runtime 和它的依赖（含 zod 4.6.6），发布前跑 `npm ci` 让打进包的和锁文件一致。升级 sandbox-runtime 时复核这条覆盖和打包，上游放宽 zod 的范围后就都去掉。
 - 检查：Biome（格式与 lint）、`tsc --noEmit`、`node --test`。
 
 ## 开发约定
@@ -31,7 +31,7 @@
 - **文案**：只写已经实现的能力，朴素、具体，不用比喻和排比（规范 14.1–14.3）。官网、商店和各渠道怎样介绍 Yew Harness，以[对外介绍](docs/introduction.md)为准，能力变化时同步改它。
 - **测试**：Agent 循环、工具和权限用 pi-ai 的 faux provider 写确定性测试，测试里不调用真实模型，不读写真实的 `~/.yew`。
 - **临时试用**：要起一个 Yew Harness 看界面或截图时，用新的 `YEW_HOME` 加 `YEW_KEYCHAIN=off`，不需要浏览器和电脑操控时再加 `YEW_MCP_BUILTIN=off`（不然会从 npm 安装并启动自带的两个 MCP 服务）：系统钥匙串是所有数据目录共用的，不关掉的话临时的 Yew Harness 手里有真实的 API Key，一封信就会让会话调用真实模型。要复用的演示和截图脚本放进仓库，不放系统临时目录（会被系统清掉）。
-- **提交前**：运行 `npm run check` 和 `gitleaks git --staged`（规范 15.1.6）。依赖锁定版本，`package-lock.json` 入库；发布前运行 `npm run audit:gate`（15.1.2）：生产依赖的高危问题必须修好；只在构建、测试时用到的依赖，没有修复版时可以在 `scripts/audit-gate.mjs` 登记豁免，写明公告编号、涉及的包、为什么只影响构建或测试和截止日，最长一个月，到期前升级或重新评估。
+- **提交前**：运行 `npm run check` 和 `gitleaks git --staged`（规范 15.1.6）。依赖锁定版本，`package-lock.json` 入库；发布前运行 `npm run audit:gate` 和 `npm run audit:install`（15.1.2；后者把打好的包全局装进临时目录，查装到的依赖和沙箱拿到的 zod）：生产依赖的高危问题必须修好；只在构建、测试时用到的依赖，没有修复版时可以在 `scripts/audit-gate.mjs` 登记豁免，写明公告编号、涉及的包、为什么只影响构建或测试和截止日，最长一个月，到期前升级或重新评估。
 
 ## 版本与更新记录
 

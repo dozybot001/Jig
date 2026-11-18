@@ -1,6 +1,6 @@
 # Yew Harness 产品蓝图
 
-版本 1.36（2026-11-18）。本文是 Yew Harness 的起点：为什么做、做什么、不做什么、怎么验收。开发以本文为准；需求有变时更新本文，并在文末记录。
+版本 1.37（2026-11-18）。本文是 Yew Harness 的起点：为什么做、做什么、不做什么、怎么验收。开发以本文为准；需求有变时更新本文，并在文末记录。
 
 ## 一、一句话定义
 
@@ -233,7 +233,7 @@ Yew Harness 本身就是 Agent 的运行框架（harness），可以借鉴递归
 - **沙箱外**：命令加 `outside_sandbox` 才在沙箱外跑，每次都问，卡片写明在沙箱外运行；在外面跑的 git 不执行钩子和 fsmonitor。
 - **MCP**：人加的 stdio 服务器和 Yew Harness 装的预置服务器进沙箱。预置服务器能读自己在数据目录里的代码、连自己的服务（Gitee、Notion、Sentry）；人加的服务器在 mcp.json 的条目里用 `allowedDomains` 写它要连的网址。自带的浏览器和电脑操控不进沙箱（Chrome 自带沙箱，不能嵌套）；浏览器以数据目录里一个空文件夹为文件根，打不开 `file://`，也连不上 Yew Harness 的端口。
 - **保持不开**：`allowAppleEvents`、`allowAllUnixSockets`、`allowLocalBinding`、`allowPty`、`enableWeakerNestedSandbox`、`enableWeakerNetworkIsolation`、`allowNestedUserNamespaces`；`allowGitConfig` 保持 false。
-- **依赖**：macOS 要 ripgrep；Linux 要 bubblewrap、socat 和 ripgrep，写进 README 的安装说明。缺了的话 `yew serve` 写明沙箱没起来，命令照旧以你的系统账户运行。zod 用 `overrides` 定到 4.6.6：sandbox-runtime 声明的是 `^3.25.0`，3.x 有高危公告 GHSA-mrhx-c7xc-m3w5（4.6.6 才修，3.x 没有修复版），生产依赖的门禁不放行；它导入的是 `zod/v3`，zod 4 自带这个入口，上游 README 写明可以这样用。升级 sandbox-runtime 时复核，能去掉就去掉（安全组 11-18）。
+- **依赖**：macOS 要 ripgrep；Linux 要 bubblewrap、socat 和 ripgrep，写进 README 的安装说明。缺了的话 `yew serve` 写明沙箱没起来，命令照旧以你的系统账户运行。zod 用 `overrides` 定到 4.6.6：sandbox-runtime 声明的是 `^3.25.0`，3.x 有高危公告 GHSA-mrhx-c7xc-m3w5（4.6.6 才修，3.x 没有修复版），生产依赖的门禁不放行；它导入的是 `zod/v3`，zod 4 自带这个入口，上游 README 写明可以这样用。升级 sandbox-runtime 时复核，能去掉就去掉（安全组 11-18）。`overrides` 只在本仓库生效：安全组 11-18 核对 1.6.0 时发现，全局安装照旧装上 zod 3.25.76；带 `npm-shrinkwrap.json` 也不行，npm 见 4.6.6 不合 `^3.25.0` 会重新解析。所以 npm 包改用 `bundleDependencies` 自带 sandbox-runtime 和它的依赖（多约 6.5 MB），发布前 `npm run audit:install` 把打好的包全局装进临时目录核对。上游把 zod 的范围放宽到 4 以后，覆盖和打包都去掉。
 - **还有的限制**：
   - 问网址时，库不说是哪条命令在连，所以只在恰好一条能问的命令在跑时才问；要请上游让回调带上命令标识。
   - 本机端口不能监听，dev server 要在沙箱外跑；Xcode、swift 的构建要写 `~/Library/Developer` 这类位置，也要在沙箱外跑。
@@ -346,6 +346,7 @@ Yew Harness 本身就是 Agent 的运行框架（harness），可以借鉴递归
 - **1.7（2026-11-16）** 创始人问「服务商与密钥是否加一个各服务商的连通性测试（显示延迟）、余额查看」。6.10 新增第 37 条。余额只接了文档里写明能用普通密钥查询的两家；OpenRouter 的余额接口要管理密钥，Anthropic、OpenAI 等没有按密钥查余额的接口，没有接。
 - **1.8（2026-11-16）** 余额查看做出来后只有两家服务商能查，创始人定「那不接余额」。6.10 第 37 条去掉余额，只留连接测试；相关代码、接口和界面一并删除。
 - **1.9（2026-11-16）** 创始人问能否把整个工作流迁到 Jig，缺口是浏览器和电脑操控，他定「可以默认装载浏览器 mcp 以及电脑控制 mcp」。6.10 新增第 38 条；第十节「v1 不做」里的电脑操控改为经自带的 MCP 服务提供。不自己实现，按原则 6「能用 MCP 接的不内置」。
+- **1.37（2026-11-18）** 安全组核对 npm 1.6.0：`overrides` 对用户的全局安装不生效，沙箱用的 zod 是带高危公告的 3.25.76。npm 包改为自带 sandbox-runtime 和它的依赖；发布前加 `npm run audit:install`，全局装一次再查。
 - **1.36（2026-11-18）** 安全组在 Linux 容器里复测：下层仓库和子模块的钩子、配置没保护到。改为每条命令前找出工作区里所有仓库逐个列上，命令结束后把新钩子挪开并写明；设置里 Linux 的说明写上命令运行中新建的仓库不受保护。
 - **1.35（2026-11-18）** 创始人：「Linux 上的沙箱也打开」。Linux 默认打开；在 Debian 12 容器里跑过全部测试；`yew serve` 启动沙箱后先跑一条测试命令，跑不通就不进沙箱并写明原因。README、对外介绍 0.33、更新记录和界面上没有沙箱时的说明同步改。
 - **1.34（2026-11-18）** 系统沙箱在 macOS 上对用户开放，创始人：「现在开放」。macOS 默认打开，`YEW_SANDBOX=off` 关掉；Linux 真机测过之前默认不开。第七节「你本人的标记」改为 macOS 上命令伪造不了，Linux 上照旧。界面上授权方式的说明、README「安全」、对外介绍和更新记录同步改。
