@@ -61,7 +61,7 @@ function harness(options: { waitMs?: number; dbPath?: string } = {}) {
 			model: faux.getModel().id,
 			cwd: folder,
 			thinking: "off",
-			options: { permissionMode: "auto" },
+			options: { permissionMode: "default" },
 			...extra,
 		});
 	const script = (session: Session, steps: Step[]) => scripts.set(session.name, steps);
@@ -159,9 +159,9 @@ describe("letters between sessions", () => {
 	test("a letter to a working session arrives between tool calls, after the results", async () => {
 		const { store, agents, make, script, entries } = harness();
 		const a = make("产品会话");
-		const b = make("平台组", { options: { permissionMode: "manual" } });
+		const b = make("平台组", { options: { permissionMode: "default" } });
 		script(b, [
-			toolUse(fauxToolCall("shell", { command: "touch made.txt" }, { id: "c1" })),
+			toolUse(fauxToolCall("shell", { command: "touch made.txt", confirm: true }, { id: "c1" })),
 			fauxAssistantMessage("好的"),
 		]);
 		agents.send(b.id, "建个文件");
@@ -394,26 +394,30 @@ describe("task sessions", () => {
 		assert.match(prompt, /"Yew · 开发" \(id [^)]+\) opened you for this task/);
 	});
 
-	test("a child's folder must be inside the parent's; a manual parent asks first", async () => {
+	test("a child's folder must be inside the parent's; a parent that asks to be asked is asked first", async () => {
 		const { store, agents, make, script, seen } = harness();
 		const outside = realpathSync(tempDir("yew-elsewhere-"));
-		const parent = make("产品会话", { options: { permissionMode: "manual" } });
+		const parent = make("产品会话", { options: { permissionMode: "default" } });
 		mkdirSync(join(parent.cwd as string, "web"));
 		script(parent, [
 			toolUse(
-				fauxToolCall("open_session", { name: "外面", brief: "x", folder: outside }, { id: "p1" }),
+				fauxToolCall(
+					"open_session",
+					{ name: "外面", brief: "x", folder: outside, confirm: true },
+					{ id: "p1" },
+				),
 			),
 			toolUse(
 				fauxToolCall(
 					"open_session",
-					{ name: "里面", brief: "改界面", folder: "web" },
+					{ name: "里面", brief: "改界面", folder: "web", confirm: true },
 					{ id: "p2" },
 				),
 			),
 			fauxAssistantMessage("好"),
 		]);
 		agents.send(parent.id, "开子任务");
-		// Manual approval: opening a session is asked about before the call runs.
+		// The parent asked to be asked: opening a session is asked about before the call runs.
 		await until(() => store.pendingApprovals(parent.id).length === 1);
 		const [first] = store.pendingApprovals(parent.id);
 		// The card names the session to open and shows its brief.
@@ -539,7 +543,7 @@ describe("when things go wrong", () => {
 	test("open_session checks the brief before it opens a session", async () => {
 		const { store, agents, make, script, seen, said } = harness();
 		const other = make("其他");
-		const parent = make("父", { options: { permissionMode: "auto", letterQuota: 1 } });
+		const parent = make("父", { options: { permissionMode: "default", letterQuota: 1 } });
 		script(other, [fauxAssistantMessage("好")]);
 		script(parent, [
 			toolUse(
@@ -769,9 +773,9 @@ describe("when things go wrong", () => {
 	test("a session the person stopped stays stopped when letters arrive", async () => {
 		const { store, agents, make, script, entries, said } = harness();
 		const a = make("发信方");
-		const b = make("收信方", { options: { permissionMode: "manual" } });
+		const b = make("收信方", { options: { permissionMode: "default" } });
 		script(b, [
-			toolUse(fauxToolCall("shell", { command: "touch made.txt" }, { id: "c1" })),
+			toolUse(fauxToolCall("shell", { command: "touch made.txt", confirm: true }, { id: "c1" })),
 			fauxAssistantMessage("看到了通知"),
 		]);
 		agents.send(b.id, "建个文件");
@@ -955,7 +959,10 @@ describe("when things go wrong", () => {
 describe("organizing sessions", () => {
 	test("the main conversation organizes sessions in one call; a bad call is refused before anyone is asked", async () => {
 		const { store, agents, make, script, seen, said } = harness();
-		const main = make("总办", { options: { permissionMode: "manual" } });
+		const main = make("总办", {
+			options: { permissionMode: "default" },
+			rules: [{ effect: "ask", tool: "manage_yew" }],
+		});
 		const a = make("甲");
 		const b = make("乙");
 		store.setSetting("mainSessionId", main.id);
@@ -983,7 +990,7 @@ describe("organizing sessions", () => {
 			fauxAssistantMessage("整理好了"),
 		]);
 		agents.send(main.id, "把甲和乙放进产品团队");
-		// Organizing follows the permission mode: manual asks, and the card lists every change by name.
+		// Organizing follows the session's rules: here they ask, and the card lists every change by name.
 		await until(() => store.pendingApprovals(main.id).length === 1);
 		const [approval] = store.pendingApprovals(main.id);
 		const request = approval?.request as PermissionRequest;
@@ -1020,8 +1027,8 @@ describe("organizing sessions", () => {
 
 	test("settings changes always ask; widening a session must be confirmed every time and leaves a trace", async () => {
 		const { store, agents, make, script, said, entries } = harness();
-		const main = make("总办", { options: { permissionMode: "skip" } });
-		const ui = make("UI", { options: { permissionMode: "manual" } });
+		const main = make("总办", { options: { permissionMode: "default" } });
+		const ui = make("UI", { options: { permissionMode: "default" } });
 		store.setSetting("mainSessionId", main.id);
 		script(main, [
 			toolUse(
@@ -1041,7 +1048,7 @@ describe("organizing sessions", () => {
 			fauxAssistantMessage("都改好了"),
 		]);
 		agents.send(main.id, "UI 管界面，给它完全授权和放卡片的权利");
-		// A role change asks even with full access, and can be always allowed for this kind.
+		// A role change asks in the default mode, and can be always allowed for this kind.
 		await until(() => store.pendingApprovals(main.id).length === 1);
 		const [configure] = store.pendingApprovals(main.id);
 		const first = configure?.request as PermissionRequest;
@@ -1086,7 +1093,7 @@ describe("organizing sessions", () => {
 			model: helper.model,
 			thinking: "off",
 		});
-		store.setSetting("defaultPermissionMode", "manual");
+		store.setSetting("defaultPermissionMode", "default");
 		script(helper, [
 			toolUse(fauxToolCall("manage_yew", { sessions: [{ name: "文档" }] }, { id: "d1" })),
 			fauxAssistantMessage("好"),
@@ -1098,12 +1105,12 @@ describe("organizing sessions", () => {
 			}
 			return said(helper).some((text) => text.includes('"text":"好"'));
 		});
-		assert.equal(store.findSessionByName("文档")?.options.permissionMode, "manual");
+		assert.equal(store.findSessionByName("文档")?.options.permissionMode, "default");
 	});
 
 	test("a session cannot widen itself; a session it creates gets no more room than it has", async () => {
 		const { store, agents, make, script, said } = harness();
-		const helper = make("助手", { options: { permissionMode: "manual", canOrganize: true } });
+		const helper = make("助手", { options: { permissionMode: "default", canOrganize: true } });
 		const model = { provider: helper.provider, model: helper.model, thinking: "off" };
 		store.setSetting("defaultModel", model);
 		script(helper, [
@@ -1139,11 +1146,11 @@ describe("organizing sessions", () => {
 		]);
 		agents.answer(create?.id as string, { decision: "allow_once" });
 		await until(() => said(helper).some((text) => text.includes('"text":"好"')));
-		assert.equal(store.getSession(helper.id).options.permissionMode, "manual");
+		assert.equal(store.getSession(helper.id).options.permissionMode, "default");
 		const docs = store.findSessionByName("文档");
 		assert.ok(docs);
 		assert.equal(docs.kind, "standing");
-		assert.equal(docs.options.permissionMode, "manual");
+		assert.equal(docs.options.permissionMode, "default");
 		assert.equal(store.getSetting("theme", "system"), "dark");
 	});
 
@@ -1168,9 +1175,9 @@ describe("organizing sessions", () => {
 	test("a session started from the home page gets a short name after its first turn", async () => {
 		const { store, agents, make, script, said } = harness();
 		const x = make("帮我看看这个仓库里有哪些地方需要…", {
-			options: { permissionMode: "auto", autoName: true },
+			options: { permissionMode: "default", autoName: true },
 		});
-		const kept = make("我起的名字", { options: { permissionMode: "auto" } });
+		const kept = make("我起的名字", { options: { permissionMode: "default" } });
 		script(x, [fauxAssistantMessage("看了，主要有三处")]);
 		script(kept, [fauxAssistantMessage("好")]);
 		// The naming request has a system prompt of its own, without a session's name.

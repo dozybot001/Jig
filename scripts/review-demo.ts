@@ -88,7 +88,7 @@ for (const [name, cwd] of [
 		model: "demo-1",
 		cwd,
 		thinking: "off",
-		options: { permissionMode: "auto" },
+		options: { permissionMode: "default" },
 	});
 }
 db.close();

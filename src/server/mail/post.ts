@@ -132,10 +132,10 @@ export interface CardInput {
 	replaces?: number[];
 }
 
-/** Permission level for the hold rule: a chat, then manual, automatic and skip approval (blueprint 7.1). */
+/** Permission level for the hold rule: a chat, then the default, automatic and skip modes (blueprint 7.1). */
 function rank(session: Session): number {
 	if (!session.cwd) return 0;
-	return { manual: 1, auto: 2, skip: 3 }[permissionModeOf(session.options)];
+	return { default: 1, review: 2, skip: 3 }[permissionModeOf(session.options)];
 }
 
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();

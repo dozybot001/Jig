@@ -54,15 +54,18 @@ describe("api: sessions", () => {
 		assert.equal(list.nextCursor, null);
 	});
 
-	test("new sessions approve automatically; the mode can be changed and is checked", async () => {
+	test("new sessions start in the default mode; the mode can be changed and is checked", async () => {
 		const { call } = setup();
 		const session = await (await call("POST", "/api/sessions", { name: "模式" })).json();
-		assert.equal(session.options.permissionMode, "auto");
+		assert.equal(session.options.permissionMode, "default");
 		const path = `/api/sessions/${session.id}`;
-		const manual = await (
-			await call("PATCH", path, { options: { permissionMode: "manual" } })
+		const review = await (
+			await call("PATCH", path, { options: { permissionMode: "review" } })
 		).json();
-		assert.equal(manual.options.permissionMode, "manual");
+		assert.equal(review.options.permissionMode, "review");
+		// The modes before 1.7 are gone (blueprint 6.1, item 6).
+		const old = await call("PATCH", path, { options: { permissionMode: "manual" } });
+		assert.equal(old.status, 400);
 		const wrong = await call("PATCH", path, { options: { permissionMode: "never" } });
 		assert.equal(wrong.status, 400);
 	});

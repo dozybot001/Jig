@@ -21,7 +21,7 @@ type Context = { messages: { role: string; content: unknown }[] };
 type Step = Reply | ((context: Context) => Reply | Promise<Reply>);
 
 /** One scripted model for the session and its helpers, told apart by their system prompts. */
-function harness(mode: PermissionMode = "auto") {
+function harness(mode: PermissionMode = "default") {
 	const faux = fauxProvider();
 	const { store } = newStore();
 	const gateway = new ModelGateway({

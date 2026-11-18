@@ -221,23 +221,32 @@ describe("sandbox configuration", () => {
 });
 
 describe("a command outside the sandbox", () => {
-	test("is asked about every time, and cannot be remembered", () => {
-		const engine = new PermissionEngine(places.home);
-		const session = {
+	const engine = new PermissionEngine(places.home);
+	const session = (mode: string) =>
+		({
 			id: "s1",
 			cwd: base,
 			rules: [{ effect: "allow", tool: "shell" }],
-			options: { permissionMode: "skip" },
-		} as unknown as Session;
-		const decision = engine.decide(
-			{ kind: "command", tool: "shell", command: "ls", outsideSandbox: true },
-			session,
-		);
+			options: { permissionMode: mode },
+		}) as unknown as Session;
+	const outside = { kind: "command" as const, tool: "shell", command: "ls", outsideSandbox: true };
+
+	test("is asked about every time in the default mode, and cannot be remembered", () => {
+		const decision = engine.decide(outside, session("default"));
 		assert.equal(decision.effect, "ask");
 		if (decision.effect !== "ask") return;
 		assert.equal(decision.request.mustConfirm, true);
 		assert.ok(decision.request.reasons?.includes("outside-sandbox"));
 		assert.equal(decision.request.rememberRules, undefined);
+	});
+
+	test("is a permission: skip mode runs it and marks it, the automatic mode leaves it to the check", () => {
+		assert.deepEqual(engine.decide(outside, session("skip")), {
+			effect: "allow",
+			note: { risk: ["outside-sandbox"] },
+		});
+		const reviewed = engine.decide(outside, session("review"));
+		assert.ok(reviewed.effect === "ask" && reviewed.review);
 	});
 });
 

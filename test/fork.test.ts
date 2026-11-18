@@ -57,7 +57,7 @@ function harness() {
 			model: faux.getModel().id,
 			cwd: folder,
 			thinking: "off",
-			options: { permissionMode: "auto" },
+			options: { permissionMode: "default" },
 		});
 	return { store, agents, make, scripts, seen };
 }

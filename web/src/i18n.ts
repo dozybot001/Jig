@@ -147,14 +147,19 @@ const zh = {
 	newTeamEllipsis: "新建团队…",
 	exporting: "正在导出…",
 	permissionMode: "授权方式",
-	perm_auto: "按需授权",
-	perm_auto_hint: "模型判断哪些操作要先问你；不问就跑的命令以你的系统账户运行",
-	perm_manual: "逐项授权",
-	perm_manual_hint: "改文件、运行命令、访问网址前都先问你",
-	perm_skip: "完全授权",
-	perm_skip_hint: "直接执行，命令以你的系统账户运行；删除、推送等操作仍会问你",
-	perm_auto_hint_sandbox: "模型判断哪些操作要先问你；不问就跑的命令在沙箱里运行",
-	perm_skip_hint_sandbox: "直接执行，命令在沙箱里运行；删除、推送等操作仍会问你",
+	perm_default: "默认",
+	perm_default_hint: "常用的操作直接执行，有风险的先问你；命令以你的系统账户运行",
+	perm_default_hint_sandbox: "常用的操作直接执行，有风险的先问你；命令在沙箱里运行",
+	perm_review: "自动",
+	perm_review_hint:
+		"本来要问你的，先由一次单独的模型检查判断，它拿不准再问你；命令以你的系统账户运行",
+	perm_review_hint_sandbox:
+		"本来要问你的，先由一次单独的模型检查判断，它拿不准再问你；命令在沙箱里运行",
+	perm_skip: "跳过",
+	perm_skip_hint:
+		"什么都不问，有风险的在记录里标出来；要你决定的事照样进审批中心；命令以你的系统账户运行",
+	perm_skip_hint_sandbox:
+		"什么都不问，有风险的在记录里标出来；要你决定的事照样进审批中心；命令在沙箱里运行",
 	loadEarlier: "加载更早的记录",
 	emptyTranscript: "发一条消息开始。",
 	composerPlaceholder: "给 {name} 发消息（Enter 发送，Shift+Enter 换行）",
@@ -230,6 +235,15 @@ const zh = {
 	// approvals
 	approvalTitle: "需要你授权",
 	askedInReply: "在回复里问你",
+	matterTag: "要你决定",
+	matterTagHint: "做错了收不回或会落到别人身上，三种授权方式下都由你决定",
+	reviewDeclined: "自动检查没有放行：{reason}",
+	reviewDeclinedPlain: "自动检查没有放行，要你来定",
+	permRisk: "有风险",
+	permRiskLine: "跳过模式没有问就执行了，有风险：{reasons}",
+	permReviewed: "自动放行",
+	permReviewedLine: "自动检查放行：{reason}",
+	permReviewedPlain: "自动检查放行了这一步",
 	confirmEachTime: "每次确认",
 	confirmEachTimeHint: "这类操作每次都要你确认，不能设为总是允许",
 	ask_shell: "运行命令",
@@ -243,6 +257,10 @@ const zh = {
 	ask_open_session_named: "开任务会话{name}",
 	ask_manage_yew: "管理 Yew Harness",
 	"confirm_delete-files": "删除文件",
+	"confirm_delete-outside": "删除工作区外的文件",
+	"confirm_unreadable-command": "Yew Harness 读不懂的命令",
+	"confirm_yew-data": "碰 Yew Harness 自己的数据，审批存在那里",
+	"confirm_hidden-folder": "碰你设为会话读不到的目录",
 	"confirm_delete-untracked": "删除未跟踪的文件",
 	"confirm_delete-branch": "删除分支",
 	"confirm_delete-tag": "删除标签",
@@ -1184,18 +1202,21 @@ const en: Record<MessageKey, string> = {
 	newTeamEllipsis: "New team…",
 	exporting: "Exporting…",
 	permissionMode: "Permission mode",
-	perm_auto: "Ask when needed",
-	perm_auto_hint:
-		"The model decides what to ask you about; commands it runs without asking run as your user account",
-	perm_manual: "Ask each time",
-	perm_manual_hint: "Asks before edits, commands and web requests",
-	perm_skip: "Full access",
+	perm_default: "Default",
+	perm_default_hint:
+		"Runs common operations and asks before risky ones; commands run as your user account",
+	perm_default_hint_sandbox:
+		"Runs common operations and asks before risky ones; commands run in the sandbox",
+	perm_review: "Auto",
+	perm_review_hint:
+		"What would be asked goes to a separate check by the model first; you're asked when it isn't sure. Commands run as your user account",
+	perm_review_hint_sandbox:
+		"What would be asked goes to a separate check by the model first; you're asked when it isn't sure. Commands run in the sandbox",
+	perm_skip: "Skip",
 	perm_skip_hint:
-		"Runs without asking, as your user account; still asks before deletes, pushes and the like",
-	perm_auto_hint_sandbox:
-		"The model decides what to ask you about; commands it runs without asking run in the sandbox",
+		"Asks nothing and marks risky calls in the record; your decisions still go to the approval center. Commands run as your user account",
 	perm_skip_hint_sandbox:
-		"Runs without asking, commands in the sandbox; still asks before deletes, pushes and the like",
+		"Asks nothing and marks risky calls in the record; your decisions still go to the approval center. Commands run in the sandbox",
 	loadEarlier: "Load earlier messages",
 	emptyTranscript: "Send a message to start.",
 	composerPlaceholder: "Message {name} (Enter to send, Shift+Enter for a new line)",
@@ -1269,6 +1290,16 @@ const en: Record<MessageKey, string> = {
 	linesRemoved: "−{n}",
 	approvalTitle: "Needs your permission",
 	askedInReply: "Asked in a reply",
+	matterTag: "Your decision",
+	matterTagHint:
+		"Can't be taken back or reaches other people, so it's yours to decide in every permission mode",
+	reviewDeclined: "The check didn't allow it: {reason}",
+	reviewDeclinedPlain: "The check didn't allow it, so it's up to you",
+	permRisk: "Risky",
+	permRiskLine: "Ran without asking in skip mode; risky: {reasons}",
+	permReviewed: "Allowed by the check",
+	permReviewedLine: "The check allowed it: {reason}",
+	permReviewedPlain: "The check allowed this step",
 	confirmEachTime: "Asks every time",
 	confirmEachTimeHint: "Operations like this ask every time and can't be always allowed",
 	ask_shell: "Run a command",
@@ -1282,6 +1313,10 @@ const en: Record<MessageKey, string> = {
 	ask_open_session_named: "Open the task session {name}",
 	ask_manage_yew: "Manage Yew Harness",
 	"confirm_delete-files": "Delete files",
+	"confirm_delete-outside": "Delete files outside the working folder",
+	"confirm_unreadable-command": "A command Yew Harness can't read",
+	"confirm_yew-data": "Touch Yew Harness's own data, where decisions are kept",
+	"confirm_hidden-folder": "Touch a folder you keep from sessions",
 	"confirm_delete-untracked": "Delete untracked files",
 	"confirm_delete-branch": "Delete a branch",
 	"confirm_delete-tag": "Delete a tag",
@@ -2145,9 +2180,8 @@ export function hasMessage(key: string): key is MessageKey {
 }
 
 /** A permission mode's hint, as commands run now: in the system sandbox, or as the person. */
-export function permissionHint(mode: "auto" | "manual" | "skip", sandboxed: boolean): string {
-	if (mode === "manual" || !sandboxed) return t(`perm_${mode}_hint`);
-	return t(`perm_${mode}_hint_sandbox`);
+export function permissionHint(mode: "default" | "review" | "skip", sandboxed: boolean): string {
+	return t(sandboxed ? `perm_${mode}_hint_sandbox` : `perm_${mode}_hint`);
 }
 
 export function t(key: MessageKey, params: Record<string, string | number> = {}): string {

@@ -35,7 +35,7 @@ export interface WorldSession {
 	team?: string | null;
 	role?: string;
 	workspace?: string | null;
-	permissionMode?: "auto" | "manual" | "skip";
+	permissionMode?: "default" | "review" | "skip";
 	receive?: "accept" | "hold" | "refuse";
 	canOrganize?: boolean;
 	canPostCards?: boolean;
@@ -97,7 +97,7 @@ export interface WorldSchedule {
 	session: string;
 	message: string;
 	enabled?: boolean;
-	permissionMode?: "auto" | "manual" | "skip";
+	permissionMode?: "default" | "review" | "skip";
 	catchUp?: boolean;
 }
 

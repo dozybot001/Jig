@@ -230,7 +230,7 @@ function harness() {
 			model: faux.getModel().id,
 			cwd: folder,
 			thinking: "off",
-			options: { permissionMode: "auto" },
+			options: { permissionMode: "default" },
 			...extra,
 		});
 	const script = (session: Session, steps: Step[]) => scripts.set(session.name, steps);
@@ -304,7 +304,7 @@ describe("scheduled runs", () => {
 
 	test("a run waits for the person's turn to end; its permission mode holds for that run alone", async () => {
 		const { store, agents, scheduler, make, script, seen, said, folder } = harness();
-		const design = make("设计", { options: { permissionMode: "manual" } });
+		const design = make("设计", { options: { permissionMode: "default" } });
 		const task = agents.schedules.create({
 			name: "整理",
 			cron: "0 18 * * *",
@@ -334,7 +334,7 @@ describe("scheduled runs", () => {
 		const contexts = seen.get("设计") ?? [];
 		assert.doesNotMatch(textOf(contexts[0]), /写一份笔记/, "the person's turn did not get it");
 		assert.match(textOf(contexts[1]), /写一份笔记/);
-		assert.match(textOf(contexts[1]), /For this run: Permission mode: full access/);
+		assert.match(textOf(contexts[1]), /For this run: Permission mode: skip/);
 		// Full access for this run: the write ran without asking, though the session asks each time.
 		assert.equal(store.pendingApprovals(design.id).length, 0);
 		const { readFileSync } = await import("node:fs");
@@ -343,7 +343,9 @@ describe("scheduled runs", () => {
 
 		// Back to the session's own mode: the next write asks.
 		script(design, [
-			toolUse(fauxToolCall("write", { path: "more.md", content: "再写" }, { id: "w2" })),
+			toolUse(
+				fauxToolCall("write", { path: "more.md", content: "再写", confirm: true }, { id: "w2" }),
+			),
 			fauxAssistantMessage("好"),
 		]);
 		agents.send(design.id, "再写一份");
@@ -354,8 +356,8 @@ describe("scheduled runs", () => {
 
 	test("the main conversation sets up tasks with manage_yew; a run mode wider than the session's is confirmed", async () => {
 		const { store, agents, make, script, said } = harness();
-		const main = make("总办", { options: { permissionMode: "skip" } });
-		make("设计", { options: { permissionMode: "manual" } });
+		const main = make("总办", { options: { permissionMode: "default" } });
+		make("设计", { options: { permissionMode: "default" } });
 		store.setSetting("mainSessionId", main.id);
 		script(main, [
 			toolUse(
@@ -439,11 +441,11 @@ describe("scheduled tasks over the API and the command line", () => {
 			cron: "0 9 * * 1",
 			session: "周报",
 			message: "写周报",
-			permissionMode: "manual",
+			permissionMode: "default",
 		});
 		assert.equal(created.status, 201);
 		const task = await created.json();
-		assert.equal(task.permissionMode, "manual");
+		assert.equal(task.permissionMode, "default");
 		const list = await (await call("GET", "/api/schedules")).json();
 		assert.deepEqual(
 			list.items.map((item: { name: string }) => item.name),

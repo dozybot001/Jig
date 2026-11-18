@@ -148,7 +148,8 @@ describe("instructions, memory folders and what may be read", () => {
 		const session = store.createSession({
 			...sessionInput("s"),
 			cwd,
-			options: { permissionMode: "manual" },
+			// Yew's read-only helpers are asked before reading outside the working folder.
+			options: { readerOnly: true },
 		});
 		const read = {
 			kind: "read" as const,

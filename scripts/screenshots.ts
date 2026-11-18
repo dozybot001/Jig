@@ -517,7 +517,7 @@ function seed(folder: string, lang: Lang, modelUrl: string): { env: NodeJS.Proce
 			provider: "demo",
 			model: "demo-1",
 			thinking: "off",
-			options: { permissionMode: "auto" },
+			options: { permissionMode: "default" },
 		});
 	const { names, roles } = story;
 	const content = session(names.content, roles.content, marketing.id, null);

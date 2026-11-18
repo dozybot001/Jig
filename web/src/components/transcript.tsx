@@ -22,7 +22,9 @@ import {
 	type Approval,
 	type ChangeStep,
 	type Entry,
+	normalizePermissionMode,
 	type PermissionMode,
+	type PermissionNote,
 	type PermissionRequest,
 	type Question,
 	type QuestionRequest,
@@ -230,8 +232,9 @@ export function changeText(step: ChangeStep): string {
 		case "set_permission":
 			return t("change_set_permission", {
 				session: quoted(step.session),
-				from: t(`perm_${step.from}`),
-				to: t(`perm_${step.to}`),
+				// Changes saved before 1.7 name the earlier modes, which read as default now.
+				from: t(`perm_${normalizePermissionMode(step.from) ?? "default"}`),
+				to: t(`perm_${normalizePermissionMode(step.to) ?? "default"}`),
 			});
 		case "set_receive":
 			return t("change_set_receive", {
@@ -369,13 +372,25 @@ export function PermissionCard({ approval, session }: { approval: Approval; sess
 				icon={<ShieldIcon />}
 				parts={session ? [session, formatWaited(approval.createdAt, now)] : [t("approvalTitle")]}
 				tags={
-					request.mustConfirm ? (
+					request.matter ? (
+						<span className="tag" title={t("matterTagHint")}>
+							{t("matterTag")}
+						</span>
+					) : request.mustConfirm ? (
 						<span className="tag" title={t("confirmEachTimeHint")}>
 							{t("confirmEachTime")}
 						</span>
 					) : null
 				}
 			/>
+			{/* The automatic mode's check looked at it first and left it to the person. */}
+			{request.review !== undefined && (
+				<p className="hint">
+					{request.review
+						? t("reviewDeclined", { reason: request.review })
+						: t("reviewDeclinedPlain")}
+				</p>
+			)}
 			<p className="request-title">{headline}</p>
 			{request.description && (
 				<Capped className="request-description" label={headline}>
@@ -673,9 +688,21 @@ const ToolCard = memo(function ToolCard({
 	const status = view?.status ?? (result ? (result.isError ? "error" : "done") : "pending");
 	const pending = approvals.some((approval) => approval.status === "pending");
 	const detail = view?.detail as
-		| { diff?: string; added?: number; removed?: number; code?: string }
+		| {
+				diff?: string;
+				added?: number;
+				removed?: number;
+				code?: string;
+				permission?: PermissionNote;
+		  }
 		| null
 		| undefined;
+	// Ran without being asked about: in skip mode with its risk, or allowed by the check.
+	const risk = detail?.permission?.risk;
+	const reviewed = detail?.permission?.reviewed;
+	const riskText = risk
+		?.map((reason) => t(`confirm_${reason}` satisfies MessageKey))
+		.join(t("listSeparator"));
 	// Refused because the turn was a scheduled run with nobody watching (M3 plan, section 9).
 	const unattended = detail?.code === "unattended";
 	const [open, setOpen] = useState(false);
@@ -719,9 +746,25 @@ const ToolCard = memo(function ToolCard({
 								{status === "denied" && unattended ? t("tool_unattended") : t(`tool_${status}`)}
 							</span>
 						)}
+						{riskText && (
+							<span className="tool-state tool-state-risk" title={riskText}>
+								{t("permRisk")}
+							</span>
+						)}
+						{reviewed !== undefined && (
+							<span className="tool-state tool-state-reviewed" title={reviewed || undefined}>
+								{t("permReviewed")}
+							</span>
+						)}
 						<ChevronIcon />
 					</summary>
 					<div className="tool-detail">
+						{riskText && <p className="hint">{t("permRiskLine", { reasons: riskText })}</p>}
+						{reviewed !== undefined && (
+							<p className="hint">
+								{reviewed ? t("permReviewedLine", { reason: reviewed }) : t("permReviewedPlain")}
+							</p>
+						)}
 						<h2>{t("toolArguments")}</h2>
 						<ScrollBlock className="code output" label={t("toolArguments")}>
 							{JSON.stringify(call.arguments, null, 2)}

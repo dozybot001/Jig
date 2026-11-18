@@ -59,15 +59,15 @@ describe("settings: defaults for new sessions", () => {
 
 	test("new sessions start with the default permission mode; an unknown mode is refused", async () => {
 		const { call } = setup();
-		assert.equal((await call("GET", "/api/settings")).body.defaultPermissionMode, "auto");
-		const saved = await call("PATCH", "/api/settings", { defaultPermissionMode: "manual" });
-		assert.equal(saved.body.defaultPermissionMode, "manual");
+		assert.equal((await call("GET", "/api/settings")).body.defaultPermissionMode, "default");
+		const saved = await call("PATCH", "/api/settings", { defaultPermissionMode: "skip" });
+		assert.equal(saved.body.defaultPermissionMode, "skip");
 		const session = await call("POST", "/api/sessions", { name: "新的" });
-		assert.equal(session.body.options.permissionMode, "manual");
+		assert.equal(session.body.options.permissionMode, "skip");
 		const wrong = await call("PATCH", "/api/settings", { defaultPermissionMode: "always" });
 		assert.equal(wrong.status, 400);
 		assert.equal(wrong.body.field, "defaultPermissionMode");
-		assert.equal((await call("GET", "/api/settings")).body.defaultPermissionMode, "manual");
+		assert.equal((await call("GET", "/api/settings")).body.defaultPermissionMode, "skip");
 	});
 
 	test("the default workspace is one of the saved ones, and is forgotten when that one is removed", async () => {

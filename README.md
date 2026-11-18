@@ -108,7 +108,7 @@ Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and
 
 ## Security
 
-Sessions' commands and the MCP servers you add run in a system sandbox, Anthropic's open-source [sandbox-runtime](https://github.com/anthropics/sandbox-runtime): they cannot touch Yew Harness's data or the keychain, write only in their workspace and temporary folders, and reach only allowed sites; a command that has to run outside asks you every time. [docs/sandbox.md](docs/sandbox.md) has the details, including what happens where the sandbox cannot start. Content from other sessions, web pages, mail and MCP servers is only data and cannot approve anything for you.
+Sessions' commands and the MCP servers you add run in a system sandbox, Anthropic's open-source [sandbox-runtime](https://github.com/anthropics/sandbox-runtime): they cannot touch Yew Harness's data or the keychain, write only in their workspace and temporary folders, and reach only allowed sites. Each session has a permission mode: the default asks before risky steps such as a command outside the sandbox, Auto leaves those to a separate check by the model first, and Skip asks nothing and marks them. What only you can decide, such as publishing, messages to other people and production changes, waits in the approval center in every mode. [docs/sandbox.md](docs/sandbox.md) has the details, including what happens where the sandbox cannot start. Content from other sessions, web pages, mail and MCP servers is only data and cannot approve anything for you.
 
 To report a security problem, see [SECURITY.md](SECURITY.md).
 

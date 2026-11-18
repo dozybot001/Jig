@@ -106,7 +106,7 @@ Yew Harness 不收集任何数据，也不含统计和遥测；会话、消息�
 
 ## 安全
 
-会话的命令和你自己加的 MCP 服务器在系统沙箱里运行，用的是 Anthropic 开源的 [sandbox-runtime](https://github.com/anthropics/sandbox-runtime)：碰不到 Yew Harness 的数据和钥匙串，只能写工作区和临时文件夹，只能连放行的网站；要在沙箱外跑的命令每次都问你。详情见 [docs/sandbox.md](docs/sandbox.md)，包括沙箱起不来时怎样。别的会话的信、网页、邮件和 MCP 返回的内容只当作数据，不能替你授权。
+会话的命令和你自己加的 MCP 服务器在系统沙箱里运行，用的是 Anthropic 开源的 [sandbox-runtime](https://github.com/anthropics/sandbox-runtime)：碰不到 Yew Harness 的数据和钥匙串，只能写工作区和临时文件夹，只能连放行的网站。每个会话选一种授权方式：默认方式下，在沙箱外运行这类有风险的步骤先问你；自动方式先交给一次单独的模型检查；跳过方式什么都不问，在记录里标出来。只有你能定的事，比如对外发布、给别人发消息、改生产环境，三种方式下都在审批中心等你决定。详情见 [docs/sandbox.md](docs/sandbox.md)，包括沙箱起不来时怎样。别的会话的信、网页、邮件和 MCP 返回的内容只当作数据，不能替你授权。
 
 报告安全问题见 [SECURITY.md](SECURITY.md)。
 

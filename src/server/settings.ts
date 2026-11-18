@@ -1,7 +1,12 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { DEFAULT_RELAY_URL, type PermissionMode, type ThinkingLevel } from "../shared/types.ts";
+import {
+	DEFAULT_RELAY_URL,
+	normalizePermissionMode,
+	type PermissionMode,
+	type ThinkingLevel,
+} from "../shared/types.ts";
 import { invalid } from "./errors.ts";
 import { canonical } from "./permissions/paths.ts";
 import type { Store } from "./store.ts";
@@ -45,7 +50,7 @@ export const SETTING_DEFAULTS = {
 	/** Folders of notes sessions may read, such as ~/memory (M4 plan, section 4). */
 	memoryDirs: [] as string[],
 	/** The permission mode new sessions start with (blueprint 6.10, item 32). */
-	defaultPermissionMode: "auto" as PermissionMode,
+	defaultPermissionMode: "default" as PermissionMode,
 	/** The saved workspace the interface preselects for a new session; null for none. */
 	defaultWorkspaceId: null as string | null,
 	notify: { waiting: true, error: true, task: true, budget: true } as NotifySettings,
@@ -101,10 +106,9 @@ export function readSettings(store: Store): Settings {
 		remote: { ...SETTING_DEFAULTS.remote, ...store.getSetting("remote", SETTING_DEFAULTS.remote) },
 		dailyBudget: store.getSetting("dailyBudget", SETTING_DEFAULTS.dailyBudget),
 		memoryDirs: store.getSetting("memoryDirs", SETTING_DEFAULTS.memoryDirs),
-		defaultPermissionMode: store.getSetting(
-			"defaultPermissionMode",
+		defaultPermissionMode:
+			normalizePermissionMode(store.getSetting("defaultPermissionMode", null)) ??
 			SETTING_DEFAULTS.defaultPermissionMode,
-		),
 		// A workspace that was removed is no longer the default.
 		defaultWorkspaceId: workspaces.some((workspace) => workspace.id === defaultWorkspaceId)
 			? defaultWorkspaceId

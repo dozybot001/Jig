@@ -344,4 +344,43 @@ DELETE FROM session_events;`,
 	// as Yew's, so they still count as Yew's own words and not the person's.
 	`UPDATE messages SET body = replace(body, '[From Jig, not from the person]', '[From Yew, not from the person]')
 	WHERE body LIKE '%[From Jig, not from the person]%';`,
+	// Permission modes (blueprint 6.1, item 6; founder, 11-18): "auto" (ask when needed) is the
+	// default mode now and "manual" (ask each time) is gone, so both become "default". The table of
+	// scheduled tasks checks its modes, so it is made again; letters keep the task they belong to.
+	`
+UPDATE sessions SET options = json_set(options, '$.permissionMode', 'default')
+	WHERE json_extract(options, '$.permissionMode') IN ('auto', 'manual');
+UPDATE settings SET value = '"default"'
+	WHERE key = 'defaultPermissionMode' AND value IN ('"auto"', '"manual"');
+CREATE TEMP TABLE schedule_letters AS SELECT id, schedule_id FROM letters WHERE schedule_id IS NOT NULL;
+CREATE TABLE schedules_new (
+	id TEXT PRIMARY KEY,
+	name TEXT NOT NULL,
+	cron TEXT NOT NULL,
+	session_id TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+	message TEXT NOT NULL,
+	permission_mode TEXT CHECK (permission_mode IN ('default', 'review', 'skip')),
+	catch_up INTEGER NOT NULL DEFAULT 1,
+	enabled INTEGER NOT NULL DEFAULT 1,
+	next_run_at INTEGER,
+	last_run_at INTEGER,
+	last_status TEXT CHECK (last_status IN ('running', 'done', 'error', 'stopped', 'skipped')),
+	last_detail TEXT,
+	last_letter_id TEXT,
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL
+) STRICT;
+INSERT INTO schedules_new (id, name, cron, session_id, message, permission_mode, catch_up, enabled,
+	next_run_at, last_run_at, last_status, last_detail, last_letter_id, created_at, updated_at)
+SELECT id, name, cron, session_id, message,
+	CASE WHEN permission_mode IN ('auto', 'manual') THEN 'default' ELSE permission_mode END,
+	catch_up, enabled, next_run_at, last_run_at, last_status, last_detail, last_letter_id, created_at,
+	updated_at FROM schedules;
+DROP TABLE schedules;
+ALTER TABLE schedules_new RENAME TO schedules;
+CREATE UNIQUE INDEX schedules_name ON schedules (name COLLATE NOCASE);
+UPDATE letters SET schedule_id = (
+	SELECT schedule_letters.schedule_id FROM schedule_letters WHERE schedule_letters.id = letters.id
+) WHERE id IN (SELECT id FROM schedule_letters);
+DROP TABLE schedule_letters;`,
 ];

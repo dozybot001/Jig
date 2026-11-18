@@ -1894,8 +1894,12 @@ body.scroll-locked {
 .tool-state-denied {
 	color: var(--danger);
 }
-.tool-state-waiting {
+.tool-state-waiting,
+.tool-state-risk {
 	color: var(--warning);
+}
+.tool-state-reviewed {
+	color: var(--text-2);
 }
 .tool-state-needs_review {
 	color: var(--review);

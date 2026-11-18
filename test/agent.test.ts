@@ -176,7 +176,7 @@ describe("agent loop", () => {
 	test("an operation that needs approval waits; a refusal with a reason reaches the model", async () => {
 		const { faux, store, agents, session, cwd, contexts, capture } = setup();
 		faux.setResponses([
-			toolUse(fauxToolCall("shell", { command: "touch made.txt" }, { id: "c1" })),
+			toolUse(fauxToolCall("shell", { command: "touch made.txt", confirm: true }, { id: "c1" })),
 			capture(fauxAssistantMessage("OK, I will not.")),
 		]);
 		agents.send(session.id, "make a file");
@@ -194,7 +194,7 @@ describe("agent loop", () => {
 		const { faux, store, agents, session, cwd } = setup();
 		writeFileSync(join(cwd, "old.txt"), "x");
 		faux.setResponses([
-			toolUse(fauxToolCall("shell", { command: "touch made.txt" }, { id: "c1" })),
+			toolUse(fauxToolCall("shell", { command: "touch made.txt", confirm: true }, { id: "c1" })),
 			toolUse(fauxToolCall("shell", { command: "rm old.txt" }, { id: "c2" })),
 			fauxAssistantMessage("Done."),
 		]);
@@ -221,7 +221,7 @@ describe("agent loop", () => {
 		assert.equal(existsSync(join(cwd, "old.txt")), false);
 	});
 
-	test("with full access a commit runs on its own; the push waits for the person's permission", async () => {
+	test("in skip mode a commit and a push run on their own; the push is marked as risky", async () => {
 		const { faux, store, agents, session, cwd } = setup();
 		store.updateSession(session.id, { options: { permissionMode: "skip" } });
 		const git = (...args: string[]) =>
@@ -243,40 +243,53 @@ describe("agent loop", () => {
 			fauxAssistantMessage("已提交并推送。"),
 		]);
 		agents.send(session.id, "改好了就提交、推送");
-		await until(() => store.pendingApprovals(session.id).length === 1);
-		// The commit did not ask; the push is in the approval center and the session shows it waits.
-		const head = git("rev-parse", "HEAD");
-		const [push] = store.pendingApprovals(session.id);
-		assert.ok(push);
-		assert.equal(push.kind, "permission");
-		assert.match(textOf(push.request), /git push -q origin main/);
-		assert.equal((push.request as { mustConfirm: boolean }).mustConfirm, true);
-		assert.equal(store.getSession(session.id).status, "waiting");
-		assert.throws(() =>
-			execFileSync("git", ["--git-dir", remote, "rev-parse", "main"], { stdio: "ignore" }),
-		);
-		agents.answer(push.id, { decision: "allow_once" });
 		await agents.whenIdle(session.id);
+		assert.deepEqual(store.pendingApprovals(session.id), []);
 		const pushed = execFileSync("git", ["--git-dir", remote, "rev-parse", "main"], {
 			encoding: "utf8",
 		}).trim();
-		assert.equal(pushed, head);
-		assert.equal(store.getSession(session.id).status, "idle");
+		assert.equal(pushed, git("rev-parse", "HEAD"));
+		// The row says it ran without asking and why it is risky (blueprint 6.1, item 6).
+		const push = store.toolCallsByStatus(session.id, ["done"]).find((call) => call.callId === "c2");
+		assert.deepEqual(push?.detail?.permission, { risk: ["push"] });
+	});
+
+	test("in skip mode a decision still waits for the person", async () => {
+		const { faux, store, agents, session } = setup();
+		store.updateSession(session.id, { options: { permissionMode: "skip" } });
+		faux.setResponses([
+			toolUse(fauxToolCall("shell", { command: "ssh deploy@example.com true" }, { id: "c1" })),
+			fauxAssistantMessage("好，不连了。"),
+		]);
+		agents.send(session.id, "去服务器上看看");
+		await until(() => store.pendingApprovals(session.id).length === 1);
+		const [card] = store.pendingApprovals(session.id);
+		assert.ok(card);
+		const request = card.request as PermissionRequest;
+		assert.equal(request.matter, true);
+		assert.deepEqual(request.reasons, ["remote-machine"]);
+		agents.answer(card.id, { decision: "deny" });
+		await agents.whenIdle(session.id);
 	});
 
 	test("a permission request shows what the call is for and the change it would make", async () => {
 		const { faux, store, agents, session, cwd } = setup();
-		store.updateSession(session.id, { options: { permissionMode: "manual" } });
+		store.updateSession(session.id, { options: { permissionMode: "default" } });
 		writeFileSync(join(cwd, "a.txt"), "one\ntwo\n");
+		// The session asks for the person's permission itself, with confirm.
 		faux.setResponses([
 			toolUse(fauxToolCall("read", { path: "a.txt" }, { id: "r1" })),
 			toolUse(
-				fauxToolCall("edit", { path: "a.txt", old_text: "two", new_text: "deux" }, { id: "e1" }),
+				fauxToolCall(
+					"edit",
+					{ path: "a.txt", old_text: "two", new_text: "deux", confirm: true },
+					{ id: "e1" },
+				),
 			),
 			toolUse(
 				fauxToolCall(
 					"shell",
-					{ command: "touch b.txt", description: "建一个空文件" },
+					{ command: "touch b.txt", description: "建一个空文件", confirm: true },
 					{ id: "s1" },
 				),
 			),
@@ -466,7 +479,7 @@ describe("agent loop", () => {
 	test("stopping while waiting cancels the approval and leaves a valid transcript", async () => {
 		const { faux, store, agents, session, contexts, capture } = setup();
 		faux.setResponses([
-			toolUse(fauxToolCall("shell", { command: "touch x" }, { id: "c1" })),
+			toolUse(fauxToolCall("shell", { command: "touch x", confirm: true }, { id: "c1" })),
 			capture(fauxAssistantMessage("Hello again.")),
 		]);
 		agents.send(session.id, "go");
@@ -489,7 +502,7 @@ describe("agent loop", () => {
 	test("a message sent while the session works waits and arrives after the tool results", async () => {
 		const { faux, store, agents, session, contexts, capture } = setup();
 		faux.setResponses([
-			toolUse(fauxToolCall("shell", { command: "touch y" }, { id: "c1" })),
+			toolUse(fauxToolCall("shell", { command: "touch y", confirm: true }, { id: "c1" })),
 			capture(fauxAssistantMessage("Got both.")),
 		]);
 		agents.send(session.id, "first");
@@ -608,7 +621,7 @@ describe("agent loop", () => {
 		agents.send(session.id, "hi");
 		await agents.whenIdle(session.id);
 		const system = textOf(contexts[0]?.messages[0]);
-		assert.match(system, /Permission mode: ask each time\./);
+		assert.match(system, /Permission mode: default\./);
 		store.updateSession(session.id, { options: { permissionMode: "skip" } });
 		agents.send(session.id, "again");
 		await agents.whenIdle(session.id);
@@ -617,10 +630,7 @@ describe("agent loop", () => {
 			.listEntries(session.id, { limit: 50 })
 			.entries.filter((e) => e.role === "system");
 		assert.equal(updates.length, 1);
-		assert.match(
-			textOf(updates[0]),
-			/changed the permission mode\. Permission mode: full access\./,
-		);
+		assert.match(textOf(updates[0]), /changed the permission mode\. Permission mode: skip\./);
 	});
 
 	test("a task list left unchanged for many calls gets a reminder; a finished one does not", async () => {
@@ -695,7 +705,7 @@ describe("system prompt", () => {
 		cwd,
 		git: null,
 		instructions: [],
-		permissionMode: "auto" as const,
+		permissionMode: "default" as const,
 	});
 	const base = { name: "产品", responsibility: "负责 Yew 的产品设计。", cwd: "/tmp/demo" };
 
@@ -714,7 +724,7 @@ describe("system prompt", () => {
 		assert.match(text, /standing session: this role is yours for the long term/);
 		assert.match(text, /in files in your working folder/);
 		assert.match(text, /Stop for the person only for what only they can decide or do/);
-		assert.match(text, /Permission mode: ask when needed\..*set "confirm": true/);
+		assert.match(text, /Permission mode: default\..*set "confirm": true/);
 	});
 
 	test("a task session ends with a report; a chat without team or role mentions neither", () => {
@@ -739,8 +749,11 @@ describe("system prompt", () => {
 		const alone = systemPrompt(session, { ...snapshot("/tmp/demo"), permissionMode: "skip" });
 		assert.match(alone, /only they can decide or do: ask with ask_user\./);
 		assert.match(alone, /take it instead of offering it; for example, commit/);
-		assert.match(alone, /When the work calls for one, make the call: Yew asks the person/);
-		assert.match(alone, /Permission mode: full access\. Your other calls run without asking;/);
+		assert.match(
+			alone,
+			/When the work calls for one, make the call: Yew puts it in the approval center/,
+		);
+		assert.match(alone, /Permission mode: skip\. Yew asks nothing before your calls/);
 		assert.doesNotMatch(alone, /Take extra care/);
 		assert.match(alone, /how you checked it, and what is left\./);
 		assert.doesNotMatch(alone, /what the person needs to do/);

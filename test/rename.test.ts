@@ -85,7 +85,10 @@ describe("the rename", () => {
 		assert.ok(renameAt > 0);
 		const db = new DatabaseSync(":memory:");
 		db.exec("PRAGMA foreign_keys = ON");
-		for (const [version, sql] of migrations.slice(0, -1).entries()) {
+		// Up to the migration that rewrites the notes; migrate() runs it and those after it.
+		const notesAt = migrations.findIndex((sql) => sql.includes("[From Jig, not from the person]"));
+		assert.ok(notesAt > 0);
+		for (const [version, sql] of migrations.slice(0, notesAt).entries()) {
 			db.exec(sql as string);
 			db.exec(`PRAGMA user_version = ${version + 1}`);
 		}
@@ -106,5 +109,84 @@ describe("the rename", () => {
 		assert.equal(body.content, "[From Yew, not from the person] The task was stopped.");
 		assert.equal(isOwnNote(body.content), true);
 		assert.equal(isOwnNote("Please fix the footer."), false);
+	});
+});
+
+describe("the permission modes of 1.7 (blueprint 6.1, item 6)", () => {
+	test("the earlier modes become the default; scheduled tasks keep their mode and their letters", () => {
+		const modesAt = migrations.findIndex((sql) =>
+			String(sql).includes("CREATE TABLE schedules_new"),
+		);
+		assert.ok(modesAt > 0);
+		const db = new DatabaseSync(":memory:");
+		db.exec("PRAGMA foreign_keys = ON");
+		for (const [version, sql] of migrations.slice(0, modesAt).entries()) {
+			db.exec(sql as string);
+			db.exec(`PRAGMA user_version = ${version + 1}`);
+		}
+		const now = Date.now();
+		const session = db.prepare(
+			"INSERT INTO sessions (id, name, kind, provider, model, options, last_activity_at, created_at, updated_at) VALUES (?, ?, 'standing', 'p', 'm', ?, ?, ?, ?)",
+		);
+		session.run(
+			"a",
+			"按需",
+			JSON.stringify({ permissionMode: "auto", letterQuota: 3 }),
+			now,
+			now,
+			now,
+		);
+		session.run("b", "逐项", JSON.stringify({ permissionMode: "manual" }), now, now, now);
+		session.run("c", "完全", JSON.stringify({ permissionMode: "skip" }), now, now, now);
+		db.prepare(
+			"INSERT INTO settings (key, value) VALUES ('defaultPermissionMode', '\"manual\"')",
+		).run();
+		const schedule = db.prepare(
+			"INSERT INTO schedules (id, name, cron, session_id, message, permission_mode, created_at, updated_at) VALUES (?, ?, '0 9 * * *', 'a', '写日报', ?, ?, ?)",
+		);
+		schedule.run("t1", "日报", "manual", now, now);
+		schedule.run("t2", "周报", "skip", now, now);
+		schedule.run("t3", "月报", null, now, now);
+		db.prepare(
+			"INSERT INTO letters (id, thread_id, from_kind, from_name, to_session, kind, summary, body, status, created_at, updated_at, schedule_id) VALUES ('l1', 'l1', 'yew', 'Yew', 'a', 'request', '日报', '写日报', 'done', ?, ?, 't1')",
+		).run(now, now);
+		migrate(db);
+		const options = (id: string) =>
+			JSON.parse(
+				String(
+					(db.prepare("SELECT options FROM sessions WHERE id = ?").get(id) as { options: string })
+						.options,
+				),
+			) as { permissionMode?: string; letterQuota?: number };
+		assert.deepEqual(options("a"), { permissionMode: "default", letterQuota: 3 });
+		assert.equal(options("b").permissionMode, "default");
+		assert.equal(options("c").permissionMode, "skip");
+		const setting = db
+			.prepare("SELECT value FROM settings WHERE key = 'defaultPermissionMode'")
+			.get() as {
+			value: string;
+		};
+		assert.equal(setting.value, '"default"');
+		const modes = db.prepare("SELECT id, permission_mode FROM schedules ORDER BY id").all();
+		assert.deepEqual(
+			modes.map((row) => [row.id, row.permission_mode]),
+			[
+				["t1", "default"],
+				["t2", "skip"],
+				["t3", null],
+			],
+		);
+		assert.equal(
+			(
+				db.prepare("SELECT schedule_id FROM letters WHERE id = 'l1'").get() as {
+					schedule_id: string;
+				}
+			).schedule_id,
+			"t1",
+		);
+		// The new modes are the only ones the table takes now.
+		assert.throws(() =>
+			db.prepare("UPDATE schedules SET permission_mode = 'manual' WHERE id = 't2'").run(),
+		);
 	});
 });

@@ -50,7 +50,7 @@ function world(workspace: string): World {
 				kind: "task",
 				team: "产品",
 				workspace: "shop",
-				permissionMode: "manual",
+				permissionMode: "default",
 				model: { provider: "demo", model: "demo-1" },
 				openedBy: "统筹",
 				status: { state: "error", error: "服务商限流", since: t(7) },

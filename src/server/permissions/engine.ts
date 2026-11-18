@@ -1,6 +1,8 @@
 import { dirname } from "node:path";
 import {
 	type ConfirmReason,
+	DECISION_REASONS,
+	type PermissionNote,
 	type PermissionRequest,
 	type PermissionRule,
 	permissionModeOf,
@@ -49,9 +51,19 @@ export type Subject =
 	  };
 
 export type Decision =
-	| { effect: "allow" }
+	/** `note`: skip mode let a risky call run, or the review allowed it (shown on its row). */
+	| { effect: "allow"; note?: PermissionNote }
 	| { effect: "deny"; reason: string }
-	| { effect: "ask"; request: PermissionRequest };
+	| {
+			effect: "ask";
+			request: PermissionRequest;
+			/** Review mode: the check by the model decides first; the person is asked if it does not allow. */
+			review?: boolean;
+			/** Asked because a rule of the session says so; not left to the check. */
+			byRule?: boolean;
+			/** A command Yew cannot read. */
+			unreadable?: boolean;
+	  };
 
 const SAFE_REDIRECT_TARGETS = new Set(["/dev/null", "/dev/stdout", "/dev/stderr", "&1", "&2", "-"]);
 
@@ -74,13 +86,18 @@ function strongest(effects: RuleEffect[]): RuleEffect | null {
 }
 
 /**
- * Decides whether a tool call may run, must be asked about, or is refused (M1 plan, section 8).
- * Order: credential locations are refused; must-confirm operations always ask and cannot be remembered
- * (spec 21.2); then the session's rules, where deny beats ask beats allow; then the built-in defaults.
+ * Decides whether a tool call may run, must be asked about, or is refused (M1 plan, section 8;
+ * blueprint 6.1, item 6). Order: credential locations are refused; operations asked about every time
+ * cannot be remembered; then the session's rules, where deny beats ask beats allow; then the
+ * built-in defaults. What is asked is then settled by its kind and the session's mode: a decision
+ * (审批: DECISION_REASONS) is the person's in every mode; a permission (授权) is asked in the default
+ * mode, goes to the check first in review mode, and runs with its risk marked in skip mode.
  * Text in the transcript never counts as approval: only the person's answer in Yew does.
  */
 export class PermissionEngine {
 	readonly #secrets: string[];
+	/** Yew's own data folder: a command that names it could change decisions. */
+	readonly #home: string;
 	/** Folders outside the working folder that may be read without asking: memory and skill folders. */
 	readRoots: () => string[] = () => [];
 	/** Folders the person keeps from sessions (the settings): refused like credential locations. */
@@ -88,6 +105,7 @@ export class PermissionEngine {
 
 	constructor(yewHome: string) {
 		this.#secrets = secretLocations(yewHome);
+		this.#home = canonical(yewHome);
 	}
 
 	/** Credential locations, Yew's own data and the folders the person keeps from sessions. */
@@ -106,6 +124,25 @@ export class PermissionEngine {
 	 * Yew cannot read are asked about in every mode.
 	 */
 	decide(subject: Subject, session: Session, flagged = false): Decision {
+		const decision = this.#decide(subject, session, flagged);
+		if (decision.effect !== "ask") return decision;
+		const reasons = decision.request.reasons ?? [];
+		if (reasons.some((reason) => DECISION_REASONS.has(reason))) {
+			decision.request.matter = true;
+			return decision;
+		}
+		if (session.options.readerOnly) return decision;
+		const mode = permissionModeOf(session.options);
+		if (mode === "skip") {
+			const risk: ConfirmReason[] =
+				reasons.length > 0 ? reasons : decision.unreadable ? ["unreadable-command"] : [];
+			return risk.length > 0 ? { effect: "allow", note: { risk } } : { effect: "allow" };
+		}
+		if (mode === "review" && !flagged && !decision.byRule) return { ...decision, review: true };
+		return decision;
+	}
+
+	#decide(subject: Subject, session: Session, flagged: boolean): Decision {
 		switch (subject.kind) {
 			case "none":
 				return { effect: "allow" };
@@ -129,8 +166,9 @@ export class PermissionEngine {
 		summary: string,
 		remember?: PermissionRule[],
 	): Decision {
-		const mode = permissionModeOf(session.options);
-		if (mode === "skip" || (mode === "auto" && !flagged)) return { effect: "allow" };
+		// What the model marks with confirm is asked about; skip mode asks nothing.
+		const skip = permissionModeOf(session.options) === "skip";
+		if (!session.options.readerOnly && (!flagged || skip)) return { effect: "allow" };
 		return this.#ask(tool, summary, undefined, remember);
 	}
 
@@ -180,14 +218,14 @@ export class PermissionEngine {
 			if (outside.length > 0) {
 				return this.#ask(subject.tool, subject.summary, ["write-outside"]);
 			}
-			if (effects.includes("ask")) return this.#ask(subject.tool, subject.summary);
+			if (effects.includes("ask")) return this.#byRule(subject.tool, subject.summary);
 			if (effects.every((effect) => effect === "allow")) return { effect: "allow" };
 			return this.#byDefault(session, flagged, subject.tool, subject.summary, [
 				{ effect: "allow", tool: subject.tool, pattern: "**" },
 			]);
 		}
 
-		if (effects.includes("ask")) return this.#ask(subject.tool, subject.summary);
+		if (effects.includes("ask")) return this.#byRule(subject.tool, subject.summary);
 		const roots = this.readRoots();
 		const needed = subject.paths.filter(
 			(path, index) =>
@@ -242,20 +280,24 @@ export class PermissionEngine {
 		const reasons = new Set<ConfirmReason>();
 		for (const argv of commands) {
 			const reason = mustConfirmReason(argv);
-			if (reason) reasons.add(reason);
-			// File tools cannot touch these places at all; a command that names one asks every time.
-			const secret = pathArguments(argv).some((arg) => {
+			// Deleting outside the working folder cannot be undone with git: the person decides.
+			if (reason === "delete-files" && !this.#allInside(argv, cwd)) reasons.add("delete-outside");
+			else if (reason) reasons.add(reason);
+			// File tools cannot touch these places at all; a command that names one asks.
+			for (const arg of pathArguments(argv)) {
 				const path = resolvePath(arg, cwd);
-				return path !== null && isSecretPath(path, this.#offLimits());
-			});
-			if (secret) reasons.add("credentials");
+				const kind = path === null ? null : this.#placeOf(path);
+				if (kind) reasons.add(kind);
+			}
 		}
 		if (privileged) reasons.add("admin");
 		if (subject.outsideSandbox) reasons.add("outside-sandbox");
 		for (const target of redirectTargets) {
 			const path = resolvePath(target, cwd);
-			if (!path || !cwd || !isInside(path, cwd)) reasons.add("write-outside");
-			else if (isSecretPath(path, this.#offLimits())) reasons.add("write-credentials");
+			const kind = path === null ? null : this.#placeOf(path);
+			if (kind === "yew-data" || kind === "hidden-folder") reasons.add(kind);
+			else if (!path || !cwd || !isInside(path, cwd)) reasons.add("write-outside");
+			else if (kind) reasons.add("write-credentials");
 		}
 
 		const ruleFor = (argv: string[]) =>
@@ -264,7 +306,8 @@ export class PermissionEngine {
 			return { effect: "deny", reason: "A rule in this session refuses this command." };
 		}
 		if (reasons.size > 0) return this.#ask(subject.tool, subject.command, [...reasons]);
-		if (!understood || dynamic) return this.#ask(subject.tool, subject.command);
+		if (!understood || dynamic)
+			return { ...this.#ask(subject.tool, subject.command), unreadable: true };
 
 		const pending: string[][] = [];
 		let ruleAsks = false;
@@ -275,7 +318,7 @@ export class PermissionEngine {
 			if (rule === null && this.#readOnlyHere(argv, cwd)) continue;
 			pending.push(argv);
 		}
-		if (ruleAsks) return this.#ask(subject.tool, subject.command);
+		if (ruleAsks) return this.#byRule(subject.tool, subject.command);
 		if (redirectTargets.length === 0 && pending.length === 0) return { effect: "allow" };
 		const remember = [...new Set(pending.map(rememberPrefix))].map((pattern) => ({
 			effect: "allow" as const,
@@ -289,6 +332,28 @@ export class PermissionEngine {
 			subject.command,
 			pending.length === 0 ? undefined : remember,
 		);
+	}
+
+	/**
+	 * Which kind of place sessions may not touch a path is in: Yew's own data and the folders the
+	 * person keeps from sessions are asked about in every mode; other credential locations are a
+	 * permission. Null for anywhere else.
+	 */
+	#placeOf(path: string): "yew-data" | "hidden-folder" | "credentials" | null {
+		if (isInside(path, this.#home)) return "yew-data";
+		if (isSecretPath(path, this.hidden().map(canonical))) return "hidden-folder";
+		if (isSecretPath(path, this.#offLimits())) return "credentials";
+		return null;
+	}
+
+	/** Whether every path a command names is inside the working folder (`host:path` never is). */
+	#allInside(argv: string[], cwd: string | null): boolean {
+		if (!cwd) return false;
+		return pathArguments(argv).every((arg) => {
+			if (/^[^/]*:/.test(arg)) return false;
+			const path = resolvePath(arg, cwd);
+			return path !== null && isInside(path, cwd);
+		});
 	}
 
 	#readOnlyHere(argv: string[], cwd: string | null): boolean {
@@ -315,7 +380,7 @@ export class PermissionEngine {
 		if (rule === "deny")
 			return { effect: "deny", reason: `A rule in this session refuses ${host}.` };
 		if (rule === "allow") return { effect: "allow" };
-		if (rule === "ask") return this.#ask(subject.tool, subject.url);
+		if (rule === "ask") return this.#byRule(subject.tool, subject.url);
 		return this.#byDefault(session, flagged, subject.tool, subject.url, [
 			{ effect: "allow", tool: subject.tool, pattern: host },
 		]);
@@ -337,7 +402,8 @@ export class PermissionEngine {
 				? { effect: "allow", tool: subject.tool, pattern: subject.scope }
 				: { effect: "allow", tool: subject.tool },
 		];
-		if (rule === "ask" || subject.always) {
+		if (rule === "ask") return this.#byRule(subject.tool, subject.summary, remember);
+		if (subject.always) {
 			const decision = this.#ask(subject.tool, subject.summary, undefined, remember);
 			if (subject.warning && decision.effect === "ask") decision.request.warning = subject.warning;
 			return decision;
@@ -345,12 +411,17 @@ export class PermissionEngine {
 		return this.#byDefault(session, flagged, subject.tool, subject.summary, remember);
 	}
 
+	/** Asked because a rule of the session says so. */
+	#byRule(tool: string, summary: string, remember?: PermissionRule[]): Decision {
+		return { ...this.#ask(tool, summary, undefined, remember), byRule: true } as Decision;
+	}
+
 	#ask(
 		tool: string,
 		summary: string,
 		reasons?: ConfirmReason[],
 		remember?: PermissionRule[],
-	): Decision {
+	): Extract<Decision, { effect: "ask" }> {
 		const request: PermissionRequest = { tool, summary, mustConfirm: reasons !== undefined };
 		if (reasons) request.reasons = reasons;
 		else if (remember && remember.length > 0) request.rememberRules = remember;

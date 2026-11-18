@@ -3,7 +3,12 @@
  * between turns, and a transcript that is summarized when it nears the model's context window.
  */
 import { type JsonObject, messageText, type Notice } from "../../shared/messages.ts";
-import { type Entry, permissionModeOf, type Session } from "../../shared/types.ts";
+import {
+	type Entry,
+	normalizePermissionMode,
+	permissionModeOf,
+	type Session,
+} from "../../shared/types.ts";
 import type { ModelGateway, ModelInfo } from "../model/gateway.ts";
 import type { Store } from "../store.ts";
 import { estimateTokens, isOwnNote, transcriptForSummary, usageTotals } from "./context.ts";
@@ -136,7 +141,8 @@ export class ContextKeeper {
 		const team = placement.team ?? null;
 		const { told: _told, ...prompt } = {
 			...saved,
-			permissionMode: saved.permissionMode ?? mode,
+			// Snapshots from before 1.7 name the earlier modes ("auto", "manual"): both read as default.
+			permissionMode: normalizePermissionMode(saved.permissionMode) ?? mode,
 			main: saved.main === undefined ? null : saved.main,
 			parent: saved.parent === undefined ? placement.parent : saved.parent,
 			name: saved.name ?? session.name,

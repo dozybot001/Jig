@@ -379,7 +379,7 @@ describe("servers Yew sets up by itself", () => {
 
 describe("the browser and computer control", () => {
 	const engine = new PermissionEngine(tempDir("yew-home-"));
-	const session = (rules: Session["rules"], mode: "skip" | "auto" = "skip") =>
+	const session = (rules: Session["rules"], mode: "skip" | "default" = "default") =>
 		({ id: "s1", cwd: null, rules, options: { permissionMode: mode } }) as unknown as Session;
 	async function tools(name: string) {
 		const hub = new McpHub({
@@ -406,6 +406,12 @@ describe("the browser and computer control", () => {
 				assert.deepEqual(decision.request.reasons, ["computer-control"]);
 				assert.equal(decision.request.rememberRules, undefined);
 			}
+			// Skip mode lets it run and marks it (blueprint 6.1, item 6).
+			const skipping = session([], "skip");
+			assert.deepEqual(
+				engine.decide(echo.subject({ action: "left_click" }, skipping, lookup), skipping),
+				{ effect: "allow", note: { risk: ["computer-control"] } },
+			);
 			// Looking can be remembered, and a remembered rule then covers looking only.
 			const fresh = session([]);
 			const look = engine.decide(echo.subject({ action: "get_screenshot" }, fresh, lookup), fresh);
@@ -551,8 +557,8 @@ describe("the browser and computer control", () => {
 
 describe("the browser in the person's own Chrome (the security group, 11-18)", () => {
 	const engine = new PermissionEngine(tempDir("yew-home-"));
-	const session = (rules: Session["rules"]) =>
-		({ id: "s1", cwd: null, rules, options: { permissionMode: "skip" } }) as unknown as Session;
+	const session = (rules: Session["rules"], mode = "default") =>
+		({ id: "s1", cwd: null, rules, options: { permissionMode: mode } }) as unknown as Session;
 	const lookup = {} as Parameters<ToolDefinition["subject"]>[2];
 	const PORT = 4777;
 	const SAFE_TABS = "- 0: (current) [Mail](https://mail.example.com/)";

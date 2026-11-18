@@ -27,14 +27,17 @@ export interface PermissionRule {
 export interface SessionOptions {
 	/** Compact when the context reaches this many tokens; null uses the default. */
 	compactAt?: number | null;
-	/** Before 0.1: let write and edit change files without asking. Read as the automatic mode. */
+	/** Before 0.1: let write and edit change files without asking. Read as the default mode now. */
 	directEdits?: boolean;
 	/**
-	 * How approvals work: auto (Yew runs calls unless the model marks one with confirm), manual
-	 * (edits and commands that are not read-only are asked about) or skip. Operations that must be
-	 * confirmed (spec 21.2) are asked about in every mode.
+	 * How permission (授权) works for the session's calls (blueprint 6.1, item 6): default (calls run
+	 * unless risky or marked with confirm), review (what would be asked goes to a separate check by
+	 * the model first) or skip (nothing is asked; risky calls are marked). Decisions (审批) are the
+	 * person's in every mode. Earlier modes ("auto", "manual") read as default.
 	 */
 	permissionMode?: PermissionMode;
+	/** Yew's read-only helpers only (never stored): anything but looking is asked about. */
+	readerOnly?: boolean;
 	/** What happens to letters from other sessions: delivered, held for the person, or refused (blueprint 7.1). */
 	receive?: ReceivePolicy;
 	/** Letters the session may send per message or decision from the person; null or absent: the default. */
@@ -68,12 +71,22 @@ export type TaskOutcome = (typeof TASK_OUTCOMES)[number];
 /** The relay Tenon runs, which phone access uses unless the person sets their own. */
 export const DEFAULT_RELAY_URL = "wss://relay.tenonai.cn";
 
-export const PERMISSION_MODES = ["auto", "manual", "skip"] as const;
+export const PERMISSION_MODES = ["default", "review", "skip"] as const;
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
 
-/** The session's approval mode; sessions from before the modes read direct edits as automatic. */
+/**
+ * A mode as stored or sent: the three of now, and the ones before 1.7 (founder, 11-18): "auto"
+ * (ask when needed) is the default now, and "manual" (ask each time) is gone and reads as default.
+ */
+export function normalizePermissionMode(value: unknown): PermissionMode | null {
+	if (value === "default" || value === "review" || value === "skip") return value;
+	if (value === "auto" || value === "manual") return "default";
+	return null;
+}
+
+/** The session's permission mode. */
 export function permissionModeOf(options: SessionOptions): PermissionMode {
-	return options.permissionMode ?? (options.directEdits ? "auto" : "manual");
+	return normalizePermissionMode(options.permissionMode) ?? "default";
 }
 
 export interface Todo {
@@ -288,9 +301,17 @@ export interface ToolCallView {
 
 export type ApprovalDecision = "allow_once" | "allow_always" | "deny";
 
-/** Why an operation must be confirmed every time (spec 21.2); the interface words each one. */
+/** Why an operation is asked about every time; the interface words each one. */
 export type ConfirmReason =
 	| "delete-files"
+	// Deleting files outside the working folder: they cannot be restored with git.
+	| "delete-outside"
+	// A command Yew cannot read; only a mark on calls that ran without asking (skip mode).
+	| "unreadable-command"
+	// A command that names Yew Harness's own data, where decisions are kept.
+	| "yew-data"
+	// A command that names a folder the person keeps from sessions.
+	| "hidden-folder"
 	| "delete-untracked"
 	| "delete-branch"
 	| "delete-tag"
@@ -368,6 +389,47 @@ export interface PermissionRequest {
 	 * have been any of them ("connect-site-unsure"): commands, background commands, MCP servers.
 	 */
 	running?: { kind: "command" | "job" | "mcp"; text: string }[];
+	/**
+	 * A decision (审批, blueprint 6.1, item 6) rather than a permission: the operation cannot be taken
+	 * back on this computer or reaches other people, so the person decides in every mode.
+	 */
+	matter?: boolean;
+	/** The automatic mode's check did not allow the call: why, in its words, for the person to see. */
+	review?: string;
+}
+
+/**
+ * What is asked about in every mode (blueprint 6.1, item 6). Decisions (审批): what cannot be taken
+ * back on this computer or reaches other people. With them, what would let a session get around a
+ * decision or a boundary the person set: Yew Harness's own data and command line, where decisions
+ * are kept and answered, and the folders the person keeps from sessions. Everything else that is
+ * asked about is a permission (授权), which the session's mode settles.
+ */
+export const DECISION_REASONS: ReadonlySet<ConfirmReason> = new Set<ConfirmReason>([
+	"yew-data",
+	"yew-cli",
+	"hidden-folder",
+	"publish-package",
+	"change-package",
+	"publish-image",
+	"github",
+	"send-data",
+	"remote-machine",
+	"remote-copy",
+	"cluster",
+	"infrastructure",
+	"write-disk",
+	"delete-outside",
+	"service-action",
+	"raise-budget",
+]);
+
+/** What a call that ran without being asked about carried (blueprint 6.1, item 6), for its row. */
+export interface PermissionNote {
+	/** Skip mode: the risks it would have been asked about in the default mode. */
+	risk?: ConfirmReason[];
+	/** Review mode: the check allowed it, and why. */
+	reviewed?: string;
 }
 
 /**

@@ -30,7 +30,7 @@ function setup() {
 		store.createSession({
 			...sessionInput(name),
 			cwd: folder,
-			options: { permissionMode: "auto" },
+			options: { permissionMode: "default" },
 			...extra,
 		});
 	return { store, events, post, queued, make, folder };
@@ -193,7 +193,7 @@ describe("sending letters", () => {
 
 	test("the quota stops a session until the person writes again", () => {
 		const { store, post, make } = setup();
-		const a = make("产品会话", { options: { permissionMode: "auto", letterQuota: 2 } });
+		const a = make("产品会话", { options: { permissionMode: "default", letterQuota: 2 } });
 		const b = make("平台组");
 		post.send({ kind: "session", session: a }, letter(b, { summary: "一" }));
 		post.send({ kind: "session", session: a }, letter(b, { summary: "二" }));
@@ -209,7 +209,7 @@ describe("sending letters", () => {
 
 	test("one session gets at most three letters a minute from another; many sessions can each get one", () => {
 		const { post, make } = setup();
-		const a = make("总办", { options: { permissionMode: "auto", letterQuota: 50 } });
+		const a = make("总办", { options: { permissionMode: "default", letterQuota: 50 } });
 		const b = make("平台组");
 		const send = (to: Session, summary: string) =>
 			post.send({ kind: "session", session: a }, letter(to, { summary }));
@@ -276,7 +276,7 @@ describe("sending letters", () => {
 	test("chains longer than eight letters are refused", () => {
 		const { post, make } = setup();
 		const sessions = Array.from({ length: 10 }, (_, i) =>
-			make(`会话 ${i}`, { options: { permissionMode: "auto", letterQuota: 50 } }),
+			make(`会话 ${i}`, { options: { permissionMode: "default", letterQuota: 50 } }),
 		);
 		let last: Letter | null = null;
 		let refused: Letter | null = null;
@@ -295,8 +295,8 @@ describe("sending letters", () => {
 	test("receive policies: refuse, hold, and letters from sessions with fewer permissions are held", () => {
 		const { store, post, queued, make } = setup();
 		const a = make("产品会话");
-		const strict = make("安全组", { options: { permissionMode: "auto", receive: "refuse" } });
-		const careful = make("法务组", { options: { permissionMode: "auto", receive: "hold" } });
+		const strict = make("安全组", { options: { permissionMode: "default", receive: "refuse" } });
+		const careful = make("法务组", { options: { permissionMode: "default", receive: "hold" } });
 		const chat = make("聊天", { cwd: null });
 		const skip = make("运维", { options: { permissionMode: "skip" } });
 		assert.equal(
@@ -373,8 +373,8 @@ describe("sending letters", () => {
 
 	test("answers to a session's own request pass its receive policy; other letters do not", () => {
 		const { store, post, make } = setup();
-		const strict = make("安全组", { options: { permissionMode: "auto", receive: "refuse" } });
-		const careful = make("法务组", { options: { permissionMode: "auto", receive: "hold" } });
+		const strict = make("安全组", { options: { permissionMode: "default", receive: "refuse" } });
+		const careful = make("法务组", { options: { permissionMode: "default", receive: "hold" } });
 		const b = make("平台组");
 		for (const asker of [strict, careful]) {
 			const request = post.send({ kind: "session", session: asker }, letter(b));
@@ -613,7 +613,7 @@ describe("decision cards", () => {
 	test("the approval center lists pending approvals, cards and held letters", () => {
 		const { store, post, make } = setup();
 		const main = make("总办");
-		const careful = make("法务组", { options: { permissionMode: "auto", receive: "hold" } });
+		const careful = make("法务组", { options: { permissionMode: "default", receive: "hold" } });
 		store.setSetting("mainSessionId", main.id);
 		post.postCard(main, fields);
 		post.send({ kind: "session", session: main }, letter(careful));

@@ -382,8 +382,9 @@ export const manageYewTool: ToolDefinition = {
 						folder: { type: "string", description: 'Its working folder, or "none" for a chat.' },
 						permission: {
 							type: "string",
-							enum: ["auto", "manual", "skip"],
-							description: "auto: asks when needed; manual: asks each time; skip: full access.",
+							enum: ["default", "review", "skip"],
+							description:
+								"default: risky calls are asked about; review: a check by the model decides them first; skip: nothing is asked. Decisions are the person's in every mode.",
 						},
 						receive: { type: "string", enum: ["accept", "hold", "refuse"] },
 						letter_quota: {
@@ -423,7 +424,7 @@ export const manageYewTool: ToolDefinition = {
 						message: { type: "string", description: "The letter: what to do each time." },
 						permission: {
 							type: "string",
-							enum: ["session", "auto", "manual", "skip"],
+							enum: ["session", "default", "review", "skip"],
 							description:
 								"Permission mode for its runs; session (the default) keeps the session's own.",
 						},

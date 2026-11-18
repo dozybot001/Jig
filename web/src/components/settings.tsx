@@ -535,7 +535,7 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 	useLang();
 	const settings = useAppState((state) => state.settings);
 	const [model, setModel] = useState(settings?.defaultModel);
-	const savedMode = settings?.defaultPermissionMode ?? "auto";
+	const savedMode = settings?.defaultPermissionMode ?? "default";
 	const [mode, setMode] = useState<PermissionMode>(savedMode);
 	const modeId = useId();
 	const savedWorkspace = settings?.defaultWorkspaceId ?? "";

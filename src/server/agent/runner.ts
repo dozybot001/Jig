@@ -10,16 +10,20 @@ import {
 	type ToolCallBlock,
 	type ToolResultMessage,
 } from "../../shared/messages.ts";
-import type {
-	Approval,
-	ApprovalDecision,
-	Entry,
-	QuestionAnswer,
-	QuestionRequest,
-	QueuedMessage,
-	Session,
-	SessionStatus,
-	ToolCallView,
+import {
+	type Approval,
+	type ApprovalDecision,
+	DECISION_REASONS,
+	type Entry,
+	type PermissionNote,
+	type PermissionRequest,
+	permissionModeOf,
+	type QuestionAnswer,
+	type QuestionRequest,
+	type QueuedMessage,
+	type Session,
+	type SessionStatus,
+	type ToolCallView,
 } from "../../shared/types.ts";
 import {
 	type BudgetMark,
@@ -63,6 +67,7 @@ import {
 	type Placement,
 	systemPrompt,
 } from "./prompt.ts";
+import { reviewStep } from "./review.ts";
 
 /** Words a reply uses to offer a next step instead of asking outright. */
 const OFFER =
@@ -194,6 +199,8 @@ export class Agents {
 	readonly #jobs = new Map<string, Jobs>();
 	/** Messages from Yew itself (such as "a background job ended") waiting to reach the model. */
 	readonly #notes = new Map<string, string[]>();
+	/** By tool call: what ran without being asked about (skip mode) or was allowed by the check. */
+	readonly #permissionNotes = new Map<string, PermissionNote>();
 	/** Tool calls since each session last changed its task list. */
 	readonly #sinceTodo = new Map<string, number>();
 	/** Letters, decision cards and the approval center. */
@@ -873,6 +880,23 @@ export class Agents {
 				});
 				continue;
 			}
+			if (decision.effect === "allow" && decision.note) this.#notePermission(row.id, decision.note);
+			// The automatic mode: the check decides first; the person is asked when it does not allow.
+			if (decision.effect === "ask" && decision.review) {
+				const verdict = await reviewStep({
+					gateway: this.#gateway,
+					store: this.#store,
+					session,
+					request: decision.request,
+					signal: live.controller.signal,
+				});
+				if (verdict.allow) {
+					this.#notePermission(row.id, { reviewed: verdict.reason });
+					approved.push({ row, tool });
+					continue;
+				}
+				decision.request.review = verdict.reason;
+			}
 			const run = this.#mail.run(sessionId);
 			if (decision.effect === "ask" && run?.unattended) {
 				// Nobody is there to say yes: refuse now rather than wait (blueprint 6.1, item 6).
@@ -968,15 +992,63 @@ export class Agents {
 		started: number,
 	): void {
 		const entry = this.#store.appendEntry(row.sessionId, resultEntry(row, result, started));
+		const detail = (result.detail as JsonObject | undefined) ?? null;
+		const note = this.#permissionNotes.get(row.id);
+		this.#permissionNotes.delete(row.id);
 		this.#store.updateToolCall(row.id, {
 			status,
-			detail: (result.detail as JsonObject | undefined) ?? null,
+			// The row shows what ran unasked with its risk, or what the check allowed.
+			detail: note ? { ...detail, permission: note as unknown as JsonObject } : detail,
 			resultMessageId: entry.id,
 			finishedAt: Date.now(),
 		});
 		// A letter this call waited for is now in the transcript, inside the result.
 		const handed = this.#mail.takeHanded(row.id);
 		if (handed) this.post.mail.setLetterEntry(handed, entry.id);
+	}
+
+	/** Adds to what a call's row says about how it was allowed. */
+	#notePermission(callId: string, note: PermissionNote): void {
+		const current = this.#permissionNotes.get(callId) ?? {};
+		const risk = [...new Set([...(current.risk ?? []), ...(note.risk ?? [])])];
+		const reviewed = [current.reviewed, note.reviewed].filter((text) => text !== undefined);
+		this.#permissionNotes.set(callId, {
+			...(risk.length > 0 ? { risk } : {}),
+			...(reviewed.length > 0 ? { reviewed: reviewed.filter(Boolean).join(" ") } : {}),
+		});
+	}
+
+	/**
+	 * A permission a running command asks for, such as reaching a site (blueprint 6.1, item 6): a
+	 * decision goes to the person; otherwise skip mode allows it, and the automatic mode's check
+	 * decides first. True when allowed; else the request to ask the person with.
+	 */
+	async #settlePermit(
+		sessionId: string,
+		callId: string,
+		request: PermissionRequest,
+		live: Live,
+	): Promise<PermissionRequest | true> {
+		if ((request.reasons ?? []).some((reason) => DECISION_REASONS.has(reason))) {
+			return { ...request, matter: true };
+		}
+		const session = this.#store.getSession(sessionId);
+		const mode = permissionModeOf(this.#mail.withRunMode(session).options);
+		if (mode === "skip") {
+			this.#notePermission(callId, { risk: request.reasons ?? [] });
+			return true;
+		}
+		if (mode !== "review") return request;
+		const verdict = await reviewStep({
+			gateway: this.#gateway,
+			store: this.#store,
+			session,
+			request,
+			signal: live.controller.signal,
+		});
+		if (!verdict.allow) return { ...request, review: verdict.reason };
+		this.#notePermission(callId, { reviewed: verdict.reason });
+		return true;
 	}
 
 	/** After a restart: calls that were running get an honest "unknown" result; calls that never ran are checked again. */
@@ -1058,10 +1130,12 @@ export class Agents {
 				if (!answer?.answer) throw new ToolInputError("Stopped before the person answered.");
 				return answer.answer;
 			},
-			permit: (request, until) => {
+			permit: (asked, until) => {
 				// One card at a time for a call; the next waits until the person has answered.
 				const next = permits.then(async () => {
 					if (until?.aborted) return false;
+					const request = await this.#settlePermit(sessionId, row.id, asked, live);
+					if (request === true) return true;
 					const run = this.#mail.run(sessionId);
 					if (run?.unattended) {
 						run.refused.push(request.summary);

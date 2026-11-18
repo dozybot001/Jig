@@ -87,11 +87,11 @@ export async function runHelper(options: HelperOptions): Promise<HelperResult> {
 		(HELPER_TOOLS as readonly string[]).includes(tool.name),
 	);
 	const byName = new Map(tools.map((tool) => [tool.name, tool]));
-	// The same session in the mode that asks before anything but looking: a command it lets run
+	// The same session as a reader, which is asked before anything but looking: a command it lets run
 	// unasked only looks.
 	const asReader: Session = {
 		...session,
-		options: { ...session.options, permissionMode: "manual" },
+		options: { ...session.options, readerOnly: true },
 	};
 	const messages: ModelMessage[] = [{ role: "user", content: options.task, timestamp: Date.now() }];
 	let calls = 0;

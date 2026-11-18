@@ -48,7 +48,7 @@ export interface ManagerDeps {
 }
 
 const TIER_RANK: Record<ManageTier, number> = { organize: 0, configure: 1, widen: 2 };
-const MODE_RANK: Record<PermissionMode, number> = { manual: 1, auto: 2, skip: 3 };
+const MODE_RANK: Record<PermissionMode, number> = { default: 1, review: 2, skip: 3 };
 const RECEIVE_RANK: Record<ReceivePolicy, number> = { refuse: 0, hold: 1, accept: 2 };
 const THEMES = ["system", "light", "dark"] as const;
 const LANGUAGES = ["system", "zh", "en"] as const;
