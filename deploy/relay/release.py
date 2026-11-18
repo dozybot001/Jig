@@ -217,13 +217,5 @@ try:
     for line in containers():
         if line.startswith(prefix) and line not in kept:
             quiet(["docker", "rm", "-f", line])
-    # One time, then delete these lines: what the first release after the rename kept from before
-    # it (the old containers, their network and the link to the old folder) goes with this one.
-    for line in containers():
-        if line.startswith("jig-relay-"):
-            quiet(["docker", "rm", "-f", line])
-    quiet(["docker", "network", "rm", "jig-relay"])
-    if pathlib.Path("/opt/jig-relay").is_symlink():
-        pathlib.Path("/opt/jig-relay").unlink()
 except Exception as error:  # noqa: BLE001
     print(f"Release retention skipped: {error}", file=sys.stderr)
