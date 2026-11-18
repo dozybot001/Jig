@@ -270,7 +270,8 @@ const zh = {
 	alwaysActsAsYou:
 		"选「总是允许」后，本会话内这个工具的所有调用都不再问，包括在自带浏览器里以你的登录身份发送、付款、删除这类操作。",
 	"confirm_write-outside": "改动工作区外的文件",
-	"confirm_outside-sandbox": "在沙箱外运行，能读写 Yew Harness 自己的数据和钥匙串",
+	"confirm_outside-sandbox":
+		"在沙箱外运行：能读写 Yew Harness 自己的数据和钥匙串，项目里的脚本（npm run、make、构建脚本）也会在沙箱外跑",
 	"confirm_widen-permission": "调高会话的授权方式",
 	"confirm_change-folder": "改会话的工作区",
 	"confirm_open-letters": "让会话直接收信",
@@ -985,6 +986,16 @@ const zh = {
 	defaultWorkspaceNone: "不选",
 	systemMenu: "启动",
 	systemTitle: "启动",
+	sandbox: "会话的命令",
+	sandbox_seatbelt: "在 macOS 沙箱里运行",
+	sandbox_seatbelt_hint:
+		"读写不了 Yew Harness 的数据和钥匙串，连不上它的端口，只能写工作区、临时文件夹和缓存。要在沙箱外跑的命令每次都问你。",
+	sandbox_bubblewrap: "在 bubblewrap 沙箱里运行",
+	sandbox_bubblewrap_hint:
+		"读写不了 Yew Harness 的数据，只能写工作区、临时文件夹和缓存；这个沙箱挡不住 Yew Harness 的端口。要在沙箱外跑的命令每次都问你。",
+	sandbox_none: "没有进沙箱",
+	sandbox_none_hint:
+		"这台电脑没有可用的沙箱，不问就跑的命令以你的系统账户运行，能改 Yew Harness 自己的记录、读它保存的密钥。在 Linux 上装 bubblewrap 可以用上沙箱。",
 	startAtLogin: "登录时启动 Yew Harness",
 	startAtLoginHint:
 		"登录这台电脑后在后台启动 Yew Harness，不开终端手机和定时任务也能用。从下次登录起生效，现在运行着的 Yew Harness 不受影响。",
@@ -1269,7 +1280,7 @@ const en: Record<MessageKey, string> = {
 		"With Always allow, no call of this tool in this session is asked about again, including sending, paying and deleting in the built-in browser with your sign-ins.",
 	"confirm_write-outside": "Change files outside the working folder",
 	"confirm_outside-sandbox":
-		"Runs outside the sandbox, where it can read and change Yew Harness's own data and the keychain",
+		"Runs outside the sandbox, where it can read and change Yew Harness's own data and the keychain; the project's scripts (npm run, make, build scripts) run outside too",
 	"confirm_widen-permission": "Raise a session's permission mode",
 	"confirm_change-folder": "Change a session's working folder",
 	"confirm_open-letters": "Let a session receive letters directly",
@@ -2021,6 +2032,16 @@ const en: Record<MessageKey, string> = {
 	defaultWorkspaceNone: "None",
 	systemMenu: "Startup",
 	systemTitle: "Startup",
+	sandbox: "Sessions' commands",
+	sandbox_seatbelt: "Run in the macOS sandbox",
+	sandbox_seatbelt_hint:
+		"They cannot read or change Yew Harness's data or the keychain, cannot reach its port, and write only in the workspace, temporary folders and caches. A command that has to run outside asks you every time.",
+	sandbox_bubblewrap: "Run in the bubblewrap sandbox",
+	sandbox_bubblewrap_hint:
+		"They cannot read or change Yew Harness's data and write only in the workspace, temporary folders and caches; this sandbox cannot keep them from Yew Harness's port. A command that has to run outside asks you every time.",
+	sandbox_none: "Not sandboxed",
+	sandbox_none_hint:
+		"This computer has no sandbox to use, so commands that run without asking run as your user account and can change Yew Harness's own records and read the keys it keeps. On Linux, installing bubblewrap adds the sandbox.",
 	startAtLogin: "Start Yew Harness at login",
 	startAtLoginHint:
 		"Starts Yew Harness in the background after you log in to this computer, so your phone and scheduled tasks work without a terminal open. Takes effect at the next login; the Yew Harness running now is not affected.",

@@ -266,6 +266,14 @@ describe("servers Yew sets up by itself", () => {
 			"/data/yew/mcp-builtin/node_modules/computer-use-mcp/dist/main.js",
 		]);
 		assert.deepEqual(builtinMcp("/data/yew", { YEW_MCP_BUILTIN: "off" }), {});
+		// Its files stay in an empty folder of its own, and it is kept from Yew Harness's port.
+		assert.equal(servers.browser?.cwd, "/data/yew/browser-files");
+		const served = builtinMcp("/data/yew", {}, 4777).browser?.args ?? [];
+		assert.deepEqual(served.slice(-2), [
+			"--blocked-origins",
+			"http://127.0.0.1:4777;http://localhost:4777",
+		]);
+		assert.ok(!served.includes("--allow-unrestricted-file-access"));
 	});
 
 	test("are installed once per lock file, and again after a failure or a new lock", async () => {

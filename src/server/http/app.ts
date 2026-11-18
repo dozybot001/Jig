@@ -9,6 +9,7 @@ import type { ArtifactStore } from "../artifacts.ts";
 import type { EventBus } from "../events.ts";
 import { PostOffice } from "../mail/post.ts";
 import type { ModelGateway } from "../model/gateway.ts";
+import { activeSandbox } from "../sandbox.ts";
 import type { Scheduler } from "../schedules.ts";
 import type { Store } from "../store.ts";
 import type { SearchAccess } from "../tools/web-search.ts";
@@ -98,6 +99,8 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 			version: VERSION,
 			build: options.build ?? null,
 			protocol: PROTOCOL_VERSION,
+			// Which system sandbox sessions' commands run in, so the interface can say (blueprint, section 11).
+			sandbox: activeSandbox().kind,
 		}),
 	);
 	app.route(

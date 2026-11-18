@@ -243,7 +243,12 @@ export interface AppState {
 	booted: boolean;
 	failure: string | null;
 	connection: "open" | "connecting";
-	health: { version: string; build: string | null } | null;
+	health: {
+		version: string;
+		build: string | null;
+		/** The system sandbox sessions' commands run in (blueprint, section 11). */
+		sandbox?: "seatbelt" | "bubblewrap" | "none";
+	} | null;
 	settings: Settings | null;
 	groups: Group[];
 	sessions: Record<string, Session>;

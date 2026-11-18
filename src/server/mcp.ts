@@ -1,5 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { MCP_PRESETS } from "../shared/mcp-presets.ts";
 import type { ImageBlock, JsonObject, TextBlock } from "../shared/messages.ts";
@@ -33,6 +33,8 @@ export interface McpServerConfig {
 	ownEnv?: boolean;
 	/** One of the presets Yew installs (`"preset": "<id>"` in mcp.json). */
 	preset?: string;
+	/** The folder a server runs in; the browser's files stay inside it (mcp-builtin.ts). */
+	cwd?: string;
 	/** Signing in to an HTTP server in the browser: a client the person made, scopes to ask for. */
 	oauth?: OAuthSettings;
 }
@@ -291,12 +293,12 @@ class StdioTransport implements Transport {
 		const own = config.ownEnv === true && config.preset === undefined;
 		const line = own
 			? { command: config.command as string, args: config.args ?? [] }
-			: activeSandbox().wrap(
-					config.command as string,
-					config.args ?? [],
-					config.preset ? ["mcp-presets"] : [],
-				);
+			: activeSandbox().wrap(config.command as string, config.args ?? [], {
+					readable: config.preset ? ["mcp-presets"] : [],
+				});
+		if (config.cwd) mkdirSync(config.cwd, { recursive: true });
 		this.#child = spawn(line.command, line.args, {
+			...(config.cwd ? { cwd: config.cwd } : {}),
 			env: { ...(config.ownEnv ? serverEnv(env) : env), ...config.env },
 			stdio: ["pipe", "pipe", "pipe"],
 		});

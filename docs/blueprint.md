@@ -218,6 +218,8 @@ Yew Harness 本身就是 Agent 的运行框架（harness），可以借鉴递归
 
 ### 下一版的主项：会话的命令进系统沙箱（安全组 11-18）
 
+已实现，下一版发布（`src/server/sandbox.ts`）。安全组 11-18 补的要求都做了：钥匙串只拦取条目的服务，证书校验照常；写入只放行工作区、临时文件夹和常用缓存，`.git/hooks`、`.git/config` 不可写，所以新建和克隆仓库也要在沙箱外跑；在沙箱外跑的 git 由环境变量关掉钩子和 fsmonitor，卡片写明项目里的脚本也会在外面跑；自带的浏览器 MCP 只以一个空文件夹为根，挡掉本机端口；Linux 上不带会话总线；没有沙箱时设置的「启动」里写明。沙箱里默认要不要也不给 SSH、云服务这类凭据，请创始人定。
+
 会话的 Shell 子进程、按 stdio 启动的 MCP 服务器，和 `yew serve` 是同一个系统用户。不问就跑的命令能做你能做的一切：改 Yew Harness 的数据库，造出「本人」的决定；用 `yew open --print` 拿登录链接，以你的身份调本机接口；用 node 读钥匙串里的 Key 和 MCP 令牌；改安装目录和开机启动项。权限引擎按路径拦，只是防误操作的护栏，不是安全边界。安全组的判断：
 
 - **修法**：会话的命令和 stdio MCP 服务器都放进系统沙箱。macOS 用 sandbox-exec 跑 Seatbelt 配置（`/usr/bin/sandbox-exec`，已标为过时，但 Chrome、Claude Code、Codex CLI 都在用）；Linux 有 bubblewrap 用它，没有就用 Landlock。

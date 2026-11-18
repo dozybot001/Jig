@@ -2,7 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { newId } from "../ids.ts";
-import { activeSandbox } from "../sandbox.ts";
+import { activeSandbox, OUTSIDE_GIT } from "../sandbox.ts";
 
 export const MAX_LINES = 2000;
 export const MAX_BYTES = 50 * 1024;
@@ -108,10 +108,13 @@ export function startCommand(options: {
 	const shell = process.env.SHELL || "/bin/zsh";
 	const line = options.outsideSandbox
 		? { command: shell, args: ["-lc", options.command] }
-		: activeSandbox().wrap(shell, ["-lc", options.command]);
+		: activeSandbox().wrap(shell, ["-lc", options.command], { writable: [options.cwd] });
 	const child = spawn(line.command, line.args, {
 		cwd: options.cwd,
-		env: commandEnvironment(options.sessionId),
+		env: {
+			...commandEnvironment(options.sessionId),
+			...(options.outsideSandbox ? OUTSIDE_GIT : {}),
+		},
 		detached: true,
 		stdio: ["ignore", "pipe", "pipe"],
 	});
