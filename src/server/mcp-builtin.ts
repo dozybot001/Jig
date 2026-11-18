@@ -3,7 +3,6 @@ import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { fromJigEnv } from "./from-jig.ts";
 import type { McpServerConfig } from "./mcp.ts";
 
 /**
@@ -62,7 +61,7 @@ export function builtinMcp(
 	yewHome: string,
 	env: NodeJS.ProcessEnv = process.env,
 ): Record<string, McpServerConfig> {
-	if (fromJigEnv(env, "MCP_BUILTIN") === "off") return {};
+	if (env.YEW_MCP_BUILTIN === "off") return {};
 	const modules = join(installDir(yewHome), "node_modules");
 	return {
 		browser: {

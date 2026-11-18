@@ -42,7 +42,7 @@ describe("yew service", () => {
 	test("install on macOS writes a LaunchAgent that starts yew serve and loads it", async () => {
 		const { host, calls } = fakeHost("darwin");
 		const home = tempDir("yew-home-");
-		const env = { JIG_HOME: home, PATH: "/opt/homebrew/bin:/usr/bin" };
+		const env = { YEW_HOME: home, PATH: "/opt/homebrew/bin:/usr/bin" };
 		const file = join(host.homeDir, "Library", "LaunchAgents", `${SERVICE_LABEL}.plist`);
 
 		const before = await run(host, ["status", "--json"], env);
@@ -77,7 +77,7 @@ describe("yew service", () => {
 
 	test("install on Linux writes a systemd user unit and enables it", async () => {
 		const { host, calls } = fakeHost("linux");
-		const env = { JIG_HOME: tempDir("yew-home-"), PATH: "/usr/bin" };
+		const env = { YEW_HOME: tempDir("yew-home-"), PATH: "/usr/bin" };
 		const file = join(host.homeDir, ".config", "systemd", "user", "yew.service");
 		assert.equal((await run(host, ["install", "--json"], env)).code, 0);
 		const unit = readFileSync(file, "utf8");
@@ -103,7 +103,7 @@ describe("yew service", () => {
 			join(home, "serve.json"),
 			JSON.stringify({ port: 4777, pid: process.pid, startedAt: Date.now() }),
 		);
-		const result = await run(host, ["install"], { JIG_HOME: home });
+		const result = await run(host, ["install"], { YEW_HOME: home });
 		assert.equal(result.code, 1);
 		assert.match(result.err, /already running/);
 		assert.equal(
@@ -114,7 +114,7 @@ describe("yew service", () => {
 
 	test("a failed start is an error; other systems and bad arguments are refused", async () => {
 		const { host } = fakeHost("darwin", true);
-		const failed = await run(host, ["install"], { JIG_HOME: tempDir("yew-home-") });
+		const failed = await run(host, ["install"], { YEW_HOME: tempDir("yew-home-") });
 		assert.equal(failed.code, 1);
 		assert.match(failed.err, /could not start the service/);
 		await assert.rejects(run(fakeHost("win32").host, ["status"], {}), /macOS and Linux/);

@@ -42,7 +42,7 @@ describe("yew app", () => {
 			app,
 		});
 		const result = await run(host, ["install"], {
-			JIG_HOME: home,
+			YEW_HOME: home,
 			PATH: "/opt/homebrew/bin:/usr/bin",
 		});
 		assert.equal(result.code, 0);

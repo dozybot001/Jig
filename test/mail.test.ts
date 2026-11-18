@@ -46,7 +46,7 @@ const letter = (to: Session, extra: Partial<Outgoing> = {}): Outgoing => ({
 
 describe("schema", () => {
 	test("migration 2 adds letters, cards and the session columns to an existing database", () => {
-		const db = new DatabaseSync(join(tempDir(), "jig.db"));
+		const db = new DatabaseSync(join(tempDir(), "yew.db"));
 		db.exec(migrations[0] as string);
 		db.exec("PRAGMA user_version = 1");
 		db.prepare(
@@ -73,7 +73,7 @@ describe("schema", () => {
 
 describe("migration 4", () => {
 	test("what was always allowed for organize_sessions stays limited to organizing in manage_yew", () => {
-		const db = new DatabaseSync(join(tempDir(), "jig.db"));
+		const db = new DatabaseSync(join(tempDir(), "yew.db"));
 		for (const sql of migrations.slice(0, 3)) db.exec(sql);
 		db.prepare(
 			`INSERT INTO sessions (id, name, kind, provider, model, rules, last_activity_at, created_at, updated_at)

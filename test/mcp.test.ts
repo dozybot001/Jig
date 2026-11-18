@@ -265,7 +265,7 @@ describe("servers Yew sets up by itself", () => {
 		assert.deepEqual(servers.computer?.args, [
 			"/data/yew/mcp-builtin/node_modules/computer-use-mcp/dist/main.js",
 		]);
-		assert.deepEqual(builtinMcp("/data/yew", { JIG_MCP_BUILTIN: "off" }), {});
+		assert.deepEqual(builtinMcp("/data/yew", { YEW_MCP_BUILTIN: "off" }), {});
 	});
 
 	test("are installed once per lock file, and again after a failure or a new lock", async () => {
@@ -506,7 +506,7 @@ describe("MCP servers", () => {
 	test("a stdio server is started, its tools are offered by name, and a call goes through", async () => {
 		const yewHome = home({
 			test: { command: process.execPath, args: [server], env: { GREETING: "你好" } },
-			broken: { command: join(jigHome_missing(), "no-such-program") },
+			broken: { command: join(missingHome(), "no-such-program") },
 		});
 		const hub = new McpHub({ yewHome, version: "0.0.0", log: () => {} });
 		try {
@@ -605,6 +605,6 @@ describe("MCP servers", () => {
 	});
 });
 
-function jigHome_missing(): string {
+function missingHome(): string {
 	return tempDir("yew-none-");
 }

@@ -349,7 +349,7 @@ const TEXT = { type: "string" } as const;
  * manage_yew: the model changes Yew itself (blueprint 6.2, item 10). One call, all changes; Yew plans it
  * to rank how far it reaches and to show the person every change, then applies all or none.
  */
-export const manageJigTool: ToolDefinition = {
+export const manageYewTool: ToolDefinition = {
 	name: "manage_yew",
 	description:
 		"Change Yew itself when the person asks or the work needs it: sessions (create a standing one, or change its name, team, role, model, working folder, permission mode, how it receives letters, letter quota, rights, pinned, archived), teams, scheduled tasks, and settings. Put every change in one call; Yew checks them, asks the person when a change needs it, and applies all or none. Sessions, teams and tasks are named by name or id. API keys, pairing and deleting data are the person's.",

@@ -10,7 +10,7 @@ import { Store } from "../src/server/store.ts";
 import { fakeIo } from "./helpers/io.ts";
 import { sessionInput, tempDir } from "./helpers/store.ts";
 
-/** A data directory of its own, never the real ~/.jig. */
+/** A data directory of its own, never the real ~/.yew. */
 function home(sessions: Parameters<Store["createSession"]>[0][]) {
 	const dir = tempDir("yew-send-");
 	const db = openDatabase(dbPath(dir));
@@ -57,7 +57,7 @@ describe("yew send", () => {
 	test("sends a letter by name; the first line is the summary; it is marked as from the command line", async () => {
 		const { dir, letters } = home([sessionInput("平台组")]);
 		const result = await send(["平台组", "main 上的构建失败了\n失败的测试：api"], {
-			JIG_HOME: dir,
+			YEW_HOME: dir,
 		});
 		assert.equal(result.code, 0);
 		assert.match(result.stdout.text(), /^Sent letter [\w-]+ to 平台组\.\n$/);
@@ -76,7 +76,7 @@ describe("yew send", () => {
 	test("reads the message from standard input, by id, with --kind and --json", async () => {
 		const { dir, created, letters } = home([sessionInput("平台组")]);
 		const id = created[0]?.id as string;
-		const result = await send(["--kind", "request", "--json", id, "-"], { JIG_HOME: dir }, [
+		const result = await send(["--kind", "request", "--json", id, "-"], { YEW_HOME: dir }, [
 			"请看一下发布清单\n",
 		]);
 		assert.equal(result.code, 0);
@@ -90,21 +90,21 @@ describe("yew send", () => {
 			sessionInput("平台组"),
 			{ ...sessionInput("安全组"), options: { receive: "refuse" } },
 		]);
-		const unknown = await send(["没有这个", "hi"], { JIG_HOME: dir });
+		const unknown = await send(["没有这个", "hi"], { YEW_HOME: dir });
 		assert.equal(unknown.code, 1);
 		assert.match(unknown.stderr.text(), /no session with the name or id 没有这个/);
-		const refused = await send(["安全组", "hi"], { JIG_HOME: dir });
+		const refused = await send(["安全组", "hi"], { YEW_HOME: dir });
 		assert.equal(refused.code, 1);
 		assert.match(refused.stderr.text(), /does not accept letters/);
-		const bad = await send(["--kind", "decision", "平台组", "hi"], { JIG_HOME: dir });
+		const bad = await send(["--kind", "decision", "平台组", "hi"], { YEW_HOME: dir });
 		assert.equal(bad.code, 2);
-		const missing = await send(["平台组"], { JIG_HOME: dir });
+		const missing = await send(["平台组"], { YEW_HOME: dir });
 		assert.equal(missing.code, 2);
 	});
 
 	test("a held letter says so", async () => {
 		const { dir } = home([{ ...sessionInput("法务组"), options: { receive: "hold" } }]);
-		const result = await send(["法务组", "合同到了"], { JIG_HOME: dir });
+		const result = await send(["法务组", "合同到了"], { YEW_HOME: dir });
 		assert.equal(result.code, 0);
 		assert.match(result.stderr.text(), /held until you release it/);
 	});

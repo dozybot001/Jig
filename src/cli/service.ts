@@ -4,7 +4,6 @@ import { homedir, userInfo } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { fromJigEnv, JIG_SERVICE_LABEL, JIG_SERVICE_UNIT } from "../server/from-jig.ts";
 import { type CliIo, EXIT_ERROR, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
 import { serviceRunning } from "./serve.ts";
@@ -28,9 +27,6 @@ Options:
 `;
 
 export const SERVICE_LABEL = "cn.tenonai.apps.yew";
-/** Jig's, Yew's earlier name (from-jig.ts): installing or removing Yew's takes it away. */
-const JIG_LABEL = JIG_SERVICE_LABEL;
-const JIG_UNIT = JIG_SERVICE_UNIT;
 const UNIT = "yew.service";
 
 /** What the command touches on the system, so tests can stand in for launchd and systemd. */
@@ -140,25 +136,6 @@ export function serviceFile(host: ServiceHost): string {
 
 const target = (host: ServiceHost) => `gui/${host.uid}/${SERVICE_LABEL}`;
 
-/**
- * Jig's login service, from before Jig was renamed Yew: stopped and removed when Yew's is installed
- * or removed, so the two never both start.
- */
-function removeJigService(host: ServiceHost): void {
-	if (host.platform === "darwin") {
-		const file = join(host.homeDir, "Library", "LaunchAgents", `${JIG_LABEL}.plist`);
-		if (!existsSync(file)) return;
-		host.run("launchctl", ["bootout", `gui/${host.uid}/${JIG_LABEL}`]);
-		rmSync(file, { force: true });
-	} else if (host.platform === "linux") {
-		const file = join(host.homeDir, ".config", "systemd", "user", JIG_UNIT);
-		if (!existsSync(file)) return;
-		host.run("systemctl", ["--user", "disable", "--now", JIG_UNIT]);
-		rmSync(file, { force: true });
-		host.run("systemctl", ["--user", "daemon-reload"]);
-	}
-}
-
 /** The service file is there and the system has it loaded (macOS) or enabled (Linux). */
 export function serviceLoaded(host: ServiceHost): boolean {
 	return (
@@ -202,11 +179,10 @@ export function installService(
 	const file = serviceFile(host);
 	const mac = host.platform === "darwin";
 	const log = join(home, "logs", "serve.log");
-	removeJigService(host);
 	mkdirSync(join(home, "logs"), { recursive: true, mode: 0o700 });
 	// Shell commands the sessions run need your PATH; launchd and systemd start with a bare one.
 	const vars: Record<string, string> = { PATH: env.PATH ?? "/usr/bin:/bin" };
-	if (fromJigEnv(env, "HOME")) vars.YEW_HOME = home;
+	if (env.YEW_HOME) vars.YEW_HOME = home;
 	mkdirSync(dirname(file), { recursive: true });
 	writeFileSync(file, mac ? launchAgent(host, vars, log) : systemdUnit(host, vars, log), {
 		mode: 0o644,
@@ -234,7 +210,6 @@ export function uninstallService(host: ServiceHost, options: { stop: boolean }):
 	const file = serviceFile(host);
 	const mac = host.platform === "darwin";
 	const had = existsSync(file);
-	removeJigService(host);
 	if (mac) {
 		if (options.stop) host.run("launchctl", ["bootout", target(host)]);
 	} else if (had) {

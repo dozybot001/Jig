@@ -4,7 +4,6 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { fromJigEnv, JIG_APP, JIG_LAUNCHER } from "../server/from-jig.ts";
 import { VERSION } from "../shared/version.ts";
 import { type CliIo, EXIT_ERROR, EXIT_OK, UsageError } from "./io.ts";
 import type { Command } from "./run.ts";
@@ -120,17 +119,6 @@ const SIZES = [16, 32, 128, 256, 512] as const;
 /** Where the launcher goes: the person's own Applications folder. */
 export const appPath = (host: AppHost) => join(host.homeDir, "Applications", "Yew.app");
 
-/**
- * Jig's launcher, from before Jig was renamed Yew: taken away when Yew's is made or removed. Only when
- * it is the one Jig made, by the executable it has.
- */
-function removeJigApp(host: AppHost): void {
-	const old = join(host.homeDir, "Applications", JIG_APP);
-	if (existsSync(join(old, "Contents", "MacOS", JIG_LAUNCHER))) {
-		rmSync(old, { recursive: true, force: true });
-	}
-}
-
 export const appInstalled = (host: AppHost) =>
 	existsSync(join(appPath(host), "Contents", "MacOS", "yew-launcher"));
 
@@ -141,10 +129,9 @@ export function installApp(
 	env: Record<string, string | undefined>,
 ): { app: string; icon: boolean } {
 	const app = appPath(host);
-	removeJigApp(host);
 	// Sessions' commands need your PATH; an app starts with a bare one.
 	const vars: Record<string, string> = { PATH: env.PATH ?? "/usr/bin:/bin" };
-	if (fromJigEnv(env, "HOME")) vars.YEW_HOME = home;
+	if (env.YEW_HOME) vars.YEW_HOME = home;
 	rmSync(app, { recursive: true, force: true });
 	const contents = join(app, "Contents");
 	mkdirSync(join(contents, "MacOS"), { recursive: true });
@@ -191,7 +178,6 @@ export function installApp(
 
 export function uninstallApp(host: AppHost): void {
 	rmSync(appPath(host), { recursive: true, force: true });
-	removeJigApp(host);
 }
 
 export function appCommand(host: AppHost = realAppHost()): Command {

@@ -3,31 +3,6 @@
 Run as root on the server by release-from-gitee.sh. The relay keeps no data, so there is nothing
 to back up; a release swaps the container and, the first time, installs the Caddy site. A failure
 at any step puts the previous container and ingress back.
-
-Yew was called Jig until 2026-11-18, and the relay's names on the server were jig-relay. The first
-release after the rename moves them over; the domain, the port 7290 and the UID 70980 stay.
-1. release-from-gitee.sh, before anything reads the folder, takes the release lock in /opt/jig-relay
-   and renames the folder to /opt/yew-relay; if /opt/yew-relay exists already, it stops without
-   changing anything. A rename keeps config/ (relay.env 0600 root, apns.p8 0400 uid 70980),
-   releases/, active.json, the deploy key and the bare clone as they were. The running
-   jig-relay-<old> keeps serving, since its mounts hold the files, not the path. Then /opt/jig-relay
-   becomes a link to /opt/yew-relay, so that the jig-relay-* containers can start again (a
-   rollback, a reboot). The clone's remote becomes git@gitee.com:dozybot/yew.git.
-2. Here, before any change, it stops if both site files exist or if the link is missing. Then, as
-   in every release, the candidate yew-relay-<new>-candidate is tested without a network, and Caddy
-   is validated on a copy of sites-enabled in which yew-relay.caddy takes the place of
-   jig-relay.caddy, so the check never sees both.
-3. The network yew-relay is created. jig-relay-<old> is stopped and kept; yew-relay-<new> starts on
-   yew-relay and logs to journald with the tag yew-relay.
-4. jig-relay.caddy is renamed yew-relay.caddy, then given the new content, and Caddy reloads. One
-   file defines relay.tenonai.cn at every moment, whoever reloads Caddy.
-5. After the public check, active.json names yew-relay-<new>, and jig-relay-<old> as the previous
-   container.
-A failure in 2-5 removes yew-relay-<new>, starts jig-relay-<old> again (through the link, on the
-network jig-relay), renames the site file back to jig-relay.caddy with its old content and reloads
-Caddy. The folder stays moved and linked, and the next release goes through 2-5 again.
-Later, the housekeeping at the end removes the jig-relay-* containers as their releases age out,
-like any old release's. Once none is left, it removes the network jig-relay and the link.
 """
 import hashlib
 import json
@@ -56,11 +31,7 @@ active = base / "active.json"
 site = pathlib.Path("/etc/caddy/sites-enabled/yew-relay.caddy")
 name = f"yew-relay-{sha[:12]}"
 candidate = f"{name}-candidate"
-# The names from before the rename, for the one-time migration described at the top.
-old_base = pathlib.Path("/opt/jig-relay")
-old_site = site.with_name("jig-relay.caddy")
-old_prefix = "jig-relay-"
-prefixes = ("yew-relay-", old_prefix)
+prefix = "yew-relay-"
 
 
 def run(args, **kw):
@@ -127,15 +98,8 @@ lock = base / ".publish-lock"
 lock.mkdir()
 previous = json.loads(active.read_text()) if active.exists() else {}
 site_before = site.read_bytes() if site.exists() else None
-old_site_before = old_site.read_bytes() if old_site.exists() else None
 started = previous_stopped = site_changed = False
 try:
-    # Both would define the same host, and Caddy would reject its whole configuration.
-    assert site_before is None or old_site_before is None, f"Both {old_site} and {site} exist"
-    # A container from before the rename finds its files only through the link to the old folder.
-    if previous.get("container", "").startswith(old_prefix):
-        assert old_base.resolve() == base, f"{previous['container']} needs {old_base} to link to {base}"
-
     # Private configuration: the environment file is root's, the signing key is readable by the
     # relay's user alone. Neither is in the repository or the release.
     config.mkdir(mode=0o700, exist_ok=True)
@@ -180,12 +144,11 @@ try:
         quiet(["docker", "rm", "-f", candidate])
 
     # The new site file is checked through the root config, which defines the shared snippets,
-    # with the sites as they will be: the old file gone, the new one in place.
+    # with the sites as they will be.
     site_text = (release / site.name).read_text()
     sites = base / "candidate-sites"
     shutil.rmtree(sites, ignore_errors=True)
     shutil.copytree(site.parent, sites)
-    (sites / old_site.name).unlink(missing_ok=True)
     (sites / site.name).write_text(site_text)
     line = "import /etc/caddy/sites-enabled/*.caddy"
     root = pathlib.Path("/etc/caddy/Caddyfile").read_text()
@@ -209,9 +172,6 @@ try:
 
     if site_before != site_text.encode():
         site_changed = True
-        if old_site_before is not None:
-            # Renamed before it is rewritten, so that one file defines the host at every moment.
-            os.rename(old_site, site)
         put(site, site_text.encode())
         run(["systemctl", "reload", "caddy"])
     # The first time, Caddy gets the certificate before the public check can pass.
@@ -229,11 +189,7 @@ except BaseException:
     if previous_stopped:
         run(["docker", "start", previous["container"]], stdout=subprocess.DEVNULL)
     if site_changed:
-        if old_site_before is not None:
-            if site.exists():
-                os.rename(site, old_site)
-            put(old_site, old_site_before)
-        elif site_before is None:
+        if site_before is None:
             site.unlink(missing_ok=True)
         else:
             put(site, site_before)
@@ -247,27 +203,27 @@ finally:
 
 # Housekeeping after an accepted release never fails it (product standard 15.2.3): keep the
 # current release, the previous one and the three newest; remove the containers of the rest.
-# Containers from before the rename carry the old prefix and are kept or removed the same way.
 try:
     keep = {sha, previous.get("commit")}
     releases = sorted((base / "releases").iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
     keep |= {p.name for p in releases[:3]}
-    kept = {prefix + commit[:12] for commit in keep if commit for prefix in prefixes}
+    kept = {prefix + commit[:12] for commit in keep if commit}
     for old in releases:
         if old.name in keep:
             continue
-        for prefix in prefixes:
-            quiet(["docker", "rm", "-f", prefix + old.name[:12]])
+        quiet(["docker", "rm", "-f", prefix + old.name[:12]])
         run(["chmod", "-R", "u+w", str(old)])
         shutil.rmtree(old)
     for line in containers():
-        if line.startswith(prefixes) and line not in kept:
+        if line.startswith(prefix) and line not in kept:
             quiet(["docker", "rm", "-f", line])
-    # The end of the one-time migration: once no container from before the rename is left,
-    # nothing needs its network or the link to the old folder.
-    if not any(line.startswith(old_prefix) for line in containers()):
-        quiet(["docker", "network", "rm", "jig-relay"])
-        if old_base.is_symlink():
-            old_base.unlink()
+    # One time, then delete these lines: what the first release after the rename kept from before
+    # it (the old containers, their network and the link to the old folder) goes with this one.
+    for line in containers():
+        if line.startswith("jig-relay-"):
+            quiet(["docker", "rm", "-f", line])
+    quiet(["docker", "network", "rm", "jig-relay"])
+    if pathlib.Path("/opt/jig-relay").is_symlink():
+        pathlib.Path("/opt/jig-relay").unlink()
 except Exception as error:  # noqa: BLE001
     print(f"Release retention skipped: {error}", file=sys.stderr)

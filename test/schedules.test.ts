@@ -479,7 +479,7 @@ describe("scheduled tasks over the API and the command line", () => {
 		});
 		db.close();
 		const cli = async (argv: string[]) => {
-			const captured = fakeIo({ env: { JIG_HOME: dir } });
+			const captured = fakeIo({ env: { YEW_HOME: dir } });
 			const code = await run(["schedule", ...argv], captured.io, [scheduleCommand()]);
 			return { code, out: captured.stdout.text(), err: captured.stderr.text() };
 		};

@@ -37,9 +37,9 @@ function file(path: string, bytes: number): string {
 /** A data folder with something of every kind; the numbers are the files' lengths. */
 function prepared() {
 	const home = real("yew-home-");
-	file(join(home, "jig.db"), 4000);
-	file(join(home, "jig.db-wal"), 300);
-	file(join(home, "jig.db-shm"), 20);
+	file(join(home, "yew.db"), 4000);
+	file(join(home, "yew.db-wal"), 300);
+	file(join(home, "yew.db-shm"), 20);
 	file(join(home, "artifacts", "s1", "a1", "v1.md"), 700);
 	file(join(home, "artifacts", "s1", "a1", "v2.md"), 800);
 	file(join(home, "logs", "serve.log"), 150);

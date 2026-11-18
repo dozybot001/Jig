@@ -469,7 +469,7 @@ describe("settings: starting at login and the launcher icon", () => {
 		};
 		const system = systemControl({
 			home,
-			env: { JIG_HOME: home, PATH: "/opt/homebrew/bin:/usr/bin" },
+			env: { YEW_HOME: home, PATH: "/opt/homebrew/bin:/usr/bin" },
 			service,
 			app: appHost,
 		});

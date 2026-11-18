@@ -13,7 +13,7 @@ export function newStore(path = ":memory:") {
 	return { store, bus, events };
 }
 
-/** A throwaway directory, never the real ~/.jig. */
+/** A throwaway directory, never the real ~/.yew. */
 export function tempDir(prefix = "yew-test-"): string {
 	return mkdtempSync(join(tmpdir(), prefix));
 }

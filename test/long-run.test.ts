@@ -407,7 +407,7 @@ describe("a reply cut off at the output limit", () => {
 
 describe("after a restart", () => {
 	test("a session the person stopped is still not started by a letter", async () => {
-		const dbPath = `${realpathSync(tempDir("yew-db-"))}/jig.db`;
+		const dbPath = `${realpathSync(tempDir("yew-db-"))}/yew.db`;
 		const first = setup({ dbPath });
 		const sender = first.make("来信方");
 		let release: () => void = () => {};

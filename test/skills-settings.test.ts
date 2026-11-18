@@ -36,7 +36,7 @@ function folders() {
 		pdf: skill(global, "pdf", body("pdf", "PDF work")),
 		globalRelease: skill(global, "release", body("release", "The person's")),
 		projectRelease: skill(project, "release", body("release", "The project's")),
-		deploy: skill(join(cwd, ".jig", "skills"), "deploy", body("deploy", "Ship it")),
+		deploy: skill(join(cwd, ".yew", "skills"), "deploy", body("deploy", "Ship it")),
 		empty: skill(global, "empty", null),
 		badName: skill(project, "bad name", "---\nname: not a name!\n---\nE"),
 	};
@@ -72,7 +72,7 @@ describe("skills: what the settings list", () => {
 			},
 			{
 				source: workspace,
-				paths: [".agents", ".claude", ".yew", ".jig"].map((local) => join(cwd, local, "skills")),
+				paths: [".agents", ".claude", ".yew"].map((local) => join(cwd, local, "skills")),
 			},
 		]);
 	});

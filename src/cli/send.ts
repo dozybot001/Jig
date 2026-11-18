@@ -77,8 +77,7 @@ export function sendCommand(): Command {
 					}
 				}
 				// Inside a session's shell the letter is that session's, with its quota, limits and hold.
-				const { fromJigEnv } = await import("../server/from-jig.ts");
-				const fromId = fromJigEnv(io.env, "SESSION")?.trim();
+				const fromId = io.env.YEW_SESSION?.trim();
 				let sender: Sender = { kind: "cli" };
 				if (fromId) {
 					try {

@@ -1,143 +1,25 @@
 /**
- * Jig was renamed Yew on 2026-11-18 (blueprint, section 12). What a person had under the old name
- * keeps working: the data folder moves once and leaves a link, the database file follows, the old
- * environment variables still count, Jig's login service and launcher make way for Yew's, and notes
- * Jig wrote into conversations are still recognised as its own.
+ * Jig was renamed Yew on 2026-11-18 (blueprint, section 12), and Yew reads nothing by Jig's names.
+ * What was stored under the old names is rewritten once by the database migrations, so old
+ * conversations, letters and rules keep meaning what they meant.
  */
 import assert from "node:assert/strict";
-import {
-	existsSync,
-	lstatSync,
-	mkdirSync,
-	readFileSync,
-	readlinkSync,
-	writeFileSync,
-} from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { describe, test } from "node:test";
-import { type AppHost, installApp, uninstallApp } from "../src/cli/app.ts";
-import { installService, type ServiceHost } from "../src/cli/service.ts";
 import { pairingLink, parsePairingLink } from "../src/remote/protocol.ts";
 import { isOwnNote } from "../src/server/agent/context.ts";
 import { migrate } from "../src/server/db/database.ts";
 import { migrations } from "../src/server/db/migrations.ts";
-import { moveJigHome } from "../src/server/from-jig.ts";
-import { dbPath, yewHome } from "../src/server/paths.ts";
-import { tempDir } from "./helpers/store.ts";
 
-function oldHome(user: string, serving?: number) {
-	const old = join(user, ".jig");
-	mkdirSync(old);
-	writeFileSync(join(old, "jig.db"), "db");
-	writeFileSync(join(old, "jig.db-wal"), "wal");
-	writeFileSync(join(old, "mcp.json"), "{}");
-	if (serving !== undefined) {
-		writeFileSync(join(old, "serve.json"), JSON.stringify({ port: 4777, pid: serving }));
-	}
-	return old;
-}
+/** The migration that renamed the stored values; the ones before it are the database Jig left. */
+const renameAt = migrations.findIndex((sql) => String(sql).includes("CREATE TABLE letters_yew"));
 
-describe("the data folder", () => {
-	test("moves from ~/.jig to ~/.yew once, leaving a link, with the database renamed", () => {
-		const user = tempDir("yew-user-");
-		const old = oldHome(user);
-		assert.equal(yewHome({}, user), old, "before the move it is still the old folder");
-		assert.deepEqual(moveJigHome({}, user), { moved: old, to: join(user, ".yew") });
-		const home = join(user, ".yew");
-		assert.equal(yewHome({}, user), home);
-		assert.equal(readFileSync(join(home, "yew.db"), "utf8"), "db");
-		assert.equal(readFileSync(join(home, "yew.db-wal"), "utf8"), "wal");
-		assert.equal(existsSync(join(home, "jig.db")), false);
-		assert.equal(dbPath(home), join(home, "yew.db"));
-		assert.ok(lstatSync(old).isSymbolicLink());
-		assert.equal(readlinkSync(old), home);
-		assert.equal(readFileSync(join(old, "mcp.json"), "utf8"), "{}", "old paths still work");
-		assert.equal(moveJigHome({}, user), null, "only once");
-	});
-
-	test("stays where it is while Jig still runs from it", () => {
-		const user = tempDir("yew-user-");
-		const old = oldHome(user, process.pid);
-		assert.deepEqual(moveJigHome({}, user), { busy: process.pid, folder: old });
-		assert.equal(existsSync(join(user, ".yew")), false);
-		assert.equal(yewHome({}, user), old);
-		assert.equal(dbPath(old), join(old, "jig.db"));
-	});
-
-	test("set by YEW_HOME or the older JIG_HOME, it only gets its database renamed", () => {
-		const user = tempDir("yew-user-");
-		const custom = tempDir("yew-custom-");
-		writeFileSync(join(custom, "jig.db"), "db");
-		assert.equal(yewHome({ JIG_HOME: custom }, user), custom);
-		assert.equal(yewHome({ YEW_HOME: custom, JIG_HOME: "/elsewhere" }, user), custom);
-		assert.deepEqual(moveJigHome({ JIG_HOME: custom }, user), { renamed: custom });
-		assert.equal(readFileSync(join(custom, "yew.db"), "utf8"), "db");
-		assert.equal(yewHome({}, user), join(user, ".yew"), "a person without Jig starts in ~/.yew");
-	});
-});
-
-describe("what Jig set up on the computer", () => {
-	test("Jig's login service is stopped and removed when Yew's is installed", () => {
-		const homeDir = tempDir("yew-user-");
-		const agents = join(homeDir, "Library", "LaunchAgents");
-		mkdirSync(agents, { recursive: true });
-		writeFileSync(join(agents, "cn.tenonai.apps.jig.plist"), "<plist/>");
-		const calls: string[] = [];
-		const host: ServiceHost = {
-			platform: "darwin",
-			homeDir,
-			uid: 501,
-			node: "/usr/bin/node",
-			entry: "/yew/main.js",
-			run: (command, args) => {
-				calls.push([command, ...args].join(" "));
-				return 0;
-			},
-		};
-		installService(host, tempDir("yew-home-"), { PATH: "/bin" }, { start: false });
-		assert.equal(existsSync(join(agents, "cn.tenonai.apps.jig.plist")), false);
-		assert.ok(existsSync(join(agents, "cn.tenonai.apps.yew.plist")));
-		assert.ok(calls.includes("launchctl bootout gui/501/cn.tenonai.apps.jig"));
-	});
-
-	test("Jig's launcher makes way for Yew's; an app of the same name that Jig did not make stays", () => {
-		const homeDir = tempDir("yew-user-");
-		const host: AppHost = {
-			platform: "darwin",
-			homeDir,
-			node: "/usr/bin/node",
-			entry: "/yew/main.js",
-			icon: null,
-			run: () => 0,
-		};
-		const jigApp = join(homeDir, "Applications", "Jig.app");
-		mkdirSync(join(jigApp, "Contents", "MacOS"), { recursive: true });
-		writeFileSync(join(jigApp, "Contents", "MacOS", "jig-launcher"), "#!/bin/sh\n");
-		installApp(host, tempDir("yew-home-"), {});
-		assert.equal(existsSync(jigApp), false);
-		assert.ok(
-			existsSync(join(homeDir, "Applications", "Yew.app", "Contents", "MacOS", "yew-launcher")),
-		);
-		const other = join(homeDir, "Applications", "Jig.app");
-		mkdirSync(join(other, "Contents"), { recursive: true });
-		uninstallApp(host);
-		assert.ok(existsSync(other), "not Jig's launcher, so not ours to remove");
-	});
-});
-
-describe("conversations from before the rename", () => {
-	test("notes Jig wrote are still its own, not the person's", () => {
-		assert.equal(isOwnNote("[From Jig, not from the person] The task was stopped."), true);
-		assert.equal(isOwnNote("[From Yew, not from the person] The task was stopped."), true);
-		assert.equal(isOwnNote("Please fix the footer."), false);
-	});
-
-	test("pairing links are yew:// only; the phone apps are new, so Jig's links are not taken", () => {
+describe("the rename", () => {
+	test("pairing links are yew://", () => {
 		const link = { relay: "wss://r", desktop: "d1", key: "k", secret: "s", name: "Mac" };
 		assert.match(pairingLink(link), /^yew:\/\/pair\?/);
 		assert.deepEqual(parsePairingLink(pairingLink(link)), link);
-		assert.equal(parsePairingLink("jig://pair?r=wss%3A%2F%2Fr&d=d1&k=k&s=s&n=Mac"), null);
 	});
 
 	test("the command is yew only", () => {
@@ -152,8 +34,8 @@ describe("conversations from before the rename", () => {
 	test("values stored under Jig's names take Yew's: scheduled letters, the settings tool, its rules", () => {
 		const db = new DatabaseSync(":memory:");
 		db.exec("PRAGMA foreign_keys = ON");
-		// The database as Jig left it: every migration but the rename.
-		for (const [version, sql] of migrations.slice(0, -1).entries()) {
+		// The database from before the rename: every migration up to it.
+		for (const [version, sql] of migrations.slice(0, renameAt).entries()) {
 			db.exec(sql as string);
 			db.exec(`PRAGMA user_version = ${version + 1}`);
 		}
@@ -197,5 +79,32 @@ describe("conversations from before the rename", () => {
 				)
 				.run(),
 		);
+	});
+
+	test("notes written under the old name are rewritten as Yew's own", () => {
+		assert.ok(renameAt > 0);
+		const db = new DatabaseSync(":memory:");
+		db.exec("PRAGMA foreign_keys = ON");
+		for (const [version, sql] of migrations.slice(0, -1).entries()) {
+			db.exec(sql as string);
+			db.exec(`PRAGMA user_version = ${version + 1}`);
+		}
+		const now = Date.now();
+		db.prepare(
+			"INSERT INTO sessions (id, name, kind, provider, model, last_activity_at, created_at, updated_at) VALUES ('s1', 'Main', 'standing', 'p', 'm', ?, ?, ?)",
+		).run(now, now, now);
+		const old = "[From Jig, not from the person] The task was stopped.";
+		db.prepare(
+			"INSERT INTO messages (id, session_id, seq, role, body, created_at) VALUES ('m1', 's1', 1, 'user', ?, ?)",
+		).run(JSON.stringify({ role: "user", content: old, timestamp: now }), now);
+		migrate(db);
+		const body = JSON.parse(
+			String(
+				Object.values(db.prepare("SELECT body FROM messages WHERE id = 'm1'").get() as object)[0],
+			),
+		) as { content: string };
+		assert.equal(body.content, "[From Yew, not from the person] The task was stopped.");
+		assert.equal(isOwnNote(body.content), true);
+		assert.equal(isOwnNote("Please fix the footer."), false);
 	});
 });

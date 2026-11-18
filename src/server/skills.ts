@@ -2,7 +2,6 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
 import { invalid } from "./errors.ts";
-import { JIG_PROJECT_FOLDER } from "./from-jig.ts";
 import { errorResult, str, type ToolDefinition, type ToolResult, text } from "./tools/types.ts";
 
 /**
@@ -126,8 +125,7 @@ export function skillFolders(
 	const folders = [join(yewHome, "skills")];
 	if (userHome) folders.push(join(userHome, ".claude", "skills"));
 	if (cwd) {
-		for (const local of [".agents", ".claude", ".yew", JIG_PROJECT_FOLDER])
-			folders.push(join(cwd, local, "skills"));
+		for (const local of [".agents", ".claude", ".yew"]) folders.push(join(cwd, local, "skills"));
 	}
 	return folders;
 }

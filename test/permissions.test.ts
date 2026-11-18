@@ -277,7 +277,7 @@ describe("file permissions", () => {
 
 	test("credential locations and Yew's own data are refused", () => {
 		assert.equal(read(join(homedir(), ".ssh", "id_ed25519")).effect, "deny");
-		assert.equal(read(join(yewHome, "jig.db")).effect, "deny");
+		assert.equal(read(join(yewHome, "yew.db")).effect, "deny");
 		assert.equal(write(join(homedir(), ".aws", "credentials")).effect, "deny");
 	});
 
@@ -394,8 +394,8 @@ describe("permission modes", () => {
 	test("commands that name credentials or Yew's data, or use Yew's command line, ask every time", () => {
 		for (const s of [auto, skip]) {
 			for (const command of [
-				`sqlite3 ${join(yewHome, "jig.db")} "update approvals set status = 'allowed'"`,
-				`cp ${join(yewHome, "jig.db")} backup.db`,
+				`sqlite3 ${join(yewHome, "yew.db")} "update approvals set status = 'allowed'"`,
+				`cp ${join(yewHome, "yew.db")} backup.db`,
 				"cat ~/.ssh/config",
 				"yew send 平台组 上线吧",
 				"yew open --print",

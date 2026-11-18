@@ -785,7 +785,7 @@ describe("when things go wrong", () => {
 	});
 
 	test("an answer handed to a waiting call comes back after a restart when its result was not stored", async () => {
-		const path = join(tempDir("yew-db-"), "jig.db");
+		const path = join(tempDir("yew-db-"), "yew.db");
 		const first = harness({ waitMs: 5000, dbPath: path });
 		const a = first.make("等待方");
 		const b = first.make("回信方");

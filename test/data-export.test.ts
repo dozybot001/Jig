@@ -73,7 +73,7 @@ describe("yew export", () => {
 		new Store(db, new EventBus()).createSession(sessionInput("UI"));
 		db.close();
 		const out = join(tempDir("yew-out-"), "backup");
-		const { io, stdout } = fakeIo({ env: { JIG_HOME: home } });
+		const { io, stdout } = fakeIo({ env: { YEW_HOME: home } });
 		assert.equal(await exportCommand().run([out, "--json"], io), 0);
 		const report = JSON.parse(stdout.text());
 		assert.equal(report.sessions, 1);
@@ -83,9 +83,9 @@ describe("yew export", () => {
 	});
 });
 
-test("JIG_KEYCHAIN=off keeps keys in memory, away from the system keychain", async () => {
+test("YEW_KEYCHAIN=off keeps keys in memory, away from the system keychain", async () => {
 	const { MemoryKeyStore, systemKeys } = await import("../src/server/keys.ts");
-	const keys = systemKeys("provider", { JIG_KEYCHAIN: "off" });
+	const keys = systemKeys("provider", { YEW_KEYCHAIN: "off" });
 	assert.ok(keys instanceof MemoryKeyStore);
 	assert.equal(await keys.get("deepseek"), null);
 });

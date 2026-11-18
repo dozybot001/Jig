@@ -40,7 +40,7 @@ function code(error: unknown): string | undefined {
 
 describe("database", () => {
 	test("migrations run once and record the schema version", () => {
-		const path = join(tempDir(), "jig.db");
+		const path = join(tempDir(), "yew.db");
 		const first = openDatabase(path);
 		const version = first.prepare("PRAGMA user_version").get() as { user_version: number };
 		assert.equal(version.user_version, migrations.length);
@@ -54,7 +54,7 @@ describe("database", () => {
 	});
 
 	test("refuses a database from a newer version", () => {
-		const path = join(tempDir(), "jig.db");
+		const path = join(tempDir(), "yew.db");
 		const db = openDatabase(path);
 		db.exec(`PRAGMA user_version = ${migrations.length + 1}`);
 		db.close();

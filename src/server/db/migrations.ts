@@ -340,4 +340,8 @@ UPDATE approvals SET request = replace(replace(request, '"tool":"manage_jig"', '
 UPDATE sessions SET rules = replace(rules, '"tool":"manage_jig"', '"tool":"manage_yew"')
 	WHERE rules LIKE '%manage_jig%';
 DELETE FROM session_events;`,
+	// Yew no longer reads anything by Jig's names: Jig's notes in old conversations are rewritten once
+	// as Yew's, so they still count as Yew's own words and not the person's.
+	`UPDATE messages SET body = replace(body, '[From Jig, not from the person]', '[From Yew, not from the person]')
+	WHERE body LIKE '%[From Jig, not from the person]%';`,
 ];

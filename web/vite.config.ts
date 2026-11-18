@@ -11,7 +11,7 @@ import { defineConfig, type Plugin } from "vite";
  */
 function notices(): Plugin {
 	return {
-		name: "jig-notices",
+		name: "yew-notices",
 		generateBundle(_, bundle) {
 			const folders = new Set<string>();
 			for (const chunk of Object.values(bundle)) {
@@ -42,7 +42,7 @@ function notices(): Plugin {
 			this.emitFile({
 				type: "asset",
 				fileName: "THIRD-PARTY-NOTICES.txt",
-				source: `Jig's web interface is built from these packages. Each stays under its own license.\n\n${entries
+				source: `Yew's web interface is built from these packages. Each stays under its own license.\n\n${entries
 					.map(
 						(entry) =>
 							`${"=".repeat(72)}\n${entry.name} ${entry.version} (${entry.license ?? "see below"})\n${"=".repeat(72)}\n${entry.text}\n`,

@@ -1136,7 +1136,7 @@ function LetterEntry({ letter }: { letter: LetterRef }) {
 						{t("fromSchedule", { name: t("quoted", { s: letter.schedule.name }) })}
 					</span>
 				)}
-				{letter.auto && <span className="hint">{t("sentByJig")}</span>}
+				{letter.auto && <span className="hint">{t("sentByYew")}</span>}
 			</div>
 			<p className="letter-summary">{plainLine(letter.summary) || letter.summary}</p>
 			{body && (

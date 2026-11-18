@@ -473,7 +473,7 @@ function LetterRow({ letter, now }: { letter: Letter; now: number }) {
 						<span>
 							<SenderLink letter={letter} /> → <SessionLink id={letter.toSession} />
 						</span>
-						{letter.auto && <span>{t("sentByJig")}</span>}
+						{letter.auto && <span>{t("sentByYew")}</span>}
 						{status}
 						{reason && <span>{reason}</span>}
 					</div>

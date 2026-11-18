@@ -6,13 +6,6 @@ import { CHALLENGE_PREFIX, desktopIdOf, OFFLINE } from "../src/remote/protocol.t
 import { MAX_PUSH_DATA, PUSH_TOKEN, type PushJob, type PushResult } from "../src/remote/push.ts";
 
 /**
- * A computer proves it holds its key by signing the relay's challenge after this prefix. Jig, Yew's
- * name until 2026-11-18, signs after its own prefix; its computers are let in until they upgrade.
- * Drop the second one when nobody runs Jig any more.
- */
-const CHALLENGE_PREFIXES = [CHALLENGE_PREFIX, "jig-relay-desktop:"];
-
-/**
  * Yew's relay (M3 plan, section 5): joins a phone's connection to the Mac it names and forwards their
  * frames. Both ends dial out to it, so the Mac opens no port. Everything between them is end-to-end
  * encrypted (Noise), so the relay sees only ciphertext: it stores nothing and logs no content.
@@ -295,7 +288,8 @@ export class Relay {
 					hello?.type !== "hello" ||
 					!key ||
 					!sig ||
-					!CHALLENGE_PREFIXES.some((prefix) => verifies(key, Buffer.from(prefix + nonce), sig))
+					// A computer proves it holds its key by signing the relay's challenge after this prefix.
+					!verifies(key, Buffer.from(CHALLENGE_PREFIX + nonce), sig)
 				) {
 					socket.close(1008, "bad hello");
 					return;

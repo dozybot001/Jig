@@ -6,7 +6,6 @@ import type {
 } from "../../shared/messages.ts";
 import { messageText } from "../../shared/messages.ts";
 import type { Entry, UsageTotals } from "../../shared/types.ts";
-import { isJigNote } from "../from-jig.ts";
 
 export const SUMMARY_HEADING =
 	"[Summary of the earlier conversation, written by Yew when it shortened the context]";
@@ -15,8 +14,8 @@ export const REQUEST_HEADING =
 /** What Yew puts in front of its own messages to the model, which are stored like the person's. */
 export const YEW_NOTE = "[From Yew, not from the person]";
 
-/** Whether a stored message is one of Yew's own notes (or Jig's, from before the rename). */
-export const isOwnNote = (text: string): boolean => text.startsWith(YEW_NOTE) || isJigNote(text);
+/** Whether a stored message is one of Yew's own notes. */
+export const isOwnNote = (text: string): boolean => text.startsWith(YEW_NOTE);
 
 function placeholder(call: ToolCallBlock, timestamp: number): ToolResultMessage {
 	return {

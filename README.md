@@ -19,20 +19,11 @@ Yew 以 MIT 许可证开源，当前版本 1.3.0。能做什么见[更新记录]
 
 从源码运行：克隆仓库后 `npm install`、`npm run build:web`、`npm link`。
 
-### 从 Jig 升级
-
-Yew 原名 Jig，2026-11-18 改名。从 Jig 升级：
-
-1. 停掉正在运行的 Jig，换装新包：`npm uninstall -g @tenonai/jig`，再 `npm install -g @tenonai/yew`。命令改叫 `yew`。
-2. 第一次运行 `yew` 时，数据目录 `~/.jig` 会搬到 `~/.yew`，原处留一个指向新目录的链接；API Key 第一次用到时从钥匙串里旧的位置搬过来。环境变量改叫 `YEW_HOME` 这类名字，旧的 `JIG_HOME` 这类仍然认。
-3. 设过开机启动或启动图标的，各运行一次 `yew service install`、`yew app install`，换成 Yew 的，旧的 Jig 那份会一起撤掉。
-4. 手机上的 Yew 是新的应用，要重新安装并重新配对；手机上原来的 Jig 应用连不上 Yew，可以卸掉。
-
 ## 手机端
 
 手机上的 Yew 只连接你自己电脑上的 Yew：在电脑上显示二维码，手机扫码配对，之后在手机上看会话、处理审批中心里的事。两端经中继通信，内容端到端加密；默认用 Tenon AI 运行的中继，也可以自己部署（见 `relay/`）。
 
-- 安卓：安装包（apk）在 [GitHub](https://github.com/dozybot001/Yew/releases) 和 [Gitee](https://gitee.com/dozybot/yew/releases) 的 Releases 里，由长沙榫卯人工智能科技有限公司签名。签名证书的 SHA-256 指纹是 `9F:F5:6E:EA:A8:3C:DC:01:BA:66:D8:79:23:9C:DE:5A:2A:69:C3:AE:D2:60:5C:D8:E1:B9:34:8D:BF:28:61:B2`（改名前的 Jig 安装包，1.2.0 及以前，用的是旧证书 `67:37:32:56:56:15:6A:54:F9:A8:BE:17:35:D8:7F:4B:30:16:06:53:EC:AE:B9:FD:51:3B:05:96:9F:6A:43:61`）；这个指纹也公布在[官网的 Yew 页面](https://tenonai.cn/zh/products/yew/#android)上，可以对照；每个版本的说明里有安装包的 SHA-256。更新时系统如果提示签名不一致，不要安装。
+- 安卓：安装包（apk）在 [GitHub](https://github.com/dozybot001/Yew/releases) 和 [Gitee](https://gitee.com/dozybot/yew/releases) 的 Releases 里，由长沙榫卯人工智能科技有限公司签名。签名证书的 SHA-256 指纹是 `9F:F5:6E:EA:A8:3C:DC:01:BA:66:D8:79:23:9C:DE:5A:2A:69:C3:AE:D2:60:5C:D8:E1:B9:34:8D:BF:28:61:B2`；这个指纹也公布在[官网的 Yew 页面](https://tenonai.cn/zh/products/yew/#android)上，可以对照；每个版本的说明里有安装包的 SHA-256。更新时系统如果提示签名不一致，不要安装。
 - iPhone：还没有上架，之后经 TestFlight 和 App Store 发布。
 
 ## 隐私

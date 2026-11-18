@@ -52,7 +52,7 @@ describe("skills", () => {
 			"release",
 			"---\nname: release\ndescription: The project's\n---\nD",
 		);
-		skill(join(cwd, ".jig", "skills"), "bad name", "---\nname: not a name!\n---\nE");
+		skill(join(cwd, ".yew", "skills"), "bad name", "---\nname: not a name!\n---\nE");
 		mkdirSync(join(yewHome, "skills", "empty"), { recursive: true });
 		const found = findSkills(cwd, yewHome, userHome);
 		assert.deepEqual(

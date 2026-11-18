@@ -13,30 +13,12 @@ main() {
 	source="$builder/source.git"
 	repo=https://gitee.com/dozybot/yew.git
 	node_image='docker.m.daocloud.io/library/node@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7'
-	# One-time move of the folder from before the rename (Jig was Yew's name until 2026-11-18;
-	# release.py lists every step). Until then the release lock is in the old folder; a lock belongs
-	# to the file, not to its path, so it stays held when the folder is renamed.
-	old=/opt/jig-relay
-	if [[ -d "$old" && ! -L "$old" ]]; then
-		exec 9>"$old/.controller-lock"
-	else
-		install -d -m 0750 "$base"
-		exec 9>"$base/.controller-lock"
-	fi
+	install -d -m 0750 "$base"
+	exec 9>"$base/.controller-lock"
 	flock -n 9 || { echo 'Another Yew relay release is running.' >&2; exit 1; }
-	if [[ -d "$old" && ! -L "$old" ]]; then
-		[[ ! -e "$base" ]] || { echo "Both $old and $base exist; publishing stops until one is moved aside by hand." >&2; exit 1; }
-		mv -T "$old" "$base"
-	fi
-	# Containers made before the move name their files under the old path. The link lets them start
-	# again (a rollback, a reboot) until release.py has removed the last of them, and then the link.
-	if [[ ! -e "$old" && ! -L "$old" ]] && docker ps -a --format '{{.Names}}' | grep '^jig-relay-' >/dev/null; then
-		ln -sT "$base" "$old"
-	fi
 	install -d -m 0750 "$base" "$builder"
 
 	[[ -d "$source" ]] || git clone -q --bare "$repo" "$source"
-	# A clone made earlier names the old address (before the rename, and over SSH with a deploy key).
 	git --git-dir="$source" remote set-url origin "$repo"
 	# Bounded retries absorb short outages; a failure stops before production changes.
 	for attempt in 1 2 3 4; do

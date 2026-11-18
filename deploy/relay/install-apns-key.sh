@@ -10,13 +10,11 @@ key_file="$1"; key_id="$2"; team_id="$3"
 [[ "$key_id" =~ ^[A-Z0-9]{10}$ && "$team_id" =~ ^[A-Z0-9]{10}$ ]] || fail 'the key id and the team id are 10 letters and digits'
 grep -q 'BEGIN PRIVATE KEY' "$key_file" || fail 'this is not an APNs .p8 key'
 cd "$(dirname "$0")/../.."
-# Until the first release after the rename moves it (release.py), the relay's folder is still the
-# one from before; the key goes there and moves with it, so the server never holds two folders.
 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o HostKeyAlias=wesaid-prod \
 	-o UserKnownHostsFile=deploy/relay/known_hosts wesaid-prod \
 	sudo -n bash -c "'set -Eeuo pipefail
 		umask 077
-		if [[ -d /opt/jig-relay && ! -L /opt/jig-relay ]]; then cd /opt/jig-relay; else install -d -m 0700 /opt/yew-relay; cd /opt/yew-relay; fi
+		install -d -m 0700 /opt/yew-relay; cd /opt/yew-relay
 		install -d -m 0700 config
 		cat > config/apns.p8.candidate
 		grep -q \"BEGIN PRIVATE KEY\" config/apns.p8.candidate

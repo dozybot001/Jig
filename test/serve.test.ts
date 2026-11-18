@@ -26,7 +26,13 @@ describe("yew serve", () => {
 		const port = await freePort();
 		const child = spawn(process.execPath, [main, "serve", "--port", String(port)], {
 			// The servers Yew sets up by itself are fetched with npx: not in a test.
-			env: { ...process.env, JIG_HOME: home, NO_COLOR: "1", JIG_MCP_BUILTIN: "off" },
+			env: {
+				...process.env,
+				YEW_HOME: home,
+				NO_COLOR: "1",
+				YEW_MCP_BUILTIN: "off",
+				YEW_KEYCHAIN: "off",
+			},
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 		let stdout = "";
