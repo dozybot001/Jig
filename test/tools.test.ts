@@ -9,6 +9,7 @@ import { htmlToMarkdown } from "../src/server/tools/html.ts";
 import { Jobs } from "../src/server/tools/jobs.ts";
 import { findUnique } from "../src/server/tools/match.ts";
 import { todoTool } from "../src/server/tools/misc.ts";
+import { commandEnvironment } from "../src/server/tools/process.ts";
 import { ReadState } from "../src/server/tools/read-state.ts";
 import { globTool, grepTool } from "../src/server/tools/search.ts";
 import { shellJobTool, shellTool } from "../src/server/tools/shell.ts";
@@ -179,6 +180,25 @@ describe("search tools", () => {
 });
 
 describe("shell tool", () => {
+	test("commands get neither provider keys nor an evaluation's switches", () => {
+		const saved = { ...process.env };
+		process.env.DEEPSEEK_API_KEY = "sk-test";
+		process.env.YEW_SIM = "1";
+		process.env.YEW_SIM_RUN = "{}";
+		try {
+			const env = commandEnvironment("s1");
+			assert.equal(env.DEEPSEEK_API_KEY, undefined);
+			assert.equal(env.YEW_SIM, undefined);
+			assert.equal(env.YEW_SIM_RUN, undefined);
+			assert.equal(env.YEW_SESSION, "s1");
+		} finally {
+			for (const name of ["DEEPSEEK_API_KEY", "YEW_SIM", "YEW_SIM_RUN"]) {
+				if (saved[name] === undefined) delete process.env[name];
+				else process.env[name] = saved[name];
+			}
+		}
+	});
+
 	test("runs a command and reports the exit code", async () => {
 		const ctx = makeContext(realpathSync(tempDir()));
 		assert.match(

@@ -71,7 +71,8 @@ const KEY_VARIABLES =
 export function commandEnvironment(sessionId: string): NodeJS.ProcessEnv {
 	const env: NodeJS.ProcessEnv = {};
 	for (const [name, value] of Object.entries(process.env)) {
-		if (!KEY_VARIABLES.test(name)) env[name] = value;
+		// Keys stay out, and so do an evaluation's switches (docs/sim.md, section 3).
+		if (!KEY_VARIABLES.test(name) && !name.startsWith("YEW_SIM")) env[name] = value;
 	}
 	return {
 		...env,
