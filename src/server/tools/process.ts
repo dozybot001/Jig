@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { newId } from "../ids.ts";
+import { activeSandbox } from "../sandbox.ts";
 
 export const MAX_LINES = 2000;
 export const MAX_BYTES = 50 * 1024;
@@ -70,7 +71,8 @@ const KEY_VARIABLES =
 export function commandEnvironment(sessionId: string): NodeJS.ProcessEnv {
 	const env: NodeJS.ProcessEnv = {};
 	for (const [name, value] of Object.entries(process.env)) {
-		if (!KEY_VARIABLES.test(name)) env[name] = value;
+		// Keys stay out, and so do an evaluation's switches (docs/sim.md, section 3).
+		if (!KEY_VARIABLES.test(name) && !name.startsWith("YEW_SIM")) env[name] = value;
 	}
 	return {
 		...env,
@@ -91,7 +93,8 @@ export interface RunningCommand {
 
 /**
  * Runs a command with the user's login shell in its own process group, so stopping it ends every
- * process it started. Stopping freezes the group first, so `a; b` cannot slip into `b` while it is
+ * process it started. It runs inside the system sandbox (sandbox.ts) unless `outsideSandbox` is set,
+ * which the person approved for this one command. Stopping freezes the group first, so `a; b` cannot slip into `b` while it is
  * being ended (pi's approach on macOS, prior-art 4.2), then sends SIGTERM and, 3 seconds later, SIGKILL.
  */
 export function startCommand(options: {
@@ -100,9 +103,13 @@ export function startCommand(options: {
 	sessionId: string;
 	logDir: string;
 	onOutput?: (chunk: string) => void;
+	outsideSandbox?: boolean;
 }): RunningCommand {
 	const shell = process.env.SHELL || "/bin/zsh";
-	const child = spawn(shell, ["-lc", options.command], {
+	const line = options.outsideSandbox
+		? { command: shell, args: ["-lc", options.command] }
+		: activeSandbox().wrap(shell, ["-lc", options.command]);
+	const child = spawn(line.command, line.args, {
 		cwd: options.cwd,
 		env: commandEnvironment(options.sessionId),
 		detached: true,

@@ -29,6 +29,11 @@ export const shellTool: ToolDefinition = {
 			},
 			timeout_seconds: { type: "integer", minimum: 1, maximum: MAX_TIMEOUT },
 			background: { type: "boolean", description: "Start the command and return at once." },
+			outside_sandbox: {
+				type: "boolean",
+				description:
+					"Run it outside the sandbox, when it failed inside for want of the keychain or Yew Harness's own files, such as a git push that needs saved credentials. The person is asked every time.",
+			},
 			confirm: CONFIRM_ARGUMENT,
 		},
 		required: ["command"],
@@ -37,7 +42,12 @@ export const shellTool: ToolDefinition = {
 	readOnly: false,
 	needsFolder: true,
 	subject(args) {
-		return { kind: "command", tool: "shell", command: str(args, "command", true) };
+		return {
+			kind: "command",
+			tool: "shell",
+			command: str(args, "command", true),
+			...(bool(args, "outside_sandbox") ? { outsideSandbox: true } : {}),
+		};
 	},
 	preview(args) {
 		const description = typeof args.description === "string" ? args.description.trim() : "";
@@ -45,13 +55,20 @@ export const shellTool: ToolDefinition = {
 	},
 	async run(args, ctx): Promise<ToolResult> {
 		const command = str(args, "command", true);
+		const outsideSandbox = bool(args, "outside_sandbox") === true;
 		const timeout = int(args, "timeout_seconds", 1, MAX_TIMEOUT) ?? DEFAULT_TIMEOUT;
 		const cwd = ctx.session.cwd;
 		if (!cwd) return errorResult("This session has no working folder.");
 		const logDir = join(ctx.tmpDir, "output");
 
 		if (bool(args, "background")) {
-			const job = ctx.jobs.start({ command, cwd, sessionId: ctx.session.id, logDir });
+			const job = ctx.jobs.start({
+				command,
+				cwd,
+				sessionId: ctx.session.id,
+				logDir,
+				outsideSandbox,
+			});
 			return {
 				content: [
 					text(
@@ -69,6 +86,7 @@ export const shellTool: ToolDefinition = {
 			sessionId: ctx.session.id,
 			logDir,
 			onOutput: ctx.output,
+			outsideSandbox,
 		});
 		let timedOut = false;
 		const timer = setTimeout(() => {

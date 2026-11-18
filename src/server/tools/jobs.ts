@@ -18,7 +18,13 @@ export class Jobs {
 		this.#onFinish = onFinish;
 	}
 
-	start(options: { command: string; cwd: string; sessionId: string; logDir: string }): Job {
+	start(options: {
+		command: string;
+		cwd: string;
+		sessionId: string;
+		logDir: string;
+		outsideSandbox?: boolean;
+	}): Job {
 		const id = `job-${this.#next++}`;
 		const running = startCommand(options);
 		const job: Job = {

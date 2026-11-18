@@ -270,6 +270,7 @@ const zh = {
 	alwaysActsAsYou:
 		"选「总是允许」后，本会话内这个工具的所有调用都不再问，包括在自带浏览器里以你的登录身份发送、付款、删除这类操作。",
 	"confirm_write-outside": "改动工作区外的文件",
+	"confirm_outside-sandbox": "在沙箱外运行，能读写 Yew Harness 自己的数据和钥匙串",
 	"confirm_widen-permission": "调高会话的授权方式",
 	"confirm_change-folder": "改会话的工作区",
 	"confirm_open-letters": "让会话直接收信",
@@ -1267,6 +1268,8 @@ const en: Record<MessageKey, string> = {
 	alwaysActsAsYou:
 		"With Always allow, no call of this tool in this session is asked about again, including sending, paying and deleting in the built-in browser with your sign-ins.",
 	"confirm_write-outside": "Change files outside the working folder",
+	"confirm_outside-sandbox":
+		"Runs outside the sandbox, where it can read and change Yew Harness's own data and the keychain",
 	"confirm_widen-permission": "Raise a session's permission mode",
 	"confirm_change-folder": "Change a session's working folder",
 	"confirm_open-letters": "Let a session receive letters directly",

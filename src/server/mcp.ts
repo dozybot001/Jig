@@ -6,6 +6,7 @@ import type { ImageBlock, JsonObject, TextBlock } from "../shared/messages.ts";
 import type { ConfirmReason } from "../shared/types.ts";
 import { presetMcp, serverEnv } from "./mcp-builtin.ts";
 import { type McpAuth, type OAuthSettings, SignInRequired } from "./mcp-oauth.ts";
+import { activeSandbox } from "./sandbox.ts";
 import { errorResult, type ToolDefinition, type ToolResult, text } from "./tools/types.ts";
 
 /**
@@ -284,7 +285,18 @@ class StdioTransport implements Transport {
 	#closed: Error | null = null;
 
 	constructor(config: McpServerConfig, env: NodeJS.ProcessEnv) {
-		this.#child = spawn(config.command as string, config.args ?? [], {
+		// Yew Harness's own two servers run as they are: the browser's Chrome brings its own sandbox,
+		// which cannot start inside another. A preset it installed may read its code in the data
+		// folder; every other server runs in the sandbox like a session's commands (sandbox.ts).
+		const own = config.ownEnv === true && config.preset === undefined;
+		const line = own
+			? { command: config.command as string, args: config.args ?? [] }
+			: activeSandbox().wrap(
+					config.command as string,
+					config.args ?? [],
+					config.preset ? ["mcp-presets"] : [],
+				);
+		this.#child = spawn(line.command, line.args, {
 			env: { ...(config.ownEnv ? serverEnv(env) : env), ...config.env },
 			stdio: ["pipe", "pipe", "pipe"],
 		});

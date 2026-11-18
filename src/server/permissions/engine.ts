@@ -23,7 +23,8 @@ export type Subject =
 	| { kind: "none" }
 	| { kind: "read"; tool: string; paths: string[]; summary: string }
 	| { kind: "write"; tool: string; paths: string[]; summary: string }
-	| { kind: "command"; tool: string; command: string }
+	/** `outsideSandbox`: the command asks to run outside the system sandbox, so it asks every time. */
+	| { kind: "command"; tool: string; command: string; outsideSandbox?: boolean }
 	| { kind: "url"; tool: string; url: string }
 	/**
 	 * Something that is neither a file, a command nor a URL, such as opening a session. `scope` names
@@ -225,6 +226,7 @@ export class PermissionEngine {
 			if (secret) reasons.add("credentials");
 		}
 		if (privileged) reasons.add("admin");
+		if (subject.outsideSandbox) reasons.add("outside-sandbox");
 		for (const target of redirectTargets) {
 			const path = resolvePath(target, cwd);
 			if (!path || !cwd || !isInside(path, cwd)) reasons.add("write-outside");

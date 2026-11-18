@@ -101,6 +101,19 @@ export function serveCommand(): Command {
 
 			const runtime = openRuntime({ env: io.env });
 			const { store, bus, gateway, home } = runtime;
+			// Sessions' commands and the MCP servers people add run in the system sandbox (blueprint,
+			// section 11), set up before anything can start one.
+			const { INSTALL_DIR, systemSandbox, setSandbox } = await import("../server/sandbox.ts");
+			const os = await import("node:os");
+			const sandbox = systemSandbox({ home, install: INSTALL_DIR, userHome: os.homedir(), port });
+			setSandbox(sandbox);
+			io.stderr.write(
+				sandbox.kind === "seatbelt"
+					? "Sessions' commands run in the macOS sandbox.\n"
+					: sandbox.kind === "bubblewrap"
+						? "Sessions' commands run in the bubblewrap sandbox; it cannot keep them from Yew Harness's port.\n"
+						: "No system sandbox here: sessions' commands run as your user account and can reach Yew Harness's own data.\n",
+			);
 			const stuck = store.recoverAfterRestart();
 			if (stuck.length > 0) {
 				io.stderr.write(
