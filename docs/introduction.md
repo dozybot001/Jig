@@ -1,6 +1,6 @@
 # Yew 对外介绍
 
-版本 0.27（2026-11-18）。官网产品库、README、App Store 描述和各渠道介绍 Yew 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
+版本 0.28（2026-11-18）。官网产品库、README、App Store 描述和各渠道介绍 Yew 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
 
 ## 一、定义
 
@@ -127,8 +127,11 @@ Yew 的特点不在单个会话多能干，而在一组会话怎样组织、人�
 | `models` | 主张 5 | Yew 给后端会话选服务商：国内、境外分组列出，没设密钥的会标出 / Choosing a provider for the Backend session in Yew: providers grouped into Chinese providers and Other providers, with the ones that have no key marked |
 | Yew | 主张 6 | Yew：红发女孩，头上别着红豆杉发饰 / Yew: a red-haired girl with a yew-berry hair ornament |
 
+官网 Yew 页用到的 Yew 的图（website b92d3e7，创始人看过预览说「发布」）：宽屏首屏是全身立绘 `portrait`；第 2、3、4 条主张旁边分别是 `letter-run`、`stamp`、`phone`；第 6 条是 `greeting` 加界面里那句真实的气泡。文件都在 `web/public/mascot/`。
+
 ## 修改记录
 
+- **0.28（2026-11-18）** 第七节记下官网 Yew 页用了哪几张 Yew 的图（平台组 b92d3e7）。
 - **0.27（2026-11-18）** Yew（红发女孩）从 10 个姿势加到 38 个，高清立绘 `web/public/mascot/portrait.webp` 已入库，主张 6 的配图可以换成它。
 - **0.26（2026-11-18）** 创始人（平台组转达）：「不要说吉祥物，它的名字就是 Yew」。正文里的吉祥物都改称 Yew，第 6 条主张和配图说明照官网改（website 2448a9a）。
 - **0.25（2026-11-18）** 创始人定产品页加一条吉祥物的主张（原话「加上」）：主张第 6 条和它的配图，文字在官网改版里请他确认。配图先用 `web/public/mascot` 的原图，高清立绘到了再换。
