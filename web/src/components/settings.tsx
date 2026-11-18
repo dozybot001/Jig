@@ -845,12 +845,52 @@ function UpdateStatus() {
 			</Button>
 		</div>
 	);
+	const manualBlock = updates.manual ? (
+		<div className="update-manual">
+			<p className="hint">{t("update_manual")}</p>
+			<div className="update-command">
+				<code className="update-code">{updates.manual}</code>
+				<Button
+					variant="icon"
+					aria-label={t("copy")}
+					busy={copy.busy}
+					onClick={() => void copy.run(updates.manual ?? "")}
+				>
+					<CopyIcon />
+				</Button>
+			</div>
+		</div>
+	) : null;
+	const installButton =
+		updates.available && latest && !updates.manual ? (
+			<div className="update-actions">
+				<Button
+					variant="primary"
+					busy={install.busy}
+					onClick={() => void install.run(latest.version)}
+				>
+					<ArrowUpIcon />
+					{t("update_install", { v: latest.version })}
+				</Button>
+			</div>
+		) : null;
 	let body: ReactNode;
 	if (job?.state === "installing") {
 		body = (
 			<p className="update-line" aria-live="polite">
 				{t("update_installing", { v: job.version })}
 			</p>
+		);
+	} else if (job?.state === "failed" && !updates.restart) {
+		// What went wrong, then what can be done: the command, or trying again.
+		body = (
+			<>
+				<details className="update-output">
+					<summary>{t("update_failed", { v: job.version })}</summary>
+					<pre>{job.output}</pre>
+				</details>
+				{manualBlock ?? installButton}
+			</>
 		);
 	} else if (updates.restart || installedNew) {
 		body = (
@@ -873,39 +913,7 @@ function UpdateStatus() {
 						{t("update_notes")}
 					</a>
 				</p>
-				{job?.state === "failed" && (
-					<details className="update-output">
-						<summary>{t("update_failed", { v: job.version })}</summary>
-						<pre>{job.output}</pre>
-					</details>
-				)}
-				{updates.manual ? (
-					<div className="update-manual">
-						<p className="hint">{t("update_manual")}</p>
-						<div className="update-command">
-							<code className="update-code">{updates.manual}</code>
-							<Button
-								variant="icon"
-								aria-label={t("copy")}
-								busy={copy.busy}
-								onClick={() => void copy.run(updates.manual ?? "")}
-							>
-								<CopyIcon />
-							</Button>
-						</div>
-					</div>
-				) : (
-					<div className="update-actions">
-						<Button
-							variant="primary"
-							busy={install.busy}
-							onClick={() => void install.run(latest.version)}
-						>
-							<ArrowUpIcon />
-							{t("update_install", { v: latest.version })}
-						</Button>
-					</div>
-				)}
+				{manualBlock ?? installButton}
 			</>
 		);
 	} else if (updates.kind === "source") {

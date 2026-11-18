@@ -40,6 +40,8 @@ function setup(options: Partial<UpdateOptions> = {}, version = "1.7.0") {
 		"registry.npmmirror.com": "sha512-same",
 		"registry.npmjs.org": "sha512-same",
 	};
+	/** What npm records in the global folder's lock file for the package it installs. */
+	const installs = { integrity: "sha512-same" };
 	let busy = 0;
 	let restarts = 0;
 	let refreshed = 0;
@@ -80,6 +82,12 @@ function setup(options: Partial<UpdateOptions> = {}, version = "1.7.0") {
 					join(made.root, "package.json"),
 					JSON.stringify({ name: "@tenonai/yew", version: asked.slice("@tenonai/yew@".length) }),
 				);
+				writeFileSync(
+					join(made.prefix, "lib", "node_modules", ".package-lock.json"),
+					JSON.stringify({
+						packages: { "node_modules/@tenonai/yew": { integrity: installs.integrity } },
+					}),
+				);
 			}
 			return { code: 0, output: "added 1 package" };
 		},
@@ -101,6 +109,7 @@ function setup(options: Partial<UpdateOptions> = {}, version = "1.7.0") {
 		restarts: () => restarts,
 		refreshed: () => refreshed,
 		integrity,
+		installs,
 	};
 }
 
@@ -238,6 +247,31 @@ describe("installing an update", () => {
 		assert.equal(runs.filter((run) => run.args.includes("install")).length, 0);
 	});
 
+	test("what npm installed from a mirror is checked again: one unlike npm's blocks the restart", async () => {
+		const { updates, installs, refreshed, prefix } = setup();
+		await updates.check();
+		installs.integrity = "sha512-swapped";
+		updates.install("1.8.0");
+		for (let i = 0; i < 5; i++) await settle();
+		const state = updates.state();
+		assert.equal(state.job?.state, "failed");
+		assert.match(state.job?.output ?? "", /is not the package/);
+		assert.equal(state.restart, false);
+		assert.equal(
+			state.manual,
+			"npm install --global @tenonai/yew@1.8.0 --registry=https://registry.npmjs.org/",
+		);
+		assert.equal(refreshed(), 0);
+		assert.throws(() => updates.restart(true), /Install it again first/);
+		// Installed again from npm's registry: the restart is offered.
+		writeFileSync(
+			join(prefix, "lib", "node_modules", ".package-lock.json"),
+			JSON.stringify({ packages: { "node_modules/@tenonai/yew": { integrity: "sha512-same" } } }),
+		);
+		assert.equal(updates.state().restart, true);
+		assert.equal(updates.state().manual, null);
+	});
+
 	test("when npm's own registry cannot be reached, the mirror's package is installed", async () => {
 		const { updates, integrity } = setup();
 		await updates.check();
@@ -261,6 +295,8 @@ describe("installing an update", () => {
 		assert.equal(job?.state, "failed");
 		assert.match(job?.output ?? "", /does not hold @tenonai\/yew@1\.8\.0/);
 		assert.equal(refreshed(), 0);
+		// Nothing that is not the package asked for gets started.
+		assert.throws(() => updates.restart(true), /Install it again first/);
 	});
 
 	test("an install that fails says so, with npm's output", async () => {

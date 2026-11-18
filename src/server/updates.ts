@@ -122,6 +122,11 @@ export class Updates {
 	#pending: NodeJS.Timeout | null = null;
 	#timer: NodeJS.Timeout | null = null;
 	#checking: Promise<UpdateState> | null = null;
+	/**
+	 * A mirror's package that is not npm's own got installed: no restart and no new Mac app until it
+	 * is installed again from npm's registry (the security group, 11-19).
+	 */
+	#blocked: { command: string; cleared: () => boolean } | null = null;
 
 	constructor(options: UpdateOptions) {
 		this.#o = options;
@@ -213,9 +218,12 @@ export class Updates {
 		const installed = this.#installed();
 		const latest = this.#kind === "source" ? null : this.#latest();
 		const available = latest !== null && newer(latest.version, installed.version);
+		// Installed again as it should be: the block is lifted.
+		if (this.#blocked?.cleared()) this.#blocked = null;
 		const restart =
-			installed.version !== this.#o.version ||
-			(installed.build !== null && this.#o.build !== null && installed.build !== this.#o.build);
+			this.#blocked === null &&
+			(installed.version !== this.#o.version ||
+				(installed.build !== null && this.#o.build !== null && installed.build !== this.#o.build));
 		return {
 			version: this.#o.version,
 			build: this.#o.build,
@@ -225,7 +233,7 @@ export class Updates {
 			checks: this.#checks(),
 			latest,
 			available,
-			manual: available && latest ? this.#manual(latest.version) : null,
+			manual: this.#blocked?.command ?? (available && latest ? this.#manual(latest.version) : null),
 			job: this.#job,
 			busy: this.#o.busy(),
 			restartPending: this.#pending !== null,
@@ -339,16 +347,31 @@ export class Updates {
 		}
 	}
 
+	/** The integrity npm recorded for the package it installed in a global folder. */
+	#installedIntegrity(prefix: string): string | null {
+		try {
+			const lock = JSON.parse(
+				readFileSync(join(prefix, "lib", "node_modules", ".package-lock.json"), "utf8"),
+			) as { packages?: Record<string, { integrity?: unknown }> };
+			const integrity = lock.packages?.[`node_modules/${PACKAGE}`]?.integrity;
+			return typeof integrity === "string" ? integrity : null;
+		} catch {
+			return null;
+		}
+	}
+
 	async #install(version: string): Promise<void> {
 		const prefix = globalPrefix(this.#root);
 		const registry = await this.#registryUrl();
 		// From a mirror, the package must be the one npm's own registry has (the security group, 11-19):
 		// a different one is not installed. When npm's registry cannot be reached, it goes ahead.
+		let official: string | null = null;
 		if (registry !== DEFAULT_REGISTRY) {
-			const [mirror, official] = await Promise.all([
+			const [mirror, fromNpm] = await Promise.all([
 				this.#integrity(registry, version),
 				this.#integrity(DEFAULT_REGISTRY, version),
 			]);
+			official = fromNpm;
 			if (official !== null && mirror !== official) {
 				this.#job = {
 					state: "failed",
@@ -389,12 +412,42 @@ export class Updates {
 			// Checked just below.
 		}
 		if (installed.name !== PACKAGE || installed.version !== version) {
+			const root = this.#root;
+			this.#blocked = {
+				command: `npm install --global ${PACKAGE}@${version}`,
+				cleared: () => {
+					try {
+						const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+							name?: unknown;
+							version?: unknown;
+						};
+						return pkg.name === PACKAGE && pkg.version === version;
+					} catch {
+						return false;
+					}
+				},
+			};
 			this.#job = {
 				state: "failed",
 				version,
 				output: `${result.output}\nAfter npm ran, ${this.#root} does not hold ${PACKAGE}@${version}; the Mac app was left as it was.`,
 			};
 			this.#o.log(`update: ${this.#root} does not hold ${PACKAGE}@${version} after npm`);
+			return;
+		}
+		// npm asks the mirror again while it installs: what it put there is checked against npm's own.
+		if (official !== null && this.#installedIntegrity(prefix) !== official) {
+			const command = `npm install --global ${PACKAGE}@${version} --registry=${DEFAULT_REGISTRY}`;
+			this.#blocked = {
+				command,
+				cleared: () => this.#installedIntegrity(prefix) === official,
+			};
+			this.#job = {
+				state: "failed",
+				version,
+				output: `${result.output}\nWhat npm installed from ${registry} is not the package ${DEFAULT_REGISTRY} has. Yew Harness was not restarted and the Mac app was left as it was. Install it again from npm's own registry: ${command}`,
+			};
+			this.#o.log(`update: the installed ${PACKAGE}@${version} does not match npm's`);
 			return;
 		}
 		let output = result.output;
@@ -414,6 +467,13 @@ export class Updates {
 	restart(now: boolean): UpdateState & { restarting: boolean } {
 		if (this.#job?.state === "installing") {
 			throw conflict("Wait until the update is installed.", undefined, "update-running");
+		}
+		if (this.#blocked) {
+			throw conflict(
+				`Install it again first: ${this.#blocked.command}`,
+				undefined,
+				"update-not-npm",
+			);
 		}
 		if (!now && this.#o.busy() > 0) {
 			this.#pending ??= setInterval(() => {
