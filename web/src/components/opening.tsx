@@ -97,28 +97,36 @@ export function Opening() {
 			<div className="opening-stage">
 				<svg className="opening-mark" viewBox="0 0 64 64" width={88} height={88} aria-hidden="true">
 					<circle className="opening-ring" cx="32" cy="32" r="30" pathLength={1} />
-					<path
-						className="opening-leaf"
-						pathLength={1}
-						d="M35.4 50.2C36.6 37.6 42.6 22.6 60 12.6C58.6 24.4 55.2 32.4 49.4 38.6C45 43.3 39.4 46.4 35.4 50.2Z"
-					/>
-					<ellipse
-						className="opening-berry"
-						cx="19.8"
-						cy="35.4"
-						rx="15.9"
-						ry="15.4"
-						fill="#C8323F"
-					/>
-					<ellipse
-						className="opening-seed"
-						cx="25.8"
-						cy="22.6"
-						rx="4.6"
-						ry="3.1"
-						transform="rotate(12 25.8 22.6)"
-						fill="#1F3A2E"
-					/>
+					{/*
+					 * The mark drawn at full size reaches past the ring: the leaf's tip at the top right is
+					 * 34 from the centre, the ring 30. Centred on what is drawn (3.9 to 60 across, 12.6 to
+					 * 50.8 down, as the app icons place it) and scaled to three quarters, its farthest
+					 * point, the leaf's tip, is 26 from the centre.
+					 */}
+					<g transform="translate(32 32) scale(0.75) translate(-31.95 -31.7)">
+						<path
+							className="opening-leaf"
+							pathLength={1}
+							d="M35.4 50.2C36.6 37.6 42.6 22.6 60 12.6C58.6 24.4 55.2 32.4 49.4 38.6C45 43.3 39.4 46.4 35.4 50.2Z"
+						/>
+						<ellipse
+							className="opening-berry"
+							cx="19.8"
+							cy="35.4"
+							rx="15.9"
+							ry="15.4"
+							fill="#C8323F"
+						/>
+						<ellipse
+							className="opening-seed"
+							cx="25.8"
+							cy="22.6"
+							rx="4.6"
+							ry="3.1"
+							transform="rotate(12 25.8 22.6)"
+							fill="#1F3A2E"
+						/>
+					</g>
 				</svg>
 				<ProductName className="opening-word" />
 				<Mascot pose="greeting" height={112} className="opening-mascot" />
