@@ -60,8 +60,6 @@ export function presetMcp(yewHome: string, id: string): McpServerConfig | null {
 export function builtinMcp(
 	yewHome: string,
 	env: NodeJS.ProcessEnv = process.env,
-	/** Yew Harness's own port, which the browser is kept from. */
-	port?: number,
 ): Record<string, McpServerConfig> {
 	if (env.YEW_MCP_BUILTIN === "off") return {};
 	const modules = join(installDir(yewHome), "node_modules");
@@ -75,12 +73,7 @@ export function builtinMcp(
 				// Page snapshots and screenshots it saves; otherwise they land in the folder Yew was started in.
 				"--output-dir",
 				join(yewHome, "tmp", "browser"),
-				// Not a boundary in itself (the security group, 11-18), one more layer over Yew Harness's port.
-				...(port ? ["--blocked-origins", `http://127.0.0.1:${port};http://localhost:${port}`] : []),
 			],
-			// Its root for files: uploads and named screenshots stay in this empty folder, not the whole
-			// computer, and file:// pages are refused (it is started without unrestricted file access).
-			cwd: join(yewHome, "browser-files"),
 			ownEnv: true,
 		},
 		computer: {

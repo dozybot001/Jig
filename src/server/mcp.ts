@@ -1,12 +1,11 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { MCP_PRESETS } from "../shared/mcp-presets.ts";
 import type { ImageBlock, JsonObject, TextBlock } from "../shared/messages.ts";
 import type { ConfirmReason } from "../shared/types.ts";
 import { presetMcp, serverEnv } from "./mcp-builtin.ts";
 import { type McpAuth, type OAuthSettings, SignInRequired } from "./mcp-oauth.ts";
-import { activeSandbox } from "./sandbox.ts";
 import { errorResult, type ToolDefinition, type ToolResult, text } from "./tools/types.ts";
 
 /**
@@ -33,8 +32,6 @@ export interface McpServerConfig {
 	ownEnv?: boolean;
 	/** One of the presets Yew installs (`"preset": "<id>"` in mcp.json). */
 	preset?: string;
-	/** The folder a server runs in; the browser's files stay inside it (mcp-builtin.ts). */
-	cwd?: string;
 	/** Signing in to an HTTP server in the browser: a client the person made, scopes to ask for. */
 	oauth?: OAuthSettings;
 }
@@ -287,18 +284,7 @@ class StdioTransport implements Transport {
 	#closed: Error | null = null;
 
 	constructor(config: McpServerConfig, env: NodeJS.ProcessEnv) {
-		// Yew Harness's own two servers run as they are: the browser's Chrome brings its own sandbox,
-		// which cannot start inside another. A preset it installed may read its code in the data
-		// folder; every other server runs in the sandbox like a session's commands (sandbox.ts).
-		const own = config.ownEnv === true && config.preset === undefined;
-		const line = own
-			? { command: config.command as string, args: config.args ?? [] }
-			: activeSandbox().wrap(config.command as string, config.args ?? [], {
-					readable: config.preset ? ["mcp-presets"] : [],
-				});
-		if (config.cwd) mkdirSync(config.cwd, { recursive: true });
-		this.#child = spawn(line.command, line.args, {
-			...(config.cwd ? { cwd: config.cwd } : {}),
+		this.#child = spawn(config.command as string, config.args ?? [], {
 			env: { ...(config.ownEnv ? serverEnv(env) : env), ...config.env },
 			stdio: ["pipe", "pipe", "pipe"],
 		});

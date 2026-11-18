@@ -2311,7 +2311,6 @@ function SkillsDialog({ onClose }: { onClose: () => void }) {
  * `yew app`, as two switches. Where the system does not support one, its row says so.
  */
 function SystemDialog({ onClose }: { onClose: () => void }) {
-	const sandbox = useAppState((state) => state.health?.sandbox ?? "none");
 	useLang();
 	const [status, setStatus] = useState<SystemStatus | null>(null);
 	const [error, setError] = useState<unknown>(null);
@@ -2364,12 +2363,6 @@ function SystemDialog({ onClose }: { onClose: () => void }) {
 						labelledBy={launcherId}
 						onChange={(on) => void change.run({ launcher: on })}
 					/>
-				</SettingRow>
-				{/* Where sessions' commands run (blueprint, section 11); without a sandbox it says so. */}
-				<SettingRow label={t("sandbox")} hint={t(`sandbox_${sandbox}_hint`)}>
-					<span className={sandbox === "none" ? "field-error" : "hint"}>
-						{t(`sandbox_${sandbox}`)}
-					</span>
 				</SettingRow>
 			</SettingGroup>
 			<ErrorBox error={error ?? change.error} />
