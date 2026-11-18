@@ -2,7 +2,7 @@
 
 本文件记录 Yew Harness（原名 Jig，1.3.0、1.4.0 叫 Yew）各版本中用户能感知的变化。格式参照 [Keep a Changelog 1.1.0](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
-## [未发布]
+## [1.6.0] - 2026-11-18
 
 ### 新增
 
