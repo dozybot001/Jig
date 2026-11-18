@@ -500,7 +500,7 @@ const zh = {
 	update_daily: "每天检查新版本",
 	update_dailyHint: "每天向 npm 的源查一次最新的版本号，只带 Yew Harness 的版本号。",
 	companion_update: "有新版本 {v}，在设置的「关于」里更新",
-	companion_restart: "新版本装好了，重启 Yew Harness 后用上",
+	companion_restart: "有更新还没用上，重启 Yew Harness 就好",
 	aboutBody:
 		"AI 原生的多 Agent 工作台。Yew Harness 按 Session Engineering 的做法组织 Agent 会话：你只对接主对话，要你授权和决定的事都汇到审批中心。\n\n会话按团队组织：常设会话长期负责一块事，任务会话为一件事开设，做完回报。会话跑在你电脑上的 Yew Harness 服务里，网页关了也照常干活。",
 	publisher: "出品方",
@@ -1598,7 +1598,7 @@ const en: Record<MessageKey, string> = {
 	update_dailyHint:
 		"Once a day, asks your npm registry for the newest version number, sending only Yew Harness's version.",
 	companion_update: "Version {v} is out: update it under About in the settings",
-	companion_restart: "The new version is installed: restart Yew Harness to use it",
+	companion_restart: "An update is waiting: restart Yew Harness to use it",
 	aboutBody:
 		"An AI-native multi-agent workbench. Yew Harness organizes agent sessions the Session Engineering way: you deal only with the main conversation, and everything that needs your approval or decision comes to the approval center.\n\nSessions are organized in teams: a standing session owns an area for the long term, and a task session is opened for one job and reports when it is done. Sessions run in the Yew Harness service on your computer and keep working when the page is closed.",
 	publisher: "Publisher",
