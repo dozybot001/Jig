@@ -56,7 +56,13 @@ import {
 	type ToolResult,
 } from "../tools/types.ts";
 import { ContextKeeper, notice } from "./compaction.ts";
-import { sanitizeInterrupted, toModelMessages, usageTotals, YEW_NOTE } from "./context.ts";
+import {
+	hookNote,
+	sanitizeInterrupted,
+	toModelMessages,
+	usageTotals,
+	YEW_NOTE,
+} from "./context.ts";
 import { Held } from "./held.ts";
 import { runHelper } from "./helper.ts";
 import { freeName, Mailroom } from "./mailroom.ts";
@@ -644,7 +650,10 @@ export class Agents {
 						});
 						if (stopped.block) {
 							stopHooks++;
-							this.#note(sessionId, `The person's Stop hook asks you to go on: ${stopped.block}`);
+							this.#store.appendEntry(
+								sessionId,
+								userEntry(hookNote("Stop", `It asks you to go on: ${stopped.block}`)),
+							);
 							this.#deliver(sessionId);
 							continue;
 						}
@@ -890,7 +899,7 @@ export class Agents {
 				const before = await this.#hook("PreToolUse", sessionId, {}, row.tool, row.args);
 				if (before.block) {
 					results.set(row.id, {
-						result: failure(`Stopped by the person's hook: ${before.block}`),
+						result: failure(hookNote("PreToolUse", `It stopped this call: ${before.block}`)),
 						status: "denied",
 						started,
 					});
@@ -1025,7 +1034,7 @@ export class Agents {
 						...result,
 						content: [
 							...result.content,
-							{ type: "text", text: `[The person's hook says] ${after.block}` },
+							{ type: "text", text: hookNote("PostToolUse", after.block) },
 						],
 					};
 				}
@@ -1112,7 +1121,7 @@ export class Agents {
 		if (first && this.#hooks.has("SessionStart")) {
 			const started = await this.#hook("SessionStart", sessionId, { source: "startup" });
 			if (started.context) {
-				this.#store.appendEntry(sessionId, userEntry(`${YEW_NOTE} ${started.context}`));
+				this.#store.appendEntry(sessionId, userEntry(hookNote("SessionStart", started.context)));
 			}
 		}
 		const prompts = this.#prompts.get(sessionId) ?? [];
@@ -1124,7 +1133,10 @@ export class Agents {
 				this.#store.appendEntry(
 					sessionId,
 					userEntry(
-						`${YEW_NOTE} The person's hook stopped the message above, so it is not to be acted on: ${checked.block}`,
+						hookNote(
+							"UserPromptSubmit",
+							`It stopped the message above, so that message is not to be acted on: ${checked.block}`,
+						),
 					),
 				);
 				this.#notice(sessionId, "hook", checked.block, {
@@ -1135,7 +1147,10 @@ export class Agents {
 				return true;
 			}
 			if (checked.context) {
-				this.#store.appendEntry(sessionId, userEntry(`${YEW_NOTE} ${checked.context}`));
+				this.#store.appendEntry(
+					sessionId,
+					userEntry(hookNote("UserPromptSubmit", checked.context)),
+				);
 			}
 		}
 		return false;

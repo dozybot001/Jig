@@ -888,7 +888,7 @@ const zh = {
 	modelProviders: "模型服务商",
 	searchServices: "搜索服务",
 	searchHelp:
-		"有 DeepSeek 的密钥就能联网搜索，用的是 DeepSeek 自己的搜索，不用另配；也可以存博查、Tavily、Brave 的密钥，几家都有时用排在前面的那家。搜索时只把搜索词发给这家服务。",
+		"有 DeepSeek 的密钥就能联网搜索，用的是 DeepSeek 自己的搜索，不用另配；也可以存博查、Tavily、Brave 的密钥，几家都有时用排在前面的那家。搜索时只把搜索词发给这家服务。DeepSeek 搜索按次收费，记在你的 DeepSeek 账上。",
 	searchName_bocha: "博查",
 	searchName_deepseek: "DeepSeek 搜索",
 	searchUsesProviderKey: "用「服务商与密钥」里的 {provider} 密钥",
@@ -1980,7 +1980,7 @@ const en: Record<MessageKey, string> = {
 	modelProviders: "Model providers",
 	searchServices: "Search services",
 	searchHelp:
-		"With a DeepSeek key, sessions can search the web through DeepSeek's own search, with nothing more to set up; you can also save a key for Bocha, Tavily or Brave, and when several have a key the first in this list is used. A search sends only the query to that service.",
+		"With a DeepSeek key, sessions can search the web through DeepSeek's own search, with nothing more to set up; you can also save a key for Bocha, Tavily or Brave, and when several have a key the first in this list is used. A search sends only the query to that service. DeepSeek charges each search to your DeepSeek account.",
 	searchName_bocha: "Bocha",
 	searchName_deepseek: "DeepSeek search",
 	searchUsesProviderKey: "Uses the {provider} key from Providers and keys",

@@ -2,7 +2,7 @@ import { messageText } from "../../shared/messages.ts";
 import type { ConfirmReason, PermissionRequest, Session } from "../../shared/types.ts";
 import type { ModelGateway } from "../model/gateway.ts";
 import type { Store } from "../store.ts";
-import { usageTotals } from "./context.ts";
+import { isOwnNote, usageTotals } from "./context.ts";
 
 /**
  * The automatic mode's check (blueprint 6.1, item 6): a permission that would be asked about goes to
@@ -72,7 +72,8 @@ export function personWords(store: Store, sessionId: string, limit = WORDS_LIMIT
 		if (entry?.role !== "user") continue;
 		if (entry.letter && entry.letter.from.kind !== "person") continue;
 		const text = messageText(entry.message).trim();
-		if (!text) continue;
+		// Yew's notes and what hooks printed are not the person's words.
+		if (!text || isOwnNote(text)) continue;
 		const piece = text.length > room ? `…${text.slice(text.length - room)}` : text;
 		room -= piece.length;
 		words.unshift(piece);

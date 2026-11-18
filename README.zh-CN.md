@@ -92,6 +92,7 @@ Key 只存进系统钥匙串。以后需要新的登录链接，运行 `yew open
 
 - [产品蓝图](docs/blueprint.md)：为什么做、做什么、不做什么、怎么验收
 - [系统沙箱](docs/sandbox.md)：会话的命令能做什么、不能做什么
+- [hooks](docs/hooks.md)：在会话的几个时候跑你自己的命令
 - [对外介绍](docs/introduction.md)：官网和商店介绍 Yew Harness 时用的定义和能写的能力
 - [数据清单](docs/data-inventory.md)：Yew Harness 在你电脑上存了哪些数据、怎么删除
 - [开发约定](AGENTS.md)、[更新记录](CHANGELOG.md)，以及实现计划 [M1](docs/archive/m1-plan.md)、[M2](docs/archive/m2-plan.md)、[M3](docs/archive/m3-plan.md)
