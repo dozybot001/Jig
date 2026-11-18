@@ -44,6 +44,34 @@ interface ServeFile {
 
 const serveFile = (home: string) => join(home, "serve.json");
 
+/** How often the sites of model providers with a key are read again for the sandbox. */
+const PROVIDER_SITES_MS = 60_000;
+
+/**
+ * The sites of the model providers that have a key, which commands in the sandbox may reach
+ * (blueprint, section 11). Providers on this computer are left out: local ports stay closed.
+ */
+async function modelSites(gateway: {
+	providers(): { id: string; baseUrl: string }[];
+	hasKey(provider: string): Promise<boolean>;
+}): Promise<string[]> {
+	const sites: string[] = [];
+	for (const provider of gateway.providers()) {
+		let url: URL;
+		try {
+			url = new URL(provider.baseUrl);
+		} catch {
+			continue;
+		}
+		const host = url.hostname;
+		if (host === "localhost" || host.endsWith(".localhost") || host === "[::1]") continue;
+		if (/^127\./.test(host) || host === "0.0.0.0") continue;
+		if (!(await gateway.hasKey(provider.id).catch(() => false))) continue;
+		sites.push(url.port ? `${host}:${url.port}` : host);
+	}
+	return [...new Set(sites)];
+}
+
 /** The short commit of a source checkout; null when Yew does not run from a git checkout. */
 function shortCommit(): string | null {
 	try {
@@ -101,6 +129,38 @@ export function serveCommand(): Command {
 
 			const runtime = openRuntime({ env: io.env });
 			const { store, bus, gateway, home } = runtime;
+			// Sessions' commands and the MCP servers people add go into the system sandbox, set up before
+			// anything can start one (blueprint, section 11). Off until the security group has tested it.
+			const sandbox = await import("../server/sandbox.ts");
+			let providerSites: string[] = [];
+			const refreshProviderSites = async () => {
+				providerSites = await modelSites(gateway);
+			};
+			if (io.env.YEW_SANDBOX === "on") {
+				const { homedir } = await import("node:os");
+				await refreshProviderSites();
+				const started = await sandbox
+					.startSandbox(
+						{
+							home,
+							install: sandbox.INSTALL_DIR,
+							userHome: homedir(),
+							port,
+							root: sandbox.sandboxRoot(homedir(), process.platform, io.env as NodeJS.ProcessEnv),
+						},
+						() => ({
+							sites: providerSites,
+							credentials: store.getSetting("sandboxCredentials", false),
+						}),
+						io.env as NodeJS.ProcessEnv,
+					)
+					.catch((error: Error) => ({ kind: "none" as const, problems: [error.message] }));
+				io.stderr.write(
+					started.kind === "none"
+						? `The system sandbox could not start, so sessions' commands run as your user account: ${started.problems.join("; ")}\n`
+						: `Sessions' commands run in the system sandbox (sandbox-runtime, ${started.kind === "macos" ? "Seatbelt" : "bubblewrap"}).\n${started.problems.map((line) => `sandbox: ${line}\n`).join("")}`,
+				);
+			}
 			const stuck = store.recoverAfterRestart();
 			if (stuck.length > 0) {
 				io.stderr.write(
@@ -124,7 +184,7 @@ export function serveCommand(): Command {
 				yewHome: home,
 				version: VERSION,
 				log,
-				builtin: builtinMcp(home, io.env as NodeJS.ProcessEnv),
+				builtin: builtinMcp(home, io.env as NodeJS.ProcessEnv, port),
 				prepare: mcpInstaller({ yewHome: home, env: io.env as NodeJS.ProcessEnv, log }),
 				// Sign-ins to MCP servers: tokens in the keychain; the browser comes back to this port.
 				auth: new McpAuth({
@@ -213,6 +273,7 @@ export function serveCommand(): Command {
 				});
 			});
 			if (!started) {
+				await sandbox.stopSandbox().catch(() => {});
 				runtime.close();
 				return EXIT_ERROR;
 			}
@@ -232,6 +293,11 @@ export function serveCommand(): Command {
 			};
 			syncRemote();
 			const remoteSweep = setInterval(syncRemote, REMOTE_SYNC_MS);
+			// A model provider's key saved since is a site commands in the sandbox may reach.
+			const sitesSweep =
+				sandbox.activeSandbox() === "none"
+					? null
+					: setInterval(() => void refreshProviderSites().catch(() => {}), PROVIDER_SITES_MS);
 			const info: ServeFile = { port, pid: process.pid, startedAt: Date.now() };
 			writeFileSync(serveFile(home), JSON.stringify(info), { mode: 0o600 });
 
@@ -246,6 +312,7 @@ export function serveCommand(): Command {
 					io.stderr.write("Stopping Yew Harness…\n");
 					clearInterval(sweep);
 					clearInterval(remoteSweep);
+					if (sitesSweep) clearInterval(sitesSweep);
 					scheduler.stop();
 					notifier.stop();
 					mcp.stop();
@@ -255,8 +322,14 @@ export function serveCommand(): Command {
 					// Open event streams would keep the process alive; end them too.
 					if ("closeAllConnections" in server) server.closeAllConnections();
 					rmSync(serveFile(home), { force: true });
-					runtime.close();
-					resolve(EXIT_OK);
+					// The sandbox's proxies stop once the commands and servers in it have been ended.
+					void sandbox
+						.stopSandbox()
+						.catch((error: Error) => log(`sandbox: ${error.message}`))
+						.finally(() => {
+							runtime.close();
+							resolve(EXIT_OK);
+						});
 				};
 				process.once("SIGINT", stop);
 				process.once("SIGTERM", stop);

@@ -36,6 +36,13 @@ export interface ToolContext {
 	/** Asks the person a question in Yew and waits for the answer. */
 	/** Puts questions to the person and waits; resolves with the answer as the session reads it. */
 	ask(request: QuestionRequest): Promise<string>;
+	/**
+	 * Asks the person to allow something the running call needs, such as a site a command in the
+	 * sandbox wants to reach, on a card for this call. Resolves false when they decline or nobody
+	 * can answer (an unattended run, a helper). `until` withdraws the card when the need has passed,
+	 * such as when the command ended first. Absent where the call cannot ask.
+	 */
+	permit?(request: PermissionRequest, until?: AbortSignal): Promise<boolean>;
 	mail: MailContext;
 	/** Sends a helper with a task and waits for its answer (blueprint 6.11, item 43). */
 	helper(task: string): Promise<{ text: string; calls: number; stopped?: string }>;

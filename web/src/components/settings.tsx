@@ -2312,6 +2312,9 @@ function SkillsDialog({ onClose }: { onClose: () => void }) {
  */
 function SystemDialog({ onClose }: { onClose: () => void }) {
 	useLang();
+	const sandbox = useAppState((state) => state.health?.sandbox ?? "none");
+	const credentials = useAppState((state) => state.settings?.sandboxCredentials ?? false);
+	const credentialsId = useId();
 	const [status, setStatus] = useState<SystemStatus | null>(null);
 	const [error, setError] = useState<unknown>(null);
 	useEffect(() => {
@@ -2365,6 +2368,25 @@ function SystemDialog({ onClose }: { onClose: () => void }) {
 					/>
 				</SettingRow>
 			</SettingGroup>
+			{/* Only while the system sandbox is on (blueprint, section 11). */}
+			{sandbox !== "none" && (
+				<SettingGroup title={t("sandbox")}>
+					<SettingRow label={t(`sandbox_${sandbox}`)} hint={t("sandboxHint")}>
+						{null}
+					</SettingRow>
+					<SettingRow
+						label={t("sandboxCredentials")}
+						hint={t("sandboxCredentialsHint")}
+						labelId={credentialsId}
+					>
+						<Switch
+							checked={credentials}
+							labelledBy={credentialsId}
+							onChange={(on) => void saveSettings({ sandboxCredentials: on }).catch(() => {})}
+						/>
+					</SettingRow>
+				</SettingGroup>
+			)}
 			<ErrorBox error={error ?? change.error} />
 		</Dialog>
 	);

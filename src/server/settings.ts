@@ -54,6 +54,11 @@ export const SETTING_DEFAULTS = {
 	mascot: true as boolean,
 	/** Whether the opening leaves by itself once started, or waits for a click (blueprint 6.10, item 45). */
 	opening: "auto" as OpeningMode,
+	/**
+	 * Whether commands in the system sandbox may use the SSH agent and the usual credential files;
+	 * off by default (founder, 11-18, on the security group's advice; blueprint, section 11).
+	 */
+	sandboxCredentials: false as boolean,
 };
 
 export const OPENING_MODES = ["auto", "click"] as const;
@@ -94,6 +99,7 @@ export function readSettings(store: Store): Settings {
 		disabledSkills: store.getSetting("disabledSkills", SETTING_DEFAULTS.disabledSkills),
 		mascot: store.getSetting("mascot", SETTING_DEFAULTS.mascot),
 		opening: store.getSetting("opening", SETTING_DEFAULTS.opening),
+		sandboxCredentials: store.getSetting("sandboxCredentials", SETTING_DEFAULTS.sandboxCredentials),
 	};
 }
 

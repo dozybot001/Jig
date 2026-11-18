@@ -39,6 +39,8 @@ export interface Settings {
 	mascot: boolean;
 	/** The opening leaves by itself once started, or waits for a click (blueprint 6.10, item 45). */
 	opening: "auto" | "click";
+	/** Whether commands in the system sandbox may use SSH and credential files (blueprint, section 11). */
+	sandboxCredentials: boolean;
 }
 
 /** This browser remembers "off" here, so the opening knows before the settings arrive. */
@@ -243,7 +245,12 @@ export interface AppState {
 	booted: boolean;
 	failure: string | null;
 	connection: "open" | "connecting";
-	health: { version: string; build: string | null } | null;
+	health: {
+		version: string;
+		build: string | null;
+		/** The system sandbox sessions' commands run in; "none" while it is off (blueprint, section 11). */
+		sandbox?: "macos" | "linux" | "none";
+	} | null;
 	settings: Settings | null;
 	groups: Group[];
 	sessions: Record<string, Session>;

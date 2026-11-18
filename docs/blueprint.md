@@ -1,6 +1,6 @@
 # Yew Harness 产品蓝图
 
-版本 1.30（2026-11-18）。本文是 Yew Harness 的起点：为什么做、做什么、不做什么、怎么验收。开发以本文为准；需求有变时更新本文，并在文末记录。
+版本 1.31（2026-11-18）。本文是 Yew Harness 的起点：为什么做、做什么、不做什么、怎么验收。开发以本文为准；需求有变时更新本文，并在文末记录。
 
 ## 一、一句话定义
 
@@ -216,16 +216,27 @@ Yew Harness 本身就是 Agent 的运行框架（harness），可以借鉴递归
 3. **评测固定，被改的一方碰不到**：用一组回放任务判断改得好不好，包括 M1–M4 的验收场景和过去的真实任务，再看成本和你介入的次数。评测、权限规则和「本人」标记，会话都不能改。Sakana 的 Darwin Gödel Machine 实验里出现过 agent 删掉检测幻觉用的标记、报告假成功，这一条就是防这种情况。
 4. **时机**：自我改进的循环放到 v1 之后。v1 只记下每个任务会话的结果和你介入的次数（6.2 第 9 条）。
 
-### 系统沙箱：暂停（创始人 11-18）
+### 系统沙箱：改用 sandbox-runtime（创始人 11-18）
 
-暂时不做。创始人 11-18（产品组会话）：「我觉得这类风险内容是否是不必要的，我们暂时不需要涉及这一方面」。起因是写沙箱评审的回复多次被模型服务的安全检查拦下。沙箱不对用户开放：已写的两次提交（4fe4086、a9e0ae9）撤回，没提交的半成品存成补丁放在 `~/.tenon-data/yew/`；新会话照旧默认按需授权（1.28），界面和 README 照旧写明不问就跑的命令以你的系统账户运行。安全组 11-18 确认其余功能照常发布，前提是：界面、README 和本文里讲按需授权风险的说明保留不动；对外不说、也不暗示有沙箱保护；界面上不出现沙箱字样。以后重启时按安全组 11-18 的防御版改法来做。
+**重启**：创始人 11-18（产品组会话，产品组转达）：「对，现在就重启沙箱，然后我们用 Anthropic 的开源项目」。1.29 的暂停到此为止；之前问「要把『以后改用 sandbox-runtime』记进 Harness 蓝图吗？」，他答「记下」（1.30）。自写的 Seatbelt 配置和 bubblewrap 参数不再用。
 
-**重启时改用 sandbox-runtime，不再自己写**（创始人 11-18，产品组会话，回答「要把『以后改用 sandbox-runtime』记进 Harness 蓝图吗？」：「记下」）。现在只记方向，不动代码。
+**什么时候对用户开放**：代码已接入，默认关闭，`yew serve` 在 `YEW_SANDBOX=on` 时才启用。安全组按配置逐条评审、再用自己的探针复测，通过以后才对用户开放。在那之前：新会话照旧默认按需授权（1.28）；界面、README 和本文里讲按需授权风险的说明保留不动；对外不说、也不暗示有沙箱保护；沙箱关着时界面上不出现沙箱字样。
 
-- **是什么**：Anthropic 开源的 sandbox-runtime（github.com/anthropics/sandbox-runtime，npm 包 `@anthropic-ai/sandbox-runtime`，Apache-2.0，Node 22.12 起），Claude Code 用的就是它，上游还标着 Beta。macOS 用 Seatbelt，Linux 用 bubblewrap，和撤回的 `sandbox.ts` 是同一路子。TypeScript 库先 `SandboxManager.initialize(config)`，再用 `wrapWithSandbox` 包住要跑的命令。
-- **为什么用它**：默认不让写文件，联网按域名放行，也连不上本机的套接字；安全组的五项改法大多变成写配置，不用再写沙箱本身，漏洞由上游和众多使用者一起修。权限引擎照旧自己写（第九节），它只管系统这一层的隔离。
-- **要自己配的**：挡住 `~/.yew` 和 Yew Harness 的端口；各工具的缓存目录指到沙箱自己的地方；子模块和 worktree 的 git 钩子和配置也要保护。
-- **接入时**：锁定精确版本，外面包一层 Yew Harness 自己的接口，因为它的配置格式还会变；要装的依赖写进安装说明（macOS 要 ripgrep，Linux 要 bubblewrap、ripgrep 和 socat）；接入后请安全组用它自己的探针复测。
+- **是什么**：Anthropic 开源的 sandbox-runtime（github.com/anthropics/sandbox-runtime，npm 包 `@anthropic-ai/sandbox-runtime`，Apache-2.0），Claude Code 用的就是它，上游还标着 Beta。macOS 用 Seatbelt，Linux 用 bubblewrap。锁定精确版本（0.0.83），只用它 README 和类型定义里公开的接口，只在 `src/server/sandbox.ts` 里引用，外面这一层是 Yew Harness 自己的接口。`yew serve` 启动时 `SandboxManager.initialize` 一次、退出时 `reset`；会话的命令和 stdio MCP 服务器的启动命令先用 `wrapWithSandbox` 包起来再执行。权限引擎照旧自己写（第九节），沙箱只管系统这一层的隔离。
+- **写入**：只放行会话的工作目录、沙箱自己的缓存目录（macOS 在 `~/Library/Caches/yew-sandbox`，Linux 在 `~/.cache/yew-sandbox`）和临时目录（`/tmp`；macOS 上还有用户自己的临时文件夹，`mktemp` 只认它）。数据目录、安装目录、开机启动项（LaunchAgents、systemd 用户单元、autostart）和 `~/Applications/Yew.app` 不可写。仓库的钩子和配置不可写：库自带保护 `.git/hooks`、`.git/config` 和 shell 的配置文件，Yew Harness 另加子模块和 worktree 的（macOS 用通配，Linux 列出现有的路径）。
+- **读取**：数据目录不可读。常见凭据文件（和文件工具拒绝的是同一份清单：`~/.ssh`、`~/.aws`、`~/.netrc`、`~/.npmrc` 等）和 ssh-agent 默认不给，用 `credentials`（`mode: "deny"`）配；设置「启动」里的开关打开才放行（创始人 11-18 在安全组会话：「按你建议即可」）。
+- **网络**：放行常用的包管理源、GitHub 和 Gitee、配了密钥的模型服务商。别的网址在命令运行时问你，卡片挂在这次调用上，审批中心里也有；命令先结束了，卡片就撤下。没人可问时（后台命令、MCP 服务器、无人值守的定时任务）或同时有几条命令都能问时，直接拒绝并写明原因。Yew Harness 的端口、本机端口、私网地址和 Unix 套接字不通。
+- **缓存**：npm、yarn、pip、uv、Go、Gradle 等工具的缓存用环境变量指到沙箱自己的缓存目录；你自己的缓存在沙箱里只读。
+- **沙箱外**：命令加 `outside_sandbox` 才在沙箱外跑，每次都问，卡片写明在沙箱外运行；在外面跑的 git 不执行钩子和 fsmonitor。
+- **MCP**：人加的 stdio 服务器和 Yew Harness 装的预置服务器进沙箱。预置服务器能读自己在数据目录里的代码、连自己的服务（Gitee、Notion、Sentry）；人加的服务器在 mcp.json 的条目里用 `allowedDomains` 写它要连的网址。自带的浏览器和电脑操控不进沙箱（Chrome 自带沙箱，不能嵌套）；浏览器以数据目录里一个空文件夹为文件根，打不开 `file://`，也连不上 Yew Harness 的端口。
+- **保持不开**：`allowAppleEvents`、`allowAllUnixSockets`、`allowLocalBinding`、`allowPty`、`enableWeakerNestedSandbox`、`enableWeakerNetworkIsolation`、`allowNestedUserNamespaces`；`allowGitConfig` 保持 false。
+- **依赖**：macOS 要 ripgrep；Linux 要 bubblewrap、socat 和 ripgrep，写进 README 的安装说明。缺了的话 `yew serve` 写明沙箱没起来，命令照旧以你的系统账户运行。
+- **还没解决，交安全组评审时定**：
+  - 钥匙串：库的公开配置只能多放行系统服务（`allowMachLookup`），不能另外拦。创始人选的 A（沙箱里取不到钥匙串条目）还没落到配置上，要上游加选项，或在外层补。
+  - 问网址时，库不说是哪条命令在连，所以只在恰好一条能问的命令在跑时才问。
+  - 本机端口不能监听，dev server 要在沙箱外跑；Xcode、swift 的构建要写 `~/Library/Developer` 这类位置，也要在沙箱外跑。
+  - Linux 没有实测。
+  - 1.29 时存在 `~/.tenon-data/yew/` 的半成品补丁已被这次的实现取代。
 
 下面是安全组 11-18 当时的评估。
 
@@ -334,6 +345,7 @@ Yew Harness 本身就是 Agent 的运行框架（harness），可以借鉴递归
 - **1.7（2026-11-16）** 创始人问「服务商与密钥是否加一个各服务商的连通性测试（显示延迟）、余额查看」。6.10 新增第 37 条。余额只接了文档里写明能用普通密钥查询的两家；OpenRouter 的余额接口要管理密钥，Anthropic、OpenAI 等没有按密钥查余额的接口，没有接。
 - **1.8（2026-11-16）** 余额查看做出来后只有两家服务商能查，创始人定「那不接余额」。6.10 第 37 条去掉余额，只留连接测试；相关代码、接口和界面一并删除。
 - **1.9（2026-11-16）** 创始人问能否把整个工作流迁到 Jig，缺口是浏览器和电脑操控，他定「可以默认装载浏览器 mcp 以及电脑控制 mcp」。6.10 新增第 38 条；第十节「v1 不做」里的电脑操控改为经自带的 MCP 服务提供。不自己实现，按原则 6「能用 MCP 接的不内置」。
+- **1.31（2026-11-18）** 系统沙箱重启，改用 sandbox-runtime，创始人（产品组会话，产品组转达）：「对，现在就重启沙箱，然后我们用 Anthropic 的开源项目」。第十一节「系统沙箱：暂停」改为「系统沙箱：改用 sandbox-runtime」，写明配置、开关、依赖和还没解决的几项。代码默认关闭，`YEW_SANDBOX=on` 时启用；安全组复测通过以前不对用户开放，新会话照旧默认按需授权。
 - **1.30（2026-11-18）** 重启沙箱时改用 Anthropic 开源的 sandbox-runtime，不再自己写，创始人（产品组会话）：「记下」。第十一节「系统沙箱：暂停」加上重启时的做法；现在只记方向，不动代码。
 - **1.29（2026-11-18）** 系统沙箱暂停，创始人（产品组会话 15:03）：「我觉得这类风险内容是否是不必要的，我们暂时不需要涉及这一方面」。第十一节「下一版的主项」改为「系统沙箱：暂停」；撤回 4fe4086、a9e0ae9，没提交的半成品存成补丁；新会话照旧默认按需授权。安全组的五项改法一并暂停，重启沙箱时照它来做。安全组确认其余功能照常发布，前提是风险说明保留、对外不说有沙箱保护、界面上不出现沙箱字样。
 - **1.28（2026-11-18）** 沙箱上线前新会话默认的授权方式，创始人定「保持按需授权」（选项：保持按需授权，或改成逐项授权）。

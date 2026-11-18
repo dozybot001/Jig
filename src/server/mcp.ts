@@ -1,11 +1,12 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { MCP_PRESETS } from "../shared/mcp-presets.ts";
 import type { ImageBlock, JsonObject, TextBlock } from "../shared/messages.ts";
 import type { ConfirmReason } from "../shared/types.ts";
-import { presetMcp, serverEnv } from "./mcp-builtin.ts";
+import { PRESET_SITES, presetMcp, serverEnv } from "./mcp-builtin.ts";
 import { type McpAuth, type OAuthSettings, SignInRequired } from "./mcp-oauth.ts";
+import { quote, sandboxed } from "./sandbox.ts";
 import { errorResult, type ToolDefinition, type ToolResult, text } from "./tools/types.ts";
 
 /**
@@ -32,6 +33,13 @@ export interface McpServerConfig {
 	ownEnv?: boolean;
 	/** One of the presets Yew installs (`"preset": "<id>"` in mcp.json). */
 	preset?: string;
+	/** The folder a server runs in; the browser's files stay inside it (mcp-builtin.ts). */
+	cwd?: string;
+	/**
+	 * Sites a server in the system sandbox may reach (`"allowedDomains"` in mcp.json), such as
+	 * `api.example.com` or `*.example.com:443`; nobody is asked for a server's connections.
+	 */
+	allowedDomains?: string[];
 	/** Signing in to an HTTP server in the browser: a client the person made, scopes to ask for. */
 	oauth?: OAuthSettings;
 }
@@ -207,6 +215,19 @@ function oauthOf(value: unknown, env: NodeJS.ProcessEnv): OAuthSettings | undefi
 	};
 }
 
+/** The sites of an entry's `allowedDomains`: names with an optional `*.` and `:port`, up to 50. */
+function sitesOf(value: unknown): string[] | undefined {
+	if (!Array.isArray(value)) return undefined;
+	const sites = value
+		.filter(
+			(site): site is string =>
+				typeof site === "string" &&
+				/^(\*\.)?[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*(:\d{1,5})?$/.test(site),
+		)
+		.slice(0, 50);
+	return sites.length > 0 ? sites : undefined;
+}
+
 export function readMcpConfig(
 	yewHome: string,
 	env: NodeJS.ProcessEnv = process.env,
@@ -245,19 +266,23 @@ export function readMcpConfig(
 			};
 		} else if (typeof entry.preset === "string" && presetMcp(yewHome, entry.preset)) {
 			const envs = strings(entry.env);
+			const sites = sitesOf(entry.allowedDomains);
 			configs[name] = {
 				...(presetMcp(yewHome, entry.preset) as McpServerConfig),
 				...(envs ? { env: envs } : {}),
+				...(sites ? { allowedDomains: sites } : {}),
 				...off,
 			};
 		} else if (typeof entry.command === "string" && entry.command) {
 			const envs = strings(entry.env);
+			const sites = sitesOf(entry.allowedDomains);
 			configs[name] = {
 				command: expand(entry.command, env),
 				args: Array.isArray(entry.args)
 					? entry.args.filter((arg) => typeof arg === "string").map((arg) => expand(arg, env))
 					: [],
 				...(envs ? { env: envs } : {}),
+				...(sites ? { allowedDomains: sites } : {}),
 				...off,
 			};
 		} else if (entry.disabled === true && builtin[name]) {
@@ -283,11 +308,52 @@ class StdioTransport implements Transport {
 	#buffer = "";
 	#closed: Error | null = null;
 
-	constructor(config: McpServerConfig, env: NodeJS.ProcessEnv) {
-		this.#child = spawn(config.command as string, config.args ?? [], {
-			env: { ...(config.ownEnv ? serverEnv(env) : env), ...config.env },
-			stdio: ["pipe", "pipe", "pipe"],
-		});
+	/**
+	 * Starts a server. Yew Harness's own two run as they are: the browser's Chrome brings its own
+	 * sandbox, which cannot start inside another, and computer control needs the screen. Every other
+	 * server runs in the system sandbox when it is on (sandbox.ts), like a session's commands: it
+	 * writes only temporary files and caches, reaches the sites it is allowed, and a preset may read
+	 * its own code in the data folder.
+	 */
+	static async start(
+		config: McpServerConfig,
+		env: NodeJS.ProcessEnv,
+		yewHome: string,
+	): Promise<StdioTransport> {
+		const variables = { ...(config.ownEnv ? serverEnv(env) : env), ...config.env };
+		if (config.cwd) mkdirSync(config.cwd, { recursive: true });
+		const own = config.ownEnv === true && config.preset === undefined;
+		const line = [config.command as string, ...(config.args ?? [])].map(quote).join(" ");
+		const box = own
+			? null
+			: await sandboxed(`exec ${line}`, {
+					grant: {
+						readable: config.preset ? [join(yewHome, "mcp-presets", config.preset)] : [],
+						sites: [
+							...(config.preset ? (PRESET_SITES[config.preset] ?? []) : []),
+							...(config.allowedDomains ?? []),
+						],
+					},
+					text: line,
+				});
+		if (box) {
+			for (const name of box.unset) delete variables[name];
+			Object.assign(variables, box.env);
+		}
+		const options = {
+			...(config.cwd ? { cwd: config.cwd } : {}),
+			env: variables,
+			stdio: ["pipe", "pipe", "pipe"] as ["pipe", "pipe", "pipe"],
+		};
+		const child = box
+			? spawn(box.line, { ...options, shell: true })
+			: spawn(config.command as string, config.args ?? [], options);
+		if (box) child.once("exit", () => box.finish());
+		return new StdioTransport(child);
+	}
+
+	constructor(child: ChildProcessWithoutNullStreams) {
+		this.#child = child;
 		this.#child.stdout.setEncoding("utf8");
 		this.#child.stdout.on("data", (chunk: string) => this.#read(chunk));
 		// What a server prints as diagnostics is not kept: it may hold what the server was given.
@@ -483,19 +549,28 @@ class Server {
 	/** Where its sign-in page is, while it wants one. */
 	signInAt: string | null = null;
 	#transport: Transport | null = null;
+	#closed = false;
 
 	constructor(name: string, config: McpServerConfig) {
 		this.name = name;
 		this.config = config;
 	}
 
-	async connect(make: (config: McpServerConfig) => Transport, version: string): Promise<void> {
+	async connect(
+		make: (config: McpServerConfig) => Transport | Promise<Transport>,
+		version: string,
+	): Promise<void> {
 		if (this.config.disabled) {
 			this.state = "disabled";
 			return;
 		}
 		try {
-			const transport = make(this.config);
+			const transport = await make(this.config);
+			// Closed while it was starting: the server it started goes too.
+			if (this.#closed) {
+				transport.close();
+				return;
+			}
 			this.#transport = transport;
 			const limit = AbortSignal.timeout(CONNECT_MS);
 			await transport.request(
@@ -560,6 +635,7 @@ class Server {
 	}
 
 	close(): void {
+		this.#closed = true;
 		this.#transport?.close();
 		this.#transport = null;
 	}
@@ -622,7 +698,7 @@ export class McpHub {
 		}
 		const env = this.#options.env ?? process.env;
 		const auth = this.#options.auth;
-		const make = (name: string, config: McpServerConfig): Transport =>
+		const make = (name: string, config: McpServerConfig): Transport | Promise<Transport> =>
 			config.url
 				? new HttpTransport(
 						config,
@@ -630,7 +706,7 @@ export class McpHub {
 						this.#options.fetch ?? fetch,
 						auth ? () => auth.bearer(name, config.url as string) : null,
 					)
-				: new StdioTransport(config, env);
+				: StdioTransport.start(config, env, this.#options.yewHome);
 		const offer = () => {
 			this.#definitions = [...this.#servers.values()].flatMap((server) =>
 				server.tools.map((tool) => this.#definition(server, tool)),

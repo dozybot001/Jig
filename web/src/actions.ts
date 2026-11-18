@@ -136,9 +136,19 @@ export async function boot(): Promise<void> {
 	applyAppearance(null);
 	try {
 		await exchangeToken();
-		const health = await api<{ version: string; build?: string }>("GET", "/api/health");
+		const health = await api<{
+			version: string;
+			build?: string;
+			sandbox?: "macos" | "linux" | "none";
+		}>("GET", "/api/health");
 		// The opening lists these steps as they finish.
-		setState({ health: { version: health.version, build: health.build ?? null } });
+		setState({
+			health: {
+				version: health.version,
+				build: health.build ?? null,
+				...(health.sandbox ? { sandbox: health.sandbox } : {}),
+			},
+		});
 		const settings = await api<Settings>("GET", "/api/settings");
 		setState({ settings });
 		applyAppearance(settings);

@@ -10,6 +10,8 @@ import { MemoryKeyStore } from "../src/server/keys.ts";
 import { ModelGateway } from "../src/server/model/gateway.ts";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "../src/server/model/testing.ts";
 import { PermissionEngine } from "../src/server/permissions/engine.ts";
+import { ALL_TOOLS } from "../src/server/tools/registry.ts";
+import { type ToolDefinition, text } from "../src/server/tools/types.ts";
 import type { Entry, PermissionRequest, Session } from "../src/shared/types.ts";
 import { newStore, tempDir } from "./helpers/store.ts";
 
@@ -22,6 +24,7 @@ function setup(
 		retry?: { maxRetries: number; baseDelayMs: number };
 		idleMs?: number;
 		maxSteps?: number;
+		tools?: ToolDefinition[];
 	} = {},
 ) {
 	const faux = fauxProvider();
@@ -45,6 +48,7 @@ function setup(
 		draftIntervalMs: 0,
 		log: () => {},
 		...(options.maxSteps ? { maxSteps: options.maxSteps } : {}),
+		...(options.tools ? { tools: options.tools } : {}),
 	});
 	const session = store.createSession({
 		name: "test",
@@ -116,6 +120,57 @@ describe("agent loop", () => {
 			calls.map((call) => call.status),
 			["done", "done"],
 		);
+	});
+
+	test("a running call can ask the person for what it needs; a card whose need has passed is withdrawn", async () => {
+		const answers: boolean[] = [];
+		let pending: () => number = () => 0;
+		const request: PermissionRequest = {
+			tool: "shell",
+			summary: "example.com:443",
+			mustConfirm: false,
+			reasons: ["connect-site"],
+		};
+		// Like a command in the sandbox that wants to reach a site, then another while it runs.
+		const needs: ToolDefinition = {
+			name: "needs_site",
+			description: "Connects to two sites.",
+			parameters: { type: "object", properties: {} },
+			readOnly: false,
+			needsFolder: false,
+			subject: () => ({ kind: "none" }),
+			async run(_args, ctx) {
+				answers.push((await ctx.permit?.(request)) ?? false);
+				const ended = new AbortController();
+				const second = ctx.permit?.({ ...request, summary: "example.org:443" }, ended.signal);
+				await until(() => pending() === 1);
+				ended.abort();
+				answers.push((await second) ?? false);
+				return { content: [text("connected")] };
+			},
+		};
+		const { faux, store, agents, session } = setup({ tools: [...ALL_TOOLS, needs] });
+		pending = () => store.pendingApprovals(session.id).length;
+		faux.setResponses([
+			toolUse(fauxToolCall("needs_site", {}, { id: "c1" })),
+			fauxAssistantMessage("Done."),
+		]);
+		agents.send(session.id, "connect");
+		await until(() => pending() === 1);
+		const [card] = store.pendingApprovals(session.id);
+		assert.ok(card);
+		assert.equal(card.kind, "permission");
+		assert.equal((card.request as PermissionRequest).summary, "example.com:443");
+		assert.equal(store.getSession(session.id).status, "waiting");
+		agents.answer(card.id, { decision: "allow_once" });
+		await agents.whenIdle(session.id);
+		assert.deepEqual(answers, [true, false]);
+		const all = store.approvalsForToolCalls([card.toolCallId as string]);
+		assert.deepEqual(
+			all.map((approval) => approval.status),
+			["resolved", "cancelled"],
+		);
+		assert.equal(store.getSession(session.id).status, "idle");
 	});
 
 	test("an operation that needs approval waits; a refusal with a reason reaches the model", async () => {

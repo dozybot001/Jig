@@ -1018,6 +1018,7 @@ export class Agents {
 		const model = this.#gateway.model(session.provider, session.model);
 		let tail = "";
 		let timer: ReturnType<typeof setTimeout> | null = null;
+		let permits: Promise<boolean> = Promise.resolve(true);
 		const context: ToolContext = {
 			session,
 			signal: live.controller.signal,
@@ -1054,6 +1055,39 @@ export class Agents {
 				if (!answer?.answer) throw new ToolInputError("Stopped before the person answered.");
 				return answer.answer;
 			},
+			permit: (request, until) => {
+				// One card at a time for a call; the next waits until the person has answered.
+				const next = permits.then(async () => {
+					if (until?.aborted) return false;
+					const run = this.#mail.run(sessionId);
+					if (run?.unattended) {
+						run.refused.push(request.summary);
+						return false;
+					}
+					this.#store.updateToolCall(row.id, { status: "waiting" });
+					const approval = this.#store.createApproval({
+						sessionId,
+						toolCallId: row.id,
+						kind: "permission",
+						request,
+					});
+					// The need passed before the person answered: the card is withdrawn.
+					const withdraw = () => {
+						if (this.#store.getApproval(approval.id).status !== "pending") return;
+						this.#store.cancelApproval(approval.id);
+						live.waiters.get(approval.id)?.(null);
+					};
+					until?.addEventListener("abort", withdraw, { once: true });
+					const answer = await this.#waitFor(sessionId, approval.id, live);
+					until?.removeEventListener("abort", withdraw);
+					if (!live.controller.signal.aborted) {
+						this.#store.updateToolCall(row.id, { status: "running" });
+					}
+					return answer?.decision === "allow_once" || answer?.decision === "allow_always";
+				});
+				permits = next.catch(() => false);
+				return next;
+			},
 			mail: this.#mailContext(sessionId, live, row.id),
 			helper: (task) => {
 				const parent = this.#store.getSession(sessionId);
@@ -1072,6 +1106,7 @@ export class Agents {
 						ask: async () => {
 							throw new ToolInputError("A helper cannot ask the person.");
 						},
+						permit: async () => false,
 					},
 					systemPrompt: helperPrompt(parent.name, parent.cwd),
 					task,

@@ -270,6 +270,9 @@ const zh = {
 	alwaysActsAsYou:
 		"选「总是允许」后，本会话内这个工具的所有调用都不再问，包括在自带浏览器里以你的登录身份发送、付款、删除这类操作。",
 	"confirm_write-outside": "改动工作区外的文件",
+	"confirm_outside-sandbox":
+		"在沙箱外运行：能读写 Yew Harness 自己的数据和钥匙串，项目里的脚本（npm run、make、构建脚本）也会在沙箱外跑",
+	"confirm_connect-site": "让命令连接这个网站",
 	"confirm_widen-permission": "调高会话的授权方式",
 	"confirm_change-folder": "改会话的工作区",
 	"confirm_open-letters": "让会话直接收信",
@@ -992,6 +995,14 @@ const zh = {
 	launcherHint:
 		"点它会启动 Yew Harness 并打开界面。移动或升级 Node.js、Yew Harness 之后，关掉再打开这个开关一次。",
 	launcherUnsupported: "只支持 macOS。",
+	sandbox: "会话的命令",
+	sandbox_macos: "在系统沙箱里运行（macOS）",
+	sandbox_linux: "在系统沙箱里运行（Linux）",
+	sandboxHint:
+		"读写不了 Yew Harness 的数据，改不了它的程序和开机启动项；只能写工作区、临时文件夹和沙箱自己的缓存。联网只放行常用的包管理源、代码托管网站和配了密钥的模型服务商，连别的网站时先问你。要在沙箱外跑的命令每次都问你。",
+	sandboxCredentials: "沙箱里可以用 SSH 和凭据文件",
+	sandboxCredentialsHint:
+		"打开后，沙箱里的命令可以读 ~/.ssh、~/.aws、~/.netrc 这类凭据文件，macOS 上还可以用 ssh-agent。默认关闭，从下一条命令起生效。",
 	writtenTo: "已写到 {path}",
 	err_notOnThisSystem: "这台电脑的系统不支持这一项。",
 	err_serviceFailed: "系统没有接受这个启动项。在终端运行 yew service install 看具体原因。",
@@ -1267,6 +1278,9 @@ const en: Record<MessageKey, string> = {
 	alwaysActsAsYou:
 		"With Always allow, no call of this tool in this session is asked about again, including sending, paying and deleting in the built-in browser with your sign-ins.",
 	"confirm_write-outside": "Change files outside the working folder",
+	"confirm_outside-sandbox":
+		"Runs outside the sandbox, where it can read and change Yew Harness's own data and the keychain; the project's scripts (npm run, make, build scripts) run outside too",
+	"confirm_connect-site": "Let the command connect to this site",
 	"confirm_widen-permission": "Raise a session's permission mode",
 	"confirm_change-folder": "Change a session's working folder",
 	"confirm_open-letters": "Let a session receive letters directly",
@@ -2026,6 +2040,14 @@ const en: Record<MessageKey, string> = {
 	launcherHint:
 		"Clicking it starts Yew Harness and opens the interface. After you move or update Node.js or Yew Harness, turn this off and on again.",
 	launcherUnsupported: "Works on macOS only.",
+	sandbox: "Sessions' commands",
+	sandbox_macos: "Run in the system sandbox (macOS)",
+	sandbox_linux: "Run in the system sandbox (Linux)",
+	sandboxHint:
+		"They cannot read or change Yew Harness's data, its program or what starts at login, and write only in the workspace, temporary folders and the sandbox's own caches. They reach the usual package registries, code hosts and the model providers that have a key; for any other site you are asked first. A command that has to run outside asks you every time.",
+	sandboxCredentials: "Commands in the sandbox can use SSH and credential files",
+	sandboxCredentialsHint:
+		"When on, commands in the sandbox can read credential files such as ~/.ssh, ~/.aws and ~/.netrc, and on macOS use ssh-agent. Off by default; applies from the next command.",
 	writtenTo: "Written to {path}",
 	err_notOnThisSystem: "This computer's system does not support this.",
 	err_serviceFailed:

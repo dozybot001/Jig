@@ -10,7 +10,7 @@ Yew Harness 以 MIT 许可证开源，当前版本 1.5.0。能做什么见[更�
 
 ## 安装与快速开始
 
-需要 macOS 或 Linux、Node.js 24 或更高版本和 ripgrep（macOS：`brew install ripgrep`）。Windows 请在 WSL 里使用。
+需要 macOS 或 Linux、Node.js 24 或更高版本和 ripgrep（macOS：`brew install ripgrep`）；Linux 上还要 bubblewrap 和 socat（Debian、Ubuntu：`sudo apt install ripgrep bubblewrap socat`）。Windows 请在 WSL 里使用。
 
 1. 安装：`npm install -g @tenonai/yew`。
 2. 存入一个模型服务商的 API Key（默认服务商是 DeepSeek）：`yew key set deepseek`。Key 只存进系统钥匙串。

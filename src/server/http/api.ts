@@ -422,6 +422,8 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		if (mascot !== undefined) store.setSetting("mascot", mascot);
 		const opening = optEnum(fields, "opening", OPENING_MODES);
 		if (opening) store.setSetting("opening", opening);
+		const credentials = optBoolean(fields, "sandboxCredentials");
+		if (credentials !== undefined) store.setSetting("sandboxCredentials", credentials);
 		const workspaces = optArray(fields, "workspaces");
 		if (workspaces) {
 			store.setSetting("workspaces", parseWorkspaces(workspaces, readSettings(store).workspaces));

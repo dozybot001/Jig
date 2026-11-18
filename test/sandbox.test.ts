@@ -1,0 +1,323 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { after, describe, test } from "node:test";
+import { fileURLToPath } from "node:url";
+import { McpHub } from "../src/server/mcp.ts";
+import { PermissionEngine } from "../src/server/permissions/engine.ts";
+import {
+	activeSandbox,
+	commandFilesystem,
+	gitInternals,
+	INSTALL_DIR,
+	PACKAGE_SITES,
+	type SandboxPlaces,
+	sandboxConfig,
+	sandboxEnvironment,
+	startSandbox,
+	stopSandbox,
+} from "../src/server/sandbox.ts";
+import { startCommand } from "../src/server/tools/process.ts";
+import type { Session } from "../src/shared/types.ts";
+import { tempDir } from "./helpers/store.ts";
+
+/**
+ * The system sandbox (blueprint, section 11): its configuration, and everyday work in it. Whether it
+ * holds against a command trying to get out is the security group's to test, with its own probes.
+ */
+
+const base = realpathSync(tempDir("yew-sandbox-"));
+const places: SandboxPlaces = {
+	home: join(base, "yew-home"),
+	install: INSTALL_DIR,
+	userHome: homedir(),
+	port: 4799,
+	root: join(base, "sandbox"),
+};
+mkdirSync(places.home);
+const policy = { sites: ["api.deepseek.com"], credentials: false };
+
+describe("sandbox configuration", () => {
+	const config = sandboxConfig(places, policy, { platform: "darwin" });
+	const work = join(base, "work-config");
+	mkdirSync(work);
+	const files = commandFilesystem(places, policy, { writable: [work] }, "darwin");
+
+	test("a command writes in its working folder, the sandbox's caches and temporary folders only", () => {
+		assert.ok(files.allowWrite.includes(work));
+		assert.ok(files.allowWrite.includes(join(places.root, "cache")));
+		assert.ok(files.allowWrite.includes("/tmp"));
+		assert.ok(!files.allowWrite.includes(homedir()));
+		// Without a working folder, nothing of the person's is writable.
+		assert.ok(!config.filesystem.allowWrite.includes(work));
+	});
+
+	test("the data folder, the program and what starts at login cannot be changed", () => {
+		const denied = files.denyWrite;
+		assert.ok(denied.includes(places.home));
+		assert.ok(denied.includes(realpathSync(INSTALL_DIR)));
+		assert.ok(denied.includes(join(homedir(), "Library", "LaunchAgents")));
+		assert.ok(denied.includes(join(homedir(), "Applications", "Yew.app")));
+		assert.ok(denied.includes(join(homedir(), ".config", "systemd", "user")));
+		// The hooks and settings of submodules and worktrees under the working folder.
+		for (const pattern of gitInternals(work, "darwin")) assert.ok(denied.includes(pattern));
+		assert.equal(files.allowGitConfig, false);
+	});
+
+	test("on macOS submodule and worktree git settings are covered by patterns; on Linux by the paths there", () => {
+		assert.ok(gitInternals("/w", "darwin").includes("/w/.git/**/hooks"));
+		assert.ok(gitInternals("/w", "darwin").includes("/w/**/.git/**/config"));
+		const repo = join(base, "repo-linux");
+		mkdirSync(join(repo, ".git", "modules", "lib", "hooks"), { recursive: true });
+		writeFileSync(join(repo, ".git", "modules", "lib", "config"), "");
+		mkdirSync(join(repo, ".git", "worktrees", "other"), { recursive: true });
+		writeFileSync(join(repo, ".git", "worktrees", "other", "config.worktree"), "");
+		assert.deepEqual(gitInternals(repo, "linux").sort(), [
+			join(repo, ".git", "modules", "lib", "config"),
+			join(repo, ".git", "modules", "lib", "hooks"),
+			join(repo, ".git", "worktrees", "other", "config.worktree"),
+		]);
+	});
+
+	test("the data folder cannot be read; credential files and the SSH agent only when the setting allows", () => {
+		assert.ok(config.filesystem.denyRead.includes(places.home));
+		assert.ok(config.filesystem.denyRead.includes(join(homedir(), ".ssh")));
+		assert.ok(config.credentials?.files?.some((file) => file.path === join(homedir(), ".aws")));
+		assert.ok(config.credentials?.files?.every((file) => file.mode === "deny"));
+		assert.deepEqual(
+			config.credentials?.envVars?.map((variable) => variable.name),
+			["SSH_AUTH_SOCK", "SSH_AGENT_PID"],
+		);
+		assert.equal(config.network.allowUnixSockets, undefined);
+
+		const allowed = sandboxConfig(
+			places,
+			{ ...policy, credentials: true },
+			{ platform: "darwin", agentSocket: "/tmp/agent.sock" },
+		);
+		assert.equal(allowed.credentials, undefined);
+		assert.deepEqual(allowed.filesystem.denyRead, [places.home]);
+		assert.deepEqual(allowed.network.allowUnixSockets, ["/tmp/agent.sock"]);
+	});
+
+	test("package registries and model providers with a key are reachable; Yew Harness's port and private networks are not", () => {
+		const network = config.network;
+		assert.ok(network.allowedDomains.includes("registry.npmjs.org"));
+		assert.ok(network.allowedDomains.includes("api.deepseek.com"));
+		assert.equal(network.allowedDomains.length, new Set(network.allowedDomains).size);
+		assert.equal(network.allowedDomains.length, PACKAGE_SITES.length + 1);
+		assert.ok(network.deniedDomains.includes("127.0.0.1:4799"));
+		assert.ok(network.deniedDomains.includes("localhost:4799"));
+		assert.ok(network.deniedResolvedAddresses?.includes("192.168.0.0/16"));
+		assert.equal(network.allowLocalBinding, false);
+		assert.equal(network.allowAllUnixSockets, false);
+	});
+
+	test("nothing that would widen it is on", () => {
+		assert.equal(config.allowAppleEvents, false);
+		assert.equal(config.allowPty, false);
+		assert.equal(config.enableWeakerNestedSandbox, false);
+		assert.equal(config.enableWeakerNetworkIsolation, false);
+		assert.equal(config.allowNestedUserNamespaces, false);
+	});
+
+	test("the usual tools keep their caches in the sandbox's own folder", () => {
+		const env = sandboxEnvironment(places);
+		for (const name of ["npm_config_cache", "PIP_CACHE_DIR", "GOMODCACHE", "XDG_CACHE_HOME"]) {
+			assert.ok(env[name]?.startsWith(join(places.root, "cache")), name);
+		}
+	});
+});
+
+describe("a command outside the sandbox", () => {
+	test("is asked about every time, and cannot be remembered", () => {
+		const engine = new PermissionEngine(places.home);
+		const session = {
+			id: "s1",
+			cwd: base,
+			rules: [{ effect: "allow", tool: "shell" }],
+			options: { permissionMode: "skip" },
+		} as unknown as Session;
+		const decision = engine.decide(
+			{ kind: "command", tool: "shell", command: "ls", outsideSandbox: true },
+			session,
+		);
+		assert.equal(decision.effect, "ask");
+		if (decision.effect !== "ask") return;
+		assert.equal(decision.request.mustConfirm, true);
+		assert.ok(decision.request.reasons?.includes("outside-sandbox"));
+		assert.equal(decision.request.rememberRules, undefined);
+	});
+});
+
+// Everyday work runs in the sandbox where this computer has one (macOS; Linux with bubblewrap).
+const started =
+	process.platform === "darwin" || process.platform === "linux"
+		? await startSandbox(places, () => policy)
+		: { kind: "none" as const, problems: [`${process.platform} has no sandbox`] };
+after(() => stopSandbox());
+const skip = started.kind === "none" ? `no sandbox here: ${started.problems.join("; ")}` : false;
+
+/** Runs a command in the sandbox in `cwd`; resolves with its exit code and output. */
+async function run(
+	command: string,
+	cwd: string,
+	ask?: (host: string, port?: number) => Promise<boolean>,
+): Promise<{ code: number | null; output: string }> {
+	const running = await startCommand({
+		command,
+		cwd,
+		sessionId: "s1",
+		logDir: join(base, "logs"),
+		...(ask ? { ask } : {}),
+	});
+	const { exitCode } = await running.done;
+	return { code: exitCode, output: running.output.render() };
+}
+
+const folder = (name: string) => {
+	const path = join(base, name);
+	mkdirSync(path, { recursive: true });
+	return path;
+};
+
+describe("everyday work in the sandbox", { skip }, () => {
+	test("it is the sandbox commands run in", () => {
+		assert.equal(activeSandbox(), process.platform === "darwin" ? "macos" : "linux");
+	});
+
+	test("git: status, add, commit and log in a repository", async () => {
+		const repo = folder("git");
+		execFileSync("git", ["init", "-q", "-b", "main"], { cwd: repo });
+		const result = await run(
+			[
+				"echo hello > note.txt",
+				"git status --short",
+				"git add note.txt",
+				"git -c user.name=Yew -c user.email=yew@example.com commit -q -m 'First note'",
+				"git log --oneline",
+			].join(" && "),
+			repo,
+		);
+		assert.equal(result.code, 0, result.output);
+		assert.match(result.output, /\?\? note\.txt/);
+		assert.match(result.output, /First note/);
+	});
+
+	test("npm: install a local package and run a script", async () => {
+		const project = folder("npm");
+		mkdirSync(join(project, "greeting"));
+		writeFileSync(
+			join(project, "greeting", "package.json"),
+			JSON.stringify({ name: "greeting", version: "1.0.0", main: "index.js" }),
+		);
+		writeFileSync(join(project, "greeting", "index.js"), "module.exports = 'hello';\n");
+		writeFileSync(
+			join(project, "package.json"),
+			JSON.stringify({
+				name: "project",
+				version: "1.0.0",
+				private: true,
+				dependencies: { greeting: "file:./greeting" },
+				scripts: { hello: `node -e "console.log(require('greeting'))"` },
+			}),
+		);
+		const result = await run(
+			"npm install --offline --no-audit --no-fund --loglevel=error && npm run --silent hello",
+			project,
+		);
+		assert.equal(result.code, 0, result.output);
+		assert.match(result.output, /hello/);
+		assert.ok(existsSync(join(project, "package-lock.json")));
+		assert.ok(existsSync(join(project, "node_modules", "greeting")));
+	});
+
+	test("build: TypeScript compiles into the working folder", async () => {
+		const project = folder("build");
+		writeFileSync(join(project, "index.ts"), "export const answer: number = 42;\n");
+		const tsc = join(INSTALL_DIR, "node_modules", "typescript", "bin", "tsc");
+		const result = await run(`node ${tsc} --outDir dist index.ts`, project);
+		assert.equal(result.code, 0, result.output);
+		assert.match(readFileSync(join(project, "dist", "index.js"), "utf8"), /answer = 42/);
+	});
+
+	test("temporary files: mktemp and node's temporary folder", async () => {
+		const result = await run(
+			`f=$(mktemp) && echo one > "$f" && cat "$f" && node -e "const p=require('path').join(require('os').tmpdir(),'yew-sandbox-test');require('fs').writeFileSync(p,'two');console.log(require('fs').readFileSync(p,'utf8'))"`,
+			folder("temp"),
+		);
+		assert.equal(result.code, 0, result.output);
+		assert.match(result.output, /one\ntwo/);
+	});
+
+	test("a site that is not on the list is put to the person, and stays closed when they decline", async () => {
+		const asked: string[] = [];
+		const result = await run(
+			"curl -sS https://unlisted.example.invalid/",
+			folder("ask"),
+			async (host, port) => {
+				asked.push(`${host}:${port}`);
+				return false;
+			},
+		);
+		assert.deepEqual(asked, ["unlisted.example.invalid:443"]);
+		assert.notEqual(result.code, 0);
+		assert.match(result.output, /did not allow unlisted\.example\.invalid/);
+	});
+
+	test("a preset MCP server runs in it from its own folder in the data folder", async () => {
+		const yewHome = folder("preset-home");
+		// Where Yew installs the Gitee server; a stand-in that answers like one.
+		const program = join(
+			yewHome,
+			"mcp-presets",
+			"gitee",
+			"node_modules",
+			"@gitee",
+			"mcp-gitee",
+			"bin",
+		);
+		mkdirSync(program, { recursive: true });
+		const server = fileURLToPath(new URL("./helpers/mcp-server.mjs", import.meta.url));
+		writeFileSync(join(program, "index.js"), readFileSync(server, "utf8"));
+		writeFileSync(join(program, "package.json"), JSON.stringify({ type: "module" }));
+		writeFileSync(
+			join(yewHome, "mcp.json"),
+			JSON.stringify({ mcpServers: { gitee: { preset: "gitee" } } }),
+		);
+		const hub = new McpHub({ yewHome, version: "0.0.0", log: () => {} });
+		try {
+			await hub.refresh();
+			const status = hub.status().find((entry) => entry.name === "gitee");
+			assert.equal(status?.state, "ready", status?.error ?? "");
+			assert.ok(hub.tools().some((tool) => tool.name === "mcp__gitee__echo"));
+		} finally {
+			hub.stop();
+		}
+	});
+
+	test("a stdio MCP server someone added runs in it and its tools work", async () => {
+		const yewHome = folder("mcp-home");
+		const server = fileURLToPath(new URL("./helpers/mcp-server.mjs", import.meta.url));
+		writeFileSync(
+			join(yewHome, "mcp.json"),
+			JSON.stringify({ mcpServers: { test: { command: "node", args: [server] } } }),
+		);
+		const hub = new McpHub({ yewHome, version: "0.0.0", log: () => {} });
+		try {
+			await hub.refresh();
+			assert.equal(hub.status().find((status) => status.name === "test")?.state, "ready");
+			const echo = hub.tools().find((tool) => tool.name === "mcp__test__echo");
+			assert.ok(echo);
+			const ctx = { signal: new AbortController().signal, acceptsImages: false } as Parameters<
+				typeof echo.run
+			>[1];
+			const result = await echo.run({ text: "hi" }, ctx);
+			assert.match(JSON.stringify(result.content), /hi/);
+		} finally {
+			hub.stop();
+		}
+	});
+});

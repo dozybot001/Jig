@@ -7,10 +7,11 @@ generated from `package-lock.json` by `scripts/notices.mjs`.
 The web interface is built from further packages; they are listed with their license texts in
 `web/dist/THIRD-PARTY-NOTICES.txt`.
 
-109 packages: MIT 56, Apache-2.0 35, BSD-3-Clause 12, BSD-2-Clause 4, Unlicense 1, 0BSD 1.
+114 packages: MIT 59, Apache-2.0 36, BSD-3-Clause 12, BSD-2-Clause 4, Unlicense 1, (BSD-3-Clause OR GPL-2.0) 1, 0BSD 1.
 
 | Package | Version | License |
 | --- | --- | --- |
+| @anthropic-ai/sandbox-runtime | 0.0.83 | Apache-2.0 |
 | @anthropic-ai/sdk | 0.129.0 | MIT |
 | @aws-sdk/client-bedrock-runtime | 3.1127.0 | Apache-2.0 |
 | @aws-sdk/core | 3.980.1 | Apache-2.0 |
@@ -51,6 +52,7 @@ The web interface is built from further packages; they are listed with their lic
 | @napi-rs/keyring-win32-arm64-msvc | 2.1.2 | MIT |
 | @napi-rs/keyring-win32-ia32-msvc | 2.1.2 | MIT |
 | @napi-rs/keyring-win32-x64-msvc | 2.1.2 | MIT |
+| @pondwader/socks5-server | 1.0.10 | MIT |
 | @protobufjs/aspromise | 1.1.2 | BSD-3-Clause |
 | @protobufjs/base64 | 1.1.2 | BSD-3-Clause |
 | @protobufjs/codegen | 2.0.5 | BSD-3-Clause |
@@ -76,6 +78,7 @@ The web interface is built from further packages; they are listed with their lic
 | bignumber.js | 9.3.1 | MIT |
 | bowser | 2.15.0 | MIT |
 | buffer-equal-constant-time | 1.0.1 | BSD-3-Clause |
+| commander | 12.1.0 | MIT |
 | data-uri-to-buffer | 4.0.1 | MIT |
 | debug | 4.4.3 | MIT |
 | diff | 9.0.0 | BSD-3-Clause |
@@ -106,6 +109,7 @@ The web interface is built from further packages; they are listed with their lic
 | ms | 2.1.3 | MIT |
 | node-domexception | 1.0.0 | MIT |
 | node-fetch | 3.3.2 | MIT |
+| node-forge | 1.4.3 | (BSD-3-Clause OR GPL-2.0) |
 | openai | 7.19.0 | Apache-2.0 |
 | p-retry | 4.6.2 | MIT |
 | partial-json | 0.1.7 | MIT |
@@ -120,3 +124,4 @@ The web interface is built from further packages; they are listed with their lic
 | uqr | 0.1.3 | MIT |
 | web-streams-polyfill | 3.3.3 | MIT |
 | ws | 8.22.0 | MIT |
+| zod | 4.6.6 | MIT |

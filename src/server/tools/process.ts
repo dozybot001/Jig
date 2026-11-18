@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { newId } from "../ids.ts";
+import { activeSandbox, OUTSIDE_GIT, quote, sandboxed } from "../sandbox.ts";
 
 export const MAX_LINES = 2000;
 export const MAX_BYTES = 50 * 1024;
@@ -91,23 +92,49 @@ export interface RunningCommand {
 
 /**
  * Runs a command with the user's login shell in its own process group, so stopping it ends every
- * process it started. Stopping freezes the group first, so `a; b` cannot slip into `b` while it is
- * being ended (pi's approach on macOS, prior-art 4.2), then sends SIGTERM and, 3 seconds later, SIGKILL.
+ * process it started. When the system sandbox is on (sandbox.ts) the command runs in it, able to
+ * write in its working folder, unless the person approved `outsideSandbox` for this one command;
+ * `ask` puts a site it wants to reach to the person. Stopping freezes the group first, so `a; b`
+ * cannot slip into `b` while it is being ended (pi's approach on macOS, prior-art 4.2), then sends
+ * SIGTERM and, 3 seconds later, SIGKILL.
  */
-export function startCommand(options: {
+export async function startCommand(options: {
 	command: string;
 	cwd: string;
 	sessionId: string;
 	logDir: string;
 	onOutput?: (chunk: string) => void;
-}): RunningCommand {
+	outsideSandbox?: boolean;
+	ask?: (host: string, port?: number) => Promise<boolean>;
+}): Promise<RunningCommand> {
 	const shell = process.env.SHELL || "/bin/zsh";
-	const child = spawn(shell, ["-lc", options.command], {
-		cwd: options.cwd,
-		env: commandEnvironment(options.sessionId),
-		detached: true,
-		stdio: ["ignore", "pipe", "pipe"],
-	});
+	const env = commandEnvironment(options.sessionId);
+	const outside = options.outsideSandbox === true && activeSandbox() !== "none";
+	const box = outside
+		? null
+		: await sandboxed(`exec ${quote(shell)} -lc ${quote(options.command)}`, {
+				grant: { writable: [options.cwd] },
+				text: options.command,
+				...(options.ask ? { ask: options.ask } : {}),
+			});
+	if (box) {
+		for (const name of box.unset) delete env[name];
+		Object.assign(env, box.env);
+	}
+	const child = box
+		? spawn(box.line, {
+				shell: true,
+				cwd: options.cwd,
+				env,
+				detached: true,
+				stdio: ["ignore", "pipe", "pipe"],
+			})
+		: spawn(shell, ["-lc", options.command], {
+				cwd: options.cwd,
+				env: outside ? { ...env, ...OUTSIDE_GIT } : env,
+				detached: true,
+				stdio: ["ignore", "pipe", "pipe"],
+			});
 	const output = new OutputTail(options.logDir);
 	const onData = (data: Buffer) => {
 		const chunk = data.toString("utf8");
@@ -122,6 +149,16 @@ export function startCommand(options: {
 			resolve({ exitCode: null, signal: null });
 		});
 		child.on("close", (exitCode, signal) => resolve({ exitCode, signal }));
+	}).then((result) => {
+		// When a command failed, what the sandbox kept from it goes after the output, so the session
+		// sees why.
+		const blocked = box?.finish() ?? [];
+		if (blocked.length > 0 && result.exitCode !== 0) {
+			output.push(
+				`\n[Blocked by the sandbox: ${blocked.length} time(s). If the command needs this, run it again with outside_sandbox.]\n${blocked.slice(0, 10).join("\n")}\n`,
+			);
+		}
+		return result;
 	});
 	let stopping = false;
 	const stop = () => {

@@ -316,6 +316,10 @@ export type ConfirmReason =
 	| "write-credentials"
 	| "admin"
 	| "write-outside"
+	// A command that runs outside the system sandbox (blueprint, section 11).
+	| "outside-sandbox"
+	// A command in the sandbox connecting to a site that is not on its list; asked while it runs.
+	| "connect-site"
 	// An action of the computer control tool: a click or keystroke anywhere on the screen.
 	| "computer-control"
 	// An MCP tool that sends, publishes or deletes something in the service it connects to.

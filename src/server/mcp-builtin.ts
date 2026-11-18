@@ -42,6 +42,13 @@ const PRESET_PROGRAMS: Record<string, string> = {
 };
 export const INSTALLED_PRESETS = Object.keys(PRESET_PROGRAMS);
 
+/** The services the presets talk to: what they may reach from the system sandbox (sandbox.ts). */
+export const PRESET_SITES: Record<string, string[]> = {
+	gitee: ["gitee.com"],
+	notion: ["api.notion.com"],
+	sentry: ["sentry.io", "*.sentry.io"],
+};
+
 /**
  * How the preset `id` is started: with node from Yew's data folder, with a small part of Yew's
  * environment and the entry's own variables (its token). Null for a preset Yew does not install.
@@ -60,6 +67,8 @@ export function presetMcp(yewHome: string, id: string): McpServerConfig | null {
 export function builtinMcp(
 	yewHome: string,
 	env: NodeJS.ProcessEnv = process.env,
+	/** Yew Harness's own port, which the browser is kept from. */
+	port?: number,
 ): Record<string, McpServerConfig> {
 	if (env.YEW_MCP_BUILTIN === "off") return {};
 	const modules = join(installDir(yewHome), "node_modules");
@@ -73,7 +82,12 @@ export function builtinMcp(
 				// Page snapshots and screenshots it saves; otherwise they land in the folder Yew was started in.
 				"--output-dir",
 				join(yewHome, "tmp", "browser"),
+				// One more layer over Yew Harness's own port (the security group, 11-18).
+				...(port ? ["--blocked-origins", `http://127.0.0.1:${port};http://localhost:${port}`] : []),
 			],
+			// Its root for files: uploads and named screenshots stay in this empty folder, not the whole
+			// computer, and file:// pages are refused (it is started without unrestricted file access).
+			cwd: join(yewHome, "browser-files"),
 			ownEnv: true,
 		},
 		computer: {

@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { activeSandbox } from "../sandbox.ts";
 import { startCommand } from "./process.ts";
 import {
 	bool,
@@ -14,30 +15,55 @@ import {
 const DEFAULT_TIMEOUT = 120;
 const MAX_TIMEOUT = 600;
 
+const DESCRIPTION =
+	"Run a command with the user's login shell in the working folder. Standard input is closed, so commands must not wait for input. Output keeps the last 2000 lines or 50 KB; longer output is saved to a file named in the result. Times out after 120 seconds by default (timeout_seconds, up to 600). Set background to start a long-running command, such as a dev server, and check on it with shell_job.";
+
+const PARAMETERS = {
+	command: { type: "string", description: "The command line to run." },
+	description: {
+		type: "string",
+		description:
+			"What the command is for, in a few words in the language the person writes in. Yew shows it to the person when it asks for their permission.",
+	},
+	timeout_seconds: { type: "integer", minimum: 1, maximum: MAX_TIMEOUT },
+	background: { type: "boolean", description: "Start the command and return at once." },
+};
+
+/** Offered while the system sandbox is on (sandbox.ts). */
+const OUTSIDE_SANDBOX = {
+	type: "boolean",
+	description:
+		"Run it outside the sandbox, when it cannot work inside: it needs saved credentials (a git push), to create or clone a repository, to listen on a local port (a dev server), or to write outside the working folder. The person is asked every time.",
+};
+
 export const shellTool: ToolDefinition = {
 	name: "shell",
-	description:
-		"Run a command with the user's login shell in the working folder. Standard input is closed, so commands must not wait for input. Output keeps the last 2000 lines or 50 KB; longer output is saved to a file named in the result. Times out after 120 seconds by default (timeout_seconds, up to 600). Set background to start a long-running command, such as a dev server, and check on it with shell_job.",
-	parameters: {
-		type: "object",
-		properties: {
-			command: { type: "string", description: "The command line to run." },
-			description: {
-				type: "string",
-				description:
-					"What the command is for, in a few words in the language the person writes in. Yew shows it to the person when it asks for their permission.",
+	get description() {
+		return activeSandbox() === "none"
+			? DESCRIPTION
+			: `${DESCRIPTION} Commands run in a sandbox: they write only in the working folder and temporary folders, and reach package registries and code hosts; connecting to another site asks the person.`;
+	},
+	get parameters() {
+		return {
+			type: "object",
+			properties: {
+				...PARAMETERS,
+				...(activeSandbox() === "none" ? {} : { outside_sandbox: OUTSIDE_SANDBOX }),
+				confirm: CONFIRM_ARGUMENT,
 			},
-			timeout_seconds: { type: "integer", minimum: 1, maximum: MAX_TIMEOUT },
-			background: { type: "boolean", description: "Start the command and return at once." },
-			confirm: CONFIRM_ARGUMENT,
-		},
-		required: ["command"],
-		additionalProperties: false,
+			required: ["command"],
+			additionalProperties: false,
+		};
 	},
 	readOnly: false,
 	needsFolder: true,
 	subject(args) {
-		return { kind: "command", tool: "shell", command: str(args, "command", true) };
+		return {
+			kind: "command",
+			tool: "shell",
+			command: str(args, "command", true),
+			...(outsideSandbox(args) ? { outsideSandbox: true } : {}),
+		};
 	},
 	preview(args) {
 		const description = typeof args.description === "string" ? args.description.trim() : "";
@@ -45,13 +71,20 @@ export const shellTool: ToolDefinition = {
 	},
 	async run(args, ctx): Promise<ToolResult> {
 		const command = str(args, "command", true);
+		const outside = outsideSandbox(args);
 		const timeout = int(args, "timeout_seconds", 1, MAX_TIMEOUT) ?? DEFAULT_TIMEOUT;
 		const cwd = ctx.session.cwd;
 		if (!cwd) return errorResult("This session has no working folder.");
 		const logDir = join(ctx.tmpDir, "output");
 
 		if (bool(args, "background")) {
-			const job = ctx.jobs.start({ command, cwd, sessionId: ctx.session.id, logDir });
+			const job = await ctx.jobs.start({
+				command,
+				cwd,
+				sessionId: ctx.session.id,
+				logDir,
+				outsideSandbox: outside,
+			});
 			return {
 				content: [
 					text(
@@ -63,12 +96,32 @@ export const shellTool: ToolDefinition = {
 		}
 
 		const started = Date.now();
-		const running = startCommand({
+		const permit = ctx.permit;
+		// A question still open when the command has ended is withdrawn.
+		const asking = new AbortController();
+		const running = await startCommand({
 			command,
 			cwd,
 			sessionId: ctx.session.id,
 			logDir,
 			onOutput: ctx.output,
+			outsideSandbox: outside,
+			// A site outside the sandbox's list is put to the person on this call's card.
+			...(permit
+				? {
+						ask: (host: string, port?: number) =>
+							permit(
+								{
+									tool: "shell",
+									summary: port === undefined ? host : `${host}:${port}`,
+									mustConfirm: false,
+									reasons: ["connect-site"],
+									description: command.slice(0, 300),
+								},
+								asking.signal,
+							),
+					}
+				: {}),
 		});
 		let timedOut = false;
 		const timer = setTimeout(() => {
@@ -78,6 +131,7 @@ export const shellTool: ToolDefinition = {
 		const onAbort = () => running.stop();
 		ctx.signal.addEventListener("abort", onAbort, { once: true });
 		const { exitCode, signal } = await running.done;
+		asking.abort();
 		clearTimeout(timer);
 		ctx.signal.removeEventListener("abort", onAbort);
 
@@ -101,6 +155,11 @@ export const shellTool: ToolDefinition = {
 		};
 	},
 };
+
+/** Whether the call asks to run outside the sandbox; only while there is one. */
+function outsideSandbox(args: Parameters<typeof bool>[0]): boolean {
+	return bool(args, "outside_sandbox") === true && activeSandbox() !== "none";
+}
 
 export const shellJobTool: ToolDefinition = {
 	name: "shell_job",

@@ -18,9 +18,16 @@ export class Jobs {
 		this.#onFinish = onFinish;
 	}
 
-	start(options: { command: string; cwd: string; sessionId: string; logDir: string }): Job {
+	/** Starts a command in the background; it runs in the sandbox like any other, but never asks the person. */
+	async start(options: {
+		command: string;
+		cwd: string;
+		sessionId: string;
+		logDir: string;
+		outsideSandbox?: boolean;
+	}): Promise<Job> {
 		const id = `job-${this.#next++}`;
-		const running = startCommand(options);
+		const running = await startCommand(options);
 		const job: Job = {
 			id,
 			command: options.command,

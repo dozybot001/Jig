@@ -13,6 +13,7 @@
 - 本地服务：Hono；服务端向界面推送用 SSE。网页界面：React + Vite。
 - iPhone 应用：Swift 6、SwiftUI，iOS 17 起，工程在 `ios/`，Bundle ID `cn.tenonai.apps.yew`；文案用 String Catalog（中英）。中继服务：TypeScript，在 `relay/`，按 `~/memory/server-deployment.md` 部署。
 - 密钥：系统钥匙串（`@napi-rs/keyring`）。
+- 系统沙箱：`@anthropic-ai/sandbox-runtime`，锁定精确版本，只在 `src/server/sandbox.ts` 里引用，只用它 README 和类型定义里公开的接口（蓝图第十一节）。复测通过前默认关闭，`YEW_SANDBOX=on` 时启用。
 - 检查：Biome（格式与 lint）、`tsc --noEmit`、`node --test`。
 
 ## 开发约定
