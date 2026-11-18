@@ -1,29 +1,45 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import { findRepositories } from "./sandbox.ts";
 
 /**
  * The outer guard (the security group, 11-18; blueprint, section 11). A session's command that does
  * not run in the system sandbox (one the person let run outside it, or every command where the
- * sandbox is off) still runs in a layer that keeps it out of the places where decisions are kept
- * and answered: Yew Harness's data folder, and the Mac app's web storage, which holds its sign-in.
- * Nothing else is closed: the command may write anywhere, go online and use credentials. Without
- * it, a command could reach those places in a way Yew cannot see in its text (a path a script puts
- * together) and answer a decision in the person's place, even in skip mode.
+ * sandbox is off) still runs in a layer that keeps it from answering a decision in the person's
+ * place, even in skip mode, in ways Yew cannot see in the command's text:
  *
- * macOS: sandbox-exec with a profile that allows everything but those places. Linux: bubblewrap
- * with the whole system as it is and an empty folder laid over each place. This is not the system
- * sandbox (sandbox.ts) and does not use its library: the library cannot leave everything else open.
+ * - it cannot read or write where decisions are kept and answered: Yew Harness's data folder, and
+ *   the Mac app's web storage, which holds its sign-in;
+ * - it cannot start a program outside the guard: on macOS no LaunchServices (`open`) and no Apple
+ *   Events (osascript telling another program); on Linux no session bus or user systemd
+ *   (`/run/user/<uid>`), so no Secret Service either;
+ * - it cannot write what runs later outside the guard by itself: login items, shells' start-up
+ *   files, git's own settings, ssh's settings, and the hooks and settings of repositories.
+ *
+ * Everything else stays open: writing anywhere else, going online, using credentials. An address
+ * to open goes through Yew's own open_url tool instead.
+ *
+ * macOS: sandbox-exec with a profile that allows everything but this. Linux: bubblewrap with the
+ * whole system as it is, an empty folder over each closed folder and the protected files read-only.
+ * This is not the system sandbox (sandbox.ts) and does not use its library, which cannot leave the
+ * rest open.
  */
 export type GuardKind = "macos" | "linux" | "none";
 
-interface Guard {
+export interface Guard {
 	kind: GuardKind;
 	program: string | null;
+	/** Closed for reading and writing. */
 	places: string[];
+	/** The person's home folder, where the files that run by themselves are. */
+	home: string;
+	/** Linux: the session bus and user systemd, closed. */
+	runtime: string | null;
 }
 
-let guard: Guard = { kind: "none", program: null, places: [] };
+const NONE: Guard = { kind: "none", program: null, places: [], home: "", runtime: null };
+let guard: Guard = NONE;
 
 /** A path as the system sees it: links resolved, through its nearest folder that exists. */
 export function resolved(path: string): string {
@@ -32,38 +48,114 @@ export function resolved(path: string): string {
 	return parent === path ? path : join(resolved(parent), basename(path));
 }
 
+/**
+ * Files and folders in the home folder that run by themselves later, outside the guard: login items,
+ * the shells' start-up files, git's and ssh's settings (the security group, 11-18).
+ */
+export function startupPlaces(home: string): { files: string[]; folders: string[] } {
+	const at = (path: string) => resolved(join(home, path));
+	return {
+		files: [
+			".zshrc",
+			".zprofile",
+			".zshenv",
+			".zlogin",
+			".zlogout",
+			".bashrc",
+			".bash_profile",
+			".bash_login",
+			".profile",
+			".gitconfig",
+			".ssh/config",
+		].map(at),
+		folders: [
+			"Library/LaunchAgents",
+			".config/fish",
+			".config/git",
+			".config/systemd",
+			".config/autostart",
+		].map(at),
+	};
+}
+
 /** A string in a Seatbelt profile. */
 const quoted = (text: string) => `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
-/** The macOS profile: everything allowed, but reading or writing the places. */
-export function guardProfile(places: string[]): string {
+/** Repositories' hooks and settings, anywhere: the main one's, submodules' and worktrees'. */
+const GIT_INTERNALS = [
+	"/\\.git/(modules/.+/)?hooks(/.*)?$",
+	"/\\.git/(modules/.+/)?config(\\.worktree)?$",
+	"/\\.git/worktrees/[^/]+/config(\\.worktree)?$",
+];
+
+/** The macOS profile: everything allowed, but what the guard closes. */
+export function guardProfile(places: string[], home: string): string {
+	const startup = startupPlaces(home);
 	return [
 		"(version 1)",
 		"(allow default)",
 		`(deny file-read* file-write* ${places.map((place) => `(subpath ${quoted(place)})`).join(" ")})`,
+		`(deny file-write* ${[
+			...startup.files.map((file) => `(literal ${quoted(file)})`),
+			...startup.folders.map((folder) => `(subpath ${quoted(folder)})`),
+			...GIT_INTERNALS.map((pattern) => `(regex #"${pattern}")`),
+		].join(" ")})`,
+		"(deny lsopen)",
+		"(deny appleevent-send)",
 	].join("\n");
 }
 
-/** How to run `shell -lc command` in the guard; null when there is no guard. */
+/** Linux: the repositories under the working folder now, their hooks and settings that exist. */
+function repositoryInternals(cwd: string): string[] {
+	return findRepositories(cwd).flatMap((repository) => {
+		if (!repository.folder) return [repository.git];
+		const paths: string[] = [];
+		const walk = (git: string, depth: number) => {
+			paths.push(join(git, "hooks"), join(git, "config"), join(git, "config.worktree"));
+			const modules = join(git, "modules");
+			if (depth < 4 && existsSync(modules)) {
+				for (const name of readdirSync(modules)) walk(join(modules, name), depth + 1);
+			}
+			const worktrees = join(git, "worktrees");
+			if (existsSync(worktrees)) {
+				for (const name of readdirSync(worktrees)) {
+					paths.push(join(worktrees, name, "config"), join(worktrees, name, "config.worktree"));
+				}
+			}
+		};
+		walk(repository.git, 0);
+		return paths.filter((path) => existsSync(path));
+	});
+}
+
+/** How to run `shell -lc command` in the guard, in `cwd`; null when there is no guard. */
 export function guardedArgs(
 	shell: string,
 	command: string,
+	cwd: string,
 	state: Guard = guard,
 ): { file: string; args: string[] } | null {
 	if (state.kind === "none" || !state.program || state.places.length === 0) return null;
 	if (state.kind === "macos") {
 		return {
 			file: state.program,
-			args: ["-p", guardProfile(state.places), shell, "-lc", command],
+			args: ["-p", guardProfile(state.places, state.home), shell, "-lc", command],
 		};
 	}
-	// An empty folder over each place that is a folder; bubblewrap cannot lay one over a file.
-	const covers = state.places.flatMap((place) =>
-		existsSync(place) && statSync(place).isDirectory() ? ["--tmpfs", place] : [],
-	);
+	// An empty folder over each closed folder; bubblewrap cannot lay one over a file. What runs by
+	// itself later is bound read-only where it exists: a placeholder for a missing one would be made
+	// in the person's real home folder.
+	const isFolder = (path: string) => existsSync(path) && statSync(path).isDirectory();
+	const covers = [...state.places, ...(state.runtime ? [state.runtime] : [])]
+		.filter(isFolder)
+		.flatMap((place) => ["--tmpfs", place]);
+	const startup = startupPlaces(state.home);
+	const readOnly = [...startup.files, ...startup.folders, ...repositoryInternals(cwd)]
+		.filter((path) => existsSync(path))
+		.flatMap((path) => ["--ro-bind", path, path]);
 	return {
 		file: state.program,
-		args: ["--dev-bind", "/", "/", ...covers, "--", shell, "-lc", command],
+		args: ["--dev-bind", "/", "/", ...covers, ...readOnly, "--", shell, "-lc", command],
 	};
 }
 
@@ -73,17 +165,26 @@ export function guardedArgs(
  */
 export function startGuard(
 	places: string[],
+	home: string,
 	find: (name: string) => string | null,
 	platform: NodeJS.Platform = process.platform,
 ): { kind: GuardKind; problem: string | null } {
 	const program =
 		platform === "darwin" ? "/usr/bin/sandbox-exec" : platform === "linux" ? find("bwrap") : null;
 	if (!program || !existsSync(program)) {
-		guard = { kind: "none", program: null, places: [] };
+		guard = NONE;
 		return { kind: "none", problem: platform === "linux" ? "bubblewrap is missing" : null };
 	}
 	const kind: GuardKind = platform === "darwin" ? "macos" : "linux";
-	const state: Guard = { kind, program, places: [...new Set(places.map(resolved))] };
+	const uid = typeof process.getuid === "function" ? process.getuid() : null;
+	const runtime = platform === "linux" && uid !== null ? `/run/user/${uid}` : null;
+	const state: Guard = {
+		kind,
+		program,
+		places: [...new Set(places.map(resolved))],
+		home: resolved(home),
+		runtime: runtime && existsSync(runtime) ? runtime : null,
+	};
 	// It must run a command, and that command must not see what is in a place (the data folder).
 	const folder = state.places.find(
 		(place) => existsSync(place) && statSync(place).isDirectory() && readdirSync(place).length > 0,
@@ -92,13 +193,14 @@ export function startGuard(
 	const probe = guardedArgs(
 		"/bin/sh",
 		entry ? `test ! -e '${entry.replace(/'/g, "'\\''")}'` : "true",
+		state.home,
 		state,
 	);
 	const ran = probe
 		? spawnSync(probe.file, probe.args, { stdio: "ignore", timeout: 10_000 })
 		: null;
 	if (!ran || ran.status !== 0) {
-		guard = { kind: "none", program: null, places: [] };
+		guard = NONE;
 		const why = ran?.error?.message ?? `exit ${ran?.status}`;
 		return { kind: "none", problem: `the guard did not keep a command out of Yew's data (${why})` };
 	}
@@ -112,5 +214,5 @@ export function guardKind(): GuardKind {
 
 /** For tests: no guard. */
 export function stopGuard(): void {
-	guard = { kind: "none", program: null, places: [] };
+	guard = NONE;
 }

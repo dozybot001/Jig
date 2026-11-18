@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { lookup as dnsLookup, type LookupAddress } from "node:dns";
 import http from "node:http";
 import https from "node:https";
@@ -271,3 +272,71 @@ export const webFetchTool: ToolDefinition = {
 		};
 	},
 };
+
+/** Opens an address in the person's default browser; tests give their own. */
+export type Opener = (url: string) => Promise<void>;
+
+const openInBrowser: Opener = (url) =>
+	new Promise((resolve, reject) => {
+		const [file, args] =
+			process.platform === "darwin" ? ["/usr/bin/open", ["-u", url]] : ["xdg-open", [url]];
+		execFile(file, args, { timeout: 15_000 }, (error) => (error ? reject(error) : resolve()));
+	});
+
+/**
+ * Opens an http(s) address in the person's default browser, for them to see: a page, a local
+ * development server. Commands outside the sandbox cannot open programs or addresses themselves
+ * (the guard closes LaunchServices; the security group, 11-18), so this is how a session does it.
+ * Yew opens it, not a command. Asked about the first time for each site in the default mode.
+ */
+export function openUrlTool(open: Opener = openInBrowser): ToolDefinition {
+	return {
+		name: "open_url",
+		description:
+			"Open an http or https address in the person's default browser, for them to look at: a page, or a development server you started. It opens in their own browser, with their sign-ins. Commands cannot open addresses or programs themselves; use this instead of `open` or `xdg-open`.",
+		parameters: {
+			type: "object",
+			properties: {
+				url: { type: "string", description: "The address, starting with http:// or https://." },
+				confirm: CONFIRM_ARGUMENT,
+			},
+			required: ["url"],
+			additionalProperties: false,
+		},
+		readOnly: false,
+		needsFolder: false,
+		subject(args) {
+			const url = str(args, "url", true);
+			let host = "";
+			try {
+				host = new URL(url).hostname.toLowerCase();
+			} catch {
+				// Refused when it runs.
+			}
+			return {
+				kind: "act",
+				tool: "open_url",
+				summary: url,
+				...(host ? { scope: host } : {}),
+				always: true,
+			};
+		},
+		async run(args): Promise<ToolResult> {
+			let url: URL;
+			try {
+				url = new URL(str(args, "url", true));
+			} catch {
+				return errorResult("That is not a valid URL.");
+			}
+			if (url.protocol !== "http:" && url.protocol !== "https:") {
+				return errorResult("Only http and https addresses are opened.");
+			}
+			try {
+				await open(url.href);
+			} catch (error) {
+				return errorResult(`The browser could not be opened: ${(error as Error).message}`);
+			}
+			return { content: [text(`Opened ${url.href} in the person's default browser.`)] };
+		},
+	};
+}

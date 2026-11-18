@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { MCP_PRESETS } from "../shared/mcp-presets.ts";
 import type { ImageBlock, JsonObject, TextBlock } from "../shared/messages.ts";
 import type { ConfirmReason } from "../shared/types.ts";
+import { keepComputerOffHarness, readScreen, type ScreenState } from "./computer-guard.ts";
 import { PRESET_SITES, presetMcp, serverEnv } from "./mcp-builtin.ts";
 import { type McpAuth, type OAuthSettings, SignInRequired } from "./mcp-oauth.ts";
 import { quote, sandboxed } from "./sandbox.ts";
@@ -771,6 +772,8 @@ export interface McpHubOptions {
 	auth?: McpAuth;
 	/** Yew Harness's own port, which the browser is kept off. */
 	port?: number;
+	/** What is on the screen, for computer control's check; tests give their own. */
+	readScreen?: () => Promise<ScreenState | null>;
 }
 
 /** The configured servers, connected, and their tools as tools sessions can call. */
@@ -784,8 +787,11 @@ export class McpHub {
 	/** Settles when the servers being connected now have connected or failed. */
 	#connecting: Promise<void> = Promise.resolve();
 
+	readonly #readScreen: () => Promise<ScreenState | null>;
+
 	constructor(options: McpHubOptions) {
 		this.#options = options;
+		this.#readScreen = options.readScreen ?? (() => readScreen());
 	}
 
 	/** The servers Yew sets up by itself. */
@@ -1012,6 +1018,11 @@ export class McpHub {
 			async run(args, ctx): Promise<ToolResult> {
 				if (server.name === "browser") {
 					const refused = await hub.#keepOffHarness(server, args as JsonObject, ctx.signal);
+					if (refused) return errorResult(refused);
+				}
+				// Computer control does not act on Yew Harness's own window or page (computer-guard.ts).
+				if (server.name === "computer") {
+					const refused = await keepComputerOffHarness(args as JsonObject, hub.#readScreen);
 					if (refused) return errorResult(refused);
 				}
 				let result: { content?: unknown; isError?: unknown };

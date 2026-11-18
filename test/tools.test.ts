@@ -313,3 +313,28 @@ describe("web_fetch", () => {
 		assert.match(markdown, /\| a \| b \|\n\| --- \| --- \|\n\| 1 \| 2 \|/);
 	});
 });
+
+describe("open_url", () => {
+	test("opens http(s) in the person's browser through Yew, asked per site; nothing else", async () => {
+		const { openUrlTool } = await import("../src/server/tools/web.ts");
+		const opened: string[] = [];
+		const tool = openUrlTool(async (url) => {
+			opened.push(url);
+		});
+		const subject = tool.subject({ url: "http://localhost:5173/" }, {} as never, {} as never);
+		assert.deepEqual(subject, {
+			kind: "act",
+			tool: "open_url",
+			summary: "http://localhost:5173/",
+			scope: "localhost",
+			always: true,
+		});
+		const ctx = {} as Parameters<typeof tool.run>[1];
+		const done = await tool.run({ url: "https://example.com/a" }, ctx);
+		assert.equal(done.isError, undefined);
+		assert.deepEqual(opened, ["https://example.com/a"]);
+		assert.equal((await tool.run({ url: "file:///etc/passwd" }, ctx)).isError, true);
+		assert.equal((await tool.run({ url: "javascript:alert(1)" }, ctx)).isError, true);
+		assert.deepEqual(opened, ["https://example.com/a"]);
+	});
+});

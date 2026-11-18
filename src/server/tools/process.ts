@@ -145,7 +145,7 @@ export async function startCommand(options: {
 		for (const name of box.unset) delete env[name];
 		Object.assign(env, box.env);
 	}
-	const guarded = box ? null : guardedArgs(shell, options.command);
+	const guarded = box ? null : guardedArgs(shell, options.command, options.cwd);
 	const child = box
 		? spawn(box.line, {
 				shell: true,

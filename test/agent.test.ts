@@ -670,6 +670,8 @@ describe("agent loop", () => {
 			"finish_task",
 			"list_sessions",
 			"open_session",
+			// Opening an address in the person's browser needs no folder.
+			"open_url",
 			"send_letter",
 			"todo",
 			"web_fetch",

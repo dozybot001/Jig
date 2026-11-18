@@ -122,6 +122,7 @@ const TOOL_VERBS = [
 	"todo",
 	"ask_user",
 	"web_fetch",
+	"open_url",
 	"send_letter",
 	"list_sessions",
 	"check_decision",

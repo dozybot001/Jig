@@ -174,6 +174,7 @@ export function serveCommand(): Command {
 			const { startGuard, guardKind } = await import("../server/guard.ts");
 			const guardState = startGuard(
 				[home, ...sandbox.appWebData({ userHome: userHome() })],
+				userHome(),
 				(name) => sandbox.findProgram(name, io.env as NodeJS.ProcessEnv),
 			);
 			if (guardState.kind === "none") {

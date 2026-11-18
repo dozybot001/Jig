@@ -17,7 +17,7 @@ import { askUserTool, delegateTool, todoTool } from "./misc.ts";
 import { globTool, grepTool } from "./search.ts";
 import { shellJobTool, shellTool } from "./shell.ts";
 import type { Roles, ToolDefinition } from "./types.ts";
-import { webFetchTool } from "./web.ts";
+import { openUrlTool, webFetchTool } from "./web.ts";
 
 export const ALL_TOOLS: ToolDefinition[] = [
 	readTool,
@@ -30,6 +30,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
 	todoTool,
 	askUserTool,
 	webFetchTool,
+	openUrlTool(),
 	listSessionsTool,
 	sendLetterTool,
 	checkDecisionTool,
