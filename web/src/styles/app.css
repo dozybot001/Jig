@@ -2408,27 +2408,28 @@ body.scroll-locked {
 	display: grid;
 	gap: 8px;
 }
+/*
+ * Versions and updates (blueprint, "版本与更新"): on the version's line, how it stands and the one
+ * button there is something to do with, as small as the line.
+ */
 .about-version {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px 6px;
+	min-height: 28px;
 	margin: 0;
 	color: var(--text-3);
 	font-size: var(--fs-s);
 }
-/* Versions and updates (blueprint, "版本与更新"): one line, its buttons, then the daily check. */
-.about-update {
-	display: grid;
-	gap: 10px;
-	padding: 14px 16px;
-	border: 1px solid var(--border);
-	border-radius: var(--radius-l);
+.about-version .btn {
+	min-height: 26px;
+	padding: 0 10px;
+	font-size: var(--fs-s);
 }
-.update-line {
-	margin: 0;
-	line-height: 1.6;
-}
-.update-actions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
+.about-version .btn-icon {
+	width: 26px;
+	padding: 0;
 }
 .update-manual {
 	display: grid;
@@ -2460,12 +2461,6 @@ body.scroll-locked {
 	background: var(--code-bg);
 	font-size: var(--fs-s);
 	white-space: pre-wrap;
-}
-/* The daily check sits in the box, under a line, like the rows of a group. */
-.about-update .setting-row {
-	margin: 4px -16px -14px;
-	padding: 10px 16px;
-	border-top: 1px solid var(--border);
 }
 .about-text {
 	display: grid;

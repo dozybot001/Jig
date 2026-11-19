@@ -2,8 +2,9 @@ import CoreServices
 import Foundation
 
 /// Marks a file as downloaded (the com.apple.quarantine attribute), as a browser does with what it
-/// saves, so macOS checks the file (Gatekeeper) before it is opened. The window app also declares
-/// LSFileQuarantineEnabled in its Info.plist; this marks the files WebKit writes for it explicitly.
+/// saves, so macOS checks the file (Gatekeeper) before it is opened. Only these files: the app does
+/// not declare LSFileQuarantineEnabled, which would pass the marking on to Yew Harness, which it
+/// starts, and to every command of its sessions.
 enum Quarantine {
 	static func mark(_ file: URL, from source: URL?) {
 		var properties: [String: Any] = [

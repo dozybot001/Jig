@@ -101,8 +101,6 @@ export function infoPlist(window: boolean): string {
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>LSFileQuarantineEnabled</key>
-	<true/>
 `
 		: `	<key>CFBundleIdentifier</key>
 	<string>cn.tenonai.apps.yew.launcher</string>
@@ -247,6 +245,10 @@ export function installApp(
 			]) === 0;
 		rmSync(work, { recursive: true, force: true });
 	}
+	// Made by a process that marks what it writes as downloaded (an app before 1.8.2 passed that on to
+	// Yew Harness and its commands), the app would be run from a moved copy and asked about by macOS:
+	// it is Yew Harness's own, so the mark comes off.
+	if (host.platform === "darwin") host.run("xattr", ["-r", "-d", "com.apple.quarantine", app]);
 	// The window app is signed ad hoc, which needs no identity: macOS then takes the program, its
 	// Info.plist and its script as one app. Last, so the seal covers the icon too.
 	const signed = !window || host.run("codesign", ["--force", "--sign", "-", app]) === 0;

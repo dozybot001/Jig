@@ -103,6 +103,7 @@ export interface UpdateOptions {
 	now?: () => number;
 	/** Whether this process may write the install's folders; tests stand in for the file system. */
 	writable?: (path: string) => boolean;
+	platform?: NodeJS.Platform;
 }
 
 interface Latest {
@@ -449,6 +450,11 @@ export class Updates {
 			};
 			this.#o.log(`update: the installed ${PACKAGE}@${version} does not match npm's`);
 			return;
+		}
+		// Installed by a Yew Harness that an app before 1.8.2 started, the files would carry the mark
+		// macOS puts on downloads: they come from npm, checked above, so it comes off.
+		if ((this.#o.platform ?? process.platform) === "darwin") {
+			await this.#run("xattr", ["-r", "-d", "com.apple.quarantine", this.#root], prefix, 60_000);
 		}
 		let output = result.output;
 		try {

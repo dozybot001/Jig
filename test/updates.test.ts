@@ -94,6 +94,7 @@ function setup(options: Partial<UpdateOptions> = {}, version = "1.7.0") {
 			return { code: 0, output: "added 1 package" };
 		},
 		writable: () => true,
+		platform: "darwin",
 		...options,
 	});
 	return {
@@ -233,6 +234,13 @@ describe("installing an update", () => {
 		});
 		assert.equal(updates.state().job?.state, "installed");
 		assert.equal(refreshed(), 1);
+		// On a Mac, the mark macOS puts on downloads comes off what npm put there.
+		assert.deepEqual(runs.find((run) => run.file === "xattr")?.args, [
+			"-r",
+			"-d",
+			"com.apple.quarantine",
+			join(prefix, "lib", "node_modules", "@tenonai", "yew"),
+		]);
 	});
 
 	test("only the new version found on npm", async () => {

@@ -118,6 +118,7 @@ import {
 	SettingGroup,
 	SettingRow,
 	Switch,
+	Toggletip,
 	useAction,
 	useNow,
 } from "./ui.tsx";
@@ -731,7 +732,9 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 
 function About() {
 	useLang();
-	const health = useAppState((state) => state.health);
+	const updates = useAppState((state) => state.updates);
+	const checks = useAppState((state) => state.settings?.updateCheck !== false);
+	const checkId = useId();
 	const [doc, setDoc] = useState<"privacy" | "terms" | null>(null);
 	const paragraphs = (body: string) =>
 		body.split("\n\n").map((paragraph) => <p key={paragraph.slice(0, 24)}>{paragraph}</p>);
@@ -748,12 +751,8 @@ function About() {
 					<YewMark className="lockup-mark" size={22} />
 					<ProductName />
 				</div>
-				<p className="about-version">
-					{t("version", { v: health?.version ?? "" })}
-					{health?.build ? ` · ${t("build", { b: health.build })}` : ""}
-				</p>
+				<VersionLine />
 			</div>
-			<UpdateStatus />
 			<div className="about-text">{paragraphs(t("aboutBody"))}</div>
 			<div className="about-list">
 				<div className="about-row">
@@ -782,6 +781,19 @@ function About() {
 					<span className="about-label">{t("feedback")}</span>
 					<a href="mailto:support@tenonai.cn">support@tenonai.cn</a>
 				</div>
+				{updates && updates.kind !== "source" && (
+					<div className="about-row">
+						<span className="about-label">
+							<span id={checkId}>{t("update_daily")}</span>
+							<Toggletip label={t("update_daily")} text={t("update_dailyHint")} />
+						</span>
+						<Switch
+							checked={checks}
+							labelledBy={checkId}
+							onChange={(on) => void saveSettings({ updateCheck: on }).catch(() => {})}
+						/>
+					</div>
+				)}
 			</div>
 			{doc && (
 				<Dialog
@@ -806,16 +818,15 @@ function releaseNotes(version: string): string {
 }
 
 /**
- * Versions and updates on the About page (blueprint, "版本与更新"): whether this is the newest
- * version, a new one to install with one click (or the command, where Yew Harness cannot run it), a
- * service running older code than is installed, and the daily check.
+ * The version on the About page, and on the same line how it stands (blueprint, "版本与更新"): the
+ * newest, a new one to install with one click (or the command, where Yew Harness cannot run it), or
+ * an installed one a restart takes up. A button only where there is something to do.
  */
-function UpdateStatus() {
+function VersionLine() {
 	useLang();
+	const health = useAppState((state) => state.health);
 	const updates = useAppState((state) => state.updates);
-	const checks = useAppState((state) => state.settings?.updateCheck !== false);
 	const [asking, setAsking] = useState(false);
-	const checkId = useId();
 	const now = useNow(60_000);
 	const check = useAction(checkUpdates);
 	const install = useAction(installUpdate);
@@ -827,43 +838,16 @@ function UpdateStatus() {
 	useEffect(() => {
 		void loadUpdates();
 	}, []);
-	if (!updates) return null;
-	const { job, latest } = updates;
-	const installedNew = job?.state === "installed";
-	const restartLine = updates.restartPending ? (
-		<p className="update-line">{t("update_restartWaiting", { n: updates.busy })}</p>
-	) : null;
-	const restartButtons = (
-		<div className="update-actions">
-			<Button
-				variant="primary"
-				busy={restart.busy}
-				onClick={() => (updates.busy > 0 ? setAsking(true) : void restart.run(true))}
-			>
-				<RetryIcon />
-				{updates.restartPending ? t("update_restartNow") : t("update_restart")}
-			</Button>
-		</div>
-	);
-	const manualBlock = updates.manual ? (
-		<div className="update-manual">
-			<p className="hint">{t("update_manual")}</p>
-			<div className="update-command">
-				<code className="update-code">{updates.manual}</code>
-				<Button
-					variant="icon"
-					aria-label={t("copy")}
-					busy={copy.busy}
-					onClick={() => void copy.run(updates.manual ?? "")}
-				>
-					<CopyIcon />
-				</Button>
-			</div>
-		</div>
-	) : null;
-	const installButton =
-		updates.available && latest && !updates.manual ? (
-			<div className="update-actions">
+	const version = `${t("version", { v: health?.version ?? "" })}${
+		health?.build ? ` · ${t("build", { b: health.build })}` : ""
+	}`;
+	let status: ReactNode = null;
+	let action: ReactNode = null;
+	let below: ReactNode = null;
+	if (updates) {
+		const { job, latest } = updates;
+		const installButton =
+			updates.available && latest && !updates.manual ? (
 				<Button
 					variant="primary"
 					busy={install.busy}
@@ -872,83 +856,98 @@ function UpdateStatus() {
 					<ArrowUpIcon />
 					{t("update_install", { v: latest.version })}
 				</Button>
+			) : null;
+		const manualBlock = updates.manual ? (
+			<div className="update-manual">
+				<p className="hint">{t("update_manual")}</p>
+				<div className="update-command">
+					<code className="update-code">{updates.manual}</code>
+					<Button
+						variant="icon"
+						aria-label={t("copy")}
+						busy={copy.busy}
+						onClick={() => void copy.run(updates.manual ?? "")}
+					>
+						<CopyIcon />
+					</Button>
+				</div>
 			</div>
 		) : null;
-	let body: ReactNode;
-	if (job?.state === "installing") {
-		body = (
-			<p className="update-line" aria-live="polite">
-				{t("update_installing", { v: job.version })}
-			</p>
-		);
-	} else if (job?.state === "failed" && !updates.restart) {
-		// What went wrong, then what can be done: the command, or trying again.
-		body = (
-			<>
-				<details className="update-output">
-					<summary>{t("update_failed", { v: job.version })}</summary>
-					<pre>{job.output}</pre>
-				</details>
-				{manualBlock ?? installButton}
-			</>
-		);
-	} else if (updates.restart || installedNew) {
-		body = (
-			<>
-				<p className="update-line">
-					{updates.kind === "source" && updates.installed.version === updates.version
-						? t("update_sourceChanged", { b: updates.installed.build ?? "" })
-						: t("update_installed", { v: updates.installed.version })}
-				</p>
-				{restartLine}
-				{restartButtons}
-			</>
-		);
-	} else if (updates.available && latest) {
-		body = (
-			<>
-				<p className="update-line">
+		if (job?.state === "installing") {
+			status = t("update_installing", { v: job.version });
+		} else if (job?.state === "failed" && !updates.restart) {
+			// What went wrong, then what can be done: the command, or trying again.
+			status = t("update_failed", { v: job.version });
+			action = installButton;
+			below = (
+				<>
+					<details className="update-output">
+						<summary>{t("update_why")}</summary>
+						<pre>{job.output}</pre>
+					</details>
+					{manualBlock}
+				</>
+			);
+		} else if (updates.restart || job?.state === "installed") {
+			status =
+				updates.kind === "source" && updates.installed.version === updates.version
+					? t("update_sourceChanged", { b: updates.installed.build ?? "" })
+					: t("update_installed", { v: updates.installed.version });
+			if (updates.restartPending) status = `${status} · ${t("update_restartWaiting")}`;
+			action = (
+				<Button
+					variant="primary"
+					busy={restart.busy}
+					onClick={() => (updates.busy > 0 ? setAsking(true) : void restart.run(true))}
+				>
+					<RetryIcon />
+					{updates.restartPending ? t("update_restartNow") : t("update_restart")}
+				</Button>
+			);
+		} else if (updates.available && latest) {
+			status = (
+				<>
 					{t("update_available", { v: latest.version })}{" "}
 					<a href={releaseNotes(latest.version)} target="_blank" rel="noopener noreferrer">
 						{t("update_notes")}
 					</a>
-				</p>
-				{manualBlock ?? installButton}
-			</>
-		);
-	} else if (updates.kind === "source") {
-		body = <p className="update-line">{t("update_source")}</p>;
-	} else {
-		body = (
-			<>
-				<p className="update-line">
-					{latest
-						? t("update_current", { time: formatAgo(latest.checkedAt, now) })
-						: t("update_unchecked")}
-				</p>
-				<div className="update-actions">
-					<Button busy={check.busy} onClick={() => void check.run()}>
-						<RetryIcon />
-						{t("update_check")}
-					</Button>
-				</div>
-			</>
-		);
+				</>
+			);
+			action = installButton;
+			below = manualBlock;
+		} else if (updates.kind === "source") {
+			status = t("update_source");
+		} else {
+			if (latest) {
+				const ago = formatAgo(latest.checkedAt, now);
+				status =
+					now - latest.checkedAt < 60_000
+						? t("update_currentNow")
+						: t("update_current", { time: ago });
+			}
+			action = (
+				<Button
+					variant="icon"
+					aria-label={t("update_check")}
+					title={t("update_check")}
+					busy={check.busy}
+					onClick={() => void check.run()}
+				>
+					<RetryIcon />
+				</Button>
+			);
+		}
 	}
 	return (
-		<div className="about-update">
-			{body}
+		<>
+			<div className="about-version">
+				<span>{version}</span>
+				{status && <span aria-live="polite">· {status}</span>}
+				{action}
+			</div>
+			{below}
 			<ErrorBox error={check.error ?? install.error ?? restart.error ?? copy.error} />
-			{updates.kind !== "source" && (
-				<SettingRow label={t("update_daily")} hint={t("update_dailyHint")} labelId={checkId}>
-					<Switch
-						checked={checks}
-						labelledBy={checkId}
-						onChange={(on) => void saveSettings({ updateCheck: on }).catch(() => {})}
-					/>
-				</SettingRow>
-			)}
-			{asking && (
+			{asking && updates && (
 				<Dialog
 					title={t("update_restartTitle")}
 					size="s"
@@ -968,7 +967,7 @@ function UpdateStatus() {
 					<p>{t("update_restartBody", { n: updates.busy })}</p>
 				</Dialog>
 			)}
-		</div>
+		</>
 	);
 }
 
