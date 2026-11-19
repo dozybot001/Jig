@@ -633,12 +633,12 @@ describe("agent loop", () => {
 		assert.match(textOf(updates[0]), /changed the permission mode\. Permission mode: skip\./);
 	});
 
-	test("a task list left unchanged for many calls gets a reminder; a finished one does not", async () => {
+	test("an open task list does not inject periodic reminder notes into the main conversation", async () => {
 		const globs = (prefix: string) =>
 			Array.from({ length: 12 }, (_, i) =>
 				fauxToolCall("glob", { pattern: "*.txt" }, { id: `${prefix}${i}` }),
 			);
-		const reminder = /task list has not changed in the last 12 tool calls/;
+		const reminder = /task list has not changed/;
 		const { faux, store, agents, session, contexts, capture } = setup();
 		store.setTodos(session.id, [
 			{ text: "Read the files", status: "done" },
@@ -647,13 +647,7 @@ describe("agent loop", () => {
 		faux.setResponses([toolUse(...globs("a")), capture(fauxAssistantMessage("done"))]);
 		agents.send(session.id, "go");
 		await agents.whenIdle(session.id);
-		assert.match(textOf(contexts[0]?.messages.at(-1)), reminder);
-
-		store.setTodos(session.id, [{ text: "Fix the bug", status: "done" }]);
-		faux.setResponses([toolUse(...globs("b")), capture(fauxAssistantMessage("done"))]);
-		agents.send(session.id, "check again");
-		await agents.whenIdle(session.id);
-		assert.doesNotMatch(textOf(contexts[1]?.messages.at(-1)), reminder);
+		assert.doesNotMatch(textOf(contexts[0]?.messages.at(-1)), reminder);
 	});
 
 	test("a chat without a working folder is offered no file or shell tools", async () => {

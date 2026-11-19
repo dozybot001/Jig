@@ -147,8 +147,6 @@ const MAX_MESSAGE_CHARS = 100_000;
 const MAX_STEPS = 500;
 /** How many times in a row a reply cut off at the model's output limit is continued by itself. */
 const MAX_CUT_REPLIES = 3;
-/** After this many tool calls without a change to a task list that still has open tasks, Yew reminds the model. */
-const TODO_REMINDER_AFTER = 12;
 /** How long a session waits for another one's answer (blueprint 7.1: one wait, no polling). */
 const WAIT_MS = 30 * 60 * 1000;
 /** The result of a call that was running when Yew stopped (blueprint 7.3). */
@@ -221,8 +219,6 @@ export class Agents {
 	readonly #prompts = new Map<string, string[]>();
 	/** By tool call: what ran without being asked about (skip mode) or was allowed by the check. */
 	readonly #permissionNotes = new Map<string, PermissionNote>();
-	/** Tool calls since each session last changed its task list. */
-	readonly #sinceTodo = new Map<string, number>();
 	/** Letters, decision cards and the approval center. */
 	readonly post: PostOffice;
 	/** Scheduled tasks, whose runs end in this runner. */
@@ -782,7 +778,6 @@ export class Agents {
 				}
 				cutReplies = 0;
 				await this.#runCalls(sessionId, rows, calls, live);
-				this.#remindTodos(sessionId, calls);
 				if (signal.aborted) {
 					this.#notice(sessionId, "interrupted", "Stopped by the person.");
 					break;
@@ -1693,28 +1688,6 @@ export class Agents {
 		const notes = this.#notes.get(sessionId) ?? [];
 		notes.push(note);
 		this.#notes.set(sessionId, notes);
-	}
-
-	/**
-	 * Models tend to write a task list once and then forget it, so the list the person sees falls behind.
-	 * After many calls without a change while tasks are still open, Yew reminds the model to update it.
-	 */
-	#remindTodos(sessionId: string, calls: ToolCallBlock[]): void {
-		if (calls.some((call) => call.name === "todo")) {
-			this.#sinceTodo.delete(sessionId);
-			return;
-		}
-		const count = (this.#sinceTodo.get(sessionId) ?? 0) + calls.length;
-		const open = this.#store.getSession(sessionId).todos.some((todo) => todo.status !== "done");
-		if (count < TODO_REMINDER_AFTER || !open) {
-			this.#sinceTodo.set(sessionId, count);
-			return;
-		}
-		this.#sinceTodo.delete(sessionId);
-		this.#note(
-			sessionId,
-			`Your task list has not changed in the last ${count} tool calls. If it no longer matches the work, update it with the todo tool.`,
-		);
 	}
 
 	/** Moves Yew's notes, letters and the person's queued messages into the transcript; true if anything arrived. */
