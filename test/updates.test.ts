@@ -1,7 +1,7 @@
 // Versions and updates (blueprint, "版本与更新"): no real npm, registry or restart.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, mock, test } from "node:test";
 import { shortCommit } from "../src/cli/serve.ts";
@@ -241,6 +241,38 @@ describe("installing an update", () => {
 			"com.apple.quarantine",
 			join(prefix, "lib", "node_modules", "@tenonai", "yew"),
 		]);
+	});
+
+	test("the mark is not taken off a package reached through a link", async () => {
+		const real = npmInstall();
+		const prefix = realpathSync(tempDir("yew-linked-"));
+		mkdirSync(join(prefix, "lib", "node_modules", "@tenonai"), { recursive: true });
+		const linked = join(prefix, "lib", "node_modules", "@tenonai", "yew");
+		symlinkSync(real.root, linked);
+		const runs: { file: string; args: string[] }[] = [];
+		const { updates } = setup({
+			root: linked,
+			node: real.node,
+			run: async (file, args) => {
+				runs.push({ file, args });
+				if (args.includes("config")) return { code: 0, output: "https://registry.npmjs.org/" };
+				if (args.includes("install")) {
+					writeFileSync(
+						join(linked, "package.json"),
+						JSON.stringify({ name: "@tenonai/yew", version: "1.8.0" }),
+					);
+				}
+				return { code: 0, output: "" };
+			},
+		});
+		await updates.check();
+		updates.install("1.8.0");
+		for (let i = 0; i < 5; i++) await settle();
+		assert.equal(updates.state().job?.state, "installed");
+		assert.equal(
+			runs.some((run) => run.file === "xattr"),
+			false,
+		);
 	});
 
 	test("only the new version found on npm", async () => {

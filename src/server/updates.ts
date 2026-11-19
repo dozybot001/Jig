@@ -1,5 +1,5 @@
 import { execFile, execFileSync } from "node:child_process";
-import { accessSync, constants, existsSync, readFileSync } from "node:fs";
+import { accessSync, constants, existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import type { InstallKind, UpdateState } from "../shared/types.ts";
 import { conflict, invalid } from "./errors.ts";
@@ -54,6 +54,15 @@ export function installKind(root: string): InstallKind {
 /** The folder a global npm install of the package in `root` went into. */
 export function globalPrefix(root: string): string {
 	return dirname(dirname(dirname(dirname(resolve(root)))));
+}
+
+/** A path with its links resolved; null when it does not exist. */
+function realOrNull(path: string): string | null {
+	try {
+		return realpathSync(path);
+	} catch {
+		return null;
+	}
 }
 
 /** npm's own program next to a Node.js: the npm that came with it. */
@@ -453,7 +462,11 @@ export class Updates {
 		}
 		// Installed by a Yew Harness that an app before 1.8.2 started, the files would carry the mark
 		// macOS puts on downloads: they come from npm, checked above, so it comes off.
-		if ((this.#o.platform ?? process.platform) === "darwin") {
+		// Only the package folder itself, where npm put it: not when it is reached through a link.
+		if (
+			(this.#o.platform ?? process.platform) === "darwin" &&
+			realOrNull(this.#root) === this.#root
+		) {
 			await this.#run("xattr", ["-r", "-d", "com.apple.quarantine", this.#root], prefix, 60_000);
 		}
 		let output = result.output;
