@@ -309,6 +309,64 @@ describe("a long turn", () => {
 		assert.equal(notices(entriesOf(store, session.id)).at(-1)?.data?.code, "compact-failed");
 	});
 
+	test("layer-1 compaction folds earlier large tool results without calling the model", async () => {
+		const { faux, store, agents, session, contexts, capture } = setup();
+		store.updateSession(session.id, { options: { compactAt: 10_000 } });
+		store.appendEntry(session.id, {
+			role: "user",
+			message: { role: "user", content: "检查几份大文件", timestamp: 1 },
+		});
+		const big = "x".repeat(16_000);
+		for (let i = 0; i < 4; i++) {
+			const call = fauxToolCall("read", { path: `big-${i}.txt` }, { id: `b${i}` });
+			store.appendEntry(session.id, { role: "assistant", message: toolUse(call) });
+			store.appendEntry(session.id, {
+				role: "toolResult",
+				message: {
+					role: "toolResult",
+					toolCallId: call.id,
+					toolName: "read",
+					content: [{ type: "text", text: big }],
+					isError: false,
+					timestamp: 1,
+				},
+			});
+		}
+		// Keep a short recent step so the older big results fall before the tail cut.
+		const recent = fauxToolCall("read", { path: "small.txt" }, { id: "small" });
+		store.appendEntry(session.id, { role: "assistant", message: toolUse(recent) });
+		store.appendEntry(session.id, {
+			role: "toolResult",
+			message: {
+				role: "toolResult",
+				toolCallId: recent.id,
+				toolName: "read",
+				content: [{ type: "text", text: "tiny recent result" }],
+				isError: false,
+				timestamp: 1,
+			},
+		});
+		store.setContextTokens(session.id, 18_000);
+		// Only ONE model response is needed (no Layer-2 summary call!).
+		faux.setResponses([capture(fauxAssistantMessage("直接继续。"))]);
+		agents.continue(session.id);
+		await agents.whenIdle(session.id);
+
+		const entries = entriesOf(store, session.id);
+		assert.equal(
+			entries.some((e) => e.role === "compaction"),
+			false,
+			"Layer-1 pruning avoids a Layer-2 semantic summary",
+		);
+		const prunedNotice = notices(entries).find((n) => n.kind === "compacted");
+		assert.equal(prunedNotice?.data?.tier, "prune");
+		const sent = JSON.stringify(contexts[0]?.messages ?? []);
+		assert.match(sent, /Earlier read result folded to save context/);
+		assert.match(sent, /tiny recent result/);
+		assert.match(sent, /检查几份大文件/);
+		assert.equal(store.getSession(session.id).status, "idle");
+	});
+
 	test("ends at the step limit and says so; continuing goes on", async () => {
 		const { faux, store, agents, session } = setup({ maxSteps: 5 });
 		let step = 0;

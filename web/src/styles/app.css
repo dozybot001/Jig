@@ -1198,32 +1198,8 @@ body.scroll-locked {
 	opacity: 0.14;
 }
 @media (prefers-reduced-motion: no-preference) {
-	.yew-backdrop {
-		animation: yew-breathe 9s ease-in-out infinite;
-	}
-	.app.with-yew.yew-feature .yew-backdrop-feature {
-		animation: yew-breathe-center 9s ease-in-out infinite;
-	}
 	.progress-mascot {
 		animation: yew-pop 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-}
-@keyframes yew-breathe {
-	0%,
-	100% {
-		transform: translateY(0);
-	}
-	50% {
-		transform: translateY(-4px);
-	}
-}
-@keyframes yew-breathe-center {
-	0%,
-	100% {
-		transform: translate(-50%, -50%);
-	}
-	50% {
-		transform: translate(-50%, calc(-50% - 5px));
 	}
 }
 @keyframes yew-pop {
@@ -1322,23 +1298,20 @@ body.scroll-locked {
 	.app.with-yew.yew-feature .empty-state .mascot {
 		display: none;
 	}
-	/* Keep composer & page headers seamless over Yew's backdrop — no opaque bottom/top seam. */
+	/* Keep composer & page headers seamless over Yew's backdrop — no opaque bottom/top seam.
+	   Avoid backdrop-filter inside scrollable containers (WebKit drops GPU scroll tiles). */
 	.app.with-yew .main .composer {
 		background: transparent;
 	}
 	.app.with-yew .main .session-header {
 		background: linear-gradient(
 			to bottom,
-			color-mix(in srgb, var(--bg) 82%, transparent),
+			color-mix(in srgb, var(--bg) 88%, transparent),
 			transparent
 		);
-		backdrop-filter: blur(8px);
-		-webkit-backdrop-filter: blur(8px);
 	}
 	.app.with-yew .main .composer-box {
-		background: color-mix(in srgb, var(--surface) 84%, transparent);
-		backdrop-filter: blur(14px);
-		-webkit-backdrop-filter: blur(14px);
+		background: color-mix(in srgb, var(--surface) 92%, transparent);
 		transition:
 			border-color 180ms ease,
 			box-shadow 180ms ease;
@@ -1353,14 +1326,10 @@ body.scroll-locked {
 	.app.with-yew .main .letter-card,
 	.app.with-yew .main .card,
 	.app.with-yew .main .artifact-viewer {
-		background: color-mix(in srgb, var(--surface) 86%, transparent);
-		backdrop-filter: blur(10px);
-		-webkit-backdrop-filter: blur(10px);
+		background: color-mix(in srgb, var(--surface) 92%, transparent);
 	}
 	.app.with-yew .main .msg-user {
-		background: color-mix(in srgb, var(--user-bubble) 88%, transparent);
-		backdrop-filter: blur(8px);
-		-webkit-backdrop-filter: blur(8px);
+		background: color-mix(in srgb, var(--user-bubble) 94%, transparent);
 	}
 }
 @media (min-width: 1180px) {
@@ -1955,7 +1924,8 @@ body.scroll-locked {
 	position: relative;
 	display: grid;
 	grid-template-columns: minmax(0, 1fr);
-	min-height: 160px;
+	min-height: 0;
+	overflow: hidden;
 }
 .transcript {
 	position: relative;

@@ -11,7 +11,15 @@ import {
 } from "../../shared/types.ts";
 import type { ModelGateway, ModelInfo } from "../model/gateway.ts";
 import type { Store } from "../store.ts";
-import { estimateTokens, isOwnNote, transcriptForSummary, usageTotals } from "./context.ts";
+import {
+	estimateTokens,
+	isOwnNote,
+	isPrunableToolResult,
+	PRUNED_PLACEHOLDER_TOKENS,
+	toolResultTokens,
+	transcriptForSummary,
+	usageTotals,
+} from "./context.ts";
 import {
 	type ContextSnapshot,
 	type InstructionExtras,
@@ -29,6 +37,8 @@ import {
 } from "./prompt.ts";
 
 const KEEP_RECENT_TOKENS = 20_000;
+/** Layer-1 tool-result folding succeeds when it brings context down to at most this share of the threshold. */
+const L1_TARGET_RATIO = 0.75;
 
 /** What an attempt to shorten the context came to. "nothing": there was nothing older to summarize. */
 export type Compacted = "done" | "nothing" | "failed";
@@ -212,8 +222,62 @@ export class ContextKeeper {
 		model: ModelInfo,
 		signal: AbortSignal,
 	): Promise<Compacted> {
-		if (session.contextTokens < compactAt(session, model)) return "nothing";
+		const threshold = compactAt(session, model);
+		if (session.contextTokens < threshold) return "nothing";
+		// Layer 1 (zero LLM call, lossless to conversation flow): fold earlier large/image tool results.
+		if (this.#tryPruneToolResults(session, threshold)) return "done";
+		// Layer 2 (semantic summary): only when conversation & reasoning itself still exceed the limit.
 		return this.compact(session, model, signal, false);
+	}
+
+	/**
+	 * Layer-1 compaction: folds older large or image-bearing tool results in one pulse batch once the
+	 * session crosses `threshold`, keeping recent turns and all user/assistant prose untouched. Stops
+	 * compaction when estimated tokens drop to at most `L1_TARGET_RATIO` of `threshold`.
+	 */
+	#tryPruneToolResults(session: Session, threshold: number): boolean {
+		const entries = this.#store.contextEntries(session.id);
+		const keep = Math.min(KEEP_RECENT_TOKENS, Math.floor(threshold / 4));
+		let kept = 0;
+		let firstKept: Entry | null = null;
+		for (let i = entries.length - 1; i >= 0; i--) {
+			const entry = entries[i] as Entry;
+			kept += estimateTokens(entry);
+			if (entry.role === "user" || entry.role === "system" || entry.role === "assistant") {
+				if (kept > keep && firstKept) break;
+				firstKept = entry;
+			}
+		}
+		if (!firstKept) return false;
+		const saved = this.#store.getContextSnapshot<ContextSnapshot>(session.id);
+		const prevPruned = saved?.prunedBeforeSeq ?? 0;
+		if (firstKept.seq <= prevPruned) return false;
+		let prunedCount = 0;
+		let savedTokens = 0;
+		for (const entry of entries) {
+			if (entry.role !== "toolResult") continue;
+			if (entry.seq < prevPruned || entry.seq >= firstKept.seq) continue;
+			if (!isPrunableToolResult(entry.message)) continue;
+			prunedCount++;
+			savedTokens += Math.max(0, toolResultTokens(entry.message) - PRUNED_PLACEHOLDER_TOKENS);
+		}
+		if (prunedCount === 0 || savedTokens === 0) return false;
+		const estimatedAfter = Math.max(0, session.contextTokens - savedTokens);
+		if (estimatedAfter > Math.floor(threshold * L1_TARGET_RATIO)) return false;
+		this.#store.tx(() => {
+			const base =
+				saved ?? takeSnapshot(session, this.#home, this.#placement(session), this.#extras());
+			this.#store.setContextSnapshot(session.id, { ...base, prunedBeforeSeq: firstKept.seq });
+			this.#store.setContextTokens(session.id, estimatedAfter);
+			notice(
+				this.#store,
+				session.id,
+				"compacted",
+				`Folded ${prunedCount} earlier large tool results to save context (${session.contextTokens} tokens before).`,
+				{ tier: "prune", prunedCount },
+			);
+		});
+		return true;
 	}
 
 	/**

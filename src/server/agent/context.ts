@@ -41,16 +41,86 @@ function placeholder(call: ToolCallBlock, timestamp: number): ToolResultMessage 
 	};
 }
 
+/** Minimum text size (in characters) for an older tool result to be folded in Layer-1 compaction. */
+export const PRUNE_MIN_CHARS = 2_000;
+/** Approximate vision token cost of one image block in a tool result. */
+export const IMAGE_TOKENS = 1_600;
+/** Rough token size of the one-line placeholder left behind after Layer-1 folding. */
+export const PRUNED_PLACEHOLDER_TOKENS = 40;
+
+/** Rough token estimate for a tool result, counting images realistically instead of base64 length. */
+export function toolResultTokens(message: ToolResultMessage): number {
+	let tokens = 16;
+	for (const block of message.content) {
+		if (block.type === "text") tokens += Math.ceil(block.text.length / 4);
+		else if (block.type === "image") tokens += IMAGE_TOKENS;
+	}
+	return tokens;
+}
+
+/** True when a tool result is large enough (or holds images) to be worth folding in Layer-1 compaction. */
+export function isPrunableToolResult(message: ToolResultMessage): boolean {
+	let chars = 0;
+	for (const block of message.content) {
+		if (block.type === "image") return true;
+		if (block.type === "text") chars += block.text.length;
+	}
+	return chars >= PRUNE_MIN_CHARS;
+}
+
+function callTarget(call: ToolCallBlock): string {
+	const args = call.arguments as Record<string, unknown>;
+	const primary = [args.path, args.command, args.pattern, args.url, args.query].find(
+		(value) => typeof value === "string" && value.trim(),
+	);
+	if (typeof primary !== "string") return "";
+	const clean = primary.replace(/\s+/g, " ").trim();
+	const short = clean.length > 90 ? `${clean.slice(0, 90)}…` : clean;
+	const pages =
+		typeof args.pages === "string" && args.pages.trim() ? ` p.${args.pages.trim()}` : "";
+	return `${short}${pages}`;
+}
+
+function foldToolResult(call: ToolCallBlock, result: ToolResultMessage): ToolResultMessage {
+	let chars = 0;
+	let images = 0;
+	for (const block of result.content) {
+		if (block.type === "text") chars += block.text.length;
+		else if (block.type === "image") images++;
+	}
+	const target = callTarget(call);
+	const parts: string[] = [];
+	if (target) parts.push(target);
+	if (chars > 0) parts.push(`~${Math.max(1, Math.round(chars / 1000))} KB text`);
+	if (images > 0) parts.push(`${images} image${images === 1 ? "" : "s"}`);
+	const detail = parts.length > 0 ? ` (${parts.join(", ")})` : "";
+	const hint =
+		call.name === "read"
+			? "Re-read if you need the exact content again."
+			: "Re-run if you need the full output again.";
+	return {
+		...result,
+		content: [
+			{
+				type: "text",
+				text: `[Earlier ${result.toolName} result folded to save context${detail}. ${hint}]`,
+			},
+		],
+	};
+}
+
 /**
  * Turns stored entries into what the model sees. Providers require each tool call to be answered right
  * after the message that made it, so results are placed there whatever order they were stored in, and a
  * call without a result (after a crash, say) gets a placeholder. Notices are for the person only.
+ * When `prunedBeforeSeq` is set (Layer-1 compaction), large/image tool results before that sequence
+ * number are folded to one-line placeholders while keeping the original entries intact in storage.
  */
-export function toModelMessages(entries: Entry[]): ModelMessage[] {
-	const results = new Map<string, ToolResultMessage>();
+export function toModelMessages(entries: Entry[], prunedBeforeSeq = 0): ModelMessage[] {
+	const results = new Map<string, { seq: number; message: ToolResultMessage }>();
 	for (const entry of entries) {
 		if (entry.role === "toolResult" && !results.has(entry.message.toolCallId)) {
-			results.set(entry.message.toolCallId, entry.message);
+			results.set(entry.message.toolCallId, { seq: entry.seq, message: entry.message });
 		}
 	}
 	const out: ModelMessage[] = [];
@@ -79,7 +149,18 @@ export function toModelMessages(entries: Entry[]): ModelMessage[] {
 				out.push(message);
 				for (const block of message.content) {
 					if (block.type !== "toolCall") continue;
-					out.push(results.get(block.id) ?? placeholder(block, message.timestamp));
+					const found = results.get(block.id);
+					if (!found) {
+						out.push(placeholder(block, message.timestamp));
+					} else if (
+						prunedBeforeSeq > 0 &&
+						found.seq < prunedBeforeSeq &&
+						isPrunableToolResult(found.message)
+					) {
+						out.push(foldToolResult(block, found.message));
+					} else {
+						out.push(found.message);
+					}
 				}
 				break;
 			}
@@ -97,21 +178,22 @@ export function toModelMessages(entries: Entry[]): ModelMessage[] {
 export async function prepareModelMessages(
 	entries: Entry[],
 	hydrate?: (entry: Extract<Entry, { role: "user" }>) => Promise<UserMessage>,
+	prunedBeforeSeq = 0,
 ): Promise<ModelMessage[]> {
-	if (!hydrate) return toModelMessages(entries);
+	if (!hydrate) return toModelMessages(entries, prunedBeforeSeq);
 	const hydrated = new Map<string, UserMessage>();
 	for (const entry of entries) {
 		if (entry.role === "user" && entry.attachments && entry.attachments.length > 0) {
 			hydrated.set(entry.id, await hydrate(entry));
 		}
 	}
-	if (hydrated.size === 0) return toModelMessages(entries);
+	if (hydrated.size === 0) return toModelMessages(entries, prunedBeforeSeq);
 	const next = entries.map((entry) =>
 		entry.role === "user" && hydrated.has(entry.id)
 			? { ...entry, message: hydrated.get(entry.id) as UserMessage }
 			: entry,
 	);
-	return toModelMessages(next);
+	return toModelMessages(next, prunedBeforeSeq);
 }
 
 /** An interrupted response may end in a half-written tool call; keep the text and drop the call. */
@@ -159,10 +241,11 @@ export function transcriptForSummary(entries: Entry[]): string {
 
 /** Rough token count (four characters per token), used to choose what compaction keeps. */
 export function estimateTokens(entry: Entry): number {
+	if (entry.role === "toolResult") return toolResultTokens(entry.message);
 	let tokens = Math.ceil(JSON.stringify(entry).length / 4);
 	if (entry.role === "user" && entry.attachments) {
 		for (const item of entry.attachments) {
-			tokens += item.kind === "image" ? 1500 : Math.min(Math.ceil(item.size / 4), 8000);
+			tokens += item.kind === "image" ? IMAGE_TOKENS : Math.min(Math.ceil(item.size / 4), 8000);
 		}
 	}
 	return tokens;

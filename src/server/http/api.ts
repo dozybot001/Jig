@@ -372,9 +372,24 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			const pending = store
 				.pendingApprovals(session.id)
 				.filter((approval) => !approvals.some((known) => known.id === approval.id));
+			// The UI only shows "[image]" for tool-result images; strip raw base64 blobs from HTTP responses.
+			const entries = page.entries.map((entry) =>
+				entry.role === "toolResult" &&
+				entry.message.content.some((block) => block.type === "image" && block.data.length > 0)
+					? {
+							...entry,
+							message: {
+								...entry.message,
+								content: entry.message.content.map((block) =>
+									block.type === "image" ? { ...block, data: "" } : block,
+								),
+							},
+						}
+					: entry,
+			);
 			return {
 				session: store.getSession(session.id),
-				entries: page.entries,
+				entries,
 				toolCalls,
 				approvals: [...approvals, ...pending],
 				queue: store.listQueue(session.id),

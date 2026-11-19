@@ -37,6 +37,8 @@ export interface ContextSnapshot {
 	 * keeps the snapshot, so it stays the same until the next compaction (prompt caching).
 	 */
 	told?: Told;
+	/** Layer-1 compaction boundary: large/image tool results with seq < this are folded when sent to the model. */
+	prunedBeforeSeq?: number;
 }
 
 /** The parts of the context that can change between turns. */

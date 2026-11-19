@@ -158,6 +158,38 @@ const CUT_TOO_OFTEN = "The reply was cut off at the model's output limit several
 const RESTARTED =
 	"Yew restarted while this call was running. It may or may not have finished; check the current state before running it again.";
 
+const MAX_DRAFT_THINKING_CHARS = 12_000;
+const MAX_DRAFT_ARG_CHARS = 500;
+
+/**
+ * Slims a streaming draft before pushing it over SSE so a giant `write` payload or 150 KB thinking
+ * block does not flood WebKit at 10 Hz. The complete message is persisted to SQLite when it finishes.
+ */
+function slimDraft(draft: AssistantMessage): AssistantMessage {
+	return {
+		...draft,
+		content: draft.content.map((block) => {
+			if (block.type === "thinking") {
+				return block.thinking.length > MAX_DRAFT_THINKING_CHARS
+					? { ...block, thinking: `…${block.thinking.slice(-MAX_DRAFT_THINKING_CHARS)}` }
+					: block;
+			}
+			if (block.type === "toolCall") {
+				const slimArgs: JsonObject = {};
+				for (const [k, v] of Object.entries(block.arguments)) {
+					if (typeof v === "string" && v.length > MAX_DRAFT_ARG_CHARS) {
+						slimArgs[k] = `${v.slice(0, MAX_DRAFT_ARG_CHARS)}… (${v.length} chars)`;
+					} else {
+						slimArgs[k] = v;
+					}
+				}
+				return { ...block, arguments: slimArgs };
+			}
+			return block;
+		}),
+	};
+}
+
 const clip = (text: string, max: number) =>
 	[...text].length > max ? `${[...text].slice(0, max - 1).join("")}…` : text;
 
@@ -656,7 +688,8 @@ export class Agents {
 				}
 				const model = this.#requireModel(session);
 				const snapshot = this.#context.refresh(session);
-				if ((await this.#context.compactIfNeeded(session, model, signal)) === "failed") {
+				const compacted = await this.#context.compactIfNeeded(session, model, signal);
+				if (compacted === "failed") {
 					// Going on would ask for a summary again at every step and end in a context that does not fit.
 					if (!signal.aborted) {
 						endStatus = "error";
@@ -669,7 +702,16 @@ export class Agents {
 				if (await this.#promptHooks(sessionId)) break;
 				if (signal.aborted) break;
 
-				const final = await this.#ask(this.#store.getSession(sessionId), model, snapshot, signal);
+				const currentSnapshot =
+					compacted === "done"
+						? (this.#store.getContextSnapshot<ContextSnapshot>(sessionId) ?? snapshot)
+						: snapshot;
+				const final = await this.#ask(
+					this.#store.getSession(sessionId),
+					model,
+					currentSnapshot,
+					signal,
+				);
 				const message = sanitizeInterrupted(final);
 				const entry =
 					message.content.length > 0
@@ -902,13 +944,16 @@ export class Agents {
 		const flush = () => {
 			pending = null;
 			last = Date.now();
-			if (latest) this.#store.live(session.id, { type: "draft", draft: structuredClone(latest) });
+			if (latest) this.#store.live(session.id, { type: "draft", draft: slimDraft(latest) });
 		};
 		try {
-			const messages = await prepareModelMessages(this.#store.contextEntries(session.id), (entry) =>
-				this.attachments.hydrateUserMessage(entry, {
-					acceptsImages: model.input.includes("image"),
-				}),
+			const messages = await prepareModelMessages(
+				this.#store.contextEntries(session.id),
+				(entry) =>
+					this.attachments.hydrateUserMessage(entry, {
+						acceptsImages: model.input.includes("image"),
+					}),
+				snapshot.prunedBeforeSeq ?? 0,
 			);
 			return await this.#gateway.stream(
 				{

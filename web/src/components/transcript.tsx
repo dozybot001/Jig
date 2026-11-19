@@ -148,7 +148,7 @@ function isToolVerb(name: string): name is (typeof TOOL_VERBS)[number] {
 	return (TOOL_VERBS as readonly string[]).includes(name);
 }
 
-function Thinking({ text, live }: { text: string; live: boolean }) {
+const Thinking = memo(function Thinking({ text, live }: { text: string; live: boolean }) {
 	// Open while it streams, folded once the answer starts (after AI Elements, prior-art 5.3).
 	const [open, setOpen] = useState(live);
 	useEffect(() => {
@@ -166,12 +166,14 @@ function Thinking({ text, live }: { text: string; live: boolean }) {
 				</span>
 				<ChevronIcon />
 			</summary>
-			<Capped className="thinking-body" label={t("thinkingLabel")} follow={live}>
-				{text}
-			</Capped>
+			{open && (
+				<Capped className="thinking-body" label={t("thinkingLabel")} follow={live}>
+					{text}
+				</Capped>
+			)}
 		</details>
 	);
-}
+});
 
 /**
  * What a permission request does, in the person's words: why a must-confirm operation asks every time,
@@ -796,40 +798,42 @@ const ToolCard = memo(function ToolCard({
 						)}
 						<ChevronIcon />
 					</summary>
-					<div className="tool-detail">
-						{riskText && <p className="hint">{t("permRiskLine", { reasons: riskText })}</p>}
-						{reviewed !== undefined && (
-							<p className="hint">
-								{reviewed ? t("permReviewedLine", { reason: reviewed }) : t("permReviewedPlain")}
-							</p>
-						)}
-						<h2>{t("toolArguments")}</h2>
-						<ScrollBlock className="code output" label={t("toolArguments")}>
-							{JSON.stringify(call.arguments, null, 2)}
-						</ScrollBlock>
-						{status === "running" && output && (
-							<>
-								<h2>{t("toolOutput")}</h2>
-								<ScrollBlock className="code output" label={t("toolOutput")} follow>
-									{output}
-								</ScrollBlock>
-							</>
-						)}
-						{detail?.diff && (
-							<>
-								<h2>{t("diff")}</h2>
-								<Diff patch={detail.diff} />
-							</>
-						)}
-						{result && (
-							<>
-								<h2>{t("toolResult")}</h2>
-								<ScrollBlock className="code output" label={t("toolResult")}>
-									{resultText(result)}
-								</ScrollBlock>
-							</>
-						)}
-					</div>
+					{open && (
+						<div className="tool-detail">
+							{riskText && <p className="hint">{t("permRiskLine", { reasons: riskText })}</p>}
+							{reviewed !== undefined && (
+								<p className="hint">
+									{reviewed ? t("permReviewedLine", { reason: reviewed }) : t("permReviewedPlain")}
+								</p>
+							)}
+							<h2>{t("toolArguments")}</h2>
+							<ScrollBlock className="code output" label={t("toolArguments")}>
+								{JSON.stringify(call.arguments, null, 2)}
+							</ScrollBlock>
+							{status === "running" && output && (
+								<>
+									<h2>{t("toolOutput")}</h2>
+									<ScrollBlock className="code output" label={t("toolOutput")} follow>
+										{output}
+									</ScrollBlock>
+								</>
+							)}
+							{detail?.diff && (
+								<>
+									<h2>{t("diff")}</h2>
+									<Diff patch={detail.diff} />
+								</>
+							)}
+							{result && (
+								<>
+									<h2>{t("toolResult")}</h2>
+									<ScrollBlock className="code output" label={t("toolResult")}>
+										{resultText(result)}
+									</ScrollBlock>
+								</>
+							)}
+						</div>
+					)}
 				</details>
 			)}
 			{!pending && substep && (
@@ -1118,7 +1122,7 @@ function StepView({
  * A run of steps folded into one line that counts what was done; open it to see every step. While the
  * session is still working on it, the latest step stays visible under the line.
  */
-function StepGroup({
+const StepGroup = memo(function StepGroup({
 	steps,
 	live,
 	transcript,
@@ -1154,45 +1158,60 @@ function StepGroup({
 					)}
 					<ChevronIcon />
 				</summary>
-				<Capped className="step-list" label={summarize(steps)} follow={live}>
-					{steps.map((step) => (
-						<StepView key={step.key} step={step} transcript={transcript} results={results} />
-					))}
-				</Capped>
+				{open && (
+					<Capped className="step-list" label={summarize(steps)} follow={live}>
+						{steps.map((step) => (
+							<StepView key={step.key} step={step} transcript={transcript} results={results} />
+						))}
+					</Capped>
+				)}
 			</details>
 			{live && !open && active && (
 				<StepView step={active} transcript={transcript} results={results} />
 			)}
 		</div>
 	);
-}
+});
 
 /** Yew's notes in the context: changed instruction files, or the summary of compacted history. */
 function NoteStep({ entry }: { entry: Entry }) {
 	useLang();
+	const [open, setOpen] = useState(false);
 	if (entry.role === "system") {
 		return (
-			<details className="activity">
+			<details
+				className="activity"
+				open={open}
+				onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
+			>
 				<summary>
 					<span className="activity-verb">{t("instructionsUpdated")}</span>
 					<ChevronIcon />
 				</summary>
-				<ScrollBlock className="code output note-body" label={t("instructionsUpdated")}>
-					{entry.message.content}
-				</ScrollBlock>
+				{open && (
+					<ScrollBlock className="code output note-body" label={t("instructionsUpdated")}>
+						{entry.message.content}
+					</ScrollBlock>
+				)}
 			</details>
 		);
 	}
 	if (entry.role === "compaction") {
 		return (
-			<details className="activity">
+			<details
+				className="activity"
+				open={open}
+				onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
+			>
 				<summary>
 					<span className="activity-verb">{t("summaryTitle")}</span>
 					<ChevronIcon />
 				</summary>
-				<Capped className="tool-detail note-summary" label={t("summaryTitle")}>
-					<Markdown text={entry.compaction.summary} />
-				</Capped>
+				{open && (
+					<Capped className="tool-detail note-summary" label={t("summaryTitle")}>
+						<Markdown text={entry.compaction.summary} />
+					</Capped>
+				)}
 			</details>
 		);
 	}
@@ -1366,6 +1385,8 @@ function EntryView({ entry }: { entry: Entry }) {
 							reason: String(data.reason),
 						})
 					: t("notice_reviewed_plain", { summary: String(data.summary ?? "") });
+			} else if (notice.kind === "compacted" && data.tier === "prune") {
+				text = t("notice_compacted_pruned", { n: Number(data.prunedCount ?? 0) });
 			} else if (notice.kind === "changed") {
 				const steps = (notice.data?.steps ?? []) as unknown as ChangeStep[];
 				text = t("notice_changed", {
@@ -1411,12 +1432,19 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 	const following = useStickToBottom(scroller, onFollow);
 	const loadMore = useAction(loadEarlier);
 
-	const results = new Map<string, ToolResultMessage>();
-	for (const entry of transcript.entries) {
-		if (entry.role === "toolResult") results.set(entry.message.toolCallId, entry.message);
-	}
+	const results = useMemo(() => {
+		const map = new Map<string, ToolResultMessage>();
+		for (const entry of transcript.entries) {
+			if (entry.role === "toolResult") map.set(entry.message.toolCallId, entry.message);
+		}
+		return map;
+	}, [transcript.entries]);
 	const detailed = useAppState((state) => state.transcriptDetail);
-	const items = buildItems(transcript, session?.status === "working", detailed);
+	const working = session?.status === "working";
+	const items = useMemo(
+		() => buildItems(transcript, working, detailed),
+		[transcript, working, detailed],
+	);
 	const freeApprovals = Object.values(transcript.approvals).filter(
 		(a) => !a.toolCallId && a.status === "pending",
 	);

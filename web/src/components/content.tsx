@@ -150,12 +150,13 @@ export function Capped({
 			current.overflow === overflow && current.more === more ? current : { overflow, more },
 		);
 	}, []);
-	// After every render: new text may have arrived.
+	// Re-measure only when content or follow mode changes, not on unrelated parent renders.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: children drives overflow height
 	useLayoutEffect(() => {
 		const element = ref.current;
 		if (element && follow && following.current) element.scrollTop = element.scrollHeight;
 		measure();
-	});
+	}, [children, follow, measure]);
 	useEffect(() => {
 		const element = ref.current;
 		if (!element) return;
