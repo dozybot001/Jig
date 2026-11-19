@@ -59,6 +59,8 @@ export interface ModelInfo {
 	input: ("text" | "image")[];
 	/** US dollars per million tokens. */
 	cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
+	/** True for active latest-generation models (shown above the divider in the model picker). */
+	latest?: boolean;
 }
 
 export interface ToolSpec {
@@ -284,6 +286,150 @@ function toInfo(model: Model<Api>): ModelInfo {
 	};
 }
 
+type VersionTuple = [number, number];
+
+interface ParsedModel {
+	info: ModelInfo;
+	family: string;
+	root: string;
+	version: VersionTuple | null;
+	dated: string | null;
+	isPreview: boolean;
+	isLatestId: boolean;
+}
+
+function compareVersion(a: VersionTuple, b: VersionTuple): number {
+	return a[0] - b[0] || a[1] - b[1];
+}
+
+function tierRank(id: string): number {
+	const lower = id.toLowerCase();
+	if (/\b(opus|pro|max|sol)\b|-opus-|-pro\b|-max\b|-sol\b/.test(lower)) return 0;
+	if (/\b(sonnet|plus|terra)\b|-sonnet-|-plus\b|-terra\b/.test(lower)) return 1;
+	if (/\b(haiku|flash|mini|lite|nano)\b|-haiku-|-flash\b|-mini\b|-lite\b/.test(lower)) return 2;
+	return 3;
+}
+
+function parseModelIdentity(info: ModelInfo): ParsedModel {
+	const raw = (info.id.split("/").pop() ?? info.id).toLowerCase();
+	let base = raw;
+	let dated: string | null = null;
+	const d8 = /-(20\d{2})(\d{2})(\d{2})$/.exec(base);
+	if (d8) {
+		dated = `${d8[1]}-${d8[2]}-${d8[3]}`;
+		base = base.slice(0, -d8[0].length);
+	} else {
+		const diso = /-(20\d{2}-\d{2}-\d{2})$/.exec(base);
+		if (diso) {
+			dated = diso[1] as string;
+			base = base.slice(0, -diso[0].length);
+		} else {
+			const d4 = /-(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?=-|$)/.exec(base);
+			const yymm = d4 ? null : /-(2[4-9])(0[1-9]|1[0-2])$/.exec(base);
+			if (d4) {
+				dated = `${d4[1]}-${d4[2]}`;
+				base = base.replace(d4[0], "");
+			} else if (yymm) {
+				dated = `20${yymm[1]}-${yymm[2]}`;
+				base = base.slice(0, -yymm[0].length);
+			}
+		}
+	}
+	const isPreview = /-preview\b|-spot\b/.test(base);
+	const isLatestId = /-latest$/.test(base);
+	const clean = base.replace(/-latest$/, "");
+	let version: VersionTuple | null = null;
+	let family = clean;
+	const claude = /^(claude-[a-z]+)-(\d+)(?:-(\d+))?$/.exec(clean);
+	if (claude) {
+		family = claude[1] as string;
+		version = [Number(claude[2]), Number(claude[3] ?? 0)];
+	} else {
+		const versioned = /^([a-z-]+?)[-_]?(\d+)(?:[.\-p](\d+))?(?![0-9bt])(.*)$/.exec(clean);
+		if (versioned) {
+			family = `${versioned[1]}-${versioned[4]}`.replace(/-+/g, "-").replace(/^-|-$/g, "");
+			version = [Number(versioned[2]), Number(versioned[3] ?? 0)];
+		} else {
+			const nameVer = /\bv?(\d+)(?:\.(\d+))?(?![0-9bt])/.exec(info.name.toLowerCase());
+			if (nameVer) version = [Number(nameVer[1]), Number(nameVer[2] ?? 0)];
+		}
+	}
+	const root = family.split("-")[0] ?? family;
+	return { info, family, root, version, dated, isPreview, isLatestId };
+}
+
+/**
+ * Cleans up upstream display quirks (such as legacy "(latest)" tags left on older generations once
+ * newer releases arrive, and duplicate names on dated snapshots), marks the current-generation
+ * `latest` models, and orders latest flagship models ahead of older ones.
+ */
+export function enrichProviderModels(models: ModelInfo[]): ModelInfo[] {
+	if (models.length === 0) return models;
+	const parsed = models.map(parseModelIdentity);
+	const maxByFamily = new Map<string, VersionTuple>();
+	const maxMajorByRoot = new Map<string, number>();
+	for (const item of parsed) {
+		if (!item.version) continue;
+		const existing = maxByFamily.get(item.family);
+		if (!existing || compareVersion(item.version, existing) > 0) {
+			maxByFamily.set(item.family, item.version);
+		}
+		if (!item.isPreview && !item.dated) {
+			const curMajor = maxMajorByRoot.get(item.root) ?? -1;
+			if (item.version[0] > curMajor) maxMajorByRoot.set(item.root, item.version[0]);
+		}
+	}
+	const renamed = parsed.map((item) => {
+		let name = item.info.name;
+		const max = maxByFamily.get(item.family);
+		if (
+			/\s*\(latest\)\s*$/i.test(name) &&
+			item.version &&
+			max &&
+			compareVersion(item.version, max) < 0
+		) {
+			name = name.replace(/\s*\(latest\)\s*$/i, "");
+		}
+		return { ...item, name };
+	});
+	const nameCounts = new Map<string, number>();
+	for (const item of renamed) nameCounts.set(item.name, (nameCounts.get(item.name) ?? 0) + 1);
+	const decorated = renamed.map((item) => {
+		let name = item.name;
+		if (item.dated && (nameCounts.get(name) ?? 0) > 1 && !name.includes(item.dated)) {
+			name = `${name} (${item.dated})`;
+		}
+		const max = maxByFamily.get(item.family);
+		const maxRoot = maxMajorByRoot.get(item.root);
+		const isTopMajor = !item.version || maxRoot === undefined || item.version[0] === maxRoot;
+		const isTopInFamily =
+			item.version !== null &&
+			max !== undefined &&
+			compareVersion(item.version, max) === 0 &&
+			!item.dated &&
+			!item.isPreview &&
+			isTopMajor;
+		const latest = (item.isLatestId && isTopMajor) || isTopInFamily;
+		return {
+			...item,
+			info: { ...item.info, name, latest },
+		};
+	});
+	decorated.sort((a, b) => {
+		if (a.info.latest !== b.info.latest) return a.info.latest ? -1 : 1;
+		if (a.version && b.version) {
+			const verDiff = compareVersion(b.version, a.version);
+			if (verDiff !== 0) return verDiff;
+		} else if (a.version !== b.version) {
+			return a.version ? -1 : 1;
+		}
+		const rankDiff = tierRank(a.info.id) - tierRank(b.info.id);
+		if (rankDiff !== 0) return rankDiff;
+		return a.info.name.localeCompare(b.info.name);
+	});
+	return decorated.map((item) => item.info);
+}
+
 export interface GatewayOptions {
 	keys: KeyStore;
 	/** Yew's version, sent as `User-Agent: yew/<version>`. */
@@ -385,12 +531,22 @@ export class ModelGateway {
 	}
 
 	models(provider?: string): ModelInfo[] {
-		return this.#models.getModels(provider).map(toInfo);
+		const list = this.#models.getModels(provider).map(toInfo);
+		if (provider) return enrichProviderModels(list);
+		const byProvider = new Map<string, ModelInfo[]>();
+		for (const item of list) {
+			const group = byProvider.get(item.provider);
+			if (group) group.push(item);
+			else byProvider.set(item.provider, [item]);
+		}
+		const enriched: ModelInfo[] = [];
+		for (const group of byProvider.values()) enriched.push(...enrichProviderModels(group));
+		return enriched;
 	}
 
 	model(provider: string, id: string): ModelInfo | undefined {
-		const model = this.#models.getModel(provider, id);
-		return model ? toInfo(model) : undefined;
+		if (!this.#models.getModel(provider, id)) return undefined;
+		return this.models(provider).find((item) => item.id === id);
 	}
 
 	/** Throws a 400 error when the provider or model is unknown. */

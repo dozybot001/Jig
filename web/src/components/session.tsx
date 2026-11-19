@@ -25,7 +25,13 @@ import {
 	withdrawQueued,
 } from "../actions.ts";
 import { formatCost, formatNumber, permissionHint, t, useLang } from "../i18n.ts";
-import { type ModelInfo, setState, type TranscriptState, useAppState } from "../state.ts";
+import {
+	type ModelInfo,
+	setState,
+	setTranscriptDetail,
+	type TranscriptState,
+	useAppState,
+} from "../state.ts";
 import {
 	ATTACHMENT_ACCEPT,
 	filesFromClipboard,
@@ -46,6 +52,8 @@ import {
 	ChevronIcon,
 	CodeIcon,
 	CompactIcon,
+	CompactViewIcon,
+	DetailedViewIcon,
 	MenuIcon,
 	NotesIcon,
 	PlayIcon,
@@ -62,7 +70,17 @@ import {
 import { Mascot } from "./mascot.tsx";
 import { ProgressLine } from "./progress.tsx";
 import { Transcript } from "./transcript.tsx";
-import { Button, Dialog, describeError, ErrorBox, Select, useAction } from "./ui.tsx";
+import {
+	Button,
+	Dialog,
+	describeError,
+	ErrorBox,
+	Menu,
+	type MenuEntry,
+	type MenuItem,
+	Select,
+	useAction,
+} from "./ui.tsx";
 import { useWorkspaces, WorkspacePicker, workspaceLabel } from "./workspaces.tsx";
 
 export function useModels(provider: string): ModelInfo[] {
@@ -104,7 +122,7 @@ export function ModelPicker({
 	const providers = useAppState((state) => state.providers);
 	const models = useModels(provider);
 	const info = models.find((m) => m.id === model);
-	const ids = { provider: useId(), model: useId(), thinking: useId() };
+	const ids = { provider: useId(), model: useId() };
 	const providerOptions = providers.map((p) => ({
 		value: p.id,
 		label: p.hasKey || !p.keyRequired ? p.name : `${p.name} · ${t("noKey")}`,
@@ -112,6 +130,47 @@ export function ModelPicker({
 	}));
 	providerOptions.sort((a, b) => (a.group === b.group ? 0 : a.group === t("region_cn") ? -1 : 1));
 	const grid = layout === "grid";
+	const activeLevel = info?.reasoning ? effectiveLevel(info.thinkingLevels, thinking) : null;
+	const triggerLabel = info
+		? activeLevel
+			? `${info.name} · ${t(`thinking_${activeLevel}`)}`
+			: info.name
+		: model;
+	const toModelEntry = (item: ModelInfo): MenuItem => {
+		const selected = item.id === model;
+		if (item.reasoning && item.thinkingLevels.length > 0) {
+			const current = effectiveLevel(item.thinkingLevels, thinking);
+			return {
+				id: item.id,
+				label: item.name,
+				checked: selected,
+				detail: selected ? t(`thinking_${current}`) : undefined,
+				onSelect: () => onChange({ model: item.id }),
+				items: item.thinkingLevels.map((level) => ({
+					id: `${item.id}:${level}`,
+					label: t(`thinking_${level}`),
+					checked: selected && current === level,
+					onSelect: () => onChange({ model: item.id, thinking: level }),
+				})),
+			};
+		}
+		return {
+			id: item.id,
+			label: item.name,
+			checked: selected,
+			onSelect: () => onChange({ model: item.id }),
+		};
+	};
+	const latestModels = models.filter((m) => m.latest);
+	const otherModels = models.filter((m) => !m.latest);
+	const modelEntries: MenuEntry[] =
+		latestModels.length > 0 && otherModels.length > 0
+			? [
+					...latestModels.map(toModelEntry),
+					{ separator: true, id: "sep-models" },
+					...otherModels.map(toModelEntry),
+				]
+			: models.map(toModelEntry);
 	const choose = {
 		provider: (
 			<Select
@@ -127,35 +186,25 @@ export function ModelPicker({
 			/>
 		),
 		model: (
-			<Select
-				{...(grid ? { labelledBy: ids.model } : { label: t("model") })}
-				value={model}
-				busy={busy}
-				options={models.map((m) => ({ value: m.id, label: m.name }))}
-				onChange={(value) => onChange({ model: value })}
+			<Menu
+				label={t("model")}
+				width={260}
+				items={modelEntries}
+				trigger={{
+					className: "btn select-trigger model-trigger",
+					content: <span>{triggerLabel}</span>,
+					title: triggerLabel,
+					busy,
+					labelledBy: grid ? ids.model : undefined,
+				}}
 			/>
 		),
-		thinking: info?.reasoning ? (
-			<Select
-				{...(grid ? { labelledBy: ids.thinking } : { label: t("thinking") })}
-				value={effectiveLevel(info.thinkingLevels, thinking)}
-				busy={busy}
-				options={info.thinkingLevels.map((level) => ({
-					value: level,
-					label: grid
-						? t(`thinking_${level}`)
-						: t("thinkingLevel", { level: t(`thinking_${level}`) }),
-				}))}
-				onChange={(value) => onChange({ thinking: value as ThinkingLevel })}
-			/>
-		) : null,
 	};
 	if (!grid) {
 		return (
 			<div className="model-picker">
 				{choose.provider}
 				{choose.model}
-				{choose.thinking}
 			</div>
 		);
 	}
@@ -173,14 +222,6 @@ export function ModelPicker({
 				</span>
 				{choose.model}
 			</div>
-			{choose.thinking && (
-				<div className="field">
-					<span className="field-label" id={ids.thinking}>
-						{t("thinking")}
-					</span>
-					{choose.thinking}
-				</div>
-			)}
 		</div>
 	);
 }
@@ -215,6 +256,7 @@ function SessionHeader({
 	const parent = useAppState((state) =>
 		parentId ? (state.sessions[parentId]?.name ?? null) : null,
 	);
+	const detailed = useAppState((state) => state.transcriptDetail);
 	const tokens =
 		session.usage.input + session.usage.output + session.usage.cacheRead + session.usage.cacheWrite;
 	return (
@@ -243,6 +285,16 @@ function SessionHeader({
 					{t("tokens", { n: formatNumber(tokens) })} ·{" "}
 					{t("cost", { n: formatCost(session.usage.cost) })}
 				</span>
+				<Button
+					variant="icon"
+					className={`view-mode-toggle${detailed ? " view-mode-detailed" : ""}`}
+					aria-pressed={detailed}
+					aria-label={t(detailed ? "transcriptViewDetailed" : "transcriptViewCompact")}
+					title={t(detailed ? "transcriptViewDetailed" : "transcriptViewCompact")}
+					onClick={() => setTranscriptDetail(!detailed)}
+				>
+					{detailed ? <DetailedViewIcon /> : <CompactViewIcon />}
+				</Button>
 			</div>
 		</header>
 	);
@@ -692,20 +744,22 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 						title={t("renewTitle")}
 						size="s"
 						onClose={() => !renew.busy && setRenewOpen(false)}
+						footer={
+							<>
+								<Button disabled={renew.busy} onClick={() => setRenewOpen(false)}>
+									{t("cancel")}
+								</Button>
+								<Button disabled={renew.busy} onClick={() => void renew.run(false)}>
+									{t("renewClean")}
+								</Button>
+								<Button variant="primary" busy={renew.busy} onClick={() => void renew.run(true)}>
+									{t("renewWithSummary")}
+								</Button>
+							</>
+						}
 					>
-						<p className="confirm-message">{t("renewHint")}</p>
+						<p>{t("renewHint")}</p>
 						<ErrorBox error={renew.error} />
-						<div className="dialog-actions dialog-actions-stack">
-							<Button variant="primary" busy={renew.busy} onClick={() => void renew.run(true)}>
-								{t("renewWithSummary")}
-							</Button>
-							<Button disabled={renew.busy} onClick={() => void renew.run(false)}>
-								{t("renewClean")}
-							</Button>
-							<Button variant="ghost" disabled={renew.busy} onClick={() => setRenewOpen(false)}>
-								{t("cancel")}
-							</Button>
-						</div>
 					</Dialog>
 				)}
 				<ErrorBox
@@ -930,6 +984,7 @@ function HomeView() {
 					onDragLeave={onDragLeave}
 					onDrop={onDrop}
 				>
+					<Mascot pose="peek" height={80} className="composer-peek" />
 					<ComposerMenu menu={menu} />
 					<input
 						ref={fileInput}

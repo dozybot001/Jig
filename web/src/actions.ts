@@ -52,6 +52,7 @@ import {
 	type SystemStatus,
 	setState,
 	THEME_KEY,
+	triggerReaction,
 	updateTranscript,
 	upsertEntry,
 } from "./state.ts";
@@ -387,11 +388,23 @@ function applyGlobalEvent(event: GlobalEvent): void {
 				artifactId: current.artifactId === event.id ? null : current.artifactId,
 			}));
 			return;
-		case "sessionSummary":
+		case "sessionSummary": {
+			const previous = getState().sessions[event.session.id];
 			setState((current) => ({
 				sessions: { ...current.sessions, [event.session.id]: event.session },
 			}));
+			if (
+				previous?.status === "working" &&
+				(event.session.status === "idle" || event.session.status === "needs_review") &&
+				event.session.archivedAt === null
+			) {
+				triggerReaction("proud", "companion_react_done", {
+					params: { name: event.session.name },
+					ms: 3600,
+				});
+			}
 			return;
+		}
 		case "approval": {
 			const approval = event.approval;
 			setState((current) => ({
@@ -938,16 +951,27 @@ export async function loadLetters(more = false): Promise<void> {
 }
 
 export async function decideCard(cardId: string, choice: number | null, note: string | null) {
-	return api<Card>(
+	const card = await api<Card>(
 		"POST",
 		`/api/cards/${cardId}/decide`,
 		{ choice, ...(note ? { note } : {}) },
 		{ idempotent: true },
 	);
+	triggerReaction("stamp", "companion_react_decided", { priority: true });
+	return card;
 }
 
-export const releaseLetter = (id: string) => api<Letter>("POST", `/api/letters/${id}/release`);
-export const refuseLetter = (id: string) => api<Letter>("POST", `/api/letters/${id}/refuse`);
+export async function releaseLetter(id: string) {
+	const letter = await api<Letter>("POST", `/api/letters/${id}/release`);
+	triggerReaction("letter-run", "companion_react_released", { priority: true });
+	return letter;
+}
+
+export async function refuseLetter(id: string) {
+	const letter = await api<Letter>("POST", `/api/letters/${id}/refuse`);
+	triggerReaction("halt", "companion_react_declined", { priority: true });
+	return letter;
+}
 
 /** Makes a session the main conversation, or none (blueprint section 5). */
 export async function setMainSession(sessionId: string | null): Promise<void> {
@@ -984,20 +1008,27 @@ export async function sendMessage(
 		const entry = result.entry;
 		updateTranscript(sessionId, (t) => ({ entries: upsertEntry(t.entries, entry) }));
 	}
+	triggerReaction("paper-plane", "companion_react_sent", { ms: 2200 });
 }
 
 export const stopSession = (sessionId: string) => api("POST", `/api/sessions/${sessionId}/stop`);
 export const continueSession = (sessionId: string) =>
 	api("POST", `/api/sessions/${sessionId}/continue`);
-export const compactSession = (sessionId: string) =>
-	api("POST", `/api/sessions/${sessionId}/compact`);
+export async function compactSession(sessionId: string) {
+	const res = await api("POST", `/api/sessions/${sessionId}/compact`);
+	triggerReaction("books", "companion_react_renewed");
+	return res;
+}
 
-export const renewSession = (sessionId: string, summarize = true) =>
-	api<{ status: "done" | "nothing" | "failed"; session: Session }>(
+export async function renewSession(sessionId: string, summarize = true) {
+	const res = await api<{ status: "done" | "nothing" | "failed"; session: Session }>(
 		"POST",
 		`/api/sessions/${sessionId}/renew`,
 		{ summarize },
 	);
+	if (res.status === "done") triggerReaction("books", "companion_react_renewed");
+	return res;
+}
 
 export interface SessionFileMatch {
 	path: string;
@@ -1045,7 +1076,15 @@ export async function answerApproval(
 		answers?: QuestionAnswer[];
 	},
 ): Promise<Approval> {
-	return api<Approval>("POST", `/api/approvals/${approvalId}`, answer);
+	const res = await api<Approval>("POST", `/api/approvals/${approvalId}`, answer);
+	if (answer.decision === "allow_once" || answer.decision === "allow_always") {
+		triggerReaction("stamp", "companion_react_stamped", { priority: true });
+	} else if (answer.decision === "deny") {
+		triggerReaction("halt", "companion_react_declined", { priority: true });
+	} else if (answer.answer !== undefined || answer.answers) {
+		triggerReaction("paper-plane", "companion_react_sent", { ms: 2400, priority: true });
+	}
+	return res;
 }
 
 // --- providers, models, settings ---

@@ -29,6 +29,7 @@ import {
 	ErrorBox,
 	Field,
 	Select,
+	SettingRow,
 	Switch,
 	useAction,
 	useNow,
@@ -444,28 +445,28 @@ function ScheduleDialog({ schedule, onClose }: { schedule: Schedule | null; onCl
 					/>
 				</Field>
 			</div>
-			<div className="field-row">
-				<Field label={t("scheduleCatchUp")} info={t("scheduleCatchUpHint")}>
-					<Select
-						label={t("scheduleCatchUp")}
-						value={catchUp ? "yes" : "no"}
-						options={[
-							{ value: "yes", label: t("scheduleCatchUp_yes") },
-							{ value: "no", label: t("scheduleCatchUp_no") },
-						]}
-						onChange={(value) => setCatchUp(value === "yes")}
-					/>
-				</Field>
-				{runMode === "task_session" && (
-					<Field
+			<Field label={t("scheduleCatchUp")} info={t("scheduleCatchUpHint")}>
+				<Select
+					label={t("scheduleCatchUp")}
+					value={catchUp ? "yes" : "no"}
+					options={[
+						{ value: "yes", label: t("scheduleCatchUp_yes") },
+						{ value: "no", label: t("scheduleCatchUp_no") },
+					]}
+					onChange={(value) => setCatchUp(value === "yes")}
+				/>
+			</Field>
+			{runMode === "task_session" && (
+				<div className="setting-box">
+					<SettingRow
 						label={t("scheduleAutoArchive")}
+						hint={t("scheduleAutoArchiveHint")}
 						labelId={ids.autoArchive}
-						info={t("scheduleAutoArchiveHint")}
 					>
 						<Switch checked={autoArchive} labelledBy={ids.autoArchive} onChange={setAutoArchive} />
-					</Field>
-				)}
-			</div>
+					</SettingRow>
+				</div>
+			)}
 			<ErrorBox error={generalError(save.error)} />
 		</Dialog>
 	);

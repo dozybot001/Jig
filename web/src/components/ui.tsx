@@ -527,6 +527,11 @@ function MenuItemButton({
 	const onClick = (event: { stopPropagation(): void; currentTarget: HTMLButtonElement }) => {
 		event.stopPropagation();
 		if (submenu) {
+			if (item.onSelect && submenu.open) {
+				close();
+				item.onSelect();
+				return;
+			}
 			submenu.show(event.currentTarget, true);
 			return;
 		}
@@ -541,7 +546,7 @@ function MenuItemButton({
 				tabIndex={-1}
 				aria-haspopup="menu"
 				aria-expanded={submenu.open}
-				className="menu-parent"
+				className={`menu-parent${item.checked ? " menu-selected" : ""}`}
 				onClick={onClick}
 				onPointerEnter={(event) => submenu.show(event.currentTarget, false)}
 				onKeyDown={(event) => {
@@ -662,7 +667,14 @@ export function Menu({
 }: {
 	label: string;
 	items: MenuEntry[];
-	trigger?: { className: string; content: ReactNode; title?: string };
+	trigger?: {
+		className: string;
+		content: ReactNode;
+		title?: string;
+		disabled?: boolean;
+		busy?: boolean;
+		labelledBy?: string;
+	};
 	open?: boolean;
 	onOpenChange?: (open: boolean) => void;
 	width?: number;
@@ -819,10 +831,13 @@ export function Menu({
 				type="button"
 				className={trigger?.className ?? "btn btn-ghost btn-icon"}
 				title={trigger?.title}
-				aria-label={trigger ? undefined : label}
+				aria-label={trigger?.labelledBy ? undefined : label}
+				aria-labelledby={trigger?.labelledBy}
 				aria-haspopup="menu"
 				aria-expanded={open}
 				aria-controls={id}
+				disabled={trigger?.disabled || trigger?.busy}
+				aria-busy={trigger?.busy ? "true" : undefined}
 				{...press}
 			>
 				{trigger ? trigger.content : <span aria-hidden="true">⋯</span>}
@@ -945,7 +960,7 @@ function ModalDialog({ title, size, onClose, children, footer, tabs }: DialogPro
 				</div>
 				{tabs}
 				<div className="dialog-body">{children}</div>
-				<div className="dialog-footer">{footer}</div>
+				{footer && <div className="dialog-footer">{footer}</div>}
 			</div>
 		</dialog>
 	);

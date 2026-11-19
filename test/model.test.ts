@@ -29,6 +29,27 @@ describe("model gateway", () => {
 		);
 	});
 
+	test("anthropic catalog strips stale (latest) tags, disambiguates snapshots, and lists latest first", () => {
+		const gateway = new ModelGateway({ keys: new MemoryKeyStore(), version: "0.0.0" });
+		const anthropic = gateway.models("anthropic");
+		const latest = anthropic.filter((m) => m.latest);
+		const older = anthropic.filter((m) => !m.latest);
+		assert.ok(latest.length >= 3);
+		assert.ok(older.length >= 5);
+		assert.equal(anthropic[0]?.id, "claude-opus-5-5");
+		assert.ok(latest.some((m) => m.id === "claude-sonnet-5-5"));
+		assert.ok(latest.some((m) => m.id === "claude-haiku-5-5"));
+		const opus45 = anthropic.find((m) => m.id === "claude-opus-4-5");
+		const opus45Dated = anthropic.find((m) => m.id === "claude-opus-4-5-20251101");
+		assert.equal(opus45?.name, "Claude Opus 4.5");
+		assert.equal(opus45?.latest, false);
+		assert.equal(opus45Dated?.name, "Claude Opus 4.5 (2025-11-01)");
+		// Latest models always come before older models in the list.
+		const firstOlderIndex = anthropic.findIndex((m) => !m.latest);
+		assert.ok(firstOlderIndex > 0);
+		assert.ok(anthropic.slice(firstOlderIndex).every((m) => !m.latest));
+	});
+
 	test("streams drafts and resolves with the final message", async () => {
 		const faux = fauxProvider();
 		const gateway = new ModelGateway({

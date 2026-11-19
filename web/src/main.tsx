@@ -14,6 +14,7 @@ import { Button } from "./components/ui.tsx";
 import { UsagePage } from "./components/usage.tsx";
 import { t, useLang } from "./i18n.ts";
 import { watchInput } from "./input.ts";
+import type { MascotPose } from "./poses.ts";
 import { watchPresence } from "./presence.ts";
 import { centerCount, setState, useAppState } from "./state.ts";
 import "./styles/app.css";
@@ -27,10 +28,44 @@ function App() {
 	const drawerOpen = useAppState((state) => state.drawerOpen);
 	const waiting = useAppState((state) => centerCount(state.center));
 	const page = useAppState((state) => state.page);
+	const selectedId = useAppState((state) => state.selectedId);
 	const narrow = useNarrow();
 	const yewOn = useAppState((state) => state.settings?.mascot !== false);
-	// Sessions and the home page only; the stylesheet decides whether the window has room for her.
-	const backdrop = yewOn && page === null && !narrow;
+	const isWorking = useAppState((state) =>
+		state.selectedId ? state.sessions[state.selectedId]?.status === "working" : false,
+	);
+	const centerTab = useAppState((state) => state.centerTab);
+	const hasPermission = useAppState((state) =>
+		Object.values(state.center.approvals).some((a) => a.kind === "permission"),
+	);
+	const hasEnabledSchedule = useAppState((state) =>
+		Boolean(state.schedules?.some((schedule) => schedule.enabled)),
+	);
+	// Shown on desktop when 「界面里的 Yew」 is on: full portrait on the right for home/sessions,
+	// enlarged centered Q-pose backdrop for each feature page.
+	const backdrop = yewOn && !narrow;
+	const isHome = page === null && !selectedId;
+	const isFeature = page !== null;
+	const featurePose: MascotPose | null =
+		page === "center"
+			? centerTab === "decided"
+				? "gift"
+				: centerTab === "letters"
+					? "reading"
+					: hasPermission
+						? "permission"
+						: "stamp"
+			: page === "schedules"
+				? hasEnabledSchedule
+					? "on-duty"
+					: "alarm"
+				: page === "artifacts"
+					? "writing"
+					: page === "usage"
+						? "clipboard"
+						: page === "map"
+							? "letter-run"
+							: null;
 	// The tab's title carries the approval center's count, so it shows in the tab strip.
 	useEffect(() => {
 		document.title = waiting > 0 ? `(${waiting}) Yew Harness` : "Yew Harness";
@@ -84,7 +119,7 @@ function App() {
 				</div>
 			)}
 			<div
-				className={`app${!narrow && collapsed ? " app-collapsed" : ""}${narrow && drawerOpen ? " sidebar-open" : ""}${backdrop ? " with-yew" : ""}`}
+				className={`app${!narrow && collapsed ? " app-collapsed" : ""}${narrow && drawerOpen ? " sidebar-open" : ""}${backdrop ? " with-yew" : ""}${backdrop && isHome ? " yew-home" : ""}${backdrop && isFeature ? " yew-feature" : ""}${backdrop && !isFeature && isWorking ? " yew-working" : ""}`}
 			>
 				{!narrow && collapsed ? <SidebarRail /> : <Sidebar />}
 				{narrow && drawerOpen && (
@@ -93,6 +128,21 @@ function App() {
 						aria-hidden="true"
 						onClick={() => setState({ drawerOpen: false })}
 					/>
+				)}
+				{backdrop && (
+					<div className="yew-backdrop-layer" aria-hidden="true">
+						{featurePose ? (
+							<img
+								key={featurePose}
+								className="yew-backdrop yew-backdrop-feature"
+								src={`/mascot/${featurePose}.webp`}
+								alt=""
+								draggable={false}
+							/>
+						) : (
+							<img className="yew-backdrop" src="/mascot/portrait.webp" alt="" draggable={false} />
+						)}
+					</div>
 				)}
 				{page === "center" ? (
 					<CenterPage />
@@ -106,17 +156,6 @@ function App() {
 					<MapPage />
 				) : (
 					<SessionView />
-				)}
-				{backdrop && (
-					// Yew at full length beside the conversation (blueprint, section 12); the stylesheet
-					// shows her only where the margin beside the column has room for her.
-					<img
-						className="yew-backdrop"
-						src="/mascot/portrait.webp"
-						alt=""
-						aria-hidden="true"
-						draggable={false}
-					/>
 				)}
 				<SettingsDialogs />
 			</div>

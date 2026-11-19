@@ -678,13 +678,15 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 					onChange={(value) => setMode(value as PermissionMode)}
 				/>
 			</Field>
-			<SettingRow
-				label={t("reviewTraceMain")}
-				hint={t("reviewTraceMainHint")}
-				labelId={traceMainId}
-			>
-				<Switch checked={traceMain} labelledBy={traceMainId} onChange={setTraceMain} />
-			</SettingRow>
+			<div className="setting-box">
+				<SettingRow
+					label={t("reviewTraceMain")}
+					hint={t("reviewTraceMainHint")}
+					labelId={traceMainId}
+				>
+					<Switch checked={traceMain} labelledBy={traceMainId} onChange={setTraceMain} />
+				</SettingRow>
+			</div>
 			<Field label={t("defaultWorkspace")} labelId={workspaceId} info={t("defaultWorkspaceHelp")}>
 				<Select
 					labelledBy={workspaceId}

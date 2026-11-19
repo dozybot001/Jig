@@ -71,6 +71,7 @@ import {
 	SendIcon,
 	ShieldIcon,
 } from "./icons.tsx";
+import { Mascot } from "./mascot.tsx";
 import { tallyText } from "./progress.tsx";
 import { Button, CardHead, describeRule, ErrorBox, useAction, useNow } from "./ui.tsx";
 
@@ -882,12 +883,21 @@ function userText(entry: Extract<Entry, { role: "user" }>): string {
 		: content.map((b) => (b.type === "text" ? b.text : "")).join("\n");
 }
 
+/** Low-signal audit notices hidden in concise timeline view (always visible in detailed view). */
+const QUIET_NOTICES = new Set([
+	"model_changed",
+	"reviewed",
+	"changed",
+	"compacted",
+	"job_finished",
+]);
+
 /**
  * Turns the transcript into items. Consecutive thoughts and tool calls between two pieces of text form
  * one run, shown folded so the conversation stays readable. A call waiting for the person is taken out
  * of its run, so an approval is never hidden.
  */
-function buildItems(transcript: TranscriptState, working: boolean): Item[] {
+function buildItems(transcript: TranscriptState, working: boolean, detailed: boolean): Item[] {
 	const items: Item[] = [];
 	let run: Step[] = [];
 	const flush = (live = false) => {
@@ -944,7 +954,9 @@ function buildItems(transcript: TranscriptState, working: boolean): Item[] {
 			entry.role === "system" ||
 			(entry.role === "compaction" && entry.compaction.kind !== "renew")
 		) {
-			run.push({ kind: "note", key: entry.id, entry });
+			if (detailed) run.push({ kind: "note", key: entry.id, entry });
+		} else if (entry.role === "notice" && !detailed && QUIET_NOTICES.has(entry.notice.kind)) {
+			// Hidden in concise mode without splitting a step run.
 		} else if (entry.role === "user" && userText(entry).startsWith(YEW_NOTE)) {
 			// Yew's own notes to the model are not shown and do not split a run.
 		} else if (entry.role !== "toolResult") {
@@ -1403,7 +1415,8 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 	for (const entry of transcript.entries) {
 		if (entry.role === "toolResult") results.set(entry.message.toolCallId, entry.message);
 	}
-	const items = buildItems(transcript, session?.status === "working");
+	const detailed = useAppState((state) => state.transcriptDetail);
+	const items = buildItems(transcript, session?.status === "working", detailed);
 	const freeApprovals = Object.values(transcript.approvals).filter(
 		(a) => !a.toolCallId && a.status === "pending",
 	);
@@ -1459,7 +1472,16 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 					</Button>
 				)}
 				{transcript.entries.length === 0 && !transcript.draft && (
-					<p className="notice">{t("emptyTranscript")}</p>
+					<div className="empty-session">
+						<Mascot pose={session?.cwd ? "typing" : "tea"} height={84} />
+						<p className="empty-session-title">{session?.name ?? t("emptyTranscript")}</p>
+						{session?.cwd && <p className="empty-session-path">{session.cwd}</p>}
+						{session?.responsibility ? (
+							<p className="empty-session-brief">{session.responsibility}</p>
+						) : (
+							<p className="notice">{t("emptyTranscript")}</p>
+						)}
+					</div>
 				)}
 				{items.map((item) => {
 					if (item.kind === "entry") {

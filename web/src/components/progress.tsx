@@ -1,7 +1,9 @@
 import type { Session } from "../../../src/shared/types.ts";
+import { activeToolPose } from "../companion.ts";
 import { formatClock, formatElapsed, t, useLang } from "../i18n.ts";
 import { SUMMARY_KINDS, type Tally, tally, turnProgress, waitingOn } from "../progress.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
+import { Mascot } from "./mascot.tsx";
 import { useNow } from "./ui.tsx";
 
 /** "读取 6 个文件，运行 4 条命令，编辑 2 处": tool calls counted by kind; empty when there are none. */
@@ -36,6 +38,7 @@ export function ProgressLine({
 	useLang();
 	const cards = useAppState((state) => state.center.cards);
 	const approvals = useAppState((state) => state.center.approvals);
+	const mascotOn = useAppState((state) => state.settings?.mascot !== false);
 	const waiting = waitingOn(session.id, Object.values(approvals), Object.values(cards));
 	const working = session.status === "working";
 	const turn = working && transcript ? turnProgress(transcript.entries, transcript.draft) : null;
@@ -63,9 +66,19 @@ export function ProgressLine({
 			spoken = t("progressStarted", { time: formatClock(turn.startedAt) });
 	}
 	const shown = wait ? "waiting" : "working";
+	const pose = wait
+		? "permission"
+		: working && transcript?.retry
+			? "waking"
+			: (activeToolPose(transcript?.toolCalls) ?? "thinking");
 	return (
 		<div className="progress-line">
-			{text && <span className={`dot row-dot dot-${shown}`} aria-hidden="true" />}
+			{text &&
+				(mascotOn ? (
+					<Mascot key={pose} pose={pose} height={22} className="progress-mascot" />
+				) : (
+					<span className={`dot row-dot dot-${shown}`} aria-hidden="true" />
+				))}
 			{/* Always in the page, so a screen reader hears the words when they appear. */}
 			<span className="progress-text" role="status" title={hint || undefined}>
 				{text}

@@ -354,8 +354,7 @@ export function SessionSettingsDialog({
 			</section>
 			<AllowedList rules={rules} onChange={setRules} />
 			{session.cwd !== null && (
-				<SettingGroup title={t("extraDirsSection")}>
-					<p className="hint setting-group-hint">{t("extraDirsHelp")}</p>
+				<SettingGroup title={t("extraDirsSection")} info={t("extraDirsHelp")}>
 					{extraDirs.length > 0 && (
 						<ul className="extra-dir-list">
 							{extraDirs.map((item) => (
@@ -428,28 +427,28 @@ export function SessionSettingsDialog({
 							{t("chooseFolder")}
 						</Button>
 					</div>
-					<ErrorBox error={pickExtra.error} />
 				</SettingGroup>
 			)}
+			{session.cwd !== null && <ErrorBox error={pickExtra.error} />}
 			{session.cwd !== null && (
-				<SettingGroup title={t("sessionDomainsSection")}>
-					<Field
-						label={t("sessionDomainsLabel")}
-						htmlFor={domainsId}
-						info={t("sandboxDomainsHelp")}
-						error={fieldError(save.error, "allowedDomains")}
-					>
-						<textarea
-							id={domainsId}
-							className="textarea"
-							spellCheck={false}
-							rows={2}
-							placeholder={t("sandboxDomainsPlaceholder")}
-							value={domainsText}
-							onChange={(event) => setDomainsText(event.target.value)}
-						/>
-					</Field>
-				</SettingGroup>
+				<section className="setting-group">
+					<h3 className="setting-group-title">
+						<label htmlFor={domainsId}>{t("sessionDomainsSection")}</label>
+						<Toggletip label={t("sessionDomainsSection")} text={t("sandboxDomainsHelp")} />
+					</h3>
+					<textarea
+						id={domainsId}
+						className="textarea"
+						spellCheck={false}
+						rows={2}
+						placeholder={t("sandboxDomainsPlaceholder")}
+						value={domainsText}
+						onChange={(event) => setDomainsText(event.target.value)}
+					/>
+					{fieldError(save.error, "allowedDomains") && (
+						<span className="field-error">{fieldError(save.error, "allowedDomains")}</span>
+					)}
+				</section>
 			)}
 			<SettingGroup title={t("lettersSection")}>
 				<SettingRow label={t("receive")} labelId={receiveId} hint={t(`receive_${receive}_hint`)}>

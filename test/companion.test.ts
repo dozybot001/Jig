@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { describe, test } from "node:test";
-import type { Session } from "../src/shared/types.ts";
-import { companionMood, GREETING_MS, greetingFor, isNight, POSES } from "../web/src/companion.ts";
+import type { Session, ToolCallView } from "../src/shared/types.ts";
+import {
+	activeToolPose,
+	companionMood,
+	GREETING_MS,
+	greetingFor,
+	isNight,
+	POSES,
+	poseForTool,
+} from "../web/src/companion.ts";
 import { MASCOT_POSES } from "../web/src/poses.ts";
 
 function session(
@@ -110,5 +118,20 @@ describe("the mascot at the foot of the sidebar", () => {
 			const file = new URL(`../web/public/mascot/${pose}.webp`, import.meta.url);
 			assert.ok(existsSync(file), `${pose}.webp is missing`);
 		}
+	});
+
+	test("running tools map to matching work poses", () => {
+		assert.equal(poseForTool("grep"), "magnifier");
+		assert.equal(poseForTool("read"), "reading");
+		assert.equal(poseForTool("edit"), "writing");
+		assert.equal(poseForTool("shell"), "typing");
+		assert.equal(poseForTool("delegate"), "books");
+		const calls: Record<string, ToolCallView> = {
+			a: { tool: "read", status: "done", startedAt: 100, createdAt: 100 } as ToolCallView,
+			b: { tool: "grep", status: "running", startedAt: 200, createdAt: 200 } as ToolCallView,
+			c: { tool: "shell", status: "running", startedAt: 300, createdAt: 300 } as ToolCallView,
+		};
+		assert.equal(activeToolPose(calls), "typing");
+		assert.equal(activeToolPose({ a: calls.a as ToolCallView }), null);
 	});
 });

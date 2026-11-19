@@ -5,7 +5,7 @@
  * after the interface opens she greets first. Her pose follows what she says: holding a card when a
  * permission waits, and on duty when nothing does but scheduled tasks are on (blueprint, section 11).
  */
-import type { Session } from "../../src/shared/types.ts";
+import type { Session, ToolCallView } from "../../src/shared/types.ts";
 import type { MascotPose } from "./poses.ts";
 
 export type Greeting = "morning" | "afternoon" | "evening";
@@ -65,6 +65,53 @@ export function greetingFor(hour: number): Greeting | null {
 
 export function isNight(hour: number): boolean {
 	return hour >= 23 || hour < 5;
+}
+
+/** Maps a live tool name to Yew's matching work pose so her actions track what the agent is doing. */
+export function poseForTool(toolName: string): MascotPose {
+	switch (toolName) {
+		case "grep":
+		case "glob":
+		case "web_search":
+			return "magnifier";
+		case "read":
+		case "read_attachment":
+		case "web_fetch":
+			return "reading";
+		case "edit":
+		case "write":
+			return "writing";
+		case "shell":
+		case "shell_job":
+			return "typing";
+		case "send_letter":
+			return "letter-run";
+		case "todo":
+		case "manage_yew":
+		case "post_card":
+			return "clipboard";
+		case "delegate":
+			return "books";
+		case "ask":
+			return "pointing";
+		default:
+			return "thinking";
+	}
+}
+
+/** Picks the most recent running tool's pose in the open transcript, if any. */
+export function activeToolPose(
+	toolCalls: Record<string, ToolCallView> | undefined,
+): MascotPose | null {
+	if (!toolCalls) return null;
+	let latest: ToolCallView | null = null;
+	for (const call of Object.values(toolCalls)) {
+		if (call.status !== "running") continue;
+		const time = call.startedAt ?? call.createdAt;
+		const latestTime = latest ? (latest.startedAt ?? latest.createdAt) : -1;
+		if (!latest || time >= latestTime) latest = call;
+	}
+	return latest ? poseForTool(latest.tool) : null;
 }
 
 export function companionMood(input: {

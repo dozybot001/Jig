@@ -24,6 +24,7 @@ import {
 	Info,
 	KeyRound,
 	Languages,
+	ListCollapse,
 	ListTodo,
 	LogIn,
 	LogOut,
@@ -45,6 +46,7 @@ import {
 	Power,
 	RefreshCw,
 	RotateCcw,
+	ScrollText,
 	Search,
 	Send,
 	Settings,
@@ -213,3 +215,6 @@ export const RewindIcon = () => <Undo2 {...props} />;
 /** Sign in to a service in the browser, and sign out of it. */
 export const SignInIcon = () => <LogIn {...props} />;
 export const SignOutIcon = () => <LogOut {...props} />;
+/** Concise vs detailed conversation timeline toggle. */
+export const CompactViewIcon = () => <ListCollapse {...props} />;
+export const DetailedViewIcon = () => <ScrollText {...props} />;

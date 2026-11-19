@@ -16,6 +16,18 @@ import type {
 	ToolCallView,
 	UpdateState,
 } from "../../src/shared/types.ts";
+import type { MessageKey } from "./i18n.ts";
+import type { MascotPose } from "./poses.ts";
+
+/** Short-lived reaction shown by Yew in the sidebar after a workbench action. */
+export interface MascotReaction {
+	pose: MascotPose;
+	key: MessageKey;
+	params?: Record<string, string | number>;
+	until: number;
+	/** Priority reactions (like stamping/blocking an approval) show even when more items wait. */
+	priority?: boolean;
+}
 
 export interface Settings {
 	defaultModel: { provider: string; model: string; thinking: ThinkingLevel };
@@ -198,6 +210,7 @@ export interface ModelInfo {
 	thinkingLevels: ThinkingLevel[];
 	input: ("text" | "image")[];
 	cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
+	latest?: boolean;
 }
 
 export interface TranscriptState {
@@ -287,6 +300,8 @@ export interface AppState {
 	homeFolder: string | null;
 	/** Wide screens: the sidebar folded to a narrow rail (remembered in this browser). */
 	sidebarCollapsed: boolean;
+	/** Conversation timeline view: false for concise (default), true for full audit notices & notes. */
+	transcriptDetail: boolean;
 	/** Narrow screens: the sidebar drawer is open. */
 	drawerOpen: boolean;
 	center: CenterState;
@@ -312,6 +327,8 @@ export interface AppState {
 	letterTick: number;
 	/** Text to put in a session's message box when it opens: a message taken back or forked from. */
 	prefill: Record<string, string>;
+	/** Short-lived sidebar reaction from Yew after a workbench event. */
+	reaction: MascotReaction | null;
 }
 
 /** How many things wait for the person: approvals, questions, cards and held letters. */
@@ -324,10 +341,19 @@ export function centerCount(center: CenterState): number {
 }
 
 const SIDEBAR_KEY = "yew.sidebar";
+const TRANSCRIPT_DETAIL_KEY = "yew.transcriptDetail";
 
 function rememberedCollapse(): boolean {
 	try {
 		return localStorage.getItem(SIDEBAR_KEY) === "collapsed";
+	} catch {
+		return false;
+	}
+}
+
+function rememberedTranscriptDetail(): boolean {
+	try {
+		return localStorage.getItem(TRANSCRIPT_DETAIL_KEY) === "1";
 	} catch {
 		return false;
 	}
@@ -339,6 +365,17 @@ export function setSidebarCollapsed(collapsed: boolean): void {
 	try {
 		if (collapsed) localStorage.setItem(SIDEBAR_KEY, "collapsed");
 		else localStorage.removeItem(SIDEBAR_KEY);
+	} catch {
+		// Storage can be unavailable (private windows); the choice then lasts for this page only.
+	}
+}
+
+/** Toggles between concise and detailed conversation timeline, remembered in this browser only. */
+export function setTranscriptDetail(detailed: boolean): void {
+	setState({ transcriptDetail: detailed });
+	try {
+		if (detailed) localStorage.setItem(TRANSCRIPT_DETAIL_KEY, "1");
+		else localStorage.removeItem(TRANSCRIPT_DETAIL_KEY);
 	} catch {
 		// Storage can be unavailable (private windows); the choice then lasts for this page only.
 	}
@@ -365,6 +402,7 @@ let state: AppState = {
 	phones: null,
 	homeFolder: null,
 	sidebarCollapsed: rememberedCollapse(),
+	transcriptDetail: rememberedTranscriptDetail(),
 	drawerOpen: false,
 	center: { approvals: {}, cards: {}, held: {} },
 	letters: { items: [], nextCursor: null, loaded: false },
@@ -377,7 +415,41 @@ let state: AppState = {
 	teamFilter: null,
 	prefill: {},
 	letterTick: 0,
+	reaction: null,
 };
+
+let reactionTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Shows a brief work-state reaction from Yew in the sidebar, then returns to live status. */
+export function triggerReaction(
+	pose: MascotPose,
+	key: MessageKey,
+	options?: {
+		params?: Record<string, string | number>;
+		ms?: number;
+		priority?: boolean;
+	},
+): void {
+	if (state.settings?.mascot === false) return;
+	const ms = options?.ms ?? 3200;
+	const until = Date.now() + ms;
+	if (reactionTimer) clearTimeout(reactionTimer);
+	setState({
+		reaction: {
+			pose,
+			key,
+			...(options?.params ? { params: options.params } : {}),
+			...(options?.priority ? { priority: true } : {}),
+			until,
+		},
+	});
+	reactionTimer = setTimeout(() => {
+		reactionTimer = null;
+		if (state.reaction && state.reaction.until <= Date.now()) {
+			setState({ reaction: null });
+		}
+	}, ms + 60);
+}
 
 const listeners = new Set<() => void>();
 
