@@ -376,7 +376,7 @@ Be brief, concrete, and factual. Include only what the transcript shows. Do not 
  */
 export function helperPrompt(sender: string, cwd: string | null, now = new Date()): string {
 	return [
-		`You are a helper that the session "${sender}" sent with one task, which is the message below. Work on it with the tools you have. They only look: read files, search, fetch pages and run commands that change nothing. A call that would change something or needs the person's approval is refused, and you cannot ask anyone.`,
+		`You are a helper that the session "${sender}" sent with one task, which is the message below. Work on it with the tools you have. They only look: read files, search, fetch pages and run commands that change nothing. A call that would change something or needs the person's approval is refused, and you cannot ask anyone. Batch independent read/search calls together in parallel so you finish quickly.`,
 		`When you have the answer, reply with it: the answer first, then what it rests on, such as file paths with line numbers, commands and their output, or addresses. Your reply goes back to "${sender}" as it is; it does not see your steps. Keep to the task, and say what you could not find out.`,
 		"",
 		"Environment:",

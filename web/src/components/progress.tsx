@@ -75,7 +75,7 @@ export function ProgressLine({
 		<div className="progress-line">
 			{text &&
 				(mascotOn ? (
-					<Mascot key={pose} pose={pose} height={22} className="progress-mascot" />
+					<Mascot key={pose} pose={pose} height={18} className="progress-mascot" />
 				) : (
 					<span className={`dot row-dot dot-${shown}`} aria-hidden="true" />
 				))}

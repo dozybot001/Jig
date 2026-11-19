@@ -6,12 +6,16 @@ import assert from "node:assert/strict";
 import { existsSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test } from "node:test";
-import { stepLine } from "../src/server/agent/helper.ts";
+import { runHelper, stepLine } from "../src/server/agent/helper.ts";
 import { Agents } from "../src/server/agent/runner.ts";
 import { MemoryKeyStore } from "../src/server/keys.ts";
 import { ModelGateway } from "../src/server/model/gateway.ts";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "../src/server/model/testing.ts";
 import { PermissionEngine } from "../src/server/permissions/engine.ts";
+import { readTool } from "../src/server/tools/files.ts";
+import { Jobs } from "../src/server/tools/jobs.ts";
+import { ReadState } from "../src/server/tools/read-state.ts";
+import type { ToolContext } from "../src/server/tools/types.ts";
 import type { ToolCallBlock } from "../src/shared/messages.ts";
 import type { PermissionMode } from "../src/shared/types.ts";
 import { newStore, tempDir } from "./helpers/store.ts";
@@ -155,5 +159,73 @@ describe("helpers", () => {
 			"shell git log --oneline",
 		);
 		assert.equal(stepLine(call("web_fetch", {})), "web_fetch");
+	});
+
+	test("synthesizes a final answer without tools when it hits its step limit", async () => {
+		const faux = fauxProvider();
+		const { store } = newStore();
+		const gateway = new ModelGateway({
+			keys: new MemoryKeyStore({ [faux.provider.id]: "test-key" }),
+			version: "0.0.0",
+			providers: [faux.provider],
+		});
+		const home = realpathSync(tempDir("yew-home-"));
+		const folder = realpathSync(tempDir("yew-cwd-"));
+		writeFileSync(join(folder, "a.txt"), "alpha=42\n");
+		const session = store.createSession({
+			name: "Exam",
+			kind: "standing",
+			provider: faux.provider.id,
+			model: faux.getModel().id,
+			cwd: folder,
+			thinking: "off",
+		});
+		const seenMessages: unknown[][] = [];
+		faux.setResponses([
+			(ctx: unknown) => {
+				seenMessages.push((ctx as { messages: unknown[] }).messages);
+				return toolUse(fauxToolCall("read", { path: "a.txt" }, { id: "r1" }));
+			},
+			(ctx: unknown) => {
+				seenMessages.push((ctx as { messages: unknown[] }).messages);
+				return toolUse(fauxToolCall("read", { path: "a.txt" }, { id: "r2" }));
+			},
+			(ctx: unknown) => {
+				seenMessages.push((ctx as { messages: unknown[] }).messages);
+				return fauxAssistantMessage("Found alpha=42 in a.txt before step limit.");
+			},
+		] as never);
+		const result = await runHelper({
+			gateway,
+			permissions: new PermissionEngine(home),
+			session,
+			tools: [readTool],
+			lookup: {} as never,
+			context: {
+				session,
+				signal: new AbortController().signal,
+				readState: new ReadState(),
+				jobs: new Jobs(() => {}),
+				tmpDir: home,
+				acceptsImages: false,
+				version: "0.0.0",
+				output: () => {},
+				setTodos: () => {},
+				offLimits: () => false,
+				ask: async () => "",
+				permit: async () => false,
+				mail: {} as never,
+				helper: async () => ({ text: "", calls: 0 }),
+			} satisfies ToolContext,
+			systemPrompt: "You are a helper.",
+			task: "Read a.txt",
+			signal: new AbortController().signal,
+			maxSteps: 2,
+		});
+		assert.equal(result.stopped, undefined);
+		assert.equal(result.calls, 2);
+		assert.match(result.text, /alpha=42/);
+		assert.equal(seenMessages.length, 3);
+		assert.match(JSON.stringify(seenMessages[2]?.at(-1)), /reached your step limit/);
 	});
 });

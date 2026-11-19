@@ -146,7 +146,7 @@ const MAX_STOP_HOOKS = 3;
 const MAX_MESSAGE_CHARS = 100_000;
 const MAX_STEPS = 500;
 /** How many times in a row a reply cut off at the model's output limit is continued by itself. */
-const MAX_CUT_REPLIES = 3;
+const MAX_CUT_REPLIES = 8;
 /** How long a session waits for another one's answer (blueprint 7.1: one wait, no polling). */
 const WAIT_MS = 30 * 60 * 1000;
 /** The result of a call that was running when Yew stopped (blueprint 7.3). */

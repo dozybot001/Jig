@@ -29,18 +29,15 @@ import {
 } from "./prompt.ts";
 
 const KEEP_RECENT_TOKENS = 20_000;
-const MAX_COMPACT_AT = 200_000;
 
 /** What an attempt to shorten the context came to. "nothing": there was nothing older to summarize. */
 export type Compacted = "done" | "nothing" | "failed";
 
 const MAX_REQUEST_CHARS = 20_000;
 
-/** The context size at which a session's history is summarized. */
+/** The context size at which a session's history is summarized: 80% of the model's window unless set. */
 function compactAt(session: Session, model: ModelInfo): number {
-	return (
-		session.options.compactAt ?? Math.min(Math.floor(model.contextWindow * 0.8), MAX_COMPACT_AT)
-	);
+	return session.options.compactAt ?? Math.floor(model.contextWindow * 0.8);
 }
 
 /** A message from the person or a letter, not one of Yew's own notes to the model. */

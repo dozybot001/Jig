@@ -27,10 +27,10 @@ import { usageTotals } from "./context.ts";
 
 /** The tools a helper may have, when its session has them. */
 export const HELPER_TOOLS = ["read", "glob", "grep", "shell", "web_fetch", "web_search"] as const;
-/** Model requests one helper makes at most. */
-const MAX_STEPS = 30;
+/** Model requests one helper makes at most before a final wrap-up turn. */
+const MAX_STEPS = 80;
 /** The most of its answer that goes back. */
-const MAX_ANSWER_CHARS = 20_000;
+const MAX_ANSWER_CHARS = 60_000;
 
 export interface HelperOptions {
 	gateway: ModelGateway;
@@ -148,7 +148,8 @@ export async function runHelper(options: HelperOptions): Promise<HelperResult> {
 		calls,
 		stopped,
 	});
-	for (let step = 0; step < (options.maxSteps ?? MAX_STEPS); step++) {
+	const maxSteps = options.maxSteps ?? MAX_STEPS;
+	for (let step = 0; step < maxSteps; step++) {
 		if (signal.aborted) return stop("stopped");
 		const reply = await options.gateway.stream({
 			provider: session.provider,
@@ -179,5 +180,29 @@ export async function runHelper(options: HelperOptions): Promise<HelperResult> {
 		// Everything a helper may do only looks, so its calls of one step run at the same time.
 		messages.push(...(await Promise.all(asked.map(runCall))));
 	}
-	return stop(`it used all ${options.maxSteps ?? MAX_STEPS} of its steps`);
+	// Do not discard gathered work when the step budget runs out: ask once without tools so the helper
+	// synthesizes everything it has found so far and notes what it did not get to check.
+	if (!signal.aborted) {
+		messages.push({
+			role: "user",
+			content:
+				"You have reached your step limit. Stop calling tools and write your complete answer now from what you have already gathered, noting anything you did not get to check.",
+			timestamp: Date.now(),
+		});
+		const wrap = await options.gateway.stream({
+			provider: session.provider,
+			model: session.model,
+			thinking: session.thinking,
+			systemPrompt: options.systemPrompt,
+			messages,
+			tools: [],
+			signal,
+		});
+		options.onUsage?.(usageTotals(wrap));
+		if (wrap.stopReason !== "aborted" && wrap.stopReason !== "error" && !signal.aborted) {
+			const final = textOf(wrap);
+			if (final) return { text: final.slice(0, MAX_ANSWER_CHARS), calls };
+		}
+	}
+	return stop(`it used all ${maxSteps} of its steps`);
 }

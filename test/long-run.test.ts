@@ -395,12 +395,12 @@ describe("a reply cut off at the output limit", () => {
 	test("stops with a reason when it keeps happening", async () => {
 		const { faux, store, agents, session } = setup();
 		faux.setResponses(
-			Array.from({ length: 10 }, () => fauxAssistantMessage("又一段", { stopReason: "length" })),
+			Array.from({ length: 12 }, () => fauxAssistantMessage("又一段", { stopReason: "length" })),
 		);
 		agents.send(session.id, "写一篇长文");
 		await agents.whenIdle(session.id);
 		assert.equal(store.getSession(session.id).status, "error");
-		assert.equal(replies(entriesOf(store, session.id)).length, 4);
+		assert.equal(replies(entriesOf(store, session.id)).length, 9);
 		assert.equal(notices(entriesOf(store, session.id)).at(-1)?.data?.code, "output-cut");
 	});
 });
