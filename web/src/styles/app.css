@@ -1987,6 +1987,11 @@ body.scroll-locked {
 	margin-right: 4px;
 	font-size: 12px;
 }
+.message-actions:not(.message-actions-mine) time {
+	order: 1;
+	margin-right: 0;
+	margin-left: 4px;
+}
 .message-mine:hover .message-actions,
 .msg-assistant:hover .message-actions,
 .message-actions:focus-within {
