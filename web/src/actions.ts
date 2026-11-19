@@ -1,4 +1,4 @@
-import type { AssistantMessage } from "../../src/shared/messages.ts";
+import type { AssistantMessage, AttachmentRef } from "../../src/shared/messages.ts";
 import type {
 	Approval,
 	ApprovalDecision,
@@ -6,6 +6,7 @@ import type {
 	Card,
 	Device,
 	Entry,
+	ExtraDir,
 	Group,
 	Letter,
 	Page,
@@ -15,6 +16,7 @@ import type {
 	QueuedMessage,
 	ReceivePolicy,
 	Schedule,
+	ScheduleMode,
 	Session,
 	SessionEvent,
 	SessionKind,
@@ -26,7 +28,7 @@ import type {
 	UsageDetail,
 	UsageOverview,
 } from "../../src/shared/types.ts";
-import { ApiError, all, api, downloadFile } from "./api.ts";
+import { ApiError, all, api, downloadFile, uploadFile } from "./api.ts";
 import { getLang, setLang, systemLang } from "./i18n.ts";
 import {
 	type CenterState,
@@ -656,6 +658,8 @@ export type SessionPatch = Partial<{
 		dailyBudget?: number | null;
 		canPostCards?: boolean;
 		canOrganize?: boolean;
+		extraDirs?: ExtraDir[];
+		allowedDomains?: string[];
 	};
 	pinned: boolean;
 	archived: boolean;
@@ -710,10 +714,21 @@ export function freeName(base: string): string {
  * Starts a session from the home composer: creates it, sends the first message, then opens it, so a
  * failure leaves you on the home page with your text still there.
  */
-export async function startSession(input: NewSessionInput, text: string): Promise<Session> {
+export async function startSession(
+	input: NewSessionInput,
+	text: string,
+	files?: File[],
+): Promise<Session> {
 	const session = await api<Session>("POST", "/api/sessions", input, { idempotent: true });
 	setState((current) => ({ sessions: { ...current.sessions, [session.id]: session } }));
-	await sendMessage(session.id, text);
+	const attachmentIds: string[] = [];
+	if (files && files.length > 0) {
+		for (const file of files) {
+			const uploaded = await uploadAttachment(session.id, file);
+			attachmentIds.push(uploaded.id);
+		}
+	}
+	await sendMessage(session.id, text, attachmentIds);
 	await selectSession(session.id);
 	return session;
 }
@@ -858,6 +873,8 @@ export interface ScheduleInput {
 	session: string;
 	message: string;
 	permissionMode: PermissionMode | null;
+	mode: ScheduleMode;
+	autoArchive: boolean;
 	catchUp: boolean;
 }
 
@@ -939,11 +956,28 @@ export async function setMainSession(sessionId: string | null): Promise<void> {
 
 // --- talking to a session ---
 
-export async function sendMessage(sessionId: string, text: string): Promise<void> {
+export function uploadAttachment(sessionId: string, file: File): Promise<AttachmentRef> {
+	return uploadFile<AttachmentRef>(`/api/sessions/${sessionId}/attachments`, file);
+}
+
+export async function removePendingAttachment(
+	sessionId: string,
+	attachmentId: string,
+): Promise<void> {
+	await api("DELETE", `/api/sessions/${sessionId}/attachments/${attachmentId}`);
+}
+
+export async function sendMessage(
+	sessionId: string,
+	text: string,
+	attachmentIds?: string[],
+): Promise<void> {
+	const body: { text: string; attachments?: string[] } = { text };
+	if (attachmentIds && attachmentIds.length > 0) body.attachments = attachmentIds;
 	const result = await api<{ entry?: Entry; queued?: QueuedMessage }>(
 		"POST",
 		`/api/sessions/${sessionId}/messages`,
-		{ text },
+		body,
 		{ idempotent: true },
 	);
 	if (result.entry) {
@@ -957,6 +991,42 @@ export const continueSession = (sessionId: string) =>
 	api("POST", `/api/sessions/${sessionId}/continue`);
 export const compactSession = (sessionId: string) =>
 	api("POST", `/api/sessions/${sessionId}/compact`);
+
+export const renewSession = (sessionId: string, summarize = true) =>
+	api<{ status: "done" | "nothing" | "failed"; session: Session }>(
+		"POST",
+		`/api/sessions/${sessionId}/renew`,
+		{ summarize },
+	);
+
+export interface SessionFileMatch {
+	path: string;
+	label: string;
+	root: "cwd" | "extra";
+}
+
+export interface SessionSkillItem {
+	name: string;
+	description: string;
+}
+
+export async function searchSessionFiles(
+	sessionId: string,
+	q: string,
+	limit = 20,
+): Promise<SessionFileMatch[]> {
+	const params = new URLSearchParams({ q, limit: String(limit) });
+	const res = await api<{ items: SessionFileMatch[] }>(
+		"GET",
+		`/api/sessions/${sessionId}/files?${params}`,
+	);
+	return res.items;
+}
+
+export async function loadSessionSkills(sessionId: string): Promise<SessionSkillItem[]> {
+	const res = await api<{ items: SessionSkillItem[] }>("GET", `/api/sessions/${sessionId}/skills`);
+	return res.items;
+}
 
 export async function editQueued(sessionId: string, id: string, text: string): Promise<void> {
 	await api("PATCH", `/api/sessions/${sessionId}/queue/${id}`, { text });

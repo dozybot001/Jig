@@ -1,9 +1,17 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { guardedArgs } from "../guard.ts";
+import { type GuardMode, guardedArgs } from "../guard.ts";
 import { newId } from "../ids.ts";
-import { activeSandbox, OUTSIDE_GIT, quote, type SiteQuestion, sandboxed } from "../sandbox.ts";
+import {
+	activeSandbox,
+	checkRepositories,
+	OUTSIDE_GIT,
+	quote,
+	type SiteQuestion,
+	sandboxed,
+	snapshotRepositories,
+} from "../sandbox.ts";
 
 export const MAX_LINES = 2000;
 export const MAX_BYTES = 50 * 1024;
@@ -123,6 +131,12 @@ export async function startCommand(options: {
 	logDir: string;
 	onOutput?: (chunk: string) => void;
 	outsideSandbox?: boolean;
+	/** Guard relaxation profile for explicitly approved Decision commands (`git-setup` or `launch-app`). */
+	guardMode?: GuardMode;
+	/** Folders this command may write inside the sandbox; defaults to `[cwd]`. */
+	writableDirs?: string[];
+	/** Extra domains this command may reach inside the sandbox without asking. */
+	allowedSites?: string[];
 	ask?: (question: SiteQuestion) => Promise<boolean>;
 	/** Started in the background (shell_job), as a card listing what runs in the sandbox says. */
 	background?: boolean;
@@ -130,10 +144,18 @@ export async function startCommand(options: {
 	const shell = loginShell();
 	const env = commandEnvironment(options.sessionId);
 	const outside = options.outsideSandbox === true && activeSandbox() !== "none";
+	const writable =
+		options.writableDirs && options.writableDirs.length > 0 ? options.writableDirs : [options.cwd];
+	const guardMode: GuardMode = options.guardMode ?? "default";
 	const box = outside
 		? null
 		: await sandboxed(`exec ${quote(shell)} -lc ${quote(options.command)}`, {
-				grant: { writable: [options.cwd] },
+				grant: {
+					writable,
+					...(options.allowedSites && options.allowedSites.length > 0
+						? { sites: options.allowedSites }
+						: {}),
+				},
 				text: options.command,
 				label: {
 					kind: options.background ? "job" : "command",
@@ -145,7 +167,19 @@ export async function startCommand(options: {
 		for (const name of box.unset) delete env[name];
 		Object.assign(env, box.env);
 	}
-	const guarded = box ? null : guardedArgs(shell, options.command, options.cwd);
+	// When running a human-approved `git-setup` decision outside the sandbox, snapshot repos for post-run audit.
+	const gitAudit = !box && guardMode === "git-setup" ? snapshotRepositories(writable) : null;
+	const guarded = box
+		? null
+		: guardedArgs(shell, options.command, options.cwd, undefined, guardMode);
+	const outsideEnv =
+		outside || guardMode === "git-setup"
+			? {
+					...env,
+					...OUTSIDE_GIT,
+					...(guardMode === "git-setup" ? { GIT_TEMPLATE_DIR: "" } : {}),
+				}
+			: env;
 	const child = box
 		? spawn(box.line, {
 				shell: true,
@@ -157,7 +191,7 @@ export async function startCommand(options: {
 		: // Outside the sandbox it still runs in the guard, kept out of Yew's data (guard.ts).
 			spawn(guarded?.file ?? shell, guarded?.args ?? ["-lc", options.command], {
 				cwd: options.cwd,
-				env: outside ? { ...env, ...OUTSIDE_GIT } : env,
+				env: outsideEnv,
 				detached: true,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
@@ -179,7 +213,11 @@ export async function startCommand(options: {
 		// When a command failed, what the sandbox kept from it goes after the output, so the session
 		// sees why.
 		const { blocked, notes } = box?.finish() ?? { blocked: [], notes: [] };
-		if (notes.length > 0) output.push(`\n[Yew Harness, after the command]\n${notes.join("\n")}\n`);
+		const auditNotes = gitAudit ? checkRepositories(gitAudit) : [];
+		const allNotes = [...notes, ...auditNotes];
+		if (allNotes.length > 0) {
+			output.push(`\n[Yew Harness, after the command]\n${allNotes.join("\n")}\n`);
+		}
 		if (blocked.length > 0 && result.exitCode !== 0) {
 			output.push(
 				`\n[Blocked by the sandbox: ${blocked.length} time(s). If the command needs this, run it again with outside_sandbox.]\n${blocked.slice(0, 10).join("\n")}\n`,

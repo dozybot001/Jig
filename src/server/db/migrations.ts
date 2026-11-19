@@ -383,4 +383,28 @@ UPDATE letters SET schedule_id = (
 	SELECT schedule_letters.schedule_id FROM schedule_letters WHERE schedule_letters.id = letters.id
 ) WHERE id IN (SELECT id FROM schedule_letters);
 DROP TABLE schedule_letters;`,
+	// Message attachments (blueprint 6.12, item 46): metadata here, files in ~/.yew/attachments/.
+	`
+CREATE TABLE attachments (
+	id TEXT PRIMARY KEY,
+	session_id TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+	entry_id TEXT REFERENCES messages (id) ON DELETE CASCADE,
+	name TEXT NOT NULL,
+	mime_type TEXT NOT NULL,
+	kind TEXT NOT NULL CHECK (kind IN ('image', 'pdf', 'text')),
+	size INTEGER NOT NULL,
+	sha256 TEXT NOT NULL,
+	width INTEGER,
+	height INTEGER,
+	pages INTEGER,
+	created_at INTEGER NOT NULL
+) STRICT;
+CREATE INDEX attachments_session ON attachments (session_id, created_at);
+CREATE INDEX attachments_entry ON attachments (entry_id) WHERE entry_id IS NOT NULL;`,
+	// Dual-mode scheduled tasks (blueprint 6.5) and server-stamped origin tracing for review mode (6.1).
+	`ALTER TABLE schedules ADD COLUMN mode TEXT NOT NULL DEFAULT 'letter' CHECK (mode IN ('letter', 'task_session'));
+ALTER TABLE schedules ADD COLUMN auto_archive INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE schedules ADD COLUMN last_session_id TEXT REFERENCES sessions (id) ON DELETE SET NULL;
+ALTER TABLE letters ADD COLUMN origin_entry_id TEXT;
+CREATE INDEX letters_origin ON letters (to_session, origin_entry_id) WHERE origin_entry_id IS NOT NULL;`,
 ];

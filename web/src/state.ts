@@ -44,6 +44,10 @@ export interface Settings {
 	sandboxCredentials: boolean;
 	/** Folders sessions may not read: file tools refuse them, the system sandbox closes them. */
 	hiddenFolders: string[];
+	/** Additional domains all sandboxed commands may reach without asking. */
+	sandboxAllowedDomains: string[];
+	/** Whether automatic permission check may trace the person's original message in the main conversation. */
+	reviewTraceMain: boolean;
 	/** The built-in browser drives the person's own Chrome, or a separate window of its own. */
 	browser: "own" | "separate";
 	/** Yew Harness asks npm for a new version once a day (blueprint, "版本与更新"). */
@@ -210,7 +214,7 @@ export interface TranscriptState {
 }
 
 /** What Yew's data folder takes, by kind; `reveal` names the file manager, null where there is none. */
-export type DataPartId = "database" | "artifacts" | "logs" | "temp" | "other";
+export type DataPartId = "database" | "artifacts" | "attachments" | "logs" | "temp" | "other";
 export interface DataOverview {
 	folder: string;
 	totalBytes: number;
@@ -229,6 +233,7 @@ export interface DataExport {
 	cards: number;
 	schedules: number;
 	artifacts: number;
+	attachments: number;
 	files: number;
 }
 

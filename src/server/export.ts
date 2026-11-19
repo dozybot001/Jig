@@ -1,5 +1,6 @@
 import type {
 	AssistantMessage,
+	AttachmentRef,
 	ImageBlock,
 	Notice,
 	ToolCallBlock,
@@ -39,11 +40,13 @@ interface ExportStrings {
 	summary: string;
 	instructionsUpdated: string;
 	image: string;
+	attachment: string;
 	stopped: string;
 	modelChanged: string;
 	restarted: string;
 	changed: string;
 	compacted: string;
+	renewed: string;
 	modelError: string;
 	compactFailed: string;
 	budgetReached: string;
@@ -88,11 +91,13 @@ const ZH: ExportStrings = {
 	summary: "较早记录的摘要",
 	instructionsUpdated: "说明文件有更新",
 	image: "图片",
+	attachment: "附件",
 	stopped: "已停止",
 	modelChanged: "换了模型",
 	restarted: "Yew Harness 重启时这个会话在干活，已标为待核对。检查过后点「继续」接着运行。",
 	changed: "{by} 改了这个会话的设置",
 	compacted: "较早的记录已压成摘要",
+	renewed: "上下文已原地重置，开启了新的工作窗口",
 	modelError: "模型请求失败",
 	compactFailed: "压缩上下文失败",
 	budgetReached: "今天的费用到了{scope}每日上限（{spent} / {limit}），已停下",
@@ -117,6 +122,7 @@ const ZH: ExportStrings = {
 	},
 	tools: {
 		read: { done: "读取", running: "正在读取" },
+		read_attachment: { done: "读取附件", running: "正在读取附件" },
 		write: { done: "写入", running: "正在写入" },
 		edit: { done: "编辑", running: "正在编辑" },
 		glob: { done: "查找文件", running: "正在查找文件" },
@@ -155,12 +161,14 @@ const EN: ExportStrings = {
 	summary: "Summary of earlier messages",
 	instructionsUpdated: "Instruction files updated",
 	image: "Image",
+	attachment: "Attachment",
 	stopped: "Stopped",
 	modelChanged: "Model changed",
 	restarted:
 		"Yew Harness restarted while this session was working, so it is marked for review. Check it, then choose Continue.",
 	changed: "{by} changed this session's settings",
 	compacted: "Earlier messages were summarized",
+	renewed: "Context window was renewed in place",
 	modelError: "The model request failed",
 	compactFailed: "Could not compact the context",
 	budgetReached: "Stopped: today's spending reached {scope} daily limit ({spent} of {limit})",
@@ -185,6 +193,7 @@ const EN: ExportStrings = {
 	},
 	tools: {
 		read: { done: "Read", running: "Reading" },
+		read_attachment: { done: "Read attachment", running: "Reading attachment" },
 		write: { done: "Wrote", running: "Writing" },
 		edit: { done: "Edited", running: "Editing" },
 		glob: { done: "Listed files", running: "Listing files" },
@@ -207,6 +216,8 @@ export interface SessionExportInput {
 	language: ExportLanguage;
 	/** The export time; tests fix it. */
 	now?: number;
+	/** Relative link path for a message attachment (used by full data export). */
+	attachmentPath?: (ref: AttachmentRef) => string | null;
 }
 
 /**
@@ -227,7 +238,14 @@ export function sessionMarkdown(input: SessionExportInput): string {
 	}
 
 	for (const entry of input.entries) {
-		const rendered = entryMarkdown(entry, input.session, strings, toolCalls, toolResults);
+		const rendered = entryMarkdown(
+			entry,
+			input.session,
+			strings,
+			toolCalls,
+			toolResults,
+			input.attachmentPath,
+		);
 		if (rendered) sections.push(rendered);
 	}
 	return `${sections.join("\n\n")}\n`;
@@ -257,13 +275,19 @@ function entryMarkdown(
 	strings: ExportStrings,
 	toolCalls: Map<string, ToolCallView>,
 	toolResults: Map<string, ToolResultMessage>,
+	attachmentPath?: (ref: AttachmentRef) => string | null,
 ): string {
 	switch (entry.role) {
 		case "user": {
 			const text = userText(entry.message, strings);
+			const attached = (entry.attachments ?? []).map((ref) =>
+				attachmentMarkdown(ref, strings, attachmentPath),
+			);
 			// Yew's own notes to the model; the interface hides them and shows the matching notice.
-			if (!text || isOwnNote(text)) return "";
-			return `## ${strings.you}\n\n${quote(text)}`;
+			const visibleText = text && !isOwnNote(text) ? text : "";
+			if (!visibleText && attached.length === 0) return "";
+			const body = [visibleText, ...attached].filter(Boolean).join("\n\n");
+			return `## ${strings.you}\n\n${quote(body)}`;
 		}
 		case "assistant":
 			return assistantMarkdown(entry.message, session.name, strings, toolCalls, toolResults);
@@ -360,6 +384,20 @@ function imageMarkdown(block: ImageBlock, strings: ExportStrings): string {
 	return `![${strings.image}](data:${block.mimeType};base64,${block.data})`;
 }
 
+function attachmentMarkdown(
+	ref: AttachmentRef,
+	strings: ExportStrings,
+	attachmentPath?: (ref: AttachmentRef) => string | null,
+): string {
+	const label = ref.name.replace(/[[\]]/g, "_");
+	const link = attachmentPath?.(ref);
+	if (link) {
+		const encoded = encodeURI(link);
+		return ref.kind === "image" ? `![${label}](${encoded})` : `[${label}](${encoded})`;
+	}
+	return `[${strings.attachment}${strings.separator}${ref.name}]`;
+}
+
 function noticeLine(notice: Notice, strings: ExportStrings): string {
 	switch (notice.kind) {
 		case "interrupted":
@@ -370,6 +408,8 @@ function noticeLine(notice: Notice, strings: ExportStrings): string {
 			return strings.restarted;
 		case "compacted":
 			return strings.compacted;
+		case "renewed":
+			return strings.renewed;
 		case "changed": {
 			const by = typeof notice.data?.by === "string" ? notice.data.by : "";
 			return strings.changed.replace("{by}", () => by);

@@ -1,5 +1,7 @@
 import { join } from "node:path";
+import { classifyGuardMode, sshPreview } from "../permissions/shell.ts";
 import { activeSandbox, type SiteQuestion } from "../sandbox.ts";
+import { validateSandboxDomain } from "../settings.ts";
 import { startCommand } from "./process.ts";
 import {
 	bool,
@@ -33,7 +35,7 @@ const PARAMETERS = {
 const OUTSIDE_SANDBOX = {
 	type: "boolean",
 	description:
-		"Run it outside the sandbox, when it cannot work inside: it needs saved credentials (a git push), to create or clone a repository, to listen on a local port (a dev server), or to write outside the working folder. The person is asked every time.",
+		"Run outside the sandbox when the command needs saved credentials (such as git push), repository setup (git init, clone, remote or local git config), launching a desktop app (open -a), listening on a local port, or writing outside the session's folders. Permissions follow the session's mode; decisions such as repository setup, launching apps and remote machines always ask the person.",
 };
 
 export const shellTool: ToolDefinition = {
@@ -66,8 +68,11 @@ export const shellTool: ToolDefinition = {
 		};
 	},
 	preview(args) {
+		const command = typeof args.command === "string" ? args.command : "";
 		const description = typeof args.description === "string" ? args.description.trim() : "";
-		return description ? { description: description.slice(0, 300) } : {};
+		const ssh = command ? sshPreview(command) : null;
+		const combined = [ssh, description].filter(Boolean).join("\n");
+		return combined ? { description: combined.slice(0, 600) } : {};
 	},
 	async run(args, ctx): Promise<ToolResult> {
 		const command = str(args, "command", true);
@@ -75,6 +80,13 @@ export const shellTool: ToolDefinition = {
 		const timeout = int(args, "timeout_seconds", 1, MAX_TIMEOUT) ?? DEFAULT_TIMEOUT;
 		const cwd = ctx.session.cwd;
 		if (!cwd) return errorResult("This session has no working folder.");
+		const writableDirs = [
+			cwd,
+			...(ctx.session.options.extraDirs ?? [])
+				.filter((dir) => dir.access === "write")
+				.map((dir) => dir.path),
+		];
+		const allowedSites = ctx.session.options.allowedDomains ?? [];
 		const logDir = join(ctx.tmpDir, "output");
 
 		if (bool(args, "background")) {
@@ -84,6 +96,8 @@ export const shellTool: ToolDefinition = {
 				sessionId: ctx.session.id,
 				logDir,
 				outsideSandbox: outside,
+				writableDirs,
+				allowedSites,
 			});
 			return {
 				content: [
@@ -106,11 +120,22 @@ export const shellTool: ToolDefinition = {
 			logDir,
 			onOutput: ctx.output,
 			outsideSandbox: outside,
+			guardMode: classifyGuardMode(command),
+			writableDirs,
+			allowedSites,
 			// A site outside the sandbox's list is put to the person on this call's card.
 			...(permit
 				? {
-						ask: (question: SiteQuestion) =>
-							permit(
+						ask: (question: SiteQuestion) => {
+							let rememberHost: string | null = null;
+							if (!question.unsure) {
+								try {
+									rememberHost = validateSandboxDomain(question.host, "allowedDomains");
+								} catch {
+									rememberHost = null;
+								}
+							}
+							return permit(
 								{
 									tool: "shell",
 									summary:
@@ -120,10 +145,18 @@ export const shellTool: ToolDefinition = {
 									mustConfirm: false,
 									reasons: [question.unsure ? "connect-site-unsure" : "connect-site"],
 									description: command.slice(0, 300),
+									...(rememberHost
+										? {
+												rememberRules: [
+													{ effect: "allow", tool: "sandbox_site", pattern: rememberHost },
+												],
+											}
+										: {}),
 									...(question.unsure ? { running: question.unsure } : {}),
 								},
 								asking.signal,
-							),
+							);
+						},
 					}
 				: {}),
 		});

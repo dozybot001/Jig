@@ -1,5 +1,8 @@
 import { useEffect, useId, useState } from "react";
 import {
+	EXTRA_DIR_ACCESS,
+	type ExtraDir,
+	type ExtraDirAccess,
 	type Group,
 	letterQuotaOf,
 	type PermissionRule,
@@ -9,11 +12,18 @@ import {
 	type SessionKind,
 	type ThinkingLevel,
 } from "../../../src/shared/types.ts";
-import { createGroup, createSession, renameGroup, spentToday, updateSession } from "../actions.ts";
+import {
+	createGroup,
+	createSession,
+	pickFolder,
+	renameGroup,
+	spentToday,
+	updateSession,
+} from "../actions.ts";
 import { ApiError } from "../api.ts";
 import { formatCost, t, useLang } from "../i18n.ts";
 import { useAppState } from "../state.ts";
-import { CheckIcon, CloseIcon, PlusIcon } from "./icons.tsx";
+import { CheckIcon, CloseIcon, FolderIcon, PlusIcon } from "./icons.tsx";
 import { ModelPicker } from "./session.tsx";
 import {
 	Button,
@@ -245,6 +255,12 @@ export function SessionSettingsDialog({
 	const budgetId = useId();
 	const [canPost, setCanPost] = useState(session.options.canPostCards === true);
 	const [canOrganize, setCanOrganize] = useState(session.options.canOrganize === true);
+	const savedExtraDirs = session.options.extraDirs ?? [];
+	const [extraDirs, setExtraDirs] = useState<ExtraDir[]>(savedExtraDirs);
+	const [newDirPath, setNewDirPath] = useState("");
+	const [newDirAccess, setNewDirAccess] = useState<ExtraDirAccess>("read");
+	const savedDomains = (session.options.allowedDomains ?? []).join("\n");
+	const [domainsText, setDomainsText] = useState(savedDomains);
 	const roleId = useId();
 	const compactId = useId();
 	const compactErrorId = useId();
@@ -252,7 +268,30 @@ export function SessionSettingsDialog({
 	const receiveId = useId();
 	const postId = useId();
 	const organizeId = useId();
+	const extraDirId = useId();
+	const domainsId = useId();
+	const pickExtra = useAction(async () => {
+		const picked = await pickFolder();
+		if (!picked) return;
+		setExtraDirs((current) =>
+			current.some((d) => d.path === picked)
+				? current
+				: [...current, { path: picked, access: newDirAccess }],
+		);
+	});
+	const addTypedDir = () => {
+		const path = newDirPath.trim();
+		if (!path) return;
+		setExtraDirs((current) =>
+			current.some((d) => d.path === path) ? current : [...current, { path, access: newDirAccess }],
+		);
+		setNewDirPath("");
+	};
 	const save = useAction(async () => {
+		const nextDomains = domainsText
+			.split("\n")
+			.map((line) => line.trim())
+			.filter(Boolean);
 		await updateSession(session.id, {
 			responsibility,
 			rules,
@@ -263,6 +302,8 @@ export function SessionSettingsDialog({
 				...(budget !== savedBudget ? { dailyBudget: Number(budget) || null } : {}),
 				canPostCards: canPost,
 				canOrganize,
+				...(JSON.stringify(extraDirs) !== JSON.stringify(savedExtraDirs) ? { extraDirs } : {}),
+				...(domainsText !== savedDomains ? { allowedDomains: nextDomains } : {}),
 			},
 		});
 		onClose();
@@ -276,7 +317,9 @@ export function SessionSettingsDialog({
 		quota !== savedQuota ||
 		budget !== savedBudget ||
 		canPost !== (session.options.canPostCards === true) ||
-		canOrganize !== (session.options.canOrganize === true);
+		canOrganize !== (session.options.canOrganize === true) ||
+		JSON.stringify(extraDirs) !== JSON.stringify(savedExtraDirs) ||
+		domainsText !== savedDomains;
 	return (
 		<Dialog
 			title={t("sessionSettings")}
@@ -310,6 +353,104 @@ export function SessionSettingsDialog({
 				/>
 			</section>
 			<AllowedList rules={rules} onChange={setRules} />
+			{session.cwd !== null && (
+				<SettingGroup title={t("extraDirsSection")}>
+					<p className="hint setting-group-hint">{t("extraDirsHelp")}</p>
+					{extraDirs.length > 0 && (
+						<ul className="extra-dir-list">
+							{extraDirs.map((item) => (
+								<li key={item.path} className="extra-dir-row">
+									<span className="extra-dir-path" title={item.path}>
+										{item.path}
+									</span>
+									<Select
+										label={t("extraDirAccess")}
+										value={item.access}
+										options={EXTRA_DIR_ACCESS.map((access) => ({
+											value: access,
+											label: t(`access_${access}`),
+										}))}
+										onChange={(value) =>
+											setExtraDirs((current) =>
+												current.map((entry) =>
+													entry.path === item.path
+														? { ...entry, access: value as ExtraDirAccess }
+														: entry,
+												),
+											)
+										}
+									/>
+									<Button
+										variant="icon"
+										aria-label={t("removeFolder", { path: item.path })}
+										title={t("remove")}
+										onClick={() =>
+											setExtraDirs((current) => current.filter((entry) => entry.path !== item.path))
+										}
+									>
+										<CloseIcon />
+									</Button>
+								</li>
+							))}
+						</ul>
+					)}
+					<div className="extra-dir-add">
+						<input
+							id={extraDirId}
+							className="input mono-input"
+							spellCheck={false}
+							placeholder={t("extraDirsPlaceholder")}
+							aria-label={t("extraDirsSection")}
+							value={newDirPath}
+							onChange={(event) => setNewDirPath(event.target.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Enter") {
+									event.preventDefault();
+									addTypedDir();
+								}
+							}}
+						/>
+						<Select
+							label={t("extraDirAccess")}
+							value={newDirAccess}
+							options={EXTRA_DIR_ACCESS.map((access) => ({
+								value: access,
+								label: t(`access_${access}`),
+							}))}
+							onChange={(value) => setNewDirAccess(value as ExtraDirAccess)}
+						/>
+						<Button disabled={!newDirPath.trim()} onClick={addTypedDir}>
+							<PlusIcon />
+							{t("add")}
+						</Button>
+						<Button busy={pickExtra.busy} onClick={() => void pickExtra.run()}>
+							<FolderIcon />
+							{t("chooseFolder")}
+						</Button>
+					</div>
+					<ErrorBox error={pickExtra.error} />
+				</SettingGroup>
+			)}
+			{session.cwd !== null && (
+				<SettingGroup title={t("sessionDomainsSection")}>
+					<Field
+						label={t("sessionDomainsLabel")}
+						htmlFor={domainsId}
+						info={t("sandboxDomainsHelp")}
+						error={fieldError(save.error, "allowedDomains")}
+					>
+						<textarea
+							id={domainsId}
+							className="textarea"
+							spellCheck={false}
+							rows={2}
+							placeholder={t("sandboxDomainsPlaceholder")}
+							value={domainsText}
+							onChange={(event) => setDomainsText(event.target.value)}
+						/>
+					</Field>
+				</SettingGroup>
+			)}
 			<SettingGroup title={t("lettersSection")}>
 				<SettingRow label={t("receive")} labelId={receiveId} hint={t(`receive_${receive}_hint`)}>
 					<Select
@@ -387,7 +528,7 @@ export function SessionSettingsDialog({
 					/>
 				</SettingRow>
 			</SettingGroup>
-			<ErrorBox error={generalError(save.error, ["options"])} />
+			<ErrorBox error={generalError(save.error, ["options", "allowedDomains"])} />
 		</Dialog>
 	);
 }

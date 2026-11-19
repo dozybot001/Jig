@@ -6,6 +6,7 @@ import type { RemoteAccess } from "../../remote/access.ts";
 import { PROTOCOL_VERSION, VERSION } from "../../shared/version.ts";
 import type { Agents } from "../agent/runner.ts";
 import type { ArtifactStore } from "../artifacts.ts";
+import type { AttachmentStore } from "../attachments.ts";
 import type { EventBus } from "../events.ts";
 import { PostOffice } from "../mail/post.ts";
 import type { ModelGateway } from "../model/gateway.ts";
@@ -17,6 +18,7 @@ import type { Updates } from "../updates.ts";
 import { agentRoutes } from "./agents.ts";
 import { api } from "./api.ts";
 import { artifactRoutes } from "./artifacts.ts";
+import { attachmentRoutes } from "./attachments.ts";
 import { type DataRoutesOptions, dataRoutes } from "./data.ts";
 import { deviceRoutes } from "./devices.ts";
 import { DraftCache, eventRoutes } from "./events.ts";
@@ -62,6 +64,8 @@ export interface AppOptions {
 	notes?: NoteStreams;
 	/** What sessions saved for the person to look at (M4 plan, section 6). */
 	artifacts?: ArtifactStore;
+	/** File attachments sent with messages (blueprint 6.12, item 46). */
+	attachments?: AttachmentStore;
 	/** The MCP servers in mcp.json, managed from the settings (blueprint 6.10, item 29). */
 	mcp?: McpRoutesOptions;
 	/** The skills in the global and workspace folders, listed in the settings (item 35). */
@@ -111,6 +115,10 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 		"/api",
 		api({
 			store,
+			...(options.data?.home || agents?.home
+				? { yewHome: options.data?.home ?? agents?.home }
+				: {}),
+			...(options.skills?.userHome !== undefined ? { userHome: options.skills.userHome } : {}),
 			...(gateway ? { checkModel: (p: string, m: string) => gateway.check(p, m) } : {}),
 			...(options.pickFolder ? { pickFolder: options.pickFolder } : {}),
 			...(agents ? { onArchived: (id: string) => agents.archived(id) } : {}),
@@ -133,6 +141,8 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 	});
 	if (gateway) app.route("/api", providerRoutes(store, gateway));
 	if (agents) app.route("/api", agentRoutes(store, agents, log));
+	const attachments = options.attachments ?? agents?.attachments;
+	if (attachments) app.route("/api", attachmentRoutes(attachments));
 	// The runner's post office, so a released letter or a decision wakes its recipient.
 	app.route("/api", mailRoutes(agents?.post ?? new PostOffice(store, log)));
 	if (bus) app.route("/api", eventRoutes(store, bus, new DraftCache(bus)));

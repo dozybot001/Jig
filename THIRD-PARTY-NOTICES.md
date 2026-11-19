@@ -8,7 +8,7 @@ generated from `package-lock.json` by `scripts/notices.mjs`.
 The web interface is built from further packages; they are listed with their license texts in
 `web/dist/THIRD-PARTY-NOTICES.txt`.
 
-114 packages: MIT 59, Apache-2.0 36, BSD-3-Clause 12, BSD-2-Clause 4, Unlicense 1, (BSD-3-Clause OR GPL-2.0) 1, 0BSD 1.
+128 packages: MIT 72, Apache-2.0 37, BSD-3-Clause 12, BSD-2-Clause 4, Unlicense 1, (BSD-3-Clause OR GPL-2.0) 1, 0BSD 1.
 
 | Package | Version | License |
 | --- | --- | --- |
@@ -40,6 +40,18 @@ The web interface is built from further packages; they are listed with their lic
 | @earendil-works/pi-telemetry | 1.5.0 | MIT |
 | @google/genai | 2.21.0 | Apache-2.0 |
 | @hono/node-server | 2.1.6 | MIT |
+| @napi-rs/canvas | 1.1.1 | MIT |
+| @napi-rs/canvas-android-arm64 | 1.1.1 | MIT |
+| @napi-rs/canvas-darwin-arm64 | 1.1.1 | MIT |
+| @napi-rs/canvas-darwin-x64 | 1.1.1 | MIT |
+| @napi-rs/canvas-linux-arm-gnueabihf | 1.1.1 | MIT |
+| @napi-rs/canvas-linux-arm64-gnu | 1.1.1 | MIT |
+| @napi-rs/canvas-linux-arm64-musl | 1.1.1 | MIT |
+| @napi-rs/canvas-linux-riscv64-gnu | 1.1.1 | MIT |
+| @napi-rs/canvas-linux-x64-gnu | 1.1.1 | MIT |
+| @napi-rs/canvas-linux-x64-musl | 1.1.1 | MIT |
+| @napi-rs/canvas-win32-arm64-msvc | 1.1.1 | MIT |
+| @napi-rs/canvas-win32-x64-msvc | 1.1.1 | MIT |
 | @napi-rs/keyring | 2.1.2 | MIT |
 | @napi-rs/keyring-darwin-arm64 | 2.1.2 | MIT |
 | @napi-rs/keyring-darwin-x64 | 2.1.2 | MIT |
@@ -102,6 +114,7 @@ The web interface is built from further packages; they are listed with their lic
 | http-proxy-agent | 9.1.0 | MIT |
 | https-proxy-agent | 7.0.6 | MIT |
 | https-proxy-agent | 9.1.0 | MIT |
+| image-size | 2.1.0 | MIT |
 | json-bigint | 1.0.0 | MIT |
 | json-schema-to-ts | 3.1.1 | MIT |
 | jwa | 2.0.1 | MIT |
@@ -114,6 +127,7 @@ The web interface is built from further packages; they are listed with their lic
 | openai | 7.19.0 | Apache-2.0 |
 | p-retry | 4.6.2 | MIT |
 | partial-json | 0.1.7 | MIT |
+| pdfjs-dist | 6.5.438 | Apache-2.0 |
 | protobufjs | 7.6.6 | BSD-3-Clause |
 | proxy-agent-negotiate | 1.1.0 | MIT |
 | retry | 0.13.1 | MIT |

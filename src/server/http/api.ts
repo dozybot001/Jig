@@ -1,3 +1,7 @@
+import { spawn } from "node:child_process";
+import { type Dirent, readdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, join, relative, resolve } from "node:path";
 import { Hono } from "hono";
 import { RELAY_URL } from "../../remote/protocol.ts";
 import type {
@@ -20,17 +24,20 @@ import { invalid } from "../errors.ts";
 import { type ExportLanguage, exportFileName, sessionMarkdown } from "../export.ts";
 import { pickFolder } from "../folder-picker.ts";
 import { resolveWorkingFolder } from "../paths.ts";
+import { canonical, isSecretPath, secretLocations } from "../permissions/paths.ts";
 import {
 	BROWSER_MODES,
 	type DefaultModel,
 	NOTIFY_KINDS,
 	OPENING_MODES,
+	parseExtraDirs,
+	parseSandboxDomains,
 	readSettings,
 	resolveHiddenFolder,
 	resolveLogFile,
 	type Workspace,
 } from "../settings.ts";
-import { resolveMemoryDir } from "../skills.ts";
+import { findSkills, resolveMemoryDir } from "../skills.ts";
 import type { SessionPatch, Store } from "../store.ts";
 import { idempotent } from "./idempotency.ts";
 import {
@@ -54,6 +61,10 @@ export type ModelCheck = (provider: string, model: string) => void;
 
 export interface ApiDeps {
 	store: Store;
+	/** Yew's data directory; used when validating extraDirs and listing session skills. */
+	yewHome?: string;
+	/** The person's home folder; overridden in tests so they never read real ~/.claude/skills. */
+	userHome?: string | null;
 	checkModel?: ModelCheck;
 	/** Opens the system folder picker; replaced in tests so they never open a window. */
 	pickFolder?: () => Promise<string | null>;
@@ -290,6 +301,24 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			if (dailyBudget !== undefined && !isBudget(dailyBudget)) {
 				throw invalid("dailyBudget must be an amount in US dollars above 0, or null.", "options");
 			}
+			const rawExtraDirs = optArray(options, "extraDirs");
+			const extraDirs =
+				rawExtraDirs === undefined
+					? undefined
+					: parseExtraDirs(rawExtraDirs, {
+							offLimits: [
+								...(deps.yewHome
+									? secretLocations(deps.yewHome)
+									: secretLocations("/nonexistent-yew-home")),
+								...readSettings(store).hiddenFolders.map(canonical),
+							],
+							field: "extraDirs",
+						});
+			const rawAllowedDomains = optArray(options, "allowedDomains");
+			const allowedDomains =
+				rawAllowedDomains === undefined
+					? undefined
+					: parseSandboxDomains(rawAllowedDomains, "allowedDomains");
 			const next: SessionOptions = {};
 			if (compactAt !== undefined) next.compactAt = compactAt as number | null;
 			if (permissionMode !== undefined) next.permissionMode = permissionMode;
@@ -297,6 +326,8 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 			if (letterQuota !== undefined) next.letterQuota = letterQuota as number | null;
 			if (canPostCards !== undefined) next.canPostCards = canPostCards;
 			if (canOrganize !== undefined) next.canOrganize = canOrganize;
+			if (extraDirs !== undefined) next.extraDirs = extraDirs;
+			if (allowedDomains !== undefined) next.allowedDomains = allowedDomains;
 			// A new limit starts without the room given by continuing under the old one.
 			if (dailyBudget !== undefined) {
 				next.dailyBudget = dailyBudget;
@@ -394,6 +425,34 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		return c.body(null, 204);
 	});
 
+	// Fast file suggestions for the composer's `@` picker across cwd and extraDirs (blueprint 6.12, item 51).
+	app.get("/sessions/:id/files", async (c) => {
+		const session = store.getSession(c.req.param("id"));
+		const q = (c.req.query("q") ?? "").trim();
+		if (q.length > 200) throw invalid("The query can be at most 200 characters.", "q");
+		const limit = optIntQuery(c, "limit") ?? 30;
+		if (limit < 1 || limit > 100) throw invalid("limit must be from 1 to 100.", "limit");
+		const offLimits = [
+			...(deps.yewHome ? secretLocations(deps.yewHome) : secretLocations("/nonexistent-yew-home")),
+			...readSettings(store).hiddenFolders.map(canonical),
+		];
+		const items = await listSessionFiles(session, q, limit, offLimits);
+		return c.json({ items });
+	});
+
+	// Enabled skills active for this session's working folder, for the composer's `/` picker.
+	app.get("/sessions/:id/skills", (c) => {
+		const session = store.getSession(c.req.param("id"));
+		if (!deps.yewHome) return c.json({ items: [] });
+		const disabled = store.getSetting<string[]>("disabledSkills", []);
+		const userHome = deps.userHome === undefined ? homedir() : deps.userHome;
+		const items = findSkills(session.cwd, deps.yewHome, userHome, disabled).map((skill) => ({
+			name: skill.name,
+			description: skill.description,
+		}));
+		return c.json({ items });
+	});
+
 	// --- search and settings ---
 
 	app.get("/search", (c) => {
@@ -449,6 +508,15 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 				),
 			]);
 		}
+		const sandboxDomains = optArray(fields, "sandboxAllowedDomains");
+		if (sandboxDomains) {
+			store.setSetting(
+				"sandboxAllowedDomains",
+				parseSandboxDomains(sandboxDomains, "sandboxAllowedDomains"),
+			);
+		}
+		const reviewTraceMain = optBoolean(fields, "reviewTraceMain");
+		if (reviewTraceMain !== undefined) store.setSetting("reviewTraceMain", reviewTraceMain);
 		const workspaces = optArray(fields, "workspaces");
 		if (workspaces) {
 			store.setSetting("workspaces", parseWorkspaces(workspaces, readSettings(store).workspaces));
@@ -560,4 +628,148 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 	});
 
 	return app;
+}
+
+export interface SessionFileItem {
+	path: string;
+	label: string;
+	root: "cwd" | "extra";
+}
+
+const MAX_FILE_SCAN_BYTES = 2 * 1024 * 1024;
+const MAX_FALLBACK_FILES = 2000;
+const SKIP_DIRS = new Set([".git", "node_modules", ".DS_Store"]);
+
+function walkFallback(rootDir: string, offLimits: string[]): string[] {
+	const out: string[] = [];
+	const stack = [rootDir];
+	while (stack.length > 0 && out.length < MAX_FALLBACK_FILES) {
+		const dir = stack.pop() as string;
+		let entries: Dirent[];
+		try {
+			entries = readdirSync(dir, { withFileTypes: true });
+		} catch {
+			continue;
+		}
+		for (const entry of entries) {
+			if (SKIP_DIRS.has(entry.name)) continue;
+			const full = join(dir, entry.name);
+			if (isSecretPath(resolve(full), offLimits)) continue;
+			if (entry.isDirectory()) {
+				stack.push(full);
+			} else if (entry.isFile() || entry.isSymbolicLink()) {
+				out.push(relative(rootDir, full).replaceAll("\\", "/"));
+				if (out.length >= MAX_FALLBACK_FILES) break;
+			}
+		}
+	}
+	return out;
+}
+
+function listRootFiles(rootDir: string, offLimits: string[]): Promise<string[]> {
+	return new Promise((resolveFiles) => {
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), 3000);
+		const child = spawn(
+			"rg",
+			[
+				"--no-config",
+				"--color=never",
+				"--files",
+				"--hidden",
+				"--glob",
+				"!.git",
+				"--glob",
+				"!node_modules",
+				"--glob",
+				"!.DS_Store",
+			],
+			{ cwd: rootDir, signal: controller.signal, stdio: ["ignore", "pipe", "ignore"] },
+		);
+		let stdout = "";
+		child.stdout.on("data", (chunk: Buffer) => {
+			stdout += chunk.toString("utf8");
+			if (stdout.length > MAX_FILE_SCAN_BYTES) child.kill();
+		});
+		child.on("error", (error: NodeJS.ErrnoException) => {
+			clearTimeout(timer);
+			if (error.code === "ENOENT") {
+				resolveFiles(walkFallback(rootDir, offLimits));
+			} else {
+				resolveFiles([]);
+			}
+		});
+		child.on("close", () => {
+			clearTimeout(timer);
+			const lines = stdout
+				.split(/\r?\n/)
+				.map((line) => line.trim().replaceAll("\\", "/"))
+				.filter((line) => line.length > 0);
+			resolveFiles(lines);
+		});
+	});
+}
+
+function scoreFileMatch(label: string, query: string): number | null {
+	if (!query) return 0;
+	const lower = label.toLowerCase();
+	const base = basename(lower);
+	if (base.startsWith(query)) return 0;
+	if (base.includes(query)) return 1;
+	if (lower.includes(query)) return 2;
+	let qi = 0;
+	for (let i = 0; i < lower.length && qi < query.length; i++) {
+		if (lower[i] === query[qi]) qi++;
+	}
+	return qi === query.length ? 3 : null;
+}
+
+async function listSessionFiles(
+	session: Session,
+	query: string,
+	limit: number,
+	offLimits: string[],
+): Promise<SessionFileItem[]> {
+	const roots: { dir: string; root: "cwd" | "extra"; prefix: string }[] = [];
+	if (session.cwd) roots.push({ dir: session.cwd, root: "cwd", prefix: "" });
+	for (const extra of session.options.extraDirs ?? []) {
+		roots.push({ dir: extra.path, root: "extra", prefix: basename(extra.path) });
+	}
+	if (roots.length === 0) return [];
+
+	const needle = query.toLowerCase();
+	const candidates: { item: SessionFileItem; abs: string; score: number }[] = [];
+	for (const entry of roots) {
+		if (isSecretPath(canonical(entry.dir), offLimits)) continue;
+		const rels = await listRootFiles(entry.dir, offLimits);
+		for (const rel of rels) {
+			const abs = resolve(entry.dir, rel);
+			if (isSecretPath(abs, offLimits)) continue;
+			const label = entry.root === "cwd" ? rel : `${entry.prefix}/${rel}`;
+			const score = scoreFileMatch(label, needle);
+			if (score === null) continue;
+			candidates.push({
+				item: {
+					path: entry.root === "cwd" ? rel : abs,
+					label,
+					root: entry.root,
+				},
+				abs,
+				score,
+			});
+		}
+	}
+	candidates.sort(
+		(a, b) =>
+			a.score - b.score ||
+			a.item.label.length - b.item.label.length ||
+			a.item.label.localeCompare(b.item.label),
+	);
+	const out: SessionFileItem[] = [];
+	for (const candidate of candidates) {
+		if (out.length >= limit) break;
+		if (isSecretPath(canonical(candidate.abs), offLimits)) continue;
+		out.push(candidate.item);
+	}
+	return out;
 }

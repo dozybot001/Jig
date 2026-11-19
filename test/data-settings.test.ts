@@ -42,6 +42,7 @@ function prepared() {
 	file(join(home, "yew.db-shm"), 20);
 	file(join(home, "artifacts", "s1", "a1", "v1.md"), 700);
 	file(join(home, "artifacts", "s1", "a1", "v2.md"), 800);
+	file(join(home, "attachments", "s1", "att1.png"), 250);
 	file(join(home, "logs", "serve.log"), 150);
 	const outputs = {
 		idle1: file(join(home, "tmp", "idle", "output", "one.log"), 60_000),
@@ -73,11 +74,12 @@ describe("data: what the folder takes", () => {
 		assert.deepEqual(usage.parts, [
 			{ id: "database", bytes: 4320 },
 			{ id: "artifacts", bytes: 1500 },
+			{ id: "attachments", bytes: 250 },
 			{ id: "logs", bytes: 150 },
 			{ id: "temp", bytes: 66_000 },
 			{ id: "other", bytes: 100 },
 		]);
-		assert.equal(usage.totalBytes, 72_070);
+		assert.equal(usage.totalBytes, 72_320);
 		// What a cleanup would delete leaves out the session with a running command.
 		assert.deepEqual(usage.temp, {
 			files: 3,
@@ -207,10 +209,10 @@ describe("data: the routes", () => {
 		const { status, body } = await send("GET", "/api/data");
 		assert.equal(status, 200);
 		assert.equal(body.folder, home);
-		assert.equal(body.totalBytes, 72_070);
+		assert.equal(body.totalBytes, 72_320);
 		assert.deepEqual(
 			body.parts.map((part: Json) => part.id),
-			["database", "artifacts", "logs", "temp", "other"],
+			["database", "artifacts", "attachments", "logs", "temp", "other"],
 		);
 		assert.equal(body.temp.removableBytes, 61_000);
 		assert.equal(body.reveal, "finder");

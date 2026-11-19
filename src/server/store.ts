@@ -1,5 +1,5 @@
 import type { StatementSync } from "node:sqlite";
-import type { EntryBody, JsonObject } from "../shared/messages.ts";
+import type { AttachmentRef, EntryBody, JsonObject } from "../shared/messages.ts";
 import { messageText } from "../shared/messages.ts";
 import type {
 	Approval,
@@ -299,11 +299,12 @@ function toApproval(row: ApprovalRow): Approval {
 }
 
 function toQueued(row: QueueRow): QueuedMessage {
-	const body = JSON.parse(row.body) as { text: string };
+	const body = JSON.parse(row.body) as { text: string; attachments?: AttachmentRef[] };
 	return {
 		id: row.id,
 		sessionId: row.session_id,
 		text: body.text,
+		...(body.attachments && body.attachments.length > 0 ? { attachments: body.attachments } : {}),
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
 	};
@@ -311,7 +312,10 @@ function toQueued(row: QueueRow): QueuedMessage {
 
 /** Text indexed for search: what people and the model wrote, not thinking or tool output. */
 function searchableText(body: EntryBody): string {
-	if (body.role === "user") return messageText(body.message);
+	if (body.role === "user") {
+		const names = (body.attachments ?? []).map((item) => item.name).join("\n");
+		return [messageText(body.message), names].filter(Boolean).join("\n");
+	}
 	if (body.role === "assistant") {
 		return body.message.content
 			.filter((block) => block.type === "text")
@@ -343,15 +347,30 @@ export function validateSessionName(name: unknown): string {
 /** What a taken-back entry keeps: its role and time, without content (blueprint 6.11, item 42). */
 const TAKEN_BACK = "json_object('role', role, 'content', json('[]'), 'timestamp', created_at)";
 
+export interface AttachmentHooks {
+	onCopied?(
+		fromSessionId: string,
+		toSessionId: string,
+		entryIds: ReadonlyMap<string, string>,
+	): void;
+	onRewound?(sessionId: string, entryIds: string[]): void;
+	onQueuedRemoved?(sessionId: string, attachmentIds: string[]): void;
+}
+
 export class Store {
 	readonly db: Db;
 	readonly #bus: EventBus;
 	readonly #statements = new Map<string, StatementSync>();
 	#pending: BusEvent[] | null = null;
+	#attachmentHooks: AttachmentHooks = {};
 
 	constructor(db: Db, bus: EventBus) {
 		this.db = db;
 		this.#bus = bus;
+	}
+
+	setAttachmentHooks(hooks: AttachmentHooks): void {
+		this.#attachmentHooks = hooks;
 	}
 
 	#q(sql: string): StatementSync {
@@ -727,6 +746,7 @@ export class Store {
 				call.created_at,
 			);
 		}
+		this.#attachmentHooks.onCopied?.(fromId, toId, ids);
 		this.#q("UPDATE sessions SET message_seq = ? WHERE id = ?").run(last, toId);
 		return last;
 	}
@@ -817,6 +837,10 @@ export class Store {
 			for (const row of gone) {
 				this.#q("DELETE FROM message_search WHERE message_id = ?").run(row.id);
 			}
+			this.#attachmentHooks.onRewound?.(
+				id,
+				gone.map((row) => row.id),
+			);
 			// Calls taken back before they finished are closed, so nothing picks them up later.
 			this.#q(
 				`UPDATE tool_calls SET status = 'error', finished_at = ?
@@ -1417,14 +1441,15 @@ export class Store {
 		return rows.map(toQueued);
 	}
 
-	enqueue(sessionId: string, text: string): QueuedMessage {
+	enqueue(sessionId: string, text: string, attachments?: AttachmentRef[]): QueuedMessage {
 		return this.tx(() => {
 			this.getSession(sessionId);
 			const now = Date.now();
 			const id = newId();
+			const payload = attachments && attachments.length > 0 ? { text, attachments } : { text };
 			this.#q(
 				"INSERT INTO queued_messages (id, session_id, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-			).run(id, sessionId, JSON.stringify({ text }), now, now);
+			).run(id, sessionId, JSON.stringify(payload), now, now);
 			this.#emitQueue(sessionId);
 			return this.#queued(id);
 		});
@@ -1432,16 +1457,25 @@ export class Store {
 
 	updateQueued(sessionId: string, id: string, text: string): QueuedMessage {
 		return this.tx(() => {
-			const result = this.#q(
-				"UPDATE queued_messages SET body = ?, updated_at = ? WHERE id = ? AND session_id = ?",
-			).run(JSON.stringify({ text }), Date.now(), id, sessionId);
-			if (result.changes === 0) {
+			const existing = this.#q("SELECT * FROM queued_messages WHERE id = ? AND session_id = ?").get(
+				id,
+				sessionId,
+			) as QueueRow | undefined;
+			if (!existing) {
 				throw conflict(
 					"This message was already delivered or withdrawn.",
 					undefined,
 					"already-delivered",
 				);
 			}
+			const parsed = JSON.parse(existing.body) as { attachments?: AttachmentRef[] };
+			const payload =
+				parsed.attachments && parsed.attachments.length > 0
+					? { text, attachments: parsed.attachments }
+					: { text };
+			this.#q(
+				"UPDATE queued_messages SET body = ?, updated_at = ? WHERE id = ? AND session_id = ?",
+			).run(JSON.stringify(payload), Date.now(), id, sessionId);
 			this.#emitQueue(sessionId);
 			return this.#queued(id);
 		});
@@ -1449,15 +1483,23 @@ export class Store {
 
 	removeQueued(sessionId: string, id: string): void {
 		this.tx(() => {
-			const result = this.#q("DELETE FROM queued_messages WHERE id = ? AND session_id = ?").run(
+			const existing = this.#q("SELECT * FROM queued_messages WHERE id = ? AND session_id = ?").get(
 				id,
 				sessionId,
-			);
-			if (result.changes === 0) {
+			) as QueueRow | undefined;
+			if (!existing) {
 				throw conflict(
 					"This message was already delivered or withdrawn.",
 					undefined,
 					"already-delivered",
+				);
+			}
+			const parsed = JSON.parse(existing.body) as { attachments?: AttachmentRef[] };
+			this.#q("DELETE FROM queued_messages WHERE id = ? AND session_id = ?").run(id, sessionId);
+			if (parsed.attachments && parsed.attachments.length > 0) {
+				this.#attachmentHooks.onQueuedRemoved?.(
+					sessionId,
+					parsed.attachments.map((item) => item.id),
 				);
 			}
 			this.#emitQueue(sessionId);
@@ -1465,12 +1507,22 @@ export class Store {
 	}
 
 	/** Moves every queued message into the transcript in one transaction, so none is lost or doubled. */
-	deliverQueue(sessionId: string, toBody: (text: string) => EntryBody): Entry[] {
+	deliverQueue(
+		sessionId: string,
+		toBody: (text: string, attachments?: AttachmentRef[]) => EntryBody,
+		onDelivered?: (entry: Entry, attachments: AttachmentRef[]) => void,
+	): Entry[] {
 		return this.tx(() => {
 			const queued = this.listQueue(sessionId);
 			if (queued.length === 0) return [];
 			this.#q("DELETE FROM queued_messages WHERE session_id = ?").run(sessionId);
-			const entries = queued.map((item) => this.appendEntry(sessionId, toBody(item.text)));
+			const entries = queued.map((item) => {
+				const entry = this.appendEntry(sessionId, toBody(item.text, item.attachments));
+				if (item.attachments && item.attachments.length > 0) {
+					onDelivered?.(entry, item.attachments);
+				}
+				return entry;
+			});
 			this.#emitQueue(sessionId);
 			return entries;
 		});

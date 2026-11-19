@@ -240,3 +240,17 @@ assistant-ui、ai-elements 不整体引入，只按需参考结构，符合「�
 - **停更或转向**：Vibe Kanban 宣布停运；kimi-cli、Roo Code、sugyan/claude-code-webui、wbopan/cui、21st-dev/1code 已归档；Crystal 改名 Nimbalyst；Omnara 转做托管平台；AutoGen 的 README 称已归档。
 - **不合用**：beads（Go 加 Dolt，面向多机同步）；node-cron、cron、bree、cron-parser（自带定时器或依赖 luxon，croner 够用）；Aider（用文本编辑格式，不走工具调用）；`@modelcontextprotocol/sdk` v1（依赖 express 等服务端包）；`@virtuoso.dev/message-list`（商业许可）。
 - **只核了仓库信息，没读代码**：Cline、Continue、OpenHands、Mistral Vibe、mini-swe-agent。
+
+## 十、v1 之后补齐（2026-11-19：多模态附件、PDF、多目录、换新与触发器）
+
+为避免重复造轮子，对这一批工作流补全项单独核对了开源生态（均符合第二节的许可与净室规则）：
+
+| 能力 | 选用 / 参考 | 许可证 | 决策与理由 |
+| --- | --- | --- | --- |
+| PDF 解析与扫描页渲染 | [mozilla/pdf.js](https://github.com/mozilla/pdf.js)（npm `pdfjs-dist` 6.5.438，可选依赖 `@napi-rs/canvas` 1.1.1） | Apache-2.0 / MIT | **直接作生产依赖（精确锁版本）**。零必需传递依赖、原生支持 Node 24 ESM，自带离线 `cmaps/` 和 `standard_fonts/`（中文合同/发票/证照 PDF 100% 离线解析，不请求外部 CDN）。`unpdf`（MIT）默认不含本地 CMap，解析中文 CID 字体容易乱码；`mupdf` 为 AGPL-3.0，不采用。配合 `@napi-rs/canvas`（MIT，与已有的 `@napi-rs/keyring` 同生态）在 macOS 与 Linux 上均可离线把纯图扫描页渲染成 PNG 喂给视觉模型。 |
+| 图片尺寸与格式核验 | [image-size/image-size](https://github.com/image-size/image-size)（npm `image-size` 2.1.0） | MIT | **直接作生产依赖（精确锁版本）**。98 KB、零依赖、纯 JS 解析 PNG/JPEG/GIF/WebP 宽高与格式，配合自写魔数白名单校验；不采用曾出现恶意文件死循环漏洞的 `file-type`（GHSA-5v7r-6r5c-r473），也不引入体积大且含原生 libvips 的 `sharp`（端侧缩放交给浏览器 Canvas、iOS `CGImage`、Android `Bitmap`）。 |
+| 会话级附件存储 | OpenCode Issue #46173（MIT，参考架构思路） | MIT | 附件以文件形式单独落盘在每会话目录、消息记录里只存轻量引用，避免大 base64 撑爆 SQLite、误触发 token 压缩或拖慢手机中继传输。 |
+| 多目录工作区 | Gemini CLI `--include-directories`（Apache-2.0，参考设计） | Apache-2.0 | 保留主工作区 `cwd`，新增显式区分只读/可写的 `extraDirs`，黑名单（凭据与不可读目录）永远优先于白名单。 |
+| 常设会话换新上下文 | pi `packages/durable/src/harness/inbox.ts` `reset()`（MIT，参考设计） | MIT | 保留同一会话 id 与全部历史记录，在记录里写一条新的上下文边界（可选交接摘要）并重拍环境快照。 |
+| 定时任务隔离 | Hermes `cron/`、OpenClaw `cron-jobs`（MIT，参考设计） | MIT | 支持按所属常设会话派生干净的 `task` 会话运行，完成后自动归档；定时运行期间禁止改定时任务或放宽权限。 |
+| 输入框 `@` / `/` 补全 | T3 Code、OpenCode（MIT，参考交互） | MIT | `@` 行内任意位置提及会话或工作区文件，`/` 行首触发技能与 `/compact`、`/renew`，控件按产品规范第 7、18 节自绘。 |

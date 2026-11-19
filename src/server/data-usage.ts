@@ -7,7 +7,7 @@ import { conflict } from "./errors.ts";
  * the one cleanup Yew offers: the over-long command output under `tmp`. Sizes are the files' lengths.
  * Links are never followed, so a link in the folder counts as a link and nothing outside is touched.
  */
-export type DataPartId = "database" | "artifacts" | "logs" | "temp" | "other";
+export type DataPartId = "database" | "artifacts" | "attachments" | "logs" | "temp" | "other";
 
 export interface TempUsage {
 	/** Files under `tmp`, and what they take. */
@@ -37,7 +37,12 @@ export interface CleanupResult {
 export type InUse = (sessionId: string) => boolean;
 
 const DATABASE_FILES = new Set(["yew.db", "yew.db-wal", "yew.db-shm"]);
-const FOLDERS: Record<string, DataPartId> = { artifacts: "artifacts", logs: "logs", tmp: "temp" };
+const FOLDERS: Record<string, DataPartId> = {
+	artifacts: "artifacts",
+	attachments: "attachments",
+	logs: "logs",
+	tmp: "temp",
+};
 
 function entries(dir: string): string[] {
 	try {
@@ -125,6 +130,7 @@ export function dataUsage(home: string, inUse: InUse = () => false, now = Date.n
 	const bytes: Record<DataPartId, number> = {
 		database: 0,
 		artifacts: 0,
+		attachments: 0,
 		logs: 0,
 		temp: 0,
 		other: 0,

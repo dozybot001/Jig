@@ -131,4 +131,33 @@ class ApiTest {
         assertThrows(IOException::class.java) { unpackBody(packed.dropLast(12), packed = true) }
         assertThrows(IOException::class.java) { unpackBody("not base64 !!", packed = true) }
     }
+
+    @Test
+    fun approvalDetailsAttachmentsAndRenewDecodeCleanly() {
+        val approval = checkNotNull(ApprovalItem.from(json(
+            """{"id":"a9","sessionId":"s","kind":"permission","createdAt":10,"request":{
+                "tool":"shell","summary":"git init","mustConfirm":true,"matter":true,
+                "reasons":["git-setup"],"review":"Need human check","warning":"acts-as-you",
+                "diff":"--- a\n+++ b\n+hello","running":[{"kind":"command","text":"npm test"}],
+                "changes":[{"action":"set_permission","session":"Dev","from":"default","to":"review"}]
+            }}""",
+        )))
+        assertTrue(approval.matter)
+        assertEquals(listOf("git-setup"), approval.reasons)
+        assertEquals("Need human check", approval.review)
+        assertEquals("acts-as-you", approval.warning)
+        assertEquals("--- a\n+++ b\n+hello", approval.diff)
+        assertEquals(1, approval.running.size)
+        assertEquals("set_permission Dev: default → review", approval.changes.single().label)
+
+        val entries = listOf(
+            """{"id":"u1","seq":1,"role":"user","message":{"content":""},"attachments":[{"id":"att1","name":"shot.png","mimeType":"image/png","kind":"image","size":1234,"width":800,"height":600}]}""",
+            """{"id":"c1","seq":2,"role":"compaction","compaction":{"kind":"renew","summary":"Brief here","firstKeptSeq":3,"tokensBefore":500,"timestamp":1}}""",
+            """{"id":"n1","seq":3,"role":"notice","notice":{"kind":"renewed","text":"Started fresh"}}""",
+        ).mapNotNull { Entry.from(json(it)) }
+        val steps = Step.of(entries)
+        assertEquals(listOf("u1", "c1"), steps.map { it.id })
+        assertEquals("shot.png", (steps[0] as Step.User).entry.attachments.single().name)
+        assertEquals("Brief here", (steps[1] as Step.Renew).entry.text)
+    }
 }

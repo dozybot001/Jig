@@ -19,6 +19,7 @@ import {
 	MAIN_ROLE,
 	PERMISSION_MODE,
 	type Placement,
+	RENEW_PROMPT,
 	renderInstructions,
 	type SessionRef,
 	SUMMARY_PROMPT,
@@ -156,6 +157,8 @@ export class ContextKeeper {
 		};
 		const toldName = told.name ?? prompt.name;
 		const toldTeam = told.team === undefined ? prompt.team : told.team;
+		const toldExtraDirs = told.extraDirs ?? prompt.extraDirs ?? [];
+		const currentExtraDirs = session.options.extraDirs ?? [];
 		const updates: string[] = [];
 		const date = today();
 		if (date !== told.date) updates.push(`Today's date is now ${date}.`);
@@ -176,6 +179,13 @@ export class ContextKeeper {
 		if (team !== toldTeam) {
 			updates.push(team ? `You now belong to the team "${team}".` : "You are no longer in a team.");
 		}
+		if (JSON.stringify(currentExtraDirs) !== JSON.stringify(toldExtraDirs)) {
+			updates.push(
+				currentExtraDirs.length > 0
+					? `Additional folders for this session are now: ${currentExtraDirs.map((d) => `${d.path} (${d.access === "write" ? "read-write" : "read-only"})`).join(", ")}.`
+					: "This session no longer has additional folders outside its working folder.",
+			);
+		}
 		if (updates.length > 0) {
 			this.#store.appendEntry(session.id, {
 				role: "system",
@@ -191,6 +201,7 @@ export class ContextKeeper {
 				main: sameMain ? told.main : placement.main,
 				name: session.name,
 				team,
+				extraDirs: currentExtraDirs,
 			},
 		};
 		if (JSON.stringify(next) !== JSON.stringify(saved)) {
@@ -315,6 +326,110 @@ export class ContextKeeper {
 					Math.ceil((text.length + (request?.length ?? 0)) / 4),
 				),
 			);
+		});
+		return "done";
+	}
+
+	/**
+	 * Starts a fresh context window in place (blueprint 6.12, item 50): everything before this point
+	 * stays in the database for scrolling and search, while the model starts from a clean slate (or a
+	 * concise carry-over brief when `summarize` is true). Any open incoming requests are restated in a
+	 * system entry after the boundary so the session does not forget who is waiting on it.
+	 */
+	async renew(
+		session: Session,
+		model: ModelInfo | null,
+		signal: AbortSignal,
+		summarize: boolean,
+		openRequestNote: string | null = null,
+	): Promise<Compacted> {
+		const entries = this.#store.contextEntries(session.id);
+		const hasHistory = entries.some(
+			(entry) =>
+				entry.role === "user" ||
+				entry.role === "assistant" ||
+				entry.role === "system" ||
+				(entry.role === "compaction" && entry.compaction.summary.trim().length > 0),
+		);
+		if (!hasHistory) return "nothing";
+
+		let summaryText = "";
+		if (summarize) {
+			if (!model) return "failed";
+			this.#store.live(session.id, { type: "draftCleared" });
+			const summary = await this.#gateway.stream({
+				provider: session.provider,
+				model: model.id,
+				thinking: "off",
+				systemPrompt: RENEW_PROMPT,
+				messages: [
+					{
+						role: "user",
+						content: transcriptForSummary(entries),
+						timestamp: Date.now(),
+					},
+				],
+				tools: [],
+				signal,
+			});
+			this.#store.addUsage(session.id, usageTotals(summary), session.contextTokens);
+			const text = summary.content
+				.filter((block) => block.type === "text")
+				.map((block) => block.text)
+				.join("\n")
+				.trim();
+			if (summary.stopReason !== "stop" || !text) {
+				if (!signal.aborted) {
+					notice(
+						this.#store,
+						session.id,
+						"error",
+						summary.errorMessage ?? "The carry-over summary came back empty.",
+						{ code: "compact-failed" },
+					);
+				}
+				return "failed";
+			}
+			summaryText = text;
+		} else {
+			this.#store.live(session.id, { type: "draftCleared" });
+		}
+
+		this.#store.tx(() => {
+			const seqRow = this.#store.db
+				.prepare("SELECT message_seq FROM sessions WHERE id = ?")
+				.get(session.id) as { message_seq: number } | undefined;
+			const firstKeptSeq = (seqRow?.message_seq ?? 0) + 2;
+			this.#store.appendEntry(session.id, {
+				role: "compaction",
+				compaction: {
+					kind: "renew",
+					summary: summaryText,
+					firstKeptSeq,
+					tokensBefore: session.contextTokens,
+					timestamp: Date.now(),
+				},
+			});
+			if (openRequestNote) {
+				this.#store.appendEntry(session.id, {
+					role: "system",
+					message: { role: "system", content: openRequestNote, timestamp: Date.now() },
+				});
+			}
+			notice(
+				this.#store,
+				session.id,
+				"renewed",
+				summaryText
+					? "Started a fresh context with a carry-over brief. Earlier history is still above."
+					: "Started a fresh context. Earlier history is still above.",
+			);
+			this.#store.setContextSnapshot(
+				session.id,
+				takeSnapshot(session, this.#home, this.#placement(session), this.#extras()),
+			);
+			const carriedChars = summaryText.length + (openRequestNote?.length ?? 0);
+			this.#store.setContextTokens(session.id, carriedChars > 0 ? Math.ceil(carriedChars / 4) : 0);
 		});
 		return "done";
 	}

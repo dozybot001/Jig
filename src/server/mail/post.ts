@@ -107,6 +107,8 @@ export interface Outgoing {
 	decision?: number | null;
 	/** The scheduled task whose run the letter starts or reports on. */
 	schedule?: string | null;
+	/** Server-stamped ID of the person's message in the main conversation that started this chain. */
+	originEntryId?: string | null;
 }
 
 export interface PostHooks {
@@ -322,6 +324,7 @@ export class PostOffice {
 			auto: out.auto ?? false,
 			decision: out.decision ?? null,
 			scheduleId: sender.kind === "schedule" ? sender.schedule.id : (out.schedule ?? null),
+			originEntryId: out.originEntryId ?? null,
 		};
 
 		// Yew's automatic letters answer one request each, so they skip the limits (and cannot loop).

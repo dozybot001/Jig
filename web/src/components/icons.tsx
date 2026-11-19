@@ -36,12 +36,14 @@ import {
 	Network,
 	PanelLeftClose,
 	PanelLeftOpen,
+	Paperclip,
 	PencilLine,
 	Pin,
 	Play,
 	Plug,
 	Plus,
 	Power,
+	RefreshCw,
 	RotateCcw,
 	Search,
 	Send,
@@ -68,6 +70,8 @@ import {
  */
 const props = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
 
+/** Attach files or images to a message. */
+export const AttachIcon = () => <Paperclip {...props} />;
 export const PlusIcon = () => <Plus {...props} />;
 /** MCP servers: tools plugged into Yew. */
 export const ToolsIcon = () => <Plug {...props} />;
@@ -92,6 +96,8 @@ export const SubmenuIcon = () => <ChevronRight {...props} size={14} className="m
 export const PinIcon = () => <Pin {...props} size={13} className="pin-icon" />;
 /** Make the context smaller. */
 export const CompactIcon = () => <Minimize2 {...props} />;
+/** Start a fresh context window while keeping history above. */
+export const RenewIcon = () => <RefreshCw {...props} />;
 export const PlayIcon = () => <Play {...props} />;
 export const InfoIcon = () => <Info {...props} />;
 export const CloseIcon = () => <X {...props} />;

@@ -103,8 +103,10 @@ export interface ToolResultMessage {
 /** What the model sees. */
 export type ModelMessage = SystemMessage | UserMessage | AssistantMessage | ToolResultMessage;
 
-/** Marks where older history was summarized; the model sees `summary` in place of messages before `firstKeptSeq`. */
+/** Marks where older history was summarized or renewed; the model sees `summary` in place of messages before `firstKeptSeq`. */
 export interface CompactionRecord {
+	/** "compact" (default): summarizes older turns while keeping recent ones; "renew": fresh context window in place. */
+	kind?: "compact" | "renew";
 	summary: string;
 	/**
 	 * The latest message from the person (or letter) in the removed part, word for word, when the
@@ -124,6 +126,7 @@ export interface Notice {
 		| "restarted"
 		| "error"
 		| "compacted"
+		| "renewed"
 		| "job_finished"
 		/** Another session changed this one with manage_yew; data has who and the changes. */
 		| "changed"
@@ -162,9 +165,27 @@ export interface LetterRef {
 	schedule?: { id: string; name: string };
 }
 
+export type AttachmentKind = "image" | "pdf" | "text";
+
+/**
+ * Lightweight reference to a file the person attached to a message (blueprint 6.12, item 46).
+ * The bytes live under `~/.yew/attachments/<sessionId>/` and are hydrated into model input on demand,
+ * so SQLite, SSE streams and phone sync never carry raw base64 payloads.
+ */
+export interface AttachmentRef {
+	id: string;
+	name: string;
+	mimeType: string;
+	kind: AttachmentKind;
+	size: number;
+	width?: number;
+	height?: number;
+	pages?: number;
+}
+
 export type EntryBody =
 	| { role: "system"; message: SystemMessage }
-	| { role: "user"; message: UserMessage; letter?: LetterRef }
+	| { role: "user"; message: UserMessage; letter?: LetterRef; attachments?: AttachmentRef[] }
 	| { role: "assistant"; message: AssistantMessage }
 	| { role: "toolResult"; message: ToolResultMessage }
 	| { role: "compaction"; compaction: CompactionRecord }

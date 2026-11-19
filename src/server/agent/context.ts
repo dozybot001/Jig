@@ -3,12 +3,15 @@ import type {
 	ModelMessage,
 	ToolCallBlock,
 	ToolResultMessage,
+	UserMessage,
 } from "../../shared/messages.ts";
 import { messageText } from "../../shared/messages.ts";
 import type { Entry, UsageTotals } from "../../shared/types.ts";
 
 export const SUMMARY_HEADING =
 	"[Summary of the earlier conversation, written by Yew when it shortened the context]";
+export const RENEW_HEADING =
+	"[Context renewed by the person — concise carry-over brief from prior work in this session]";
 export const REQUEST_HEADING =
 	"[The latest message to you before that summary, word for word; it is still what you are working on]";
 /** What Yew puts in front of its own messages to the model, which are stored like the person's. */
@@ -53,15 +56,19 @@ export function toModelMessages(entries: Entry[]): ModelMessage[] {
 	const out: ModelMessage[] = [];
 	for (const entry of entries) {
 		switch (entry.role) {
-			case "compaction":
+			case "compaction": {
+				const heading = entry.compaction.kind === "renew" ? RENEW_HEADING : SUMMARY_HEADING;
+				const summary = entry.compaction.summary.trim();
+				if (!summary && !entry.compaction.request) break;
 				out.push({
 					role: "user",
 					content: entry.compaction.request
-						? `${SUMMARY_HEADING}\n\n${entry.compaction.summary}\n\n${REQUEST_HEADING}\n\n${entry.compaction.request}`
-						: `${SUMMARY_HEADING}\n\n${entry.compaction.summary}`,
+						? `${heading}\n\n${summary}\n\n${REQUEST_HEADING}\n\n${entry.compaction.request}`
+						: `${heading}\n\n${summary}`,
 					timestamp: entry.compaction.timestamp,
 				});
 				break;
+			}
 			case "system":
 			case "user":
 				out.push(entry.message);
@@ -83,6 +90,30 @@ export function toModelMessages(entries: Entry[]): ModelMessage[] {
 	return out;
 }
 
+/**
+ * Like `toModelMessages`, and hydrates any file attachments on user entries into model-ready
+ * content blocks (images, PDF text/pages, text snippets) right before a model call.
+ */
+export async function prepareModelMessages(
+	entries: Entry[],
+	hydrate?: (entry: Extract<Entry, { role: "user" }>) => Promise<UserMessage>,
+): Promise<ModelMessage[]> {
+	if (!hydrate) return toModelMessages(entries);
+	const hydrated = new Map<string, UserMessage>();
+	for (const entry of entries) {
+		if (entry.role === "user" && entry.attachments && entry.attachments.length > 0) {
+			hydrated.set(entry.id, await hydrate(entry));
+		}
+	}
+	if (hydrated.size === 0) return toModelMessages(entries);
+	const next = entries.map((entry) =>
+		entry.role === "user" && hydrated.has(entry.id)
+			? { ...entry, message: hydrated.get(entry.id) as UserMessage }
+			: entry,
+	);
+	return toModelMessages(next);
+}
+
 /** An interrupted response may end in a half-written tool call; keep the text and drop the call. */
 export function sanitizeInterrupted(message: AssistantMessage): AssistantMessage {
 	if (message.stopReason !== "aborted" && message.stopReason !== "error") return message;
@@ -98,8 +129,13 @@ export function transcriptForSummary(entries: Entry[]): string {
 		if (entry.role === "compaction") {
 			lines.push(`## Earlier summary\n${entry.compaction.summary}`);
 			if (entry.compaction.request) lines.push(`## Person\n${entry.compaction.request}`);
-		} else if (entry.role === "user") lines.push(`## Person\n${messageText(entry.message)}`);
-		else if (entry.role === "system") lines.push(`## Update from Yew\n${entry.message.content}`);
+		} else if (entry.role === "user") {
+			const files =
+				entry.attachments && entry.attachments.length > 0
+					? `\n${entry.attachments.map((item) => `[Attached ${item.kind}: ${item.name}]`).join("\n")}`
+					: "";
+			lines.push(`## Person\n${messageText(entry.message)}${files}`);
+		} else if (entry.role === "system") lines.push(`## Update from Yew\n${entry.message.content}`);
 		else if (entry.role === "assistant") {
 			const text = entry.message.content
 				.filter((block) => block.type === "text")
@@ -123,7 +159,13 @@ export function transcriptForSummary(entries: Entry[]): string {
 
 /** Rough token count (four characters per token), used to choose what compaction keeps. */
 export function estimateTokens(entry: Entry): number {
-	return Math.ceil(JSON.stringify(entry).length / 4);
+	let tokens = Math.ceil(JSON.stringify(entry).length / 4);
+	if (entry.role === "user" && entry.attachments) {
+		for (const item of entry.attachments) {
+			tokens += item.kind === "image" ? 1500 : Math.min(Math.ceil(item.size / 4), 8000);
+		}
+	}
+	return tokens;
 }
 
 /** What a response used, as Yew adds it up. */

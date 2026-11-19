@@ -27,6 +27,15 @@ import { findRepositories } from "./sandbox.ts";
  */
 export type GuardKind = "macos" | "linux" | "none";
 
+/**
+ * Guard relaxation mode for explicitly human-approved Decisions (blueprint, section 11):
+ * - "default": full outer guard (blocks Yew data, WebKit storage, startup items, git hooks/config, lsopen, appleevent-send).
+ * - "git-setup": unlocks workspace `.git/config` ONLY (Core Guard stays locked: Yew data, WebKit, startup items,
+ *   `~/.gitconfig`, `~/.ssh/config`, `.git/hooks`, `lsopen`, `appleevent-send`). Paired with post-run `.git/config` audit.
+ * - "launch-app": unlocks `lsopen` ONLY so `open -a <App>` works while all write locks stay in force.
+ */
+export type GuardMode = "default" | "git-setup" | "launch-app";
+
 export interface Guard {
 	kind: GuardKind;
 	program: string | null;
@@ -81,45 +90,52 @@ export function startupPlaces(home: string): { files: string[]; folders: string[
 /** A string in a Seatbelt profile. */
 const quoted = (text: string) => `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
-/** Repositories' hooks and settings, anywhere: the main one's, submodules' and worktrees'. */
-const GIT_INTERNALS = [
-	"/\\.git/(modules/.+/)?hooks(/.*)?$",
+/** Repositories' hooks, anywhere: always permanently locked in Core Guard. */
+const GIT_HOOKS = ["/\\.git/(modules/.+/)?hooks(/.*)?$"];
+
+/** Repositories' local config files: locked by default, unlocked only for human-approved `git-setup` decisions. */
+const GIT_CONFIGS = [
 	"/\\.git/(modules/.+/)?config(\\.worktree)?$",
 	"/\\.git/worktrees/[^/]+/config(\\.worktree)?$",
 ];
 
-/** The macOS profile: everything allowed, but what the guard closes. */
-export function guardProfile(places: string[], home: string): string {
+/** The macOS profile: everything allowed, except what the guard closes for `mode`. */
+export function guardProfile(places: string[], home: string, mode: GuardMode = "default"): string {
 	const startup = startupPlaces(home);
-	return [
+	const gitPatterns = mode === "git-setup" ? GIT_HOOKS : [...GIT_HOOKS, ...GIT_CONFIGS];
+	const lines = [
 		"(version 1)",
 		"(allow default)",
 		`(deny file-read* file-write* ${places.map((place) => `(subpath ${quoted(place)})`).join(" ")})`,
 		`(deny file-write* ${[
 			...startup.files.map((file) => `(literal ${quoted(file)})`),
 			...startup.folders.map((folder) => `(subpath ${quoted(folder)})`),
-			...GIT_INTERNALS.map((pattern) => `(regex #"${pattern}")`),
+			...gitPatterns.map((pattern) => `(regex #"${pattern}")`),
 		].join(" ")})`,
-		"(deny lsopen)",
-		"(deny appleevent-send)",
-	].join("\n");
+	];
+	if (mode !== "launch-app") lines.push("(deny lsopen)");
+	lines.push("(deny appleevent-send)");
+	return lines.join("\n");
 }
 
-/** Linux: the repositories under the working folder now, their hooks and settings that exist. */
-function repositoryInternals(cwd: string): string[] {
+/** Linux: the repositories under the working folder now, their hooks (and optionally configs) that exist. */
+function repositoryInternals(cwd: string, includeConfigs = true): string[] {
 	return findRepositories(cwd).flatMap((repository) => {
-		if (!repository.folder) return [repository.git];
+		if (!repository.folder) return includeConfigs ? [repository.git] : [];
 		const paths: string[] = [];
 		const walk = (git: string, depth: number) => {
-			paths.push(join(git, "hooks"), join(git, "config"), join(git, "config.worktree"));
+			paths.push(join(git, "hooks"));
+			if (includeConfigs) paths.push(join(git, "config"), join(git, "config.worktree"));
 			const modules = join(git, "modules");
 			if (depth < 4 && existsSync(modules)) {
 				for (const name of readdirSync(modules)) walk(join(modules, name), depth + 1);
 			}
-			const worktrees = join(git, "worktrees");
-			if (existsSync(worktrees)) {
-				for (const name of readdirSync(worktrees)) {
-					paths.push(join(worktrees, name, "config"), join(worktrees, name, "config.worktree"));
+			if (includeConfigs) {
+				const worktrees = join(git, "worktrees");
+				if (existsSync(worktrees)) {
+					for (const name of readdirSync(worktrees)) {
+						paths.push(join(worktrees, name, "config"), join(worktrees, name, "config.worktree"));
+					}
 				}
 			}
 		};
@@ -134,12 +150,13 @@ export function guardedArgs(
 	command: string,
 	cwd: string,
 	state: Guard = guard,
+	mode: GuardMode = "default",
 ): { file: string; args: string[] } | null {
 	if (state.kind === "none" || !state.program || state.places.length === 0) return null;
 	if (state.kind === "macos") {
 		return {
 			file: state.program,
-			args: ["-p", guardProfile(state.places, state.home), shell, "-lc", command],
+			args: ["-p", guardProfile(state.places, state.home, mode), shell, "-lc", command],
 		};
 	}
 	// An empty folder over each closed folder; bubblewrap cannot lay one over a file. What runs by
@@ -150,7 +167,11 @@ export function guardedArgs(
 		.filter(isFolder)
 		.flatMap((place) => ["--tmpfs", place]);
 	const startup = startupPlaces(state.home);
-	const readOnly = [...startup.files, ...startup.folders, ...repositoryInternals(cwd)]
+	const readOnly = [
+		...startup.files,
+		...startup.folders,
+		...repositoryInternals(cwd, mode !== "git-setup"),
+	]
 		.filter((path) => existsSync(path))
 		.flatMap((path) => ["--ro-bind", path, path]);
 	return {
@@ -199,7 +220,7 @@ export function startGuard(
 	const ran = probe
 		? spawnSync(probe.file, probe.args, { stdio: "ignore", timeout: 10_000 })
 		: null;
-	if (!ran || ran.status !== 0) {
+	if (ran?.status !== 0) {
 		guard = NONE;
 		const why = ran?.error?.message ?? `exit ${ran?.status}`;
 		return { kind: "none", problem: `the guard did not keep a command out of Yew's data (${why})` };

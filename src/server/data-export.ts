@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { extname, join } from "node:path";
 import type { Card, Letter, Session } from "../shared/types.ts";
 import { ArtifactStore } from "./artifacts.ts";
+import { AttachmentStore } from "./attachments.ts";
 import { invalid } from "./errors.ts";
 import { type ExportLanguage, sessionMarkdown } from "./export.ts";
 import { MailStore } from "./mail/store.ts";
@@ -20,6 +21,7 @@ export interface ExportCounts {
 	cards: number;
 	schedules: number;
 	artifacts: number;
+	attachments: number;
 	files: number;
 }
 
@@ -50,6 +52,24 @@ function fileNameOf(name: string, taken: Set<string>): string {
 	return `${candidate}.md`;
 }
 
+/** A safe file name for an exported attachment, preserving its extension and avoiding collisions. */
+function attachmentFileName(name: string, taken: Set<string>): string {
+	const ext = extname(name)
+		.replace(/[\\/:*?"<>|\p{Cc}]/gu, "")
+		.slice(0, 16);
+	const rawStem = ext ? name.slice(0, -ext.length) : name;
+	const stem =
+		rawStem
+			.replace(/[\\/:*?"<>|\p{Cc}]/gu, " ")
+			.replace(/\s+/g, " ")
+			.trim()
+			.slice(0, 80) || "attachment";
+	let candidate = `${stem}${ext}`;
+	for (let n = 2; taken.has(candidate.toLowerCase()); n++) candidate = `${stem} ${n}${ext}`;
+	taken.add(candidate.toLowerCase());
+	return candidate;
+}
+
 export function exportAll(
 	store: Store,
 	folder: string,
@@ -63,7 +83,7 @@ export function exportAll(
 	const language: ExportLanguage = settings.language === "en" ? "en" : "zh";
 	const mail = new MailStore(store);
 	let files = 0;
-	const write = (path: string, content: string) => {
+	const write = (path: string, content: string | Buffer) => {
 		writeFileSync(join(folder, path), content, { mode: 0o600 });
 		files += 1;
 	};
@@ -77,9 +97,26 @@ export function exportAll(
 		),
 	];
 	const groups = new Map(store.listGroups().map((group) => [group.id, group.name]));
+	const attachmentStore = yewHome ? new AttachmentStore(store, yewHome) : null;
+	let attachments = 0;
 	const taken = new Set<string>();
 	const index = sessions.map((session) => {
 		const file = fileNameOf(session.name, taken);
+		const sessionFolder = file.replace(/\.md$/, "");
+		const links = new Map<string, string>();
+		if (attachmentStore) {
+			const list = attachmentStore.listForSession(session.id);
+			const usedNames = new Set<string>();
+			for (const item of list) {
+				if (!existsSync(item.filePath)) continue;
+				const dir = join("attachments", sessionFolder);
+				mkdirSync(join(folder, dir), { recursive: true, mode: 0o700 });
+				const outName = attachmentFileName(item.name, usedNames);
+				write(join(dir, outName), readFileSync(item.filePath));
+				links.set(item.id, `../attachments/${sessionFolder}/${outName}`);
+				attachments += 1;
+			}
+		}
 		write(
 			join("sessions", file),
 			sessionMarkdown({
@@ -89,6 +126,7 @@ export function exportAll(
 				toolCalls: store.toolCallsForSession(session.id),
 				language,
 				now,
+				...(links.size > 0 ? { attachmentPath: (ref) => links.get(ref.id) ?? null } : {}),
 			}),
 		);
 		// The record is in the Markdown file; this lists what the session is.
@@ -136,6 +174,7 @@ export function exportAll(
 	}
 	return {
 		artifacts,
+		attachments,
 		sessions: sessions.length,
 		letters: letters.length,
 		cards: cards.length,

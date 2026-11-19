@@ -4,7 +4,9 @@ import {
 	PERMISSION_MODES,
 	type PermissionMode,
 	permissionModeOf,
+	SCHEDULE_MODES,
 	type Schedule,
+	type ScheduleMode,
 } from "../../../src/shared/types.ts";
 import {
 	deleteSchedule,
@@ -95,6 +97,11 @@ function ScheduleItem({ schedule, onEdit }: { schedule: Schedule; onEdit: () => 
 		<li className="card schedule-card">
 			<div className="schedule-head">
 				<h3 id={heading}>{schedule.name}</h3>
+				{schedule.mode === "task_session" && (
+					<span className="tag" title={t("scheduleModeHint_task_session")}>
+						{t("scheduleMode_task_session")}
+					</span>
+				)}
 				{skips && (
 					<span className="tag" title={t("scheduleSkipsHint")}>
 						{t("scheduleSkips")}
@@ -133,7 +140,21 @@ function ScheduleItem({ schedule, onEdit }: { schedule: Schedule; onEdit: () => 
 				{team && <span>{t("scheduleTeam", { team })}</span>}
 			</p>
 			<p className="schedule-message">{first}</p>
-			<p className="hint">{lastRun(schedule)}</p>
+			<p className="hint">
+				{lastRun(schedule)}
+				{schedule.lastSessionId && (
+					<>
+						{" · "}
+						<button
+							type="button"
+							className="link-button"
+							onClick={() => void selectSession(schedule.lastSessionId as string)}
+						>
+							{t("scheduleLastSession")}
+						</button>
+					</>
+				)}
+			</p>
 			<div className="schedule-actions">
 				<Button busy={run.busy} onClick={() => void run.run()}>
 					<PlayIcon />
@@ -256,7 +277,9 @@ function ScheduleDialog({ schedule, onClose }: { schedule: Schedule | null; onCl
 	const [cron, setCron] = useState(schedule?.cron ?? "0 9 * * *");
 	const [sessionId, setSessionId] = useState(schedule?.sessionId ?? standing[0]?.id ?? "");
 	const [message, setMessage] = useState(schedule?.message ?? "");
-	const [mode, setMode] = useState<PermissionMode | "">(schedule?.permissionMode ?? "");
+	const [permMode, setPermMode] = useState<PermissionMode | "">(schedule?.permissionMode ?? "");
+	const [runMode, setRunMode] = useState<ScheduleMode>(schedule?.mode ?? "letter");
+	const [autoArchive, setAutoArchive] = useState(schedule?.autoArchive ?? true);
 	const [catchUp, setCatchUp] = useState(schedule?.catchUp ?? true);
 	const now = useNow();
 	const preview = useMemo(() => cronPreview(cron, now), [cron, now]);
@@ -267,6 +290,7 @@ function ScheduleDialog({ schedule, onClose }: { schedule: Schedule | null; onCl
 		cronNote: useId(),
 		message: useId(),
 		messageError: useId(),
+		autoArchive: useId(),
 	};
 	const target = sessions[sessionId];
 	const save = useAction(async () => {
@@ -275,7 +299,9 @@ function ScheduleDialog({ schedule, onClose }: { schedule: Schedule | null; onCl
 			cron,
 			session: sessionId,
 			message,
-			permissionMode: mode || null,
+			permissionMode: permMode || null,
+			mode: runMode,
+			autoArchive,
 			catchUp,
 		};
 		await saveSchedule(schedule?.id ?? null, input);
@@ -389,10 +415,22 @@ function ScheduleDialog({ schedule, onClose }: { schedule: Schedule | null; onCl
 				/>
 			</Field>
 			<div className="field-row">
+				<Field label={t("scheduleMode")} info={t("scheduleModeHelp")}>
+					<Select
+						label={t("scheduleMode")}
+						value={runMode}
+						options={SCHEDULE_MODES.map((value) => ({
+							value,
+							label: t(`scheduleMode_${value}`),
+							hint: t(`scheduleModeHint_${value}`),
+						}))}
+						onChange={(value) => setRunMode(value as ScheduleMode)}
+					/>
+				</Field>
 				<Field label={t("schedulePermission")}>
 					<Select
 						label={t("schedulePermission")}
-						value={mode}
+						value={permMode}
 						options={[
 							{
 								value: "",
@@ -402,9 +440,11 @@ function ScheduleDialog({ schedule, onClose }: { schedule: Schedule | null; onCl
 							},
 							...PERMISSION_MODES.map((value) => ({ value, label: t(`perm_${value}`) })),
 						]}
-						onChange={(value) => setMode(value as PermissionMode | "")}
+						onChange={(value) => setPermMode(value as PermissionMode | "")}
 					/>
 				</Field>
+			</div>
+			<div className="field-row">
 				<Field label={t("scheduleCatchUp")} info={t("scheduleCatchUpHint")}>
 					<Select
 						label={t("scheduleCatchUp")}
@@ -416,6 +456,15 @@ function ScheduleDialog({ schedule, onClose }: { schedule: Schedule | null; onCl
 						onChange={(value) => setCatchUp(value === "yes")}
 					/>
 				</Field>
+				{runMode === "task_session" && (
+					<Field
+						label={t("scheduleAutoArchive")}
+						labelId={ids.autoArchive}
+						info={t("scheduleAutoArchiveHint")}
+					>
+						<Switch checked={autoArchive} labelledBy={ids.autoArchive} onChange={setAutoArchive} />
+					</Field>
+				)}
 			</div>
 			<ErrorBox error={generalError(save.error)} />
 		</Dialog>

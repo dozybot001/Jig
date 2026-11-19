@@ -234,7 +234,7 @@ export function listSkills(
 /** What the prompt says about skills: one line each. */
 export function skillsNote(skills: Skill[]): string {
 	return [
-		"Skills the person has set up. Each is a set of instructions for one kind of task. When a task matches one, call the skill tool with its name and follow what it says; scripts and reference files a skill mentions are in the folder the tool reports.",
+		"Skills the person has set up. Each is a set of instructions for one kind of task. When a task matches one — or when the person starts a message with /<name> — call the skill tool with its name first and follow what it says; scripts and reference files a skill mentions are in the folder the tool reports.",
 		...skills.map((skill) => `- ${skill.name}${skill.description ? `: ${skill.description}` : ""}`),
 	].join("\n");
 }

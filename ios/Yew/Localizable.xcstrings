@@ -48,12 +48,32 @@
         }
       }
     },
+    "**This week**\n\n- The checkout page loads in under a second.\n- Two color options for the home page are drafted.\n- The weekly report now writes itself every Friday.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "**本周**\n\n- 结账页一秒内打开。\n- 首页的两套配色已起草。\n- 周报现在每周五自动写好。"
+          }
+        }
+      }
+    },
     ", ": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "，"
+          }
+        }
+      }
+    },
+    "A connection wants to reach this site": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有连接要去这个网站"
           }
         }
       }
@@ -84,6 +104,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "强调色"
+          }
+        }
+      }
+    },
+    "Act in a connected service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在你连接的服务里执行写操作"
+          }
+        }
+      }
+    },
+    "Act in your own browser": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在你自己的浏览器里操作页面或标签页"
+          }
+        }
+      }
+    },
+    "Act on the whole screen": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作整个屏幕"
           }
         }
       }
@@ -128,6 +178,26 @@
         }
       }
     },
+    "Always allow": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "总是允许"
+          }
+        }
+      }
+    },
+    "Always allow this tool?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确定总是允许这个工具？"
+          }
+        }
+      }
+    },
     "An AI-native multi-agent workbench": {
       "localizations": {
         "zh-Hans": {
@@ -158,6 +228,16 @@
         }
       }
     },
+    "Approval": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "审批"
+          }
+        }
+      }
+    },
     "Approvals": {
       "localizations": {
         "zh-Hans": {
@@ -168,12 +248,52 @@
         }
       }
     },
+    "Artifacts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "产物"
+          }
+        }
+      }
+    },
     "Asks every time": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "每次确认"
+          }
+        }
+      }
+    },
+    "Attach photo": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "附加图片"
+          }
+        }
+      }
+    },
+    "Auto-check did not allow: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动检查未放行：%@"
+          }
+        }
+      }
+    },
+    "Auto-checked": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动检查放行"
           }
         }
       }
@@ -258,6 +378,46 @@
         }
       }
     },
+    "Carry-over brief": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "交接摘要"
+          }
+        }
+      }
+    },
+    "Change files outside the working folder": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改动工作区外的文件"
+          }
+        }
+      }
+    },
+    "Change something on GitHub": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改动 GitHub 上的内容"
+          }
+        }
+      }
+    },
+    "Change system services": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改动系统服务"
+          }
+        }
+      }
+    },
     "Changed the approval center %lld times": {
       "localizations": {
         "en": {
@@ -286,6 +446,16 @@
         }
       }
     },
+    "Chart": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图表"
+          }
+        }
+      }
+    },
     "Command line": {
       "localizations": {
         "zh-Hans": {
@@ -302,6 +472,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "连接"
+          }
+        }
+      }
+    },
+    "Connect to another machine": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接其他机器"
           }
         }
       }
@@ -346,6 +526,26 @@
         }
       }
     },
+    "Copy to or from another machine": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "和其他机器互传文件"
+          }
+        }
+      }
+    },
+    "Data": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数据"
+          }
+        }
+      }
+    },
     "Debug builds only. Run `yew open` on the Mac and paste the link it prints.": {
       "localizations": {
         "zh-Hans": {
@@ -386,6 +586,26 @@
         }
       }
     },
+    "Delete files": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除文件"
+          }
+        }
+      }
+    },
+    "Delete files outside the working folder": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除工作区外的文件"
+          }
+        }
+      }
+    },
     "Demo": {
       "localizations": {
         "zh-Hans": {
@@ -412,6 +632,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "设计"
+          }
+        }
+      }
+    },
+    "Document": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文档"
           }
         }
       }
@@ -494,6 +724,16 @@
         }
       }
     },
+    "Fresh context below": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以下开始新的上下文"
+          }
+        }
+      }
+    },
     "Friday": {
       "localizations": {
         "zh-Hans": {
@@ -524,12 +764,22 @@
         }
       }
     },
-    "Yew Harness on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions' questions and decide on cards, and you can follow and reply to sessions.": {
+    "Initialize, clone or change Git repository config": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone 上的 Yew Harness 经中继连接你的 Mac，两端之间端到端加密。离开电脑时，你在这里处理要你做的事：授权操作、回答会话的提问、处理决定卡，也能看会话的进展并回复。"
+            "value": "初始化、克隆或修改 Git 仓库配置"
+          }
+        }
+      }
+    },
+    "Launch a local desktop application": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启动本机桌面应用"
           }
         }
       }
@@ -550,6 +800,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "退出演示"
+          }
+        }
+      }
+    },
+    "Let the command connect to this site": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "让命令连接这个网站"
           }
         }
       }
@@ -652,6 +912,16 @@
         }
       }
     },
+    "Merged changes per day": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每天合并的改动"
+          }
+        }
+      }
+    },
     "Message": {
       "localizations": {
         "zh-Hans": {
@@ -678,6 +948,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "下周一"
+          }
+        }
+      }
+    },
+    "No artifacts yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有产物"
           }
         }
       }
@@ -722,6 +1002,16 @@
         }
       }
     },
+    "Not turned on": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没打开"
+          }
+        }
+      }
+    },
     "Nothing is waiting for you": {
       "localizations": {
         "zh-Hans": {
@@ -742,6 +1032,16 @@
         }
       }
     },
+    "Notifications": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知"
+          }
+        }
+      }
+    },
     "OK": {
       "localizations": {
         "zh-Hans": {
@@ -752,12 +1052,42 @@
         }
       }
     },
+    "Off in iOS Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在系统设置里关着"
+          }
+        }
+      }
+    },
+    "On": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已打开"
+          }
+        }
+      }
+    },
     "One accent color": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "加一个强调色"
+          }
+        }
+      }
+    },
+    "Open iOS Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "去系统设置打开"
           }
         }
       }
@@ -810,6 +1140,16 @@
         }
       }
     },
+    "Page": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "页面"
+          }
+        }
+      }
+    },
     "Pair": {
       "localizations": {
         "zh-Hans": {
@@ -850,6 +1190,16 @@
         }
       }
     },
+    "Permission": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "授权"
+          }
+        }
+      }
+    },
     "Pick any": {
       "localizations": {
         "zh-Hans": {
@@ -866,6 +1216,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "已置顶"
+          }
+        }
+      }
+    },
+    "Planned changes (%lld)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "计划改动（%lld 项）"
           }
         }
       }
@@ -890,6 +1250,26 @@
         }
       }
     },
+    "Publish a package": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发布软件包"
+          }
+        }
+      }
+    },
+    "Publish an image": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发布镜像"
+          }
+        }
+      }
+    },
     "Publisher": {
       "localizations": {
         "zh-Hans": {
@@ -906,6 +1286,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "推送登录有效期的修复"
+          }
+        }
+      }
+    },
+    "Push to a remote repository": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推送到远程仓库"
           }
         }
       }
@@ -1036,6 +1426,16 @@
         }
       }
     },
+    "Remove attachment": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除附件"
+          }
+        }
+      }
+    },
     "Removed on the Mac": {
       "localizations": {
         "zh-Hans": {
@@ -1072,6 +1472,56 @@
           "stringUnit": {
             "state": "translated",
             "value": "重试"
+          }
+        }
+      }
+    },
+    "Risky step": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已标记风险"
+          }
+        }
+      }
+    },
+    "Run Yew Harness's command line": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行 Yew Harness 的命令行"
+          }
+        }
+      }
+    },
+    "Run a script in your own browser": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在你自己的浏览器页面里运行脚本"
+          }
+        }
+      }
+    },
+    "Running in the sandbox at the time:": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当时在沙箱里运行的："
+          }
+        }
+      }
+    },
+    "Runs outside the sandbox": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在沙箱外运行"
           }
         }
       }
@@ -1140,6 +1590,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "发送"
+          }
+        }
+      }
+    },
+    "Send data to a server": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向服务器发送数据"
           }
         }
       }
@@ -1314,6 +1774,16 @@
         }
       }
     },
+    "This artifact cannot be shown": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个产物显示不出来"
+          }
+        }
+      }
+    },
     "This is sample data. Nothing you do here reaches a Mac.": {
       "localizations": {
         "zh-Hans": {
@@ -1330,6 +1800,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "这是演示，消息没有发给真实的会话。"
+          }
+        }
+      }
+    },
+    "This week's report": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本周周报"
           }
         }
       }
@@ -1354,12 +1834,42 @@
         }
       }
     },
+    "Touch Yew Harness's own data": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "碰 Yew Harness 自己的数据"
+          }
+        }
+      }
+    },
+    "Touch a folder kept from sessions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "碰设为会话读不到的目录"
+          }
+        }
+      }
+    },
     "Try the demo": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "看演示"
+          }
+        }
+      }
+    },
+    "Turn on notifications": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开通知"
           }
         }
       }
@@ -1410,6 +1920,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "版本 %1$@ · %2$@生效"
+          }
+        }
+      }
+    },
+    "Version %lld": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 版"
+          }
+        }
+      }
+    },
+    "View diff": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看改动详情"
           }
         }
       }
@@ -1474,6 +2004,16 @@
         }
       }
     },
+    "With Always allow, no call of this tool in this session is asked about again, including sending, paying and deleting in the browser with your sign-ins.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选「总是允许」后，本会话内这个工具的所有调用都不再问，包括在浏览器里以你的登录身份发送、付款、删除这类操作。"
+          }
+        }
+      }
+    },
     "Working": {
       "localizations": {
         "zh-Hans": {
@@ -1500,6 +2040,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "根据本周合并的改动写周报。"
+          }
+        }
+      }
+    },
+    "Write to a disk": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接写磁盘"
           }
         }
       }
@@ -1560,6 +2110,26 @@
         }
       }
     },
+    "Yew Harness notifies this iPhone when something needs you (a permission, a question, a decision or a held letter), when a session stops with an error, and when a task finishes. What a notification says is encrypted for this iPhone; the relay and Apple cannot read it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有事要你处理（授权、提问、决定、待放行的信）、会话出错停下、任务做完时，Yew Harness 通知这台 iPhone。通知的内容为这台 iPhone 加密，中继和 Apple 都读不到。"
+          }
+        }
+      }
+    },
+    "Yew Harness on iPhone connects to your Mac through a relay, encrypted end to end. Away from your desk, you handle what needs you here: allow operations, answer the sessions' questions and decide on cards, and you can follow and reply to sessions.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone 上的 Yew Harness 经中继连接你的 Mac，两端之间端到端加密。离开电脑时，你在这里处理要你做的事：授权操作、回答会话的提问、处理决定卡，也能看会话的进展并回复。"
+          }
+        }
+      }
+    },
     "You": {
       "localizations": {
         "zh-Hans": {
@@ -1591,9 +2161,6 @@
       }
     },
     "http://127.0.0.1:4791/#t=…": {
-      "shouldTranslate": false
-    },
-    "yew://pair?…": {
       "shouldTranslate": false
     },
     "policy.date": {
@@ -1664,79 +2231,6 @@
         }
       }
     },
-    "·": {
-      "shouldTranslate": false
-    },
-    "Notifications": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "通知"
-          }
-        }
-      }
-    },
-    "On": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已打开"
-          }
-        }
-      }
-    },
-    "Off in iOS Settings": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在系统设置里关着"
-          }
-        }
-      }
-    },
-    "Not turned on": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "还没打开"
-          }
-        }
-      }
-    },
-    "Turn on notifications": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开通知"
-          }
-        }
-      }
-    },
-    "Open iOS Settings": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "去系统设置打开"
-          }
-        }
-      }
-    },
-    "Yew Harness notifies this iPhone when something needs you (a permission, a question, a decision or a held letter), when a session stops with an error, and when a task finishes. What a notification says is encrypted for this iPhone; the relay and Apple cannot read it.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "有事要你处理（授权、提问、决定、待放行的信）、会话出错停下、任务做完时，Yew Harness 通知这台 iPhone。通知的内容为这台 iPhone 加密，中继和 Apple 都读不到。"
-          }
-        }
-      }
-    },
     "push.fallback": {
       "extractionState": "manual",
       "localizations": {
@@ -1754,115 +2248,11 @@
         }
       }
     },
-    "Artifacts": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "产物"
-          }
-        }
-      }
+    "yew://pair?…": {
+      "shouldTranslate": false
     },
-    "No artifacts yet": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "还没有产物"
-          }
-        }
-      }
-    },
-    "Page": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "页面"
-          }
-        }
-      }
-    },
-    "Data": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "数据"
-          }
-        }
-      }
-    },
-    "Chart": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "图表"
-          }
-        }
-      }
-    },
-    "Document": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "文档"
-          }
-        }
-      }
-    },
-    "Version %lld": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "第 %lld 版"
-          }
-        }
-      }
-    },
-    "This artifact cannot be shown": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "这个产物显示不出来"
-          }
-        }
-      }
-    },
-    "This week's report": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "本周周报"
-          }
-        }
-      }
-    },
-    "Merged changes per day": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "每天合并的改动"
-          }
-        }
-      }
-    },
-    "**This week**\n\n- The checkout page loads in under a second.\n- Two color options for the home page are drafted.\n- The weekly report now writes itself every Friday.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "**本周**\n\n- 结账页一秒内打开。\n- 首页的两套配色已起草。\n- 周报现在每周五自动写好。"
-          }
-        }
-      }
+    "·": {
+      "shouldTranslate": false
     }
   },
   "version": "1.0"

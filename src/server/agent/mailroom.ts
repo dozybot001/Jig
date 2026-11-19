@@ -58,6 +58,8 @@ interface Turn {
 	/** Letters were delivered at least once. */
 	started: boolean;
 	run: ScheduledRun | null;
+	/** Server-stamped ID of the person's message in the main conversation that started this chain. */
+	originEntryId: string | null;
 }
 
 export interface MailroomOptions {
@@ -111,8 +113,26 @@ export class Mailroom {
 	}
 
 	/** A turn begins. */
-	begin(sessionId: string, byPerson: boolean): void {
-		this.#turns.set(sessionId, { sent: [], read: new Map(), byPerson, started: false, run: null });
+	begin(sessionId: string, byPerson: boolean, originEntryId: string | null = null): void {
+		this.#turns.set(sessionId, {
+			sent: [],
+			read: new Map(),
+			byPerson,
+			started: false,
+			run: null,
+			originEntryId,
+		});
+	}
+
+	/** Updates the server-stamped main-conversation origin entry for this turn. */
+	setOrigin(sessionId: string, originEntryId: string | null): void {
+		const turn = this.#turns.get(sessionId);
+		if (turn) turn.originEntryId = originEntryId;
+	}
+
+	/** Server-stamped main-conversation origin entry for outgoing letters from this turn. */
+	originOf(sessionId: string): string | null {
+		return this.#turns.get(sessionId)?.originEntryId ?? null;
 	}
 
 	/** The scheduled run this turn is, if it is one. */
@@ -238,6 +258,13 @@ export class Mailroom {
 			}
 		});
 		this.#post.enterChain(sessionId, letters);
+		// Propagate the server-stamped main-conversation origin along delegated letters when not directly prompted by the person.
+		if (turn && !turn.originEntryId) {
+			const inherited = [...letters]
+				.reverse()
+				.find((letter) => letter.originEntryId)?.originEntryId;
+			if (inherited) turn.originEntryId = inherited;
+		}
 		return letters.length;
 	}
 
@@ -296,6 +323,7 @@ export class Mailroom {
 			byPerson: false,
 			started: true,
 			run: null,
+			originEntryId: null,
 		};
 		this.#turns.delete(sessionId);
 		const mail = this.#post.mail;
@@ -320,12 +348,18 @@ export class Mailroom {
 			waiting.resolve({ kind: "ended", status, text: said, detail, stopped });
 		}
 
+		const scheduledLetters = mail.scheduledRead(sessionId);
+		const isScheduledTaskSession = session.kind === "task" && scheduledLetters.length > 0;
+
 		const owed = new Map<string, Letter[]>();
 		for (const request of mail.openRequests(sessionId)) {
 			if (!request.fromSession) continue;
 			owed.set(request.fromSession, [...(owed.get(request.fromSession) ?? []), request]);
 		}
-		if (session.parentId && !owed.has(session.parentId)) owed.set(session.parentId, []);
+		// Scheduled task sessions report to their owner standing session and main via #finishRun below.
+		if (session.parentId && !isScheduledTaskSession && !owed.has(session.parentId)) {
+			owed.set(session.parentId, []);
+		}
 
 		for (const [requester, requests] of owed) {
 			const close = () => {
@@ -393,7 +427,7 @@ export class Mailroom {
 		// Runs of scheduled tasks this turn read end with it; read from the database, so a run that a
 		// restart interrupted ends with the turn that continues it.
 		let reported = false;
-		for (const letter of mail.scheduledRead(sessionId)) {
+		for (const letter of scheduledLetters) {
 			const run = turn.run?.letterId === letter.id ? turn.run : null;
 			if (this.#finishRun(session, letter, run, { status, detail, said, stopped })) reported = true;
 		}
@@ -403,8 +437,9 @@ export class Mailroom {
 
 	/**
 	 * A scheduled run ended. Its result goes on the task, and to the main conversation as a report, which
-	 * sums it up for the person (M3 plan, decision 3); a run the person stopped needs no report. Returns
-	 * whether a report went out.
+	 * sums it up for the person (M3 plan, decision 3). For `task_session` runs, the owner standing
+	 * session also receives the report, and a clean run archives the temporary task session when
+	 * `autoArchive` is on. A run the person stopped needs no report.
 	 */
 	#finishRun(
 		session: Session,
@@ -419,10 +454,14 @@ export class Mailroom {
 			outcome,
 			outcome === "error" ? end.detail : outcome === "done" ? first || null : null,
 		);
-		const main = this.#post.mainSessionId();
-		if (outcome === "stopped" || !main || main === session.id) return false;
-		const name = this.#scheduleRef(letter)?.name ?? letter.fromName;
+		const schedule = letter.scheduleId ? this.#schedules.find(letter.scheduleId) : null;
 		const refused = run?.refused ?? [];
+		const isTaskRun =
+			schedule?.mode === "task_session" &&
+			session.kind === "task" &&
+			schedule.sessionId !== session.id;
+		const main = this.#post.mainSessionId();
+		const name = schedule?.name ?? letter.fromName;
 		const body = [
 			outcome === "error" ? (end.detail ?? "") : "",
 			end.said,
@@ -432,18 +471,44 @@ export class Mailroom {
 		]
 			.filter(Boolean)
 			.join("\n\n");
-		this.#autoLetter(session, main, {
-			kind: outcome === "done" ? "report" : "notice",
-			summary:
-				outcome === "error"
-					? `The scheduled task "${name}" stopped with an error in ${session.name}.`
-					: first ||
-						`${session.name} finished the scheduled task "${name}" without a written reply.`,
-			body,
-			replyTo: null,
-			schedule: letter.scheduleId,
-		});
-		return true;
+		const summary =
+			outcome === "error"
+				? `The scheduled task "${name}" stopped with an error in ${session.name}.`
+				: first || `${session.name} finished the scheduled task "${name}" without a written reply.`;
+
+		let sentAny = false;
+		if (outcome !== "stopped") {
+			const targets = new Set<string>();
+			if (isTaskRun && schedule) targets.add(schedule.sessionId);
+			if (main && main !== session.id) targets.add(main);
+			for (const target of targets) {
+				let recipient: Session | null = null;
+				try {
+					recipient = this.#store.getSession(target);
+				} catch {
+					recipient = null;
+				}
+				if (!recipient || recipient.archivedAt !== null) continue;
+				this.#autoLetter(session, target, {
+					kind: outcome === "done" ? "report" : "notice",
+					summary,
+					body,
+					replyTo: null,
+					schedule: letter.scheduleId,
+				});
+				sentAny = true;
+			}
+		}
+
+		// Clean task_session runs archive themselves automatically when configured; errors or refused calls stay visible.
+		if (isTaskRun && schedule?.autoArchive && outcome === "done" && refused.length === 0) {
+			try {
+				this.#store.updateSession(session.id, { archived: true });
+			} catch {
+				// Best-effort cleanup.
+			}
+		}
+		return sentAny;
 	}
 
 	/** A letter Yew sends on a session's behalf at the end of its turn. */
@@ -568,7 +633,15 @@ export class Mailroom {
 				model,
 				thinking: parent.thinking,
 				rules: inheritableRules(parent.rules),
-				options: { permissionMode: permissionModeOf(parent.options) },
+				options: {
+					permissionMode: permissionModeOf(parent.options),
+					...(cwd !== null && parent.options.extraDirs?.length
+						? { extraDirs: parent.options.extraDirs }
+						: {}),
+					...(parent.options.allowedDomains?.length
+						? { allowedDomains: parent.options.allowedDomains }
+						: {}),
+				},
 				parentId: parent.id,
 			});
 			if (input.fork) this.#fork(parent, child, callRowId);
@@ -583,6 +656,7 @@ export class Mailroom {
 					kind: "request",
 					summary: clip(plainLine(brief), SUMMARY_MAX),
 					body: brief,
+					originEntryId: this.originOf(parent.id),
 				},
 			),
 		);

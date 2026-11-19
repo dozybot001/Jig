@@ -71,9 +71,67 @@ class LetterRef(
     val body: String,
 )
 
+data class AttachmentRef(
+    val id: String,
+    val name: String,
+    val mimeType: String,
+    val kind: String,
+    val size: Int,
+    val width: Int?,
+    val height: Int?,
+    val pages: Int?,
+) {
+    companion object {
+        fun from(json: JsonObject): AttachmentRef? {
+            return AttachmentRef(
+                id = json.str("id") ?: return null,
+                name = json.str("name").orEmpty(),
+                mimeType = json.str("mimeType").orEmpty(),
+                kind = json.str("kind").orEmpty(),
+                size = json.int("size") ?: 0,
+                width = json.int("width"),
+                height = json.int("height"),
+                pages = json.int("pages"),
+            )
+        }
+    }
+}
+
+data class PermissionNote(
+    val reviewed: String?,
+    val risk: List<String>,
+) {
+    companion object {
+        fun from(json: JsonObject): PermissionNote {
+            return PermissionNote(
+                reviewed = json.str("reviewed"),
+                risk = json.list("risk").mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content },
+            )
+        }
+    }
+}
+
+data class ToolCallItem(
+    val id: String,
+    val messageId: String,
+    val tool: String,
+    val note: PermissionNote?,
+) {
+    companion object {
+        fun from(json: JsonObject): ToolCallItem? {
+            return ToolCallItem(
+                id = json.str("id") ?: return null,
+                messageId = json.str("messageId").orEmpty(),
+                tool = json.str("tool").orEmpty(),
+                note = json.obj("note")?.let(PermissionNote::from),
+            )
+        }
+    }
+}
+
 /**
  * One entry of a session's record, reduced to what a phone shows: who spoke, the text, the tools an
- * answer used, and the letter a message came in.
+ * answer used, attachments, context-renew boundaries, and the letter a message came in.
  */
 class Entry(
     val id: String,
@@ -84,8 +142,10 @@ class Entry(
     val tools: List<String>,
     /** The letter this message delivered, when it came from another session. */
     val letter: LetterRef?,
+    /** Files or images attached to a user message. */
+    val attachments: List<AttachmentRef> = emptyList(),
 ) {
-    enum class Kind { User, Assistant, Notice, Other }
+    enum class Kind { User, Assistant, Notice, Renew, Other }
 
     companion object {
         fun from(json: JsonObject): Entry? {
@@ -100,13 +160,27 @@ class Entry(
                     body = letter.str("body").orEmpty(),
                 )
             }
+            val attachments = json.objects("attachments").mapNotNull(AttachmentRef::from)
             val message = MessageText.from(json.obj("message"))
             return when (json.str("role")) {
-                "user" -> Entry(id, json.int("seq") ?: 0, Kind.User, message.text, emptyList(), letter)
+                "user" -> Entry(id, json.int("seq") ?: 0, Kind.User, message.text, emptyList(), letter, attachments)
                 "assistant" -> Entry(id, json.int("seq") ?: 0, Kind.Assistant, message.text, message.tools, letter)
-                "notice" -> Entry(
-                    id, json.int("seq") ?: 0, Kind.Notice, json.obj("notice")?.str("text").orEmpty(), emptyList(), letter,
-                )
+                "compaction" -> {
+                    val comp = json.obj("compaction")
+                    if (comp?.str("kind") == "renew") {
+                        Entry(id, json.int("seq") ?: 0, Kind.Renew, comp.str("summary").orEmpty().trim(), emptyList(), letter)
+                    } else {
+                        Entry(id, json.int("seq") ?: 0, Kind.Other, "", emptyList(), letter)
+                    }
+                }
+                "notice" -> {
+                    val notice = json.obj("notice")
+                    if (notice?.str("kind") == "renewed") {
+                        Entry(id, json.int("seq") ?: 0, Kind.Other, "", emptyList(), letter)
+                    } else {
+                        Entry(id, json.int("seq") ?: 0, Kind.Notice, notice?.str("text").orEmpty(), emptyList(), letter)
+                    }
+                }
                 else -> Entry(id, json.int("seq") ?: 0, Kind.Other, "", emptyList(), letter)
             }
         }
@@ -118,11 +192,17 @@ class Transcript(
     val entries: List<Entry>,
     /** Where the page before this one ends, when there is one: the `before` of the next request. */
     val olderCursor: Int?,
+    val toolCalls: List<ToolCallItem> = emptyList(),
 ) {
     companion object {
         fun from(json: JsonObject): Transcript? {
             val session = json.obj("session")?.let(SessionSummary::from) ?: return null
-            return Transcript(session, json.objects("entries").mapNotNull(Entry::from), json.int("olderCursor"))
+            return Transcript(
+                session,
+                json.objects("entries").mapNotNull(Entry::from),
+                json.int("olderCursor"),
+                json.objects("toolCalls").mapNotNull(ToolCallItem::from),
+            )
         }
     }
 }
@@ -148,6 +228,38 @@ class Question(
     val multiple: Boolean,
 )
 
+data class RunningItem(val kind: String, val text: String) {
+    companion object {
+        fun from(json: JsonObject): RunningItem? {
+            val text = json.str("text") ?: return null
+            return RunningItem(json.str("kind").orEmpty(), text)
+        }
+    }
+}
+
+data class ChangeStepItem(
+    val action: String,
+    val label: String,
+) {
+    companion object {
+        fun from(json: JsonObject): ChangeStepItem? {
+            val action = json.str("action") ?: return null
+            val target = json.str("session") ?: json.str("name") ?: json.str("team") ?: ""
+            val from = json.str("from")
+            val to = json.str("to")
+            val right = json.str("right")
+            val on = json.bool("on")
+            val label = when {
+                from != null && to != null -> if (target.isEmpty()) "$action: $from → $to" else "$action $target: $from → $to"
+                right != null && on != null -> "$action $target ($right: ${if (on) "on" else "off"})"
+                target.isNotEmpty() -> "$action: $target"
+                else -> action
+            }
+            return ChangeStepItem(action, label)
+        }
+    }
+}
+
 class ApprovalItem(
     val id: String,
     val sessionId: String,
@@ -161,6 +273,13 @@ class ApprovalItem(
     val canRemember: Boolean,
     /** The questions, whichever form they were saved in (src/shared/types.ts questionsOf). */
     val questions: List<Question>,
+    val matter: Boolean = false,
+    val review: String? = null,
+    val warning: String? = null,
+    val diff: String? = null,
+    val reasons: List<String> = emptyList(),
+    val running: List<RunningItem> = emptyList(),
+    val changes: List<ChangeStepItem> = emptyList(),
 ) {
     /** The line the list shows: what the session wants to do, or its first question. */
     val line: String
@@ -191,6 +310,13 @@ class ApprovalItem(
                 mustConfirm = request.bool("mustConfirm") ?: false,
                 canRemember = request.list("rememberRules").isNotEmpty(),
                 questions = questions,
+                matter = request.bool("matter") ?: false,
+                review = request.str("review"),
+                warning = request.str("warning"),
+                diff = request.str("diff"),
+                reasons = request.list("reasons").mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content },
+                running = request.objects("running").mapNotNull(RunningItem::from),
+                changes = request.objects("changes").mapNotNull(ChangeStepItem::from),
             )
         }
     }
@@ -315,23 +441,37 @@ sealed class Step {
     class User(val entry: Entry) : Step() { override val id get() = entry.id }
     class Letter(val entry: Entry, val letter: LetterRef) : Step() { override val id get() = entry.id }
     class Answer(val entry: Entry) : Step() { override val id get() = entry.id }
-    class Tools(private val first: String, val names: List<String>) : Step() { override val id get() = "tools-$first" }
+    class Tools(
+        private val first: String,
+        val names: List<String>,
+        val reviewed: Boolean = false,
+        val risky: Boolean = false,
+    ) : Step() { override val id get() = "tools-$first" }
+    class Renew(val entry: Entry) : Step() { override val id get() = entry.id }
     class Notice(val entry: Entry) : Step() { override val id get() = entry.id }
 
     companion object {
-        fun of(entries: List<Entry>): List<Step> {
+        fun of(entries: List<Entry>, toolNotes: Map<String, List<PermissionNote>> = emptyMap()): List<Step> {
             val steps = mutableListOf<Step>()
             val tools = mutableListOf<String>()
             var toolsId = ""
+            var reviewed = false
+            var risky = false
             fun flush() {
-                if (tools.isNotEmpty()) steps.add(Tools(toolsId, tools.toList()))
+                if (tools.isNotEmpty()) steps.add(Tools(toolsId, tools.toList(), reviewed, risky))
                 tools.clear()
+                reviewed = false
+                risky = false
             }
             for (entry in entries) {
                 when (entry.kind) {
                     Entry.Kind.Assistant -> {
                         if (tools.isEmpty()) toolsId = entry.id
                         tools += entry.tools
+                        for (note in toolNotes[entry.id].orEmpty()) {
+                            if (note.reviewed != null) reviewed = true
+                            if (note.risk.isNotEmpty()) risky = true
+                        }
                         if (entry.text.isNotEmpty()) {
                             flush()
                             steps.add(Answer(entry))
@@ -340,7 +480,11 @@ sealed class Step {
                     Entry.Kind.User -> {
                         flush()
                         if (entry.letter != null) steps.add(Letter(entry, entry.letter))
-                        else if (entry.text.isNotEmpty()) steps.add(User(entry))
+                        else if (entry.text.isNotEmpty() || entry.attachments.isNotEmpty()) steps.add(User(entry))
+                    }
+                    Entry.Kind.Renew -> {
+                        flush()
+                        steps.add(Renew(entry))
                     }
                     Entry.Kind.Notice -> {
                         flush()
@@ -360,7 +504,8 @@ object ToolKinds {
     val order = listOf("read", "edit", "write", "search", "shell", "web", "letter", "session", "card", "other")
 
     fun of(tool: String): String = when (tool) {
-        "read", "edit", "write" -> tool
+        "read", "read_attachment" -> "read"
+        "edit", "write" -> tool
         "grep", "glob" -> "search"
         "shell", "shell_job" -> "shell"
         "web_fetch" -> "web"

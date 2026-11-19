@@ -92,30 +92,102 @@ struct CardHead: View {
 	}
 }
 
-/// A permission request with its answers: allow, always allow this kind when offered, decline.
+/// A permission or approval request with its details, scope warning confirmation and actions.
 struct PermissionRow: View {
 	@Environment(AppModel.self) private var model
 	let approval: ApprovalItem
 	@State private var busy = false
+	@State private var showDiff = false
+	@State private var showChanges = false
+	@State private var confirmingActsAsYou = false
+
+	private var req: ApprovalItem.Request { approval.request }
+	private var isDecision: Bool { req.matter == true }
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 10) {
+			HStack(spacing: 6) {
+				Tag(
+					text: isDecision ? String(localized: "Approval") : String(localized: "Permission"),
+					warning: isDecision
+				)
+				if req.mustConfirm == true {
+					Tag(text: String(localized: "Asks every time"))
+				}
+			}
 			CardHead(session: model.name(of: approval.sessionId), date: approval.createdAt, text: approval.line)
-			if approval.request.description != nil, let summary = approval.request.summary {
+			if req.description != nil, let summary = req.summary {
 				Text(summary)
 					.font(.footnote.monospaced())
 					.foregroundStyle(.secondary)
 					.lineLimit(4)
 			}
-			if approval.request.mustConfirm == true {
-				Tag(text: String(localized: "Asks every time"))
+			if let reasons = req.reasons, !reasons.isEmpty {
+				VStack(alignment: .leading, spacing: 4) {
+					ForEach(reasons, id: \.self) { code in
+						Label(ReasonLabel.text(code), systemImage: "exclamationmark.triangle")
+							.font(.caption)
+							.foregroundStyle(.secondary)
+					}
+				}
+			}
+			if let review = req.review, !review.isEmpty {
+				Text(String(localized: "Auto-check did not allow: \(review)"))
+					.font(.caption)
+					.foregroundStyle(.secondary)
+			}
+			if let running = req.running, !running.isEmpty {
+				VStack(alignment: .leading, spacing: 3) {
+					Text("Running in the sandbox at the time:")
+						.font(.caption.weight(.medium))
+						.foregroundStyle(.secondary)
+					ForEach(running, id: \.self) { item in
+						Text("• \(item.kind): \(item.text)")
+							.font(.caption.monospaced())
+							.foregroundStyle(.secondary)
+							.lineLimit(2)
+					}
+				}
+			}
+			if let changes = req.changes, !changes.isEmpty {
+				DisclosureGroup(String(localized: "Planned changes (\(changes.count))"), isExpanded: $showChanges) {
+					VStack(alignment: .leading, spacing: 4) {
+						ForEach(changes, id: \.self) { step in
+							Text("• \(step.label)")
+								.font(.caption)
+								.foregroundStyle(.secondary)
+						}
+					}
+					.padding(.top, 4)
+				}
+				.font(.caption.weight(.medium))
+			}
+			if let diff = req.diff, !diff.isEmpty {
+				DisclosureGroup(String(localized: "View diff"), isExpanded: $showDiff) {
+					ScrollView(.horizontal) {
+						Text(diff)
+							.font(.caption2.monospaced())
+							.textSelection(.enabled)
+							.padding(8)
+					}
+					.frame(maxHeight: 220)
+					.background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
+					.padding(.top, 4)
+				}
+				.font(.caption.weight(.medium))
 			}
 			HStack(spacing: 8) {
 				Button("Allow", systemImage: "checkmark") { act(.allowOnce) }
 					.buttonStyle(CapsuleButton(kind: .primary))
-				if approval.request.mustConfirm != true, approval.request.rememberRules?.isEmpty == false {
-					Button("Always", systemImage: "checkmark.circle") { act(.allowAlways) }
-						.buttonStyle(CapsuleButton(kind: .secondary))
+				if req.mustConfirm != true, req.rememberRules?.isEmpty == false {
+					Button("Always", systemImage: "checkmark.circle") {
+						if req.warning == "acts-as-you" {
+							confirmingActsAsYou = true
+						} else {
+							act(.allowAlways)
+						}
+					}
+					.buttonStyle(CapsuleButton(kind: .secondary))
 				}
 				Button("Decline", systemImage: "nosign") { act(.deny) }
 					.buttonStyle(CapsuleButton(kind: .destructive))
@@ -123,13 +195,51 @@ struct PermissionRow: View {
 			.disabled(busy)
 		}
 		.padding(.vertical, 4)
+		.alert("Always allow this tool?", isPresented: $confirmingActsAsYou) {
+			Button("Always allow", role: .destructive) { act(.allowAlways, confirmedWarning: true) }
+			Button("Cancel", role: .cancel) {}
+		} message: {
+			Text("With Always allow, no call of this tool in this session is asked about again, including sending, paying and deleting in the browser with your sign-ins.")
+		}
 	}
 
-	private func act(_ decision: AppModel.Decision) {
+	private func act(_ decision: AppModel.Decision, confirmedWarning: Bool = false) {
 		busy = true
 		Task {
-			await model.answer(approval.id, decision)
+			await model.answer(approval.id, decision, confirmedWarning: confirmedWarning)
 			busy = false
+		}
+	}
+}
+
+private enum ReasonLabel {
+	static func text(_ code: String) -> String {
+		switch code {
+		case "git-setup": String(localized: "Initialize, clone or change Git repository config")
+		case "launch-app": String(localized: "Launch a local desktop application")
+		case "outside-sandbox": String(localized: "Runs outside the sandbox")
+		case "connect-site": String(localized: "Let the command connect to this site")
+		case "connect-site-unsure": String(localized: "A connection wants to reach this site")
+		case "remote-machine": String(localized: "Connect to another machine")
+		case "remote-copy": String(localized: "Copy to or from another machine")
+		case "send-data": String(localized: "Send data to a server")
+		case "delete-files": String(localized: "Delete files")
+		case "delete-outside": String(localized: "Delete files outside the working folder")
+		case "write-outside": String(localized: "Change files outside the working folder")
+		case "push": String(localized: "Push to a remote repository")
+		case "publish-package": String(localized: "Publish a package")
+		case "publish-image": String(localized: "Publish an image")
+		case "github": String(localized: "Change something on GitHub")
+		case "write-disk": String(localized: "Write to a disk")
+		case "system-services": String(localized: "Change system services")
+		case "yew-data": String(localized: "Touch Yew Harness's own data")
+		case "yew-cli": String(localized: "Run Yew Harness's command line")
+		case "hidden-folder": String(localized: "Touch a folder kept from sessions")
+		case "browser-action": String(localized: "Act in your own browser")
+		case "browser-script": String(localized: "Run a script in your own browser")
+		case "computer-control": String(localized: "Act on the whole screen")
+		case "service-action": String(localized: "Act in a connected service")
+		default: code
 		}
 	}
 }

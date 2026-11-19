@@ -576,6 +576,12 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 	const savedHidden = (settings?.hiddenFolders ?? []).join("\n");
 	const [hidden, setHidden] = useState(savedHidden);
 	const hiddenId = useId();
+	const savedDomains = (settings?.sandboxAllowedDomains ?? []).join("\n");
+	const [domains, setDomains] = useState(savedDomains);
+	const domainsId = useId();
+	const savedTraceMain = settings?.reviewTraceMain ?? true;
+	const [traceMain, setTraceMain] = useState(savedTraceMain);
+	const traceMainId = useId();
 	const sandbox = useAppState((state) => state.health?.sandbox ?? "none");
 	const save = useAction(async () => {
 		await saveSettings({
@@ -598,6 +604,15 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 							.filter(Boolean),
 					}
 				: {}),
+			...(domains !== savedDomains
+				? {
+						sandboxAllowedDomains: domains
+							.split("\n")
+							.map((line) => line.trim())
+							.filter(Boolean),
+					}
+				: {}),
+			...(traceMain !== savedTraceMain ? { reviewTraceMain: traceMain } : {}),
 			decisionLog: log.trim() || null,
 			...(budget !== savedBudget ? { dailyBudget: Number(budget) || null } : {}),
 		});
@@ -610,7 +625,9 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 		log.trim() !== (settings?.decisionLog ?? "") ||
 		budget !== savedBudget ||
 		memory !== savedMemory ||
-		hidden !== savedHidden;
+		hidden !== savedHidden ||
+		domains !== savedDomains ||
+		traceMain !== savedTraceMain;
 	return (
 		<Dialog
 			title={t("defaultsTitle")}
@@ -661,6 +678,13 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 					onChange={(value) => setMode(value as PermissionMode)}
 				/>
 			</Field>
+			<SettingRow
+				label={t("reviewTraceMain")}
+				hint={t("reviewTraceMainHint")}
+				labelId={traceMainId}
+			>
+				<Switch checked={traceMain} labelledBy={traceMainId} onChange={setTraceMain} />
+			</SettingRow>
 			<Field label={t("defaultWorkspace")} labelId={workspaceId} info={t("defaultWorkspaceHelp")}>
 				<Select
 					labelledBy={workspaceId}
@@ -710,6 +734,17 @@ function DefaultsDialog({ onClose }: { onClose: () => void }) {
 					placeholder={t("hiddenFoldersPlaceholder")}
 					value={hidden}
 					onChange={(event) => setHidden(event.target.value)}
+				/>
+			</Field>
+			<Field label={t("sandboxAllowedDomains")} htmlFor={domainsId} info={t("sandboxDomainsHelp")}>
+				<textarea
+					id={domainsId}
+					className="textarea"
+					spellCheck={false}
+					rows={2}
+					placeholder={t("sandboxDomainsPlaceholder")}
+					value={domains}
+					onChange={(event) => setDomains(event.target.value)}
 				/>
 			</Field>
 			<Field label={t("dailyBudgetAll")} htmlFor={budgetId} info={t("dailyBudgetAllHelp")}>

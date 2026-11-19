@@ -119,6 +119,11 @@ const FIELD_MESSAGES: Record<string, MessageKey> = {
 	headers: "err_field_headers",
 	remote: "err_field_remote",
 	folder: "err_field_folder",
+	file: "err_field_file",
+	attachments: "err_field_attachments",
+	extraDirs: "err_field_extraDirs",
+	allowedDomains: "err_field_sandboxDomains",
+	sandboxAllowedDomains: "err_field_sandboxDomains",
 };
 
 const CODE_MESSAGES: Record<string, MessageKey> = {
@@ -1108,13 +1113,16 @@ export function describeRule(rule: PermissionRule): string {
 						? t("ruleRun", { p: pattern })
 						: rule.tool === "web_fetch" && pattern
 							? t("ruleFetch", { p: pattern })
-							: rule.tool === "read" && pattern
-								? t("ruleRead", { p: pattern })
-								: rule.tool === "manage_yew" && (pattern === "organize" || pattern === "configure")
-									? t(`manage_${pattern}`)
-									: !pattern && hasMessage(`ask_${rule.tool}`)
-										? t(`ask_${rule.tool}` as MessageKey)
-										: `${rule.tool}${pattern ? ` ${pattern}` : ""}`;
+							: rule.tool === "sandbox_site" && pattern
+								? t("ruleSite", { p: pattern })
+								: rule.tool === "read" && pattern
+									? t("ruleRead", { p: pattern })
+									: rule.tool === "manage_yew" &&
+											(pattern === "organize" || pattern === "configure")
+										? t(`manage_${pattern}`)
+										: !pattern && hasMessage(`ask_${rule.tool}`)
+											? t(`ask_${rule.tool}` as MessageKey)
+											: `${rule.tool}${pattern ? ` ${pattern}` : ""}`;
 	if (rule.effect === "deny") return t("ruleDeny", { rule: what });
 	if (rule.effect === "ask") return t("ruleAsk", { rule: what });
 	return what;

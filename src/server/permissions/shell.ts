@@ -1,5 +1,6 @@
 import { basename } from "node:path";
 import type { ConfirmReason } from "../../shared/types.ts";
+import type { GuardMode } from "../guard.ts";
 
 /**
  * A small, conservative shell parser for permission checks. It does not try to understand every
@@ -403,6 +404,28 @@ export function mustConfirmReason(argv: string[]): ConfirmReason | null {
 		const { sub, rest } = gitSubcommand(args);
 		const restHas = (...flags: string[]) => rest.some((arg) => flags.includes(arg));
 		if (sub === "push") return "push";
+		if (sub === "init" || sub === "clone") return "git-setup";
+		if (
+			sub === "remote" &&
+			rest.length > 0 &&
+			!rest.every((arg) => arg === "-v" || arg === "--verbose" || arg === "show")
+		) {
+			return "git-setup";
+		}
+		if (
+			sub === "config" &&
+			!restHas(
+				"--get",
+				"--get-all",
+				"--get-regexp",
+				"--list",
+				"-l",
+				"--show-origin",
+				"--show-scope",
+			)
+		) {
+			return "git-setup";
+		}
 		if (sub === "reset" && restHas("--hard", "--merge", "--keep")) return "discard-changes";
 		if (sub === "clean") return "delete-untracked";
 		if (sub === "branch" && restHas("-d", "-D", "--delete")) return "delete-branch";
@@ -477,7 +500,120 @@ export function mustConfirmReason(argv: string[]): ConfirmReason | null {
 	if (["launchctl", "systemctl", "crontab", "shutdown", "reboot", "halt"].includes(name)) {
 		return "system-services";
 	}
+	if (name === "open" && has("-a", "--application")) {
+		return "launch-app";
+	}
 	return null;
+}
+
+/**
+ * Picks the outer guard relaxation mode for a human-approved command running outside the sandbox.
+ * Only a single static, fully understood command that asks for local `git-setup` OR `launch-app`
+ * receives the corresponding single-purpose unlock; compound, dynamic or global-config commands
+ * stay in `"default"`.
+ */
+export function classifyGuardMode(command: string): GuardMode {
+	const parsed = parseShell(command);
+	if (!parsed.understood || parsed.segments.length !== 1) return "default";
+	const segment = parsed.segments[0];
+	if (!segment || segment.dynamic) return "default";
+	const inner = unwrap(segment.argv);
+	if (!inner.understood || inner.commands.length !== 1) return "default";
+	const argv = inner.commands[0] ?? [];
+	const reason = mustConfirmReason(argv);
+	if (reason === "git-setup") {
+		// Global/system/arbitrary-file git config must never relax the outer guard.
+		if (
+			argv.some(
+				(arg) =>
+					arg === "--global" ||
+					arg === "--system" ||
+					arg === "--file" ||
+					arg === "-f" ||
+					arg.startsWith("--file="),
+			)
+		) {
+			return "default";
+		}
+		return "git-setup";
+	}
+	if (reason === "launch-app") return "launch-app";
+	return "default";
+}
+
+const SSH_VALUE_FLAGS = new Set([
+	"-b",
+	"-c",
+	"-D",
+	"-E",
+	"-e",
+	"-F",
+	"-I",
+	"-i",
+	"-J",
+	"-L",
+	"-l",
+	"-m",
+	"-O",
+	"-o",
+	"-p",
+	"-Q",
+	"-R",
+	"-S",
+	"-W",
+	"-w",
+]);
+
+/**
+ * Extracts a structured target host + remote command summary for SSH/SCP/remote-rsync approval cards
+ * so the person immediately sees which remote machine is touched and what command runs there.
+ */
+export function sshPreview(command: string): string | null {
+	const parsed = parseShell(command);
+	const lines: string[] = [];
+	for (const segment of parsed.segments) {
+		const inner = unwrap(segment.argv);
+		for (const argv of inner.commands) {
+			const name = basename(argv[0] ?? "");
+			const args = argv.slice(1);
+			if (name === "ssh") {
+				let port: string | null = null;
+				let user: string | null = null;
+				let index = 0;
+				while (index < args.length && (args[index] as string).startsWith("-")) {
+					const flag = args[index] as string;
+					if (flag === "--") {
+						index++;
+						break;
+					}
+					if (flag === "-p") port = args[index + 1] ?? null;
+					if (flag === "-l") user = args[index + 1] ?? null;
+					if (SSH_VALUE_FLAGS.has(flag)) index += 2;
+					else index += 1;
+				}
+				const target = args[index];
+				if (!target) continue;
+				const fullTarget = user && !target.includes("@") ? `${user}@${target}` : target;
+				const remote = args
+					.slice(index + 1)
+					.join(" ")
+					.trim();
+				const head = port ? `SSH → ${fullTarget} (port ${port})` : `SSH → ${fullTarget}`;
+				lines.push(remote ? `${head}\nRemote command: ${remote}` : head);
+			} else if (
+				name === "scp" ||
+				(name === "rsync" && args.some((a) => /^[^/]*:/.test(a) && !a.startsWith("-")))
+			) {
+				const endpoints = args.filter((arg) => !arg.startsWith("-"));
+				if (endpoints.length >= 2) {
+					const dst = endpoints[endpoints.length - 1];
+					const src = endpoints.slice(0, -1).join(", ");
+					lines.push(`${name.toUpperCase()} → ${src} ⇒ ${dst}`);
+				}
+			}
+		}
+	}
+	return lines.length > 0 ? lines.join("\n") : null;
 }
 
 const READ_ONLY = new Set([

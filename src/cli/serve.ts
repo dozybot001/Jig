@@ -198,7 +198,7 @@ export function serveCommand(): Command {
 							root: sandbox.sandboxRoot(homedir(), process.platform, io.env as NodeJS.ProcessEnv),
 						},
 						() => ({
-							sites: providerSites,
+							sites: [...providerSites, ...store.getSetting<string[]>("sandboxAllowedDomains", [])],
 							credentials: store.getSetting("sandboxCredentials", false),
 							hidden: store.getSetting<string[]>("hiddenFolders", []),
 						}),
@@ -287,6 +287,7 @@ export function serveCommand(): Command {
 				tools: () => [...ALL_TOOLS, ...extraTools, ...mcp.tools()],
 				userHome: homedir(),
 			});
+			agents.attachments.pruneOrphans();
 			const { RemoteAccess } = await import("../remote/access.ts");
 			// A paired phone's requests run in-process against the same app, as that device.
 			let handle: ((request: Request, device: string) => Promise<Response>) | null = null;

@@ -192,6 +192,24 @@ export class PermissionEngine {
 		return strongest(effects);
 	}
 
+	/** Folders this session may change without asking: its working folder plus writable extraDirs. */
+	#writableDirs(session: Session): string[] {
+		const dirs: string[] = [];
+		if (session.cwd) dirs.push(session.cwd);
+		for (const extra of session.options.extraDirs ?? []) {
+			if (extra.access === "write") dirs.push(extra.path);
+		}
+		return dirs;
+	}
+
+	/** Folders this session may read without asking: its working folder plus all extraDirs. */
+	#readableDirs(session: Session): string[] {
+		const dirs: string[] = [];
+		if (session.cwd) dirs.push(session.cwd);
+		for (const extra of session.options.extraDirs ?? []) dirs.push(extra.path);
+		return dirs;
+	}
+
 	#files(
 		subject: Extract<Subject, { kind: "read" | "write" }>,
 		session: Session,
@@ -219,7 +237,8 @@ export class PermissionEngine {
 		if (effects.includes("deny")) {
 			return { effect: "deny", reason: "A rule in this session refuses this." };
 		}
-		const outside = subject.paths.filter((path) => !cwd || !isInside(path, cwd));
+		const writable = this.#writableDirs(session);
+		const outside = subject.paths.filter((path) => !writable.some((dir) => isInside(path, dir)));
 
 		if (subject.kind === "write") {
 			if (outside.length > 0) {
@@ -233,12 +252,9 @@ export class PermissionEngine {
 		}
 
 		if (effects.includes("ask")) return this.#byRule(subject.tool, subject.summary);
-		const roots = this.readRoots();
+		const roots = [...this.#readableDirs(session), ...this.readRoots()];
 		const needed = subject.paths.filter(
-			(path, index) =>
-				effects[index] !== "allow" &&
-				(!cwd || !isInside(path, cwd)) &&
-				!roots.some((root) => isInside(path, root)),
+			(path, index) => effects[index] !== "allow" && !roots.some((root) => isInside(path, root)),
 		);
 		if (needed.length === 0) return { effect: "allow" };
 		// Remember the folder: allowing ~/memory/a.md once usually means the person trusts ~/memory.
@@ -284,12 +300,15 @@ export class PermissionEngine {
 			understood &&= inner.understood;
 		}
 
+		const writable = this.#writableDirs(session);
+		const readable = this.#readableDirs(session);
 		const reasons = new Set<ConfirmReason>();
 		for (const argv of commands) {
 			const reason = mustConfirmReason(argv);
-			// Deleting outside the working folder cannot be undone with git: the person decides.
-			if (reason === "delete-files" && !this.#allInside(argv, cwd)) reasons.add("delete-outside");
-			else if (reason) reasons.add(reason);
+			// Deleting outside the working folder (or writable extraDirs) cannot be undone with git: the person decides.
+			if (reason === "delete-files" && !this.#allInside(argv, cwd, writable)) {
+				reasons.add("delete-outside");
+			} else if (reason) reasons.add(reason);
 			// File tools cannot touch these places at all; a command that names one asks.
 			for (const arg of pathArguments(argv)) {
 				const path = resolvePath(arg, cwd);
@@ -303,7 +322,7 @@ export class PermissionEngine {
 			const path = resolvePath(target, cwd);
 			const kind = path === null ? null : this.#placeOf(path);
 			if (kind === "yew-data" || kind === "hidden-folder") reasons.add(kind);
-			else if (!path || !cwd || !isInside(path, cwd)) reasons.add("write-outside");
+			else if (!path || !writable.some((dir) => isInside(path, dir))) reasons.add("write-outside");
 			else if (kind) reasons.add("write-credentials");
 		}
 
@@ -322,7 +341,7 @@ export class PermissionEngine {
 			const rule = ruleFor(argv);
 			if (rule === "ask") ruleAsks = true;
 			if (rule === "allow") continue;
-			if (rule === null && this.#readOnlyHere(argv, cwd)) continue;
+			if (rule === null && this.#readOnlyHere(argv, cwd, readable)) continue;
 			pending.push(argv);
 		}
 		if (ruleAsks) return this.#byRule(subject.tool, subject.command);
@@ -353,21 +372,25 @@ export class PermissionEngine {
 		return null;
 	}
 
-	/** Whether every path a command names is inside the working folder (`host:path` never is). */
-	#allInside(argv: string[], cwd: string | null): boolean {
-		if (!cwd) return false;
+	/** Whether every path a command names is inside one of `roots` (`host:path` never is). */
+	#allInside(argv: string[], cwd: string | null, roots: string[]): boolean {
+		if (roots.length === 0) return false;
 		return pathArguments(argv).every((arg) => {
 			if (/^[^/]*:/.test(arg)) return false;
 			const path = resolvePath(arg, cwd);
-			return path !== null && isInside(path, cwd);
+			return path !== null && roots.some((dir) => isInside(path, dir));
 		});
 	}
 
-	#readOnlyHere(argv: string[], cwd: string | null): boolean {
-		if (!cwd || !isReadOnly(argv)) return false;
+	#readOnlyHere(argv: string[], cwd: string | null, roots: string[]): boolean {
+		if (roots.length === 0 || !isReadOnly(argv)) return false;
 		return pathArguments(argv).every((arg) => {
 			const path = resolvePath(arg, cwd);
-			return path !== null && isInside(path, cwd) && !isSecretPath(path, this.#offLimits());
+			return (
+				path !== null &&
+				roots.some((dir) => isInside(path, dir)) &&
+				!isSecretPath(path, this.#offLimits())
+			);
 		});
 	}
 

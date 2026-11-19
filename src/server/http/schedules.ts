@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { PERMISSION_MODES, type PermissionMode } from "../../shared/types.ts";
+import { PERMISSION_MODES, type PermissionMode, SCHEDULE_MODES } from "../../shared/types.ts";
 import { type ScheduleFields, type Scheduler, skippedError } from "../schedules.ts";
 import type { Store } from "../store.ts";
 import { idempotent } from "./idempotency.ts";
@@ -14,6 +14,8 @@ function scheduleFields(fields: Fields): ScheduleFields {
 	const cron = optString(fields, "cron", 200);
 	const session = optString(fields, "session", 200);
 	const message = optString(fields, "message", 40_000);
+	const mode = optEnum(fields, "mode", SCHEDULE_MODES);
+	const autoArchive = optBoolean(fields, "autoArchive");
 	const catchUp = optBoolean(fields, "catchUp");
 	const enabled = optBoolean(fields, "enabled");
 	if (name !== undefined) out.name = name;
@@ -21,6 +23,8 @@ function scheduleFields(fields: Fields): ScheduleFields {
 	if (session !== undefined) out.session = session;
 	if (message !== undefined) out.message = message;
 	if (permissionMode !== undefined) out.permissionMode = permissionMode;
+	if (mode !== undefined) out.mode = mode;
+	if (autoArchive !== undefined) out.autoArchive = autoArchive;
 	if (catchUp !== undefined) out.catchUp = catchUp;
 	if (enabled !== undefined) out.enabled = enabled;
 	return out;

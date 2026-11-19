@@ -22,15 +22,47 @@ struct Page<Item: Decodable & Sendable>: Decodable, Sendable {
 	let nextCursor: String?
 }
 
+struct AttachmentRef: Decodable, Identifiable, Hashable, Sendable {
+	let id: String
+	let name: String
+	let mimeType: String
+	let kind: String
+	let size: Int
+	let width: Int?
+	let height: Int?
+	let pages: Int?
+}
+
+struct AttachmentPayload: Decodable, Sendable {
+	let id: String
+	let name: String
+	let mimeType: String
+	let size: Int
+	let data: String
+}
+
+struct PermissionNote: Decodable, Hashable, Sendable {
+	let reviewed: String?
+	let risk: [String]?
+}
+
+struct ToolCallItem: Decodable, Identifiable, Sendable {
+	let id: String
+	let messageId: String
+	let tool: String
+	let note: PermissionNote?
+}
+
 struct Transcript: Decodable, Sendable {
 	let session: SessionSummary
 	let entries: [Entry]
+	let toolCalls: [ToolCallItem]?
 }
 
 /// One entry of a session's record, reduced to what a phone shows: who spoke, the text, the tools an
-/// answer used, and the letter a message came in.
+/// answer used, attachments, context-renew boundaries, and the letter a message came in.
 struct Entry: Decodable, Identifiable, Sendable {
-	enum Kind: Sendable { case user, assistant, notice, other }
+	enum Kind: Sendable { case user, assistant, notice, renew, other }
 
 	let id: String
 	let seq: Int
@@ -40,14 +72,17 @@ struct Entry: Decodable, Identifiable, Sendable {
 	let tools: [String]
 	/// The letter this message delivered, when it came from another session.
 	let letter: LetterRef?
+	/// Files or images attached to a user message.
+	let attachments: [AttachmentRef]
 
-	private enum Keys: String, CodingKey { case id, seq, role, message, notice, letter }
+	private enum Keys: String, CodingKey { case id, seq, role, message, notice, letter, attachments, compaction }
 
 	init(from decoder: Decoder) throws {
 		let container = try decoder.container(keyedBy: Keys.self)
 		id = try container.decode(String.self, forKey: .id)
 		seq = try container.decodeIfPresent(Int.self, forKey: .seq) ?? 0
 		letter = try? container.decodeIfPresent(LetterRef.self, forKey: .letter)
+		attachments = (try? container.decodeIfPresent([AttachmentRef].self, forKey: .attachments)) ?? []
 		switch try container.decode(String.self, forKey: .role) {
 		case "user":
 			kind = .user
@@ -58,9 +93,24 @@ struct Entry: Decodable, Identifiable, Sendable {
 			let message = try container.decode(MessageText.self, forKey: .message)
 			text = message.text
 			tools = message.tools
+		case "compaction":
+			if let rec = try? container.decode(CompactionRecord.self, forKey: .compaction), rec.kind == "renew" {
+				kind = .renew
+				text = rec.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+			} else {
+				kind = .other
+				text = ""
+			}
+			tools = []
 		case "notice":
-			kind = .notice
-			text = (try? container.decode(Notice.self, forKey: .notice))?.text ?? ""
+			let notice = try? container.decode(Notice.self, forKey: .notice)
+			if notice?.kind == "renewed" {
+				kind = .other
+				text = ""
+			} else {
+				kind = .notice
+				text = notice?.text ?? ""
+			}
 			tools = []
 		default:
 			kind = .other
@@ -70,7 +120,13 @@ struct Entry: Decodable, Identifiable, Sendable {
 	}
 
 	private struct Notice: Decodable {
+		let kind: String?
 		let text: String?
+	}
+
+	private struct CompactionRecord: Decodable {
+		let kind: String?
+		let summary: String
 	}
 }
 
@@ -159,11 +215,44 @@ struct ApprovalItem: Decodable, Identifiable, Sendable {
 	let createdAt: Double
 	let request: Request
 
+	struct RunningItem: Decodable, Hashable, Sendable {
+		let kind: String
+		let text: String
+	}
+
+	struct ChangeStepItem: Decodable, Hashable, Sendable {
+		let action: String
+		let name: String?
+		let session: String?
+		let from: String?
+		let to: String?
+		let team: String?
+		let right: String?
+		let on: Bool?
+
+		var label: String {
+			let target = session ?? name ?? team ?? ""
+			if let from, let to {
+				return target.isEmpty ? "\(action): \(from) → \(to)" : "\(action) \(target): \(from) → \(to)"
+			}
+			if let right, let on {
+				return "\(action) \(target) (\(right): \(on ? "on" : "off"))"
+			}
+			return target.isEmpty ? action : "\(action): \(target)"
+		}
+	}
+
 	struct Request: Decodable, Sendable {
 		let tool: String?
 		let summary: String?
 		let description: String?
 		let mustConfirm: Bool?
+		let matter: Bool?
+		let review: String?
+		let warning: String?
+		let diff: String?
+		let running: [RunningItem]?
+		let changes: [ChangeStepItem]?
 		let reasons: [String]?
 		let rememberRules: [Rule]?
 		let questions: [Question]?

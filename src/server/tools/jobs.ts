@@ -25,6 +25,8 @@ export class Jobs {
 		sessionId: string;
 		logDir: string;
 		outsideSandbox?: boolean;
+		writableDirs?: string[];
+		allowedSites?: string[];
 	}): Promise<Job> {
 		const id = `job-${this.#next++}`;
 		const running = await startCommand({ ...options, background: true });

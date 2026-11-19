@@ -2,6 +2,7 @@ import { rmSync } from "node:fs";
 import { join } from "node:path";
 import {
 	type AssistantMessage,
+	type AttachmentRef,
 	type EntryBody,
 	type JsonObject,
 	messageText,
@@ -25,6 +26,7 @@ import {
 	type SessionStatus,
 	type ToolCallView,
 } from "../../shared/types.ts";
+import { AttachmentStore } from "../attachments.ts";
 import {
 	type BudgetMark,
 	crossedWarning,
@@ -58,8 +60,8 @@ import {
 import { ContextKeeper, notice } from "./compaction.ts";
 import {
 	hookNote,
+	prepareModelMessages,
 	sanitizeInterrupted,
-	toModelMessages,
 	usageTotals,
 	YEW_NOTE,
 } from "./context.ts";
@@ -134,6 +136,8 @@ export interface AgentsOptions {
 	maxSteps?: number;
 	/** The person's hooks (hooks.ts); none when not given. */
 	hooks?: Hooks;
+	/** Per-session message attachments; one is made when not given. */
+	attachments?: AttachmentStore;
 }
 
 /** How many times the Stop hooks may send a session back to work in one turn. */
@@ -159,9 +163,10 @@ const RESTARTED =
 const clip = (text: string, max: number) =>
 	[...text].length > max ? `${[...text].slice(0, max - 1).join("")}…` : text;
 
-const userEntry = (text: string): EntryBody => ({
+const userEntry = (text: string, attachments?: AttachmentRef[]): EntryBody => ({
 	role: "user",
 	message: { role: "user", content: text, timestamp: Date.now() },
+	...(attachments && attachments.length > 0 ? { attachments } : {}),
 });
 
 /** Tokens the next request starts from: everything sent plus what the model just wrote. */
@@ -222,6 +227,8 @@ export class Agents {
 	readonly post: PostOffice;
 	/** Scheduled tasks, whose runs end in this runner. */
 	readonly schedules: ScheduleBook;
+	/** Per-session message attachments. */
+	readonly attachments: AttachmentStore;
 	readonly #mail: Mailroom;
 	/** Each working session's latest written reply in this turn. */
 	readonly #lastText = new Map<string, string>();
@@ -252,7 +259,19 @@ export class Agents {
 		this.#home = options.home;
 		this.#version = options.version;
 		const tools = options.tools ?? ALL_TOOLS;
-		this.#allTools = typeof tools === "function" ? tools : () => tools;
+		this.attachments = options.attachments ?? new AttachmentStore(options.store, options.home);
+		const readAttachment = this.attachments.readTool();
+		this.#allTools = () => {
+			const list = typeof tools === "function" ? tools() : tools;
+			return list.some((tool) => tool.name === readAttachment.name)
+				? list
+				: [...list, readAttachment];
+		};
+		this.#store.setAttachmentHooks({
+			onCopied: (fromId, toId, entryIds) => this.attachments.copyForSession(fromId, toId, entryIds),
+			onRewound: (sessionId, entryIds) => this.attachments.deleteForEntries(sessionId, entryIds),
+			onQueuedRemoved: (sessionId, ids) => this.attachments.deletePending(sessionId, ids),
+		});
 		this.#log = options.log ?? ((line) => process.stderr.write(`${line}\n`));
 		this.#draftInterval = options.draftIntervalMs ?? 50;
 		this.post = options.post ?? new PostOffice(options.store, this.#log);
@@ -290,6 +309,7 @@ export class Agents {
 		this.#manager = new Manager({
 			store: this.#store,
 			schedules: this.schedules,
+			home: this.#home,
 			mainId: () => this.post.mainSessionId(),
 			modelExists: (provider, model) => Boolean(this.#gateway.model(provider, model)),
 			onArchived: (id) => this.archived(id),
@@ -299,6 +319,10 @@ export class Agents {
 	/** What tools may look up while Yew checks a call of `session`. */
 	#lookup(session: Session): Lookup {
 		return { name: this.#names, plan: (args) => this.#manager.plan(session, args) };
+	}
+
+	get home(): string {
+		return this.#home;
 	}
 
 	isRunning(sessionId: string): boolean {
@@ -325,24 +349,44 @@ export class Agents {
 	}
 
 	/** The person sends a message: it starts a turn, or waits in the queue while one runs (blueprint 7.1). */
-	send(sessionId: string, text: string): { entry: Entry } | { queued: QueuedMessage } {
+	send(
+		sessionId: string,
+		text: string,
+		attachmentIds: string[] = [],
+	): { entry: Entry } | { queued: QueuedMessage } {
 		const trimmed = text.trim();
-		if (!trimmed) throw invalid("The message is empty.", "text");
+		if (!trimmed && attachmentIds.length === 0) throw invalid("The message is empty.", "text");
 		if (text.length > MAX_MESSAGE_CHARS) throw invalid("The message is too long.", "text");
 		const session = this.#store.getSession(sessionId);
 		if (session.archivedAt !== null)
 			throw conflict("This session is archived. Restore it first.", undefined, "session-archived");
+		const attachments =
+			attachmentIds.length > 0 ? this.attachments.verifyPending(sessionId, attachmentIds) : [];
 		// The person stepped in: a full quota of letters again, and a new chain of hand-offs (blueprint 7.1).
 		this.#dropReplyQuestions(sessionId);
 		this.#held.resume(sessionId);
 		this.#store.resetLettersSent(sessionId);
 		this.#store.addIntervention(sessionId);
 		this.post.resetChain(sessionId);
-		if (this.isRunning(sessionId)) return { queued: this.#store.enqueue(sessionId, text) };
+		if (this.isRunning(sessionId)) {
+			return { queued: this.#store.enqueue(sessionId, text, attachments) };
+		}
 		this.#dropLeftovers(sessionId, "Not run: the person sent a new message instead of continuing.");
-		const entry = this.#store.appendEntry(sessionId, userEntry(text));
-		this.#prompted(sessionId, [text]);
-		this.#start(sessionId, { byPerson: true });
+		const entry = this.#store.tx(() => {
+			const created = this.#store.appendEntry(sessionId, userEntry(text, attachments));
+			if (attachments.length > 0) {
+				this.attachments.bindToEntry(
+					sessionId,
+					attachments.map((item) => item.id),
+					created.id,
+				);
+			}
+			return created;
+		});
+		const hookPrompt = trimmed || attachments.map((item) => `[Attached: ${item.name}]`).join(", ");
+		this.#prompted(sessionId, [hookPrompt]);
+		const originEntryId = sessionId === this.post.mainSessionId() ? entry.id : null;
+		this.#start(sessionId, { byPerson: true, originEntryId });
 		return { entry };
 	}
 
@@ -444,6 +488,46 @@ export class Agents {
 	}
 
 	/**
+	 * Starts a fresh context window in place for a session (blueprint 6.12, item 50); the session must
+	 * not be working. Full history stays searchable and scrollable; only the active model window resets.
+	 */
+	async renewNow(sessionId: string, summarize = true): Promise<"done" | "nothing" | "failed"> {
+		if (this.isRunning(sessionId)) {
+			throw conflict("Wait until the session stops working.", undefined, "session-busy");
+		}
+		const session = this.#store.getSession(sessionId);
+		const model = summarize
+			? this.#requireModel(session)
+			: (this.#gateway.model(session.provider, session.model) ?? null);
+		const keep = session.status === "needs_review" || session.status === "error";
+		const openRequests = this.post.mail.openRequests(sessionId);
+		const openNote =
+			openRequests.length > 0
+				? `Open requests from other sessions still awaiting your reply:\n${openRequests
+						.map((req) => `- From "${req.fromName}": ${req.summary}`)
+						.join("\n")}`
+				: null;
+		const controller = new AbortController();
+		let outcome: "done" | "nothing" | "failed" = "nothing";
+		const done = this.#context
+			.renew(session, model, controller.signal, summarize, openNote)
+			.then((res) => {
+				outcome = res;
+			});
+		this.#live.set(sessionId, { controller, done, waiters: new Map() });
+		try {
+			this.#store.setStatus(sessionId, "working");
+			await done;
+			return outcome;
+		} finally {
+			this.#live.delete(sessionId);
+			if (keep) this.#store.setStatus(sessionId, session.status, session.statusDetail);
+			else this.#store.setStatus(sessionId, "idle");
+			this.#wake(sessionId);
+		}
+	}
+
+	/**
 	 * The person archived a session. Letters waiting for it are dropped, so they do not linger or arrive
 	 * when it is restored, and sessions waiting on one of them stop waiting.
 	 */
@@ -464,6 +548,7 @@ export class Agents {
 			rmSync(join(this.#home, "tmp", id), { recursive: true, force: true });
 			// Its artifacts' rows went with the session; their files go too.
 			rmSync(join(this.#home, "artifacts", id), { recursive: true, force: true });
+			this.attachments.deleteSessionFolder(id);
 			this.#readStates.delete(id);
 			this.#jobs.get(id)?.stopAll();
 			this.#jobs.delete(id);
@@ -487,12 +572,15 @@ export class Agents {
 		for (const jobs of this.#jobs.values()) jobs.stopAll();
 	}
 
-	#start(sessionId: string, options: { resume?: boolean; byPerson?: boolean } = {}): void {
+	#start(
+		sessionId: string,
+		options: { resume?: boolean; byPerson?: boolean; originEntryId?: string | null } = {},
+	): void {
 		const controller = new AbortController();
 		const live: Live = { controller, done: Promise.resolve(), waiters: new Map() };
 		this.#live.set(sessionId, live);
 		this.#lastText.delete(sessionId);
-		this.#mail.begin(sessionId, options.byPerson ?? false);
+		this.#mail.begin(sessionId, options.byPerson ?? false, options.originEntryId ?? null);
 		live.done = this.#run(sessionId, live, options.resume ?? false)
 			.catch((error: unknown) =>
 				this.#log(`session ${sessionId}: ${(error as Error).stack ?? error}`),
@@ -749,10 +837,16 @@ export class Agents {
 		const entries = this.#store.contextEntries(sessionId);
 		const asked = entries.find((entry) => entry.role === "user");
 		const replied = entries.find((entry) => entry.role === "assistant");
-		const textOf = (entry: Entry | undefined) =>
-			entry && (entry.role === "user" || entry.role === "assistant")
-				? messageText(entry.message).trim()
-				: "";
+		const textOf = (entry: Entry | undefined) => {
+			if (!entry) return "";
+			if (entry.role === "user") {
+				const raw = messageText(entry.message).trim();
+				if (raw) return raw;
+				return (entry.attachments ?? []).map((item) => item.name).join(", ");
+			}
+			if (entry.role === "assistant") return messageText(entry.message).trim();
+			return "";
+		};
 		const first = clip(textOf(asked), 2000);
 		if (!first) return;
 		const reply = await this.#gateway.stream({
@@ -816,13 +910,18 @@ export class Agents {
 			if (latest) this.#store.live(session.id, { type: "draft", draft: structuredClone(latest) });
 		};
 		try {
+			const messages = await prepareModelMessages(this.#store.contextEntries(session.id), (entry) =>
+				this.attachments.hydrateUserMessage(entry, {
+					acceptsImages: model.input.includes("image"),
+				}),
+			);
 			return await this.#gateway.stream(
 				{
 					provider: session.provider,
 					model: model.id,
 					thinking: session.thinking,
 					systemPrompt: systemPrompt(session, snapshot, this.#groupName(session)),
-					messages: toModelMessages(this.#store.contextEntries(session.id)),
+					messages,
 					tools: specs(tools),
 					signal,
 					sessionId: session.id,
@@ -899,6 +998,32 @@ export class Agents {
 				continue;
 			}
 			const session = this.#store.getSession(sessionId);
+			const activeRun = this.#mail.run(sessionId);
+			// Scheduled unattended runs can never self-escalate by modifying schedules or widening permissions (even in skip mode).
+			if (activeRun?.unattended && row.tool === "manage_yew") {
+				let blockedReason: string | null = null;
+				if (Array.isArray((row.args as { schedules?: unknown }).schedules)) {
+					blockedReason = "Scheduled unattended runs cannot create or modify scheduled tasks.";
+				} else {
+					try {
+						if (this.#manager.plan(session, row.args).tier === "widen") {
+							blockedReason =
+								"Scheduled unattended runs cannot widen permissions or runtime boundaries.";
+						}
+					} catch {
+						// Invalid arguments will be caught normally below.
+					}
+				}
+				if (blockedReason) {
+					activeRun.refused.push(blockedReason);
+					results.set(row.id, {
+						result: { ...failure(`Refused: ${blockedReason}`), detail: { code: "unattended" } },
+						status: "denied",
+						started,
+					});
+					continue;
+				}
+			}
 			// The person's PreToolUse hooks can stop a call before anything else (hooks.ts).
 			if (this.#hooks?.has("PreToolUse", row.tool)) {
 				const before = await this.#hook("PreToolUse", sessionId, {}, row.tool, row.args);
@@ -996,6 +1121,8 @@ export class Agents {
 						rules: [...current.rules, ...decision.request.rememberRules],
 					});
 				}
+				// Clear "waiting" immediately once approved so the UI never keeps showing "Needs your permission".
+				this.#store.updateToolCall(row.id, { status: "pending" });
 			}
 			approved.push({ row, tool });
 		}
@@ -1046,8 +1173,19 @@ export class Agents {
 			}
 			results.set(row.id, { result, status: result.isError ? "error" : "done", started });
 		};
-		if (approved.every(({ tool }) => tool.readOnly)) await Promise.all(approved.map(execute));
-		else for (const call of approved) await execute(call);
+		// Run contiguous read-only calls concurrently while preserving exact order around mutating calls.
+		for (let i = 0; i < approved.length; ) {
+			const currentCall = approved[i];
+			if (!currentCall) break;
+			if (!currentCall.tool.readOnly) {
+				await execute(currentCall);
+				i++;
+				continue;
+			}
+			const start = i;
+			while (i < approved.length && approved[i]?.tool.readOnly) i++;
+			await Promise.all(approved.slice(start, i).map(execute));
+		}
 
 		// Results go into the transcript in the order the model made the calls.
 		this.#store.tx(() => {
@@ -1324,6 +1462,18 @@ export class Agents {
 					if (!live.controller.signal.aborted) {
 						this.#store.updateToolCall(row.id, { status: "running" });
 					}
+					if (answer?.decision === "allow_always" && request.rememberRules) {
+						const newDomains = request.rememberRules
+							.filter((rule) => rule.tool === "sandbox_site" && rule.pattern)
+							.map((rule) => rule.pattern as string);
+						if (newDomains.length > 0) {
+							const current = this.#store.getSession(sessionId);
+							const merged = [
+								...new Set([...(current.options.allowedDomains ?? []), ...newDomains]),
+							];
+							this.#store.updateSession(sessionId, { options: { allowedDomains: merged } });
+						}
+					}
 					return answer?.decision === "allow_once" || answer?.decision === "allow_always";
 				});
 				permits = next.catch(() => false);
@@ -1369,7 +1519,14 @@ export class Agents {
 			canPostCards: this.post.canPostCards(this.#store.getSession(sessionId)),
 			send: (out) => {
 				const session = this.#store.getSession(sessionId);
-				return this.#mail.sent(sessionId, this.post.send({ kind: "session", session }, out));
+				const originEntryId = this.#mail.originOf(sessionId);
+				return this.#mail.sent(
+					sessionId,
+					this.post.send(
+						{ kind: "session", session },
+						{ ...out, ...(originEntryId ? { originEntryId } : {}) },
+					),
+				);
 			},
 			wait: (letter) => this.#mail.awaitReply(sessionId, letter, live.controller.signal, callId),
 			open: (input) => this.#mail.openChild(this.#store.getSession(sessionId), input, callId),
@@ -1568,16 +1725,32 @@ export class Agents {
 			this.#store.appendEntry(sessionId, userEntry(`${YEW_NOTE} ${note}`));
 		}
 		const letters = this.#mail.deliver(sessionId, this.#mail.firstDelivery(sessionId));
-		const delivered = this.#store.deliverQueue(sessionId, userEntry);
+		const delivered = this.#store.deliverQueue(sessionId, userEntry, (entry, refs) => {
+			this.attachments.bindToEntry(
+				sessionId,
+				refs.map((item) => item.id),
+				entry.id,
+			);
+		});
 		this.#prompted(
 			sessionId,
-			delivered.map((entry) => (entry.role === "user" ? messageText(entry.message) : "")),
+			delivered.map((entry) => {
+				if (entry.role !== "user") return "";
+				const raw = messageText(entry.message).trim();
+				return (
+					raw || (entry.attachments ?? []).map((item) => `[Attached: ${item.name}]`).join(", ")
+				);
+			}),
 		);
 		const fromPerson = delivered.length;
 		if (fromPerson > 0) {
 			// What the person wrote starts a new chain of hand-offs, and they are watching now.
 			this.post.resetChain(sessionId);
 			this.#mail.watched(sessionId);
+			const lastEntry = delivered.at(-1);
+			if (lastEntry && sessionId === this.post.mainSessionId()) {
+				this.#mail.setOrigin(sessionId, lastEntry.id);
+			}
 		}
 		return letters > 0 || fromPerson > 0 || notes.length > 0;
 	}

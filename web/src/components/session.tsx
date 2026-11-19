@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type DragEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import type { AttachmentRef } from "../../../src/shared/messages.ts";
 import {
 	PERMISSION_MODES,
 	type PermissionMode,
@@ -12,20 +13,34 @@ import {
 	editQueued,
 	freeName,
 	loadModels,
+	removePendingAttachment,
+	renewSession,
 	selectSession,
 	sendMessage,
 	startSession,
 	stopSession,
 	takePrefill,
 	updateSession,
+	uploadAttachment,
 	withdrawQueued,
 } from "../actions.ts";
 import { formatCost, formatNumber, permissionHint, t, useLang } from "../i18n.ts";
 import { type ModelInfo, setState, type TranscriptState, useAppState } from "../state.ts";
+import {
+	ATTACHMENT_ACCEPT,
+	filesFromClipboard,
+	guessAttachmentKind,
+	MAX_STAGED_ATTACHMENTS,
+	QueuedAttachments,
+	type StagedAttachment,
+	StagedAttachmentStrip,
+} from "./attachments.tsx";
+import { ComposerMenu, useComposerMenu } from "./composer-menu.tsx";
 import { Capped } from "./content.tsx";
 import { NewSessionDialog } from "./dialogs.tsx";
 import {
 	ArrowUpIcon,
+	AttachIcon,
 	ChatIcon,
 	CheckIcon,
 	ChevronIcon,
@@ -35,6 +50,7 @@ import {
 	NotesIcon,
 	PlayIcon,
 	RenameIcon,
+	RenewIcon,
 	SlidersIcon,
 	StopIcon,
 	TodoActiveIcon,
@@ -46,7 +62,7 @@ import {
 import { Mascot } from "./mascot.tsx";
 import { ProgressLine } from "./progress.tsx";
 import { Transcript } from "./transcript.tsx";
-import { Button, ErrorBox, Select, useAction } from "./ui.tsx";
+import { Button, Dialog, describeError, ErrorBox, Select, useAction } from "./ui.tsx";
 import { useWorkspaces, WorkspacePicker, workspaceLabel } from "./workspaces.tsx";
 
 export function useModels(provider: string): ModelInfo[] {
@@ -283,7 +299,17 @@ function useAutoGrow(value: string) {
 	return ref;
 }
 
-function QueuedItem({ sessionId, id, text }: { sessionId: string; id: string; text: string }) {
+function QueuedItem({
+	sessionId,
+	id,
+	text,
+	attachments,
+}: {
+	sessionId: string;
+	id: string;
+	text: string;
+	attachments?: AttachmentRef[];
+}) {
 	const [editing, setEditing] = useState(false);
 	const [value, setValue] = useState(text);
 	const save = useAction(async () => {
@@ -294,17 +320,20 @@ function QueuedItem({ sessionId, id, text }: { sessionId: string; id: string; te
 	const ref = useAutoGrow(value);
 	return (
 		<div className="queued-item">
-			{editing ? (
-				<textarea
-					ref={ref}
-					className="textarea"
-					value={value}
-					aria-label={t("edit")}
-					onChange={(e) => setValue(e.target.value)}
-				/>
-			) : (
-				<span>{text}</span>
-			)}
+			<div className="queued-body">
+				{editing ? (
+					<textarea
+						ref={ref}
+						className="textarea"
+						value={value}
+						aria-label={t("edit")}
+						onChange={(e) => setValue(e.target.value)}
+					/>
+				) : text ? (
+					<span>{text}</span>
+				) : null}
+				{attachments && attachments.length > 0 && <QueuedAttachments attachments={attachments} />}
+			</div>
 			{editing ? (
 				<Button busy={save.busy} onClick={() => void save.run()}>
 					<CheckIcon />
@@ -329,6 +358,26 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 	useLang();
 	const sandboxed = useAppState((state) => (state.health?.sandbox ?? "none") !== "none");
 	const [text, setText] = useState("");
+	const [staged, setStaged] = useState<StagedAttachment[]>([]);
+	const [dragging, setDragging] = useState(false);
+	const fileInput = useRef<HTMLInputElement>(null);
+	const stagedRef = useRef<StagedAttachment[]>([]);
+	stagedRef.current = staged;
+
+	// Clear staged attachments and object URLs when switching sessions or unmounting.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: reset staged attachments per session id
+	useEffect(() => {
+		setStaged((current) => {
+			for (const item of current) if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+			return [];
+		});
+		return () => {
+			for (const item of stagedRef.current) {
+				if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+			}
+		};
+	}, [session.id]);
+
 	// A message taken back or forked from comes back here to be changed and sent again.
 	const waiting = useAppState((state) => state.prefill[session.id]);
 	useEffect(() => {
@@ -341,44 +390,200 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 	const change = useAction((patch: Parameters<typeof updateSession>[1]) =>
 		updateSession(session.id, patch),
 	);
+
+	const addFiles = (list: FileList | File[]) => {
+		const files = Array.from(list);
+		if (files.length === 0) return;
+		const room = Math.max(0, MAX_STAGED_ATTACHMENTS - stagedRef.current.length);
+		const picked = files.slice(0, room);
+		const targetSession = session.id;
+		for (const file of picked) {
+			const key = crypto.randomUUID();
+			const kind = guessAttachmentKind(file);
+			const previewUrl = kind === "image" ? URL.createObjectURL(file) : undefined;
+			const entry: StagedAttachment = {
+				key,
+				name: file.name || "attachment",
+				kind,
+				size: file.size,
+				...(previewUrl ? { previewUrl } : {}),
+				uploading: true,
+			};
+			setStaged((current) => [...current, entry]);
+			void uploadAttachment(targetSession, file)
+				.then((uploaded) => {
+					setStaged((current) =>
+						current.map((item) =>
+							item.key === key
+								? {
+										...item,
+										name: uploaded.name,
+										kind: uploaded.kind,
+										size: uploaded.size,
+										pages: uploaded.pages ?? null,
+										ref: uploaded,
+										uploading: false,
+									}
+								: item,
+						),
+					);
+				})
+				.catch((error: unknown) => {
+					setStaged((current) =>
+						current.map((item) =>
+							item.key === key ? { ...item, uploading: false, error: describeError(error) } : item,
+						),
+					);
+				});
+		}
+	};
+
+	const removeStaged = (key: string) => {
+		const found = stagedRef.current.find((item) => item.key === key);
+		if (found?.previewUrl) URL.revokeObjectURL(found.previewUrl);
+		if (found?.ref) void removePendingAttachment(session.id, found.ref.id).catch(() => {});
+		setStaged((current) => current.filter((item) => item.key !== key));
+	};
+
+	const uploading = staged.some((item) => item.uploading);
+	const readyRefs = staged
+		.filter((item) => item.ref && !item.uploading && !item.error)
+		.map((item) => item.ref as AttachmentRef);
+	const canSend = !uploading && (Boolean(text.trim()) || readyRefs.length > 0);
+
 	const send = useAction(async () => {
+		if (!canSend) return;
 		const value = text;
-		if (!value.trim()) return;
-		await sendMessage(session.id, value);
+		const ids = readyRefs.map((item) => item.id);
+		await sendMessage(session.id, value, ids);
+		for (const item of stagedRef.current) {
+			if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+		}
+		setStaged([]);
 		setText("");
 	});
 	const stop = useAction(() => stopSession(session.id));
 	const cont = useAction(() => continueSession(session.id));
 	const compact = useAction(() => compactSession(session.id));
+	const [renewOpen, setRenewOpen] = useState(false);
+	const renew = useAction(async (summarize: boolean) => {
+		await renewSession(session.id, summarize);
+		setRenewOpen(false);
+	});
+	const [caret, setCaret] = useState(0);
+	const hasFolders = Boolean(session.cwd) || (session.options.extraDirs?.length ?? 0) > 0;
+	const menu = useComposerMenu({
+		sessionId: session.id,
+		hasFolders,
+		working,
+		hasContext: session.contextTokens > 0,
+		text,
+		caret,
+		setText,
+		setCaret,
+		textareaRef: ref,
+		onCommand: (command) => {
+			if (command === "compact") void compact.run();
+			else if (command === "renew") setRenewOpen(true);
+		},
+	});
 	const models = useModels(session.provider);
 	const info = models.find((m) => m.id === session.model);
+	const hasStagedImage = staged.some((item) => item.kind === "image" && !item.error);
+	const visionWarning = hasStagedImage && Boolean(info && !info.input.includes("image"));
 
 	// A workspace makes it a code session, none makes it a chat; the switch applies from the next turn.
 	const switchFolder = useAction(async (cwd: string | null) => {
 		await updateSession(session.id, { cwd });
 	});
 	const sendLabel = working ? t("queueSend") : t("send");
+
+	const onDragOver = (event: DragEvent) => {
+		if (!event.dataTransfer.types.includes("Files")) return;
+		event.preventDefault();
+		event.dataTransfer.dropEffect = "copy";
+		if (!dragging) setDragging(true);
+	};
+	const onDragLeave = (event: DragEvent) => {
+		if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+		setDragging(false);
+	};
+	const onDrop = (event: DragEvent) => {
+		event.preventDefault();
+		setDragging(false);
+		if (event.dataTransfer.files.length > 0) addFiles(event.dataTransfer.files);
+	};
+
 	return (
 		<div className="composer">
 			<div className="composer-inner">
 				{transcript.queue.length > 0 && (
 					<section className="queued" aria-label={t("queuedTitle")}>
 						{transcript.queue.map((item) => (
-							<QueuedItem key={item.id} sessionId={session.id} id={item.id} text={item.text} />
+							<QueuedItem
+								key={item.id}
+								sessionId={session.id}
+								id={item.id}
+								text={item.text}
+								{...(item.attachments ? { attachments: item.attachments } : {})}
+							/>
 						))}
 					</section>
 				)}
-				<div className="composer-box">
+				{/* biome-ignore lint/a11y/noStaticElementInteractions: drop zone wraps the composer input */}
+				<div
+					className={dragging ? "composer-box composer-box-dragging" : "composer-box"}
+					onDragOver={onDragOver}
+					onDragLeave={onDragLeave}
+					onDrop={onDrop}
+				>
+					<ComposerMenu menu={menu} />
+					<input
+						ref={fileInput}
+						type="file"
+						multiple
+						accept={ATTACHMENT_ACCEPT}
+						className="visually-hidden"
+						aria-label={t("attachFile")}
+						onChange={(event) => {
+							if (event.target.files) addFiles(event.target.files);
+							event.target.value = "";
+						}}
+					/>
+					<StagedAttachmentStrip items={staged} onRemove={removeStaged} />
+					{visionWarning && (
+						<p className="hint composer-vision-hint" role="status">
+							{t("attachNoVision")}
+						</p>
+					)}
 					<textarea
 						ref={ref}
 						rows={1}
 						value={text}
 						placeholder={
-							working ? t("composerQueued") : t("composerPlaceholder", { name: session.name })
+							dragging
+								? t("attachHintDrop")
+								: working
+									? t("composerQueued")
+									: t("composerPlaceholder", { name: session.name })
 						}
 						aria-label={t("composerPlaceholder", { name: session.name })}
-						onChange={(event) => setText(event.target.value)}
+						aria-controls={menu.open ? menu.listId : undefined}
+						onChange={(event) => {
+							setText(event.target.value);
+							setCaret(event.target.selectionStart ?? event.target.value.length);
+						}}
+						onSelect={(event) =>
+							setCaret(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
+						}
+						onPaste={(event) => {
+							const files = filesFromClipboard(event);
+							if (files.length === 0) return;
+							if (!event.clipboardData.getData("text/plain")) event.preventDefault();
+							addFiles(files);
+						}}
 						onKeyDown={(event) => {
+							if (menu.onKeyDown(event)) return;
 							if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
 								event.preventDefault();
 								void send.run();
@@ -387,6 +592,15 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 					/>
 					<div className="composer-bar">
 						<div className="composer-chips">
+							<Button
+								variant="icon"
+								aria-label={t("attachFile")}
+								title={t("attachFile")}
+								disabled={staged.length >= MAX_STAGED_ATTACHMENTS}
+								onClick={() => fileInput.current?.click()}
+							>
+								<AttachIcon />
+							</Button>
 							<WorkspacePicker
 								value={session.cwd}
 								busy={switchFolder.busy}
@@ -415,15 +629,26 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 						</div>
 						<div className="composer-actions">
 							{!working && session.contextTokens > 0 && (
-								<Button
-									variant="icon"
-									aria-label={t("compact")}
-									title={t("compact")}
-									busy={compact.busy}
-									onClick={() => void compact.run()}
-								>
-									<CompactIcon />
-								</Button>
+								<>
+									<Button
+										variant="icon"
+										aria-label={t("compact")}
+										title={t("compact")}
+										busy={compact.busy}
+										onClick={() => void compact.run()}
+									>
+										<CompactIcon />
+									</Button>
+									<Button
+										variant="icon"
+										aria-label={t("renewButton")}
+										title={t("renewButton")}
+										busy={renew.busy}
+										onClick={() => setRenewOpen(true)}
+									>
+										<RenewIcon />
+									</Button>
+								</>
 							)}
 							{!working && (
 								<Button
@@ -437,7 +662,7 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 								</Button>
 							)}
 							{info && <ContextPie used={session.contextTokens} total={info.contextWindow} />}
-							{working && !text.trim() ? (
+							{working && !canSend ? (
 								<Button
 									className="send-button"
 									aria-label={t("stop")}
@@ -453,7 +678,7 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 									aria-label={sendLabel}
 									title={sendLabel}
 									busy={send.busy}
-									disabled={!text.trim()}
+									disabled={!canSend}
 									onClick={() => void send.run()}
 								>
 									<ArrowUpIcon />
@@ -462,6 +687,27 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 						</div>
 					</div>
 				</div>
+				{renewOpen && (
+					<Dialog
+						title={t("renewTitle")}
+						size="s"
+						onClose={() => !renew.busy && setRenewOpen(false)}
+					>
+						<p className="confirm-message">{t("renewHint")}</p>
+						<ErrorBox error={renew.error} />
+						<div className="dialog-actions dialog-actions-stack">
+							<Button variant="primary" busy={renew.busy} onClick={() => void renew.run(true)}>
+								{t("renewWithSummary")}
+							</Button>
+							<Button disabled={renew.busy} onClick={() => void renew.run(false)}>
+								{t("renewClean")}
+							</Button>
+							<Button variant="ghost" disabled={renew.busy} onClick={() => setRenewOpen(false)}>
+								{t("cancel")}
+							</Button>
+						</div>
+					</Dialog>
+				)}
 				<ErrorBox
 					error={
 						send.error ??
@@ -469,6 +715,7 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 						change.error ??
 						cont.error ??
 						compact.error ??
+						renew.error ??
 						switchFolder.error
 					}
 				/>
@@ -563,7 +810,31 @@ function HomeView() {
 			},
 	);
 	const [dialog, setDialog] = useState(false);
+	const [staged, setStaged] = useState<StagedAttachment[]>([]);
+	const [dragging, setDragging] = useState(false);
+	const fileInput = useRef<HTMLInputElement>(null);
+	const stagedRef = useRef<StagedAttachment[]>([]);
+	stagedRef.current = staged;
+	useEffect(() => {
+		return () => {
+			for (const item of stagedRef.current) {
+				if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+			}
+		};
+	}, []);
 	const ref = useAutoGrow(text);
+	const [caret, setCaret] = useState(0);
+	const menu = useComposerMenu({
+		sessionId: null,
+		hasFolders: false,
+		working: false,
+		hasContext: false,
+		text,
+		caret,
+		setText,
+		setCaret,
+		textareaRef: ref,
+	});
 	useEffect(() => {
 		ref.current?.focus();
 	}, [ref]);
@@ -574,14 +845,44 @@ function HomeView() {
 		setState({ homeFolder: null });
 		ref.current?.focus();
 	}, [homeFolder, ref]);
+	const addFiles = (list: FileList | File[]) => {
+		const files = Array.from(list);
+		if (files.length === 0) return;
+		const room = Math.max(0, MAX_STAGED_ATTACHMENTS - stagedRef.current.length);
+		const next: StagedAttachment[] = files.slice(0, room).map((file) => {
+			const kind = guessAttachmentKind(file);
+			const previewUrl = kind === "image" ? URL.createObjectURL(file) : undefined;
+			return {
+				key: crypto.randomUUID(),
+				name: file.name || "attachment",
+				kind,
+				size: file.size,
+				file,
+				...(previewUrl ? { previewUrl } : {}),
+			};
+		});
+		if (next.length > 0) setStaged((current) => [...current, ...next]);
+	};
+	const removeStaged = (key: string) => {
+		const found = stagedRef.current.find((item) => item.key === key);
+		if (found?.previewUrl) URL.revokeObjectURL(found.previewUrl);
+		setStaged((current) => current.filter((item) => item.key !== key));
+	};
+	const models = useModels(model.provider);
+	const modelInfo = models.find((m) => m.id === model.model);
+	const hasStagedImage = staged.some((item) => item.kind === "image");
+	const visionWarning = hasStagedImage && Boolean(modelInfo && !modelInfo.input.includes("image"));
 	const role = template === "code" || template === "docs" ? template : null;
 	const missingFolder = role !== null && !folder;
+	const hasInput = Boolean(text.trim()) || staged.length > 0;
 	const start = useAction(async () => {
 		const value = text.trim();
-		if (!value || missingFolder) return;
+		const files = stagedRef.current.map((item) => item.file).filter((f): f is File => Boolean(f));
+		if ((!value && files.length === 0) || missingFolder) return;
+		const seed = value || files[0]?.name || "";
 		await startSession(
 			{
-				name: freeName(nameFrom(value) || t("template_chat")),
+				name: freeName(nameFrom(seed) || t("template_chat")),
 				kind: "task",
 				groupId: null,
 				cwd: folder,
@@ -590,6 +891,7 @@ function HomeView() {
 				autoName: true,
 			},
 			value,
+			files,
 		);
 	});
 	const pickTemplate = (key: TemplateKey) => {
@@ -597,6 +899,21 @@ function HomeView() {
 		setTemplate(next);
 		if (next === "chat") setFolder(null);
 		ref.current?.focus();
+	};
+	const onDragOver = (event: DragEvent) => {
+		if (!event.dataTransfer.types.includes("Files")) return;
+		event.preventDefault();
+		event.dataTransfer.dropEffect = "copy";
+		if (!dragging) setDragging(true);
+	};
+	const onDragLeave = (event: DragEvent) => {
+		if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+		setDragging(false);
+	};
+	const onDrop = (event: DragEvent) => {
+		event.preventDefault();
+		setDragging(false);
+		if (event.dataTransfer.files.length > 0) addFiles(event.dataTransfer.files);
 	};
 	return (
 		<main className="main main-home">
@@ -606,15 +923,54 @@ function HomeView() {
 					<Mascot pose="greeting" height={104} className="home-mascot" />
 					<h1>{t("homeTitle")}</h1>
 				</div>
-				<div className="composer-box">
+				{/* biome-ignore lint/a11y/noStaticElementInteractions: drop zone wraps the home composer input */}
+				<div
+					className={dragging ? "composer-box composer-box-dragging" : "composer-box"}
+					onDragOver={onDragOver}
+					onDragLeave={onDragLeave}
+					onDrop={onDrop}
+				>
+					<ComposerMenu menu={menu} />
+					<input
+						ref={fileInput}
+						type="file"
+						multiple
+						accept={ATTACHMENT_ACCEPT}
+						className="visually-hidden"
+						aria-label={t("attachFile")}
+						onChange={(event) => {
+							if (event.target.files) addFiles(event.target.files);
+							event.target.value = "";
+						}}
+					/>
+					<StagedAttachmentStrip items={staged} onRemove={removeStaged} />
+					{visionWarning && (
+						<p className="hint composer-vision-hint" role="status">
+							{t("attachNoVision")}
+						</p>
+					)}
 					<textarea
 						ref={ref}
 						rows={2}
 						value={text}
-						placeholder={t("homePlaceholder")}
+						placeholder={dragging ? t("attachHintDrop") : t("homePlaceholder")}
 						aria-label={t("homeTitle")}
-						onChange={(event) => setText(event.target.value)}
+						aria-controls={menu.open ? menu.listId : undefined}
+						onChange={(event) => {
+							setText(event.target.value);
+							setCaret(event.target.selectionStart ?? event.target.value.length);
+						}}
+						onSelect={(event) =>
+							setCaret(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
+						}
+						onPaste={(event) => {
+							const files = filesFromClipboard(event);
+							if (files.length === 0) return;
+							if (!event.clipboardData.getData("text/plain")) event.preventDefault();
+							addFiles(files);
+						}}
 						onKeyDown={(event) => {
+							if (menu.onKeyDown(event)) return;
 							if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
 								event.preventDefault();
 								void start.run();
@@ -623,6 +979,15 @@ function HomeView() {
 					/>
 					<div className="composer-bar">
 						<div className="composer-chips">
+							<Button
+								variant="icon"
+								aria-label={t("attachFile")}
+								title={t("attachFile")}
+								disabled={staged.length >= MAX_STAGED_ATTACHMENTS}
+								onClick={() => fileInput.current?.click()}
+							>
+								<AttachIcon />
+							</Button>
 							<WorkspacePicker value={folder} onChange={setFolder} />
 							<ModelPicker {...model} onChange={(patch) => setModel((m) => ({ ...m, ...patch }))} />
 						</div>
@@ -632,7 +997,7 @@ function HomeView() {
 								aria-label={t("send")}
 								title={t("send")}
 								busy={start.busy}
-								disabled={!text.trim() || missingFolder}
+								disabled={!hasInput || missingFolder}
 								onClick={() => void start.run()}
 							>
 								<ArrowUpIcon />

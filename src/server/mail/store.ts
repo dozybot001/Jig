@@ -32,6 +32,7 @@ interface LetterRow {
 	auto: number;
 	decision: number | null;
 	schedule_id: string | null;
+	origin_entry_id: string | null;
 	entry_id: string | null;
 	created_at: number;
 	delivered_at: number | null;
@@ -79,6 +80,7 @@ function toLetter(row: LetterRow): Letter {
 		auto: row.auto === 1,
 		decision: row.decision,
 		scheduleId: row.schedule_id,
+		originEntryId: row.origin_entry_id,
 		createdAt: row.created_at,
 		deliveredAt: row.delivered_at,
 	};
@@ -126,6 +128,7 @@ export interface NewLetter {
 	auto?: boolean;
 	decision?: number | null;
 	scheduleId?: string | null;
+	originEntryId?: string | null;
 }
 
 /** The six points of a decision card (blueprint 6.4), as a session writes them. */
@@ -174,8 +177,8 @@ export class MailStore {
 			const now = Date.now();
 			this.#q(
 				`INSERT INTO letters (id, thread_id, reply_to, from_kind, from_session, from_name, to_session, kind,
-					summary, body, status, status_reason, path, auto, decision, schedule_id, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					summary, body, status, status_reason, path, auto, decision, schedule_id, origin_entry_id, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			).run(
 				id,
 				input.threadId ?? id,
@@ -193,6 +196,7 @@ export class MailStore {
 				input.auto ? 1 : 0,
 				input.decision ?? null,
 				input.scheduleId ?? null,
+				input.originEntryId ?? null,
 				now,
 				now,
 			);
@@ -282,6 +286,39 @@ export class MailStore {
 				AND schedule_id IS NOT NULL ORDER BY created_at, id`,
 		).all(sessionId) as unknown as LetterRow[];
 		return rows.map(toLetter);
+	}
+
+	/**
+	 * Server-stamped main-conversation entry IDs carried by letters delivered to `sessionId`,
+	 * newest first (for authentic human traceability in review mode, blueprint 6.1, item 6).
+	 */
+	recentOriginEntries(sessionId: string, limit = 5): string[] {
+		const rows = this.#q(
+			`SELECT origin_entry_id AS id FROM letters
+				WHERE to_session = ? AND status IN ('delivered', 'done') AND origin_entry_id IS NOT NULL
+				GROUP BY origin_entry_id
+				ORDER BY MAX(created_at) DESC
+				LIMIT ?`,
+		).all(sessionId, limit) as { id: string }[];
+		return rows.map((row) => row.id);
+	}
+
+	/**
+	 * Decided cards directly involving `sessionId` (either requested by it or delivered to it as a
+	 * person-authored decision letter), oldest first among the most recent `limit`.
+	 */
+	decidedCardsForSession(sessionId: string, limit = 5): Card[] {
+		const rows = this.#q(
+			`SELECT * FROM cards WHERE status = 'decided' AND (
+				requested_by = ?
+				OR EXISTS (
+					SELECT 1 FROM letters
+					WHERE to_session = ? AND from_kind = 'person' AND decision = cards.number
+						AND status IN ('delivered', 'done')
+				)
+			) ORDER BY decided_at DESC, number DESC LIMIT ?`,
+		).all(sessionId, sessionId, limit) as unknown as CardRow[];
+		return rows.reverse().map(toCard);
 	}
 
 	/** The request was answered: it is done. */

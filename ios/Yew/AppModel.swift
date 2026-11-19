@@ -290,13 +290,54 @@ final class AppModel {
 		return result
 	}
 
-	func send(_ text: String, to sessionId: String) async -> Bool {
+	private struct SendBody: Encodable, Sendable {
+		let text: String
+		let attachments: [String]?
+	}
+
+	private struct UploadAttachmentBody: Encodable, Sendable {
+		let name: String
+		let mimeType: String
+		let data: String
+	}
+
+	private var attachmentCache: [String: Data] = [:]
+
+	func send(_ text: String, attachments: [String] = [], to sessionId: String) async -> Bool {
 		var sent = false
+		let body = SendBody(text: text, attachments: attachments.isEmpty ? nil : attachments)
 		await attempt {
-			try await $0.post("/api/sessions/\(sessionId)/messages", ["text": text])
+			try await $0.post("/api/sessions/\(sessionId)/messages", body)
 			sent = true
 		}
 		return sent
+	}
+
+	func uploadAttachment(sessionId: String, name: String, mimeType: String, data: Data) async -> AttachmentRef? {
+		var uploaded: AttachmentRef?
+		let payload = UploadAttachmentBody(name: name, mimeType: mimeType, data: data.base64EncodedString())
+		await attempt {
+			let raw = try await $0.post("/api/sessions/\(sessionId)/attachments", payload)
+			uploaded = try JSONDecoder().decode(AttachmentRef.self, from: raw)
+		}
+		return uploaded
+	}
+
+	func deletePendingAttachment(sessionId: String, attachmentId: String) async {
+		try? await client?.delete("/api/sessions/\(sessionId)/attachments/\(attachmentId)")
+	}
+
+	func fetchAttachmentData(id: String, thumb: Bool) async -> Data? {
+		let cacheKey = "\(id):\(thumb ? "t" : "f")"
+		if let cached = attachmentCache[cacheKey] { return cached }
+		guard let client else { return nil }
+		let path = thumb ? "/api/attachments/\(id)?thumb=1&format=json" : "/api/attachments/\(id)?format=json"
+		guard let payload = try? await client.get(path, as: AttachmentPayload.self),
+			let bytes = Data(base64Encoded: payload.data)
+		else { return nil }
+		if attachmentCache.count > 60 { attachmentCache.removeAll() }
+		attachmentCache[cacheKey] = bytes
+		return bytes
 	}
 
 	/// Stops what the session is doing; your next message sets it going again.
@@ -310,9 +351,18 @@ final class AppModel {
 		case deny
 	}
 
+	private struct ApprovalAnswerBody: Encodable, Sendable {
+		let decision: String
+		let confirmedWarning: Bool?
+	}
+
 	/// Answers a permission request: allow once, always allow this kind, or decline.
-	func answer(_ approvalId: String, _ decision: Decision) async {
-		await attempt { try await $0.post("/api/approvals/\(approvalId)", ["decision": decision.rawValue]) }
+	func answer(_ approvalId: String, _ decision: Decision, confirmedWarning: Bool = false) async {
+		let body = ApprovalAnswerBody(
+			decision: decision.rawValue,
+			confirmedWarning: confirmedWarning ? true : nil
+		)
+		await attempt { try await $0.post("/api/approvals/\(approvalId)", body) }
 		await refreshCenter()
 	}
 

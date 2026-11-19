@@ -1,6 +1,8 @@
 package cn.tenonai.apps.yew.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,15 +11,19 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -82,20 +88,30 @@ fun CenterList(model: AppModel) {
     }
 }
 
-/** A permission request with its answers: allow, always allow this kind when offered, decline. */
+/** A permission or approval request with its details, scope warning confirmation and actions. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PermissionRow(model: AppModel, approval: ApprovalItem) {
     var busy by remember { mutableStateOf<Decision?>(null) }
-    val act = { decision: Decision ->
+    var showDiff by remember { mutableStateOf(false) }
+    var showChanges by remember { mutableStateOf(false) }
+    var confirmWarning by remember { mutableStateOf(false) }
+    val act = { decision: Decision, confirmedWarning: Boolean ->
         busy = decision
         model.go {
-            model.answer(approval.id, decision)
+            model.answer(approval.id, decision, confirmedWarning = confirmedWarning)
             busy = null
         }
         Unit
     }
-    Column(Modifier.fillMaxWidth().padding(16.dp, 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxWidth().padding(16.dp, 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Tag(
+                stringResource(if (approval.matter) R.string.kind_approval else R.string.kind_permission),
+                warning = approval.matter,
+            )
+            if (approval.mustConfirm) Tag(stringResource(R.string.asks_every_time))
+        }
         CardHead(model.name(approval.sessionId), approval.createdAt, approval.line)
         if (approval.description != null && approval.summary != null) {
             Text(
@@ -103,24 +119,146 @@ private fun PermissionRow(model: AppModel, approval: ApprovalItem) {
                 maxLines = 4, overflow = TextOverflow.Ellipsis,
             )
         }
-        if (approval.mustConfirm) Tag(stringResource(R.string.asks_every_time))
+        if (approval.reasons.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                approval.reasons.forEach { code ->
+                    Text(
+                        "• ${reasonLabel(code)}",
+                        color = colors.soft,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+        if (!approval.review.isNullOrEmpty()) {
+            Text(
+                stringResource(R.string.review_held, approval.review),
+                color = colors.soft,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        if (approval.running.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    stringResource(R.string.site_running),
+                    color = colors.soft,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                )
+                approval.running.forEach { item ->
+                    Text(
+                        "• ${item.kind}: ${item.text}",
+                        color = colors.soft,
+                        fontFamily = Mono,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        if (approval.changes.isNotEmpty()) {
+            Text(
+                stringResource(R.string.planned_changes, approval.changes.size),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.clickable { showChanges = !showChanges }.padding(vertical = 2.dp),
+            )
+            if (showChanges) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    approval.changes.forEach { step ->
+                        Text("• ${step.label}", color = colors.soft, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+        if (!approval.diff.isNullOrEmpty()) {
+            Text(
+                stringResource(if (showDiff) R.string.hide_diff else R.string.view_diff),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.clickable { showDiff = !showDiff }.padding(vertical = 2.dp),
+            )
+            if (showDiff) {
+                Box(
+                    Modifier.fillMaxWidth()
+                        .heightIn(max = 220.dp)
+                        .background(colors.bubble, RoundedCornerShape(8.dp))
+                        .verticalScroll(rememberScrollState())
+                        .horizontalScroll(rememberScrollState())
+                        .padding(8.dp),
+                ) {
+                    Text(approval.diff, fontFamily = Mono, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             CapsuleButton(
-                stringResource(R.string.allow), { act(Decision.AllowOnce) }, icon = Icons.Check,
+                stringResource(R.string.allow), { act(Decision.AllowOnce, false) }, icon = Icons.Check,
                 enabled = busy == null, busy = busy == Decision.AllowOnce,
             )
             if (!approval.mustConfirm && approval.canRemember) {
                 CapsuleButton(
-                    stringResource(R.string.always), { act(Decision.AllowAlways) }, kind = ButtonKind.Secondary,
+                    stringResource(R.string.always),
+                    {
+                        if (approval.warning == "acts-as-you") confirmWarning = true
+                        else act(Decision.AllowAlways, false)
+                    },
+                    kind = ButtonKind.Secondary,
                     icon = Icons.Approvals, enabled = busy == null, busy = busy == Decision.AllowAlways,
                 )
             }
             CapsuleButton(
-                stringResource(R.string.decline), { act(Decision.Deny) }, kind = ButtonKind.Destructive,
+                stringResource(R.string.decline), { act(Decision.Deny, false) }, kind = ButtonKind.Destructive,
                 icon = Icons.Block, enabled = busy == null, busy = busy == Decision.Deny,
             )
         }
     }
+    if (confirmWarning) {
+        AlertDialog(
+            onDismissRequest = { confirmWarning = false },
+            title = { Text(stringResource(R.string.always_acts_as_you_title)) },
+            text = { Text(stringResource(R.string.always_acts_as_you_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmWarning = false
+                    act(Decision.AllowAlways, true)
+                }) { Text(stringResource(R.string.always_allow_confirm), color = colors.danger) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmWarning = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+}
+
+@Composable
+private fun reasonLabel(code: String): String = when (code) {
+    "git-setup" -> stringResource(R.string.reason_git_setup)
+    "launch-app" -> stringResource(R.string.reason_launch_app)
+    "outside-sandbox" -> stringResource(R.string.reason_outside_sandbox)
+    "connect-site" -> stringResource(R.string.reason_connect_site)
+    "connect-site-unsure" -> stringResource(R.string.reason_connect_site_unsure)
+    "remote-machine" -> stringResource(R.string.reason_remote_machine)
+    "remote-copy" -> stringResource(R.string.reason_remote_copy)
+    "send-data" -> stringResource(R.string.reason_send_data)
+    "delete-files" -> stringResource(R.string.reason_delete_files)
+    "delete-outside" -> stringResource(R.string.reason_delete_outside)
+    "write-outside" -> stringResource(R.string.reason_write_outside)
+    "push" -> stringResource(R.string.reason_push)
+    "publish-package" -> stringResource(R.string.reason_publish_package)
+    "publish-image" -> stringResource(R.string.reason_publish_image)
+    "github" -> stringResource(R.string.reason_github)
+    "write-disk" -> stringResource(R.string.reason_write_disk)
+    "system-services" -> stringResource(R.string.reason_system_services)
+    "yew-data" -> stringResource(R.string.reason_yew_data)
+    "yew-cli" -> stringResource(R.string.reason_yew_cli)
+    "hidden-folder" -> stringResource(R.string.reason_hidden_folder)
+    "browser-action" -> stringResource(R.string.reason_browser_action)
+    "browser-script" -> stringResource(R.string.reason_browser_script)
+    "computer-control" -> stringResource(R.string.reason_computer_control)
+    "service-action" -> stringResource(R.string.reason_service_action)
+    else -> code
 }
 
 /** A letter held for the person: who wrote to whom, why it waits, and release or refuse. */

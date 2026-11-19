@@ -1,4 +1,4 @@
-import type { EntryBody, JsonObject } from "./messages.ts";
+import type { AttachmentRef, EntryBody, JsonObject } from "./messages.ts";
 
 export type SessionKind = "standing" | "task";
 export type SessionStatus = "idle" | "working" | "waiting" | "error" | "needs_review";
@@ -24,6 +24,15 @@ export interface PermissionRule {
 	pattern?: string;
 }
 
+/** An additional directory a session can read or write alongside its main working folder (blueprint 6.12, item 48). */
+export const EXTRA_DIR_ACCESS = ["read", "write"] as const;
+export type ExtraDirAccess = (typeof EXTRA_DIR_ACCESS)[number];
+
+export interface ExtraDir {
+	path: string;
+	access: ExtraDirAccess;
+}
+
 export interface SessionOptions {
 	/** Compact when the context reaches this many tokens; null uses the default. */
 	compactAt?: number | null;
@@ -38,6 +47,10 @@ export interface SessionOptions {
 	permissionMode?: PermissionMode;
 	/** Yew's read-only helpers only (never stored): anything but looking is asked about. */
 	readerOnly?: boolean;
+	/** Additional folders this session may read or write alongside cwd. */
+	extraDirs?: ExtraDir[];
+	/** Additional domains this session's sandboxed commands may reach without asking (blueprint 6.12, item 49). */
+	allowedDomains?: string[];
 	/** What happens to letters from other sessions: delivered, held for the person, or refused (blueprint 7.1). */
 	receive?: ReceivePolicy;
 	/** Letters the session may send per message or decision from the person; null or absent: the default. */
@@ -205,6 +218,8 @@ export interface Letter {
 	decision: number | null;
 	/** The scheduled task whose run this letter starts or reports on. */
 	scheduleId: string | null;
+	/** Server-stamped ID of the person's message in the main conversation that started this chain. */
+	originEntryId?: string | null;
 	createdAt: number;
 	deliveredAt: number | null;
 }
@@ -321,6 +336,10 @@ export type ConfirmReason =
 	| "discard-changes"
 	| "rewrite-history"
 	| "push"
+	// Setting up a repository (.git/config): git init, clone, remote or local config (blueprint, section 11).
+	| "git-setup"
+	// Launching a desktop application (open -a) outside the sandbox (blueprint, section 11).
+	| "launch-app"
 	| "publish-package"
 	| "change-package"
 	| "publish-image"
@@ -409,6 +428,8 @@ export const DECISION_REASONS: ReadonlySet<ConfirmReason> = new Set<ConfirmReaso
 	"yew-data",
 	"yew-cli",
 	"hidden-folder",
+	"git-setup",
+	"launch-app",
 	"publish-package",
 	"change-package",
 	"publish-image",
@@ -474,6 +495,8 @@ export type ChangeStep =
 			session: string;
 			message: string;
 			permission: PermissionMode | null;
+			mode?: ScheduleMode;
+			autoArchive?: boolean;
 	  }
 	/** Only the fields that change are present; `permission` null means the session's own mode. */
 	| {
@@ -484,9 +507,16 @@ export type ChangeStep =
 			session?: string;
 			message?: string;
 			permission?: PermissionMode | null;
+			mode?: ScheduleMode;
+			autoArchive?: boolean;
 			catchUp?: boolean;
 			enabled?: boolean;
-	  };
+	  }
+	| { action: "set_extra_dirs"; session: string; dirs: ExtraDir[] }
+	| { action: "set_allowed_domains"; session: string | null; domains: string[] };
+
+export const SCHEDULE_MODES = ["letter", "task_session"] as const;
+export type ScheduleMode = (typeof SCHEDULE_MODES)[number];
 
 /**
  * How a scheduled task's latest run went: still running, finished, stopped with an error, stopped by the
@@ -501,8 +531,8 @@ export type ScheduleStatus = "running" | "done" | "error" | "stopped" | "skipped
 export type ScheduleSkip = "busy" | "archived" | "missed";
 
 /**
- * A scheduled task (blueprint 6.5, M3 plan section 9): at the times its cron expression names, Yew sends
- * a standing session a letter. It belongs to that session's team.
+ * A scheduled task (blueprint 6.5, M3 plan section 9): at the times its cron expression names, Yew either
+ * writes a letter to a standing session (`letter`) or opens a fresh task session (`task_session`).
  */
 export interface Schedule {
 	id: string;
@@ -514,6 +544,10 @@ export interface Schedule {
 	message: string;
 	/** The permission mode for its runs; null uses the session's own. */
 	permissionMode: PermissionMode | null;
+	/** Whether each run writes to the standing session or opens a fresh task session. */
+	mode: ScheduleMode;
+	/** In task_session mode, archive the task session automatically when it finishes cleanly. */
+	autoArchive: boolean;
 	/** A run missed while Yew was not running or the computer slept runs once afterwards. */
 	catchUp: boolean;
 	enabled: boolean;
@@ -525,6 +559,8 @@ export interface Schedule {
 	lastDetail: string | null;
 	/** The letter of the latest run. */
 	lastLetterId: string | null;
+	/** The task session opened for the latest task_session run, if any. */
+	lastSessionId: string | null;
 	createdAt: number;
 	updatedAt: number;
 }
@@ -625,6 +661,7 @@ export interface QueuedMessage {
 	id: string;
 	sessionId: string;
 	text: string;
+	attachments?: AttachmentRef[];
 	createdAt: number;
 	updatedAt: number;
 }

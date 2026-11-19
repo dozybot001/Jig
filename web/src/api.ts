@@ -77,6 +77,25 @@ function toApiError(response: Response, text: string): ApiError {
 	);
 }
 
+/** Uploads a file as multipart/form-data (for message attachments). */
+export async function uploadFile<T = unknown>(path: string, file: File): Promise<T> {
+	const form = new FormData();
+	form.append("file", file, file.name || "attachment");
+	let response: Response;
+	try {
+		response = await fetch(path, {
+			method: "POST",
+			credentials: "same-origin",
+			body: form,
+		});
+	} catch {
+		throw new ApiError(0, "network", "network");
+	}
+	const text = await response.text();
+	if (!response.ok) throw toApiError(response, text);
+	return (text ? JSON.parse(text) : undefined) as T;
+}
+
 /** Fetches a file the interface saves, such as a Markdown export. */
 export async function downloadFile(path: string): Promise<{ blob: Blob; filename: string | null }> {
 	let response: Response;

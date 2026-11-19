@@ -54,6 +54,7 @@ import {
 import { tally, YEW_NOTE } from "../progress.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
 import { ArtifactChip } from "./artifacts.tsx";
+import { MessageAttachments } from "./attachments.tsx";
 import { Capped, Diff, Markdown, ScrollBlock, useStickToBottom } from "./content.tsx";
 import { ConfirmDialog } from "./dialogs.tsx";
 import {
@@ -94,6 +95,11 @@ function callSummary(call: ToolCallBlock, recipient: string | null): string {
 			return `#${String(args.number ?? "")}`;
 		case "finish_task":
 			return typeof args.result === "string" ? t(`outcome_${args.result}` as MessageKey) : "";
+		case "read_attachment": {
+			const id = typeof args.id === "string" ? args.id : "";
+			const pages = typeof args.pages === "string" ? args.pages : "";
+			return pages ? `${id} (${pages})` : id;
+		}
 		case "todo":
 		case "list_sessions":
 		case "list_cards":
@@ -113,6 +119,7 @@ function callSummary(call: ToolCallBlock, recipient: string | null): string {
 
 const TOOL_VERBS = [
 	"read",
+	"read_attachment",
 	"write",
 	"edit",
 	"glob",
@@ -329,6 +336,27 @@ export function changeText(step: ChangeStep): string {
 			].join(t("listSeparator"));
 			return t("change_change_schedule", { name: quoted(step.schedule), details });
 		}
+		case "set_extra_dirs":
+			return t("change_set_extra_dirs", {
+				session: quoted(step.session),
+				dirs:
+					step.dirs.length > 0
+						? step.dirs
+								.map((d) => `${d.path} (${t(`access_${d.access}`)})`)
+								.join(t("listSeparator"))
+						: t("change_no_folder"),
+			});
+		case "set_allowed_domains":
+			return step.session === null
+				? t("change_set_allowed_domains_all", {
+						domains:
+							step.domains.length > 0 ? step.domains.join(t("listSeparator")) : t("noneLabel"),
+					})
+				: t("change_set_allowed_domains", {
+						session: quoted(step.session),
+						domains:
+							step.domains.length > 0 ? step.domains.join(t("listSeparator")) : t("noneLabel"),
+					});
 	}
 }
 
@@ -716,6 +744,14 @@ const ToolCard = memo(function ToolCard({
 		? t(running ? `act_${call.name}_ing` : `act_${call.name}`)
 		: call.name;
 	const flagged = status !== "running" && status !== "done";
+	const substep =
+		running && !open && call.name === "delegate" && output
+			? (() => {
+					const lines = output.trim().split("\n").filter(Boolean);
+					const latest = lines[lines.length - 1];
+					return latest ? { count: lines.length, text: latest } : null;
+				})()
+			: null;
 	return (
 		<div className="msg-assistant msg-tool">
 			{/* While the person is asked, the request card alone says what the call wants to do. */}
@@ -794,6 +830,12 @@ const ToolCard = memo(function ToolCard({
 						)}
 					</div>
 				</details>
+			)}
+			{!pending && substep && (
+				<p className="tool-substep" title={substep.text}>
+					<span className="tool-substep-count">{substep.count}</span>
+					<span className="tool-substep-text">{substep.text}</span>
+				</p>
 			)}
 			{approvals.map((approval) =>
 				approval.kind === "permission" ? (
@@ -898,7 +940,10 @@ function buildItems(transcript: TranscriptState, working: boolean): Item[] {
 	};
 	for (const entry of transcript.entries) {
 		if (entry.role === "assistant") blocks(entry.message, entry.id, false);
-		else if (entry.role === "system" || entry.role === "compaction") {
+		else if (
+			entry.role === "system" ||
+			(entry.role === "compaction" && entry.compaction.kind !== "renew")
+		) {
 			run.push({ kind: "note", key: entry.id, entry });
 		} else if (entry.role === "user" && userText(entry).startsWith(YEW_NOTE)) {
 			// Yew's own notes to the model are not shown and do not split a run.
@@ -1075,7 +1120,14 @@ function StepGroup({
 	useLang();
 	const [open, setOpen] = useState(false);
 	const errors = steps.filter((step) => failed(step, transcript, results)).length;
-	const last = steps[steps.length - 1];
+	const active = live
+		? (steps.findLast(
+				(step) =>
+					step.kind === "tool" &&
+					step.entryId &&
+					toolCallFor(transcript.toolCalls, step.entryId, step.block.id)?.status === "running",
+			) ?? steps[steps.length - 1])
+		: undefined;
 	return (
 		<div className="step-group">
 			<details
@@ -1096,7 +1148,9 @@ function StepGroup({
 					))}
 				</Capped>
 			</details>
-			{live && !open && last && <StepView step={last} transcript={transcript} results={results} />}
+			{live && !open && active && (
+				<StepView step={active} transcript={transcript} results={results} />
+			)}
 		</div>
 	);
 }
@@ -1216,16 +1270,44 @@ function LetterEntry({ letter }: { letter: LetterRef }) {
 /** A message from the person, a letter, or a notice from Yew. */
 function EntryView({ entry }: { entry: Entry }) {
 	switch (entry.role) {
-		case "user":
+		case "user": {
 			if (entry.letter) return <LetterEntry letter={entry.letter} />;
+			const text = userText(entry);
+			const attached = entry.attachments ?? [];
 			return (
 				<Capped className="msg-user" label={t("you")}>
 					<span className="visually-hidden">{t("you")}: </span>
-					{userText(entry)}
+					{attached.length > 0 && <MessageAttachments attachments={attached} />}
+					{text && <div className="msg-user-text">{text}</div>}
 				</Capped>
 			);
+		}
+		case "compaction": {
+			if (entry.compaction.kind !== "renew") return null;
+			const brief = entry.compaction.summary.trim();
+			return (
+				<div className="renew-block">
+					<div className="renew-divider">
+						<span>{t("renewDivider")}</span>
+					</div>
+					{brief && (
+						<details className="activity renew-brief">
+							<summary>
+								<span className="activity-verb">{t("renewBriefTitle")}</span>
+								<ChevronIcon />
+							</summary>
+							<Capped className="tool-detail note-summary" label={t("renewBriefTitle")}>
+								<Markdown text={brief} />
+							</Capped>
+						</details>
+					)}
+				</div>
+			);
+		}
 		case "notice": {
 			const notice = entry.notice;
+			// The renew compaction entry right above already renders the horizontal divider.
+			if (notice.kind === "renewed") return null;
 			const data = (notice.data ?? {}) as Record<string, string | number | null>;
 			let text: string;
 			if (notice.kind === "error") {

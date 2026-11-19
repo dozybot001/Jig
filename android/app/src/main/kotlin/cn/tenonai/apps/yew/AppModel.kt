@@ -8,12 +8,14 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.os.Build
 import android.provider.Settings
+import android.util.Base64
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cn.tenonai.apps.yew.api.ApprovalItem
 import cn.tenonai.apps.yew.api.ArtifactItem
+import cn.tenonai.apps.yew.api.AttachmentRef
 import cn.tenonai.apps.yew.api.CardItem
 import cn.tenonai.apps.yew.api.Center
 import cn.tenonai.apps.yew.api.DemoTransport
@@ -371,13 +373,56 @@ class AppModel(private val context: Context) {
         return result
     }
 
-    suspend fun send(text: String, sessionId: String): Boolean {
+    private val attachmentCache = LinkedHashMap<String, ByteArray>(32, 0.75f, true)
+
+    suspend fun send(text: String, sessionId: String, attachmentIds: List<String> = emptyList()): Boolean {
         var sent = false
         attempt {
-            it.post("/api/sessions/$sessionId/messages", buildJsonObject { put("text", text) })
+            it.post("/api/sessions/$sessionId/messages", buildJsonObject {
+                put("text", text)
+                if (attachmentIds.isNotEmpty()) {
+                    putJsonArray("attachments") {
+                        for (id in attachmentIds) add(kotlinx.serialization.json.JsonPrimitive(id))
+                    }
+                }
+            })
             sent = true
         }
         return sent
+    }
+
+    suspend fun uploadAttachment(sessionId: String, name: String, mimeType: String, bytes: ByteArray): AttachmentRef? {
+        var uploaded: AttachmentRef? = null
+        val encoded = Base64.encodeToString(bytes, Base64.NO_WRAP)
+        attempt {
+            val raw = it.post("/api/sessions/$sessionId/attachments", buildJsonObject {
+                put("name", name)
+                put("mimeType", mimeType)
+                put("data", encoded)
+            })
+            val obj = runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull()
+            if (obj != null) uploaded = AttachmentRef.from(obj)
+        }
+        return uploaded
+    }
+
+    suspend fun deletePendingAttachment(sessionId: String, attachmentId: String) {
+        runCatching { client?.delete("/api/sessions/$sessionId/attachments/$attachmentId") }
+    }
+
+    suspend fun fetchAttachmentBytes(id: String, thumb: Boolean): ByteArray? {
+        val key = "$id:${if (thumb) "t" else "f"}"
+        attachmentCache[key]?.let { return it }
+        val active = client ?: return null
+        val path = if (thumb) "/api/attachments/$id?thumb=1&format=json" else "/api/attachments/$id?format=json"
+        val json = runCatching { active.get(path) }.getOrNull() ?: return null
+        val b64 = json.str("data") ?: return null
+        val decoded = runCatching { Base64.decode(b64, Base64.DEFAULT) }.getOrNull() ?: return null
+        if (attachmentCache.size > 60) {
+            attachmentCache.keys.firstOrNull()?.let(attachmentCache::remove)
+        }
+        attachmentCache[key] = decoded
+        return decoded
     }
 
     /** Stops what the session is doing; your next message sets it going again. */
@@ -386,8 +431,13 @@ class AppModel(private val context: Context) {
     }
 
     /** Answers a permission request: allow once, always allow this kind, or decline. */
-    suspend fun answer(approvalId: String, decision: Decision) {
-        attempt { it.post("/api/approvals/$approvalId", buildJsonObject { put("decision", decision.value) }) }
+    suspend fun answer(approvalId: String, decision: Decision, confirmedWarning: Boolean = false) {
+        attempt {
+            it.post("/api/approvals/$approvalId", buildJsonObject {
+                put("decision", decision.value)
+                if (confirmedWarning) put("confirmedWarning", true)
+            })
+        }
         refreshCenter()
     }
 

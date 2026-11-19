@@ -11,6 +11,8 @@ import {
 	permissionModeOf,
 	RECEIVE_POLICIES,
 	type ReceivePolicy,
+	SCHEDULE_MODES,
+	type ScheduleMode,
 	type Session,
 	THINKING_LEVELS,
 	type ThinkingLevel,
@@ -18,9 +20,15 @@ import {
 import { dollars, isBudget } from "./budget.ts";
 import { invalid } from "./errors.ts";
 import { resolveWorkingFolder } from "./paths.ts";
-import { isInside } from "./permissions/paths.ts";
+import { canonical, isInside, secretLocations } from "./permissions/paths.ts";
 import type { ScheduleBook, ScheduleFields } from "./schedules.ts";
-import { readSettings, resolveLogFile, type Workspace } from "./settings.ts";
+import {
+	parseExtraDirs,
+	parseSandboxDomains,
+	readSettings,
+	resolveLogFile,
+	type Workspace,
+} from "./settings.ts";
 import { type SessionPatch, type Store, validateSessionName } from "./store.ts";
 
 /**
@@ -41,6 +49,7 @@ export interface ManagePlan {
 export interface ManagerDeps {
 	store: Store;
 	schedules: ScheduleBook;
+	home?: string;
 	mainId(): string | null;
 	modelExists(provider: string, model: string): boolean;
 	/** A session was archived: letters waiting for it are dropped. */
@@ -446,6 +455,50 @@ export class Manager {
 					`${on ? "Gave" : "Took from"} "${target.name}" the right to ${right === "cards" ? "post cards" : "manage Yew"}.`,
 				);
 			}
+			if (change.extra_dirs !== undefined) {
+				if (!Array.isArray(change.extra_dirs)) {
+					throw invalid("extra_dirs must be a list of { path, access }.", "extra_dirs");
+				}
+				const currentSettings = readSettings(store);
+				const offLimits = [
+					...secretLocations(this.#deps.home ?? "/nonexistent-yew-home"),
+					...currentSettings.hiddenFolders.map(canonical),
+				];
+				const nextDirs = parseExtraDirs(change.extra_dirs, { offLimits, field: "extra_dirs" });
+				const prevDirs = target.options.extraDirs ?? [];
+				if (JSON.stringify(nextDirs) !== JSON.stringify(prevDirs)) {
+					const prevMap = new Map(prevDirs.map((d) => [d.path, d.access]));
+					const widened = nextDirs.some((d) => {
+						const before = prevMap.get(d.path);
+						if (!before) return true;
+						return before === "read" && d.access === "write";
+					});
+					if (widened) widen("change-folder", target);
+					else reach("configure");
+					options.extraDirs = nextDirs;
+					note(
+						{ action: "set_extra_dirs", session: target.name, dirs: nextDirs },
+						`Set additional folders for "${target.name}" to ${nextDirs.length > 0 ? nextDirs.map((d) => `${d.path} (${d.access})`).join(", ") : "none"}.`,
+					);
+				}
+			}
+			if (change.allowed_domains !== undefined) {
+				if (!Array.isArray(change.allowed_domains)) {
+					throw invalid("allowed_domains must be a list of domains.", "allowed_domains");
+				}
+				const nextDomains = parseSandboxDomains(change.allowed_domains, "allowed_domains");
+				const prevDomains = target.options.allowedDomains ?? [];
+				if (JSON.stringify(nextDomains) !== JSON.stringify(prevDomains)) {
+					const prevSet = new Set(prevDomains);
+					if (nextDomains.some((d) => !prevSet.has(d))) widen("widen-permission", target);
+					else reach("configure");
+					options.allowedDomains = nextDomains;
+					note(
+						{ action: "set_allowed_domains", session: target.name, domains: nextDomains },
+						`Set allowed domains for "${target.name}" to ${nextDomains.length > 0 ? nextDomains.join(", ") : "none"}.`,
+					);
+				}
+			}
 			if (archived !== undefined && archived !== (target.archivedAt !== null)) {
 				if (archived && target.id === by.id)
 					throw invalid("You cannot archive yourself.", "archived");
@@ -493,6 +546,8 @@ export class Manager {
 			const session = text(change, "session", 200);
 			const message = text(change, "message", 20_000);
 			const permission = oneOf(change, "permission", ["session", ...PERMISSION_MODES] as const);
+			const scheduleMode = oneOf(change, "mode", SCHEDULE_MODES) as ScheduleMode | undefined;
+			const autoArchive = flag(change, "auto_archive");
 			const catchUp = flag(change, "catch_up");
 			const enabled = flag(change, "enabled");
 			if (name !== undefined) fields.name = name;
@@ -502,6 +557,8 @@ export class Manager {
 			if (permission !== undefined) {
 				fields.permissionMode = permission === "session" ? null : permission;
 			}
+			if (scheduleMode !== undefined) fields.mode = scheduleMode;
+			if (autoArchive !== undefined) fields.autoArchive = autoArchive;
 			if (catchUp !== undefined) fields.catchUp = catchUp;
 			if (enabled !== undefined) fields.enabled = enabled;
 			const current = ref === undefined ? null : book.find(ref);
@@ -528,6 +585,9 @@ export class Manager {
 						session: target.name,
 						message: values.message,
 						permission: mode,
+						...(values.mode !== "letter"
+							? { mode: values.mode, autoArchive: values.autoArchive }
+							: {}),
 					},
 					`Created the scheduled task "${values.name}" (${values.cron}, to "${target.name}").`,
 				);
@@ -542,6 +602,8 @@ export class Manager {
 			if (values.sessionId !== current.sessionId) step.session = target.name;
 			if (values.message !== current.message) step.message = values.message;
 			if (values.permissionMode !== current.permissionMode) step.permission = values.permissionMode;
+			if (values.mode !== current.mode) step.mode = values.mode;
+			if (values.autoArchive !== current.autoArchive) step.autoArchive = values.autoArchive;
 			if (values.catchUp !== current.catchUp) step.catchUp = values.catchUp;
 			if (values.enabled !== current.enabled) step.enabled = values.enabled;
 			const changed = Object.keys(step).filter((key) => key !== "action" && key !== "schedule");
@@ -665,6 +727,29 @@ export class Manager {
 			if (theme !== undefined && theme !== current.theme) {
 				if (commit) store.setSetting("theme", theme);
 				add({ action: "set_theme", to: theme }, `Set the theme to ${theme}.`);
+			}
+			if (fields.sandbox_allowed_domains !== undefined) {
+				if (!Array.isArray(fields.sandbox_allowed_domains)) {
+					throw invalid(
+						"sandbox_allowed_domains must be a list of domains.",
+						"sandbox_allowed_domains",
+					);
+				}
+				const nextDomains = parseSandboxDomains(
+					fields.sandbox_allowed_domains,
+					"sandbox_allowed_domains",
+				);
+				const prevDomains = current.sandboxAllowedDomains;
+				if (JSON.stringify(nextDomains) !== JSON.stringify(prevDomains)) {
+					const prevSet = new Set(prevDomains);
+					if (nextDomains.some((d) => !prevSet.has(d))) widen("widen-permission", null);
+					else reach("configure");
+					if (commit) store.setSetting("sandboxAllowedDomains", nextDomains);
+					add(
+						{ action: "set_allowed_domains", session: null, domains: nextDomains },
+						`Set global sandbox allowed domains to ${nextDomains.length > 0 ? nextDomains.join(", ") : "none"}.`,
+					);
+				}
 			}
 			const language = oneOf(fields, "language", LANGUAGES);
 			if (language !== undefined && language !== current.language) {

@@ -262,4 +262,47 @@
     <string name="demo_pushed">Pushed to origin/main.</string>
     <string name="demo_not_pushed">Not pushed.</string>
     <string name="demo_reply">This is the demo: no session received your message.</string>
+
+    <!-- Approvals & multimodal alignment -->
+    <string name="kind_approval">Approval</string>
+    <string name="kind_permission">Permission</string>
+    <string name="review_held">Auto-check did not allow: %s</string>
+    <string name="site_running">Running in the sandbox at the time:</string>
+    <string name="planned_changes">Planned changes (%d)</string>
+    <string name="view_diff">View diff</string>
+    <string name="hide_diff">Hide diff</string>
+    <string name="always_acts_as_you_title">Always allow this tool?</string>
+    <string name="always_acts_as_you_body">With Always allow, no call of this tool in this session is asked about again, including sending, paying and deleting in the browser with your sign-ins.</string>
+    <string name="always_allow_confirm">Always allow</string>
+    <string name="reason_git_setup">Initialize, clone or change Git repository config</string>
+    <string name="reason_launch_app">Launch a local desktop application</string>
+    <string name="reason_outside_sandbox">Runs outside the sandbox</string>
+    <string name="reason_connect_site">Let the command connect to this site</string>
+    <string name="reason_connect_site_unsure">A connection wants to reach this site</string>
+    <string name="reason_remote_machine">Connect to another machine</string>
+    <string name="reason_remote_copy">Copy to or from another machine</string>
+    <string name="reason_send_data">Send data to a server</string>
+    <string name="reason_delete_files">Delete files</string>
+    <string name="reason_delete_outside">Delete files outside the working folder</string>
+    <string name="reason_write_outside">Change files outside the working folder</string>
+    <string name="reason_push">Push to a remote repository</string>
+    <string name="reason_publish_package">Publish a package</string>
+    <string name="reason_publish_image">Publish an image</string>
+    <string name="reason_github">Change something on GitHub</string>
+    <string name="reason_write_disk">Write to a disk</string>
+    <string name="reason_system_services">Change system services</string>
+    <string name="reason_yew_data">Touch Yew Harness\'s own data</string>
+    <string name="reason_yew_cli">Run Yew Harness\'s command line</string>
+    <string name="reason_hidden_folder">Touch a folder kept from sessions</string>
+    <string name="reason_browser_action">Act in your own browser</string>
+    <string name="reason_browser_script">Run a script in your own browser</string>
+    <string name="reason_computer_control">Act on the whole screen</string>
+    <string name="reason_service_action">Act in a connected service</string>
+    <string name="attach_photo">Attach photo</string>
+    <string name="remove_attachment">Remove attachment</string>
+    <string name="auto_checked">Auto-checked</string>
+    <string name="risky_step">Risky step</string>
+    <string name="renew_divider">Fresh context below</string>
+    <string name="renew_brief">Carry-over brief</string>
+    <string name="done">Done</string>
 </resources>

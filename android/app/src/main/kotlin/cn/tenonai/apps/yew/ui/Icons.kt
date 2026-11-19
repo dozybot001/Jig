@@ -52,4 +52,6 @@ object Icons {
     val BoxOff = icon("box-off", "M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z")
     val BoxOn = icon("box-on", "M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z", "M8 12.5l2.8 2.8L16 9.5")
     val Dots = icon("dots", fills = listOf("M6 10.5a1.5 1.5 0 1 0 0 3a1.5 1.5 0 0 0 0-3Z", "M12 10.5a1.5 1.5 0 1 0 0 3a1.5 1.5 0 0 0 0-3Z", "M18 10.5a1.5 1.5 0 1 0 0 3a1.5 1.5 0 0 0 0-3Z"))
+    val Attach = icon("attach", "M16.5 6.5l-7.8 7.8a2.5 2.5 0 0 0 3.5 3.5l8.2-8.2a4.5 4.5 0 0 0-6.4-6.4L5.5 11.7a6.5 6.5 0 0 0 9.2 9.2l7.2-7.2")
+    val Close = icon("close", "M6 6l12 12", "M18 6l-12 12")
 }

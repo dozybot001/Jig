@@ -3,12 +3,16 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import {
 	DEFAULT_RELAY_URL,
+	EXTRA_DIR_ACCESS,
+	type ExtraDir,
+	type ExtraDirAccess,
 	normalizePermissionMode,
 	type PermissionMode,
 	type ThinkingLevel,
 } from "../shared/types.ts";
 import { invalid } from "./errors.ts";
-import { canonical } from "./permissions/paths.ts";
+import { resolveWorkingFolder } from "./paths.ts";
+import { canonical, isSecretPath } from "./permissions/paths.ts";
 import type { Store } from "./store.ts";
 
 /** Yew's settings: what the settings menu and new sessions read, shared by the API and manage_yew. */
@@ -70,6 +74,13 @@ export const SETTING_DEFAULTS = {
 	 * them, searches leave them out, and the system sandbox closes them (the security group, 11-18).
 	 */
 	hiddenFolders: [] as string[],
+	/** Additional domains all sandboxed commands may reach without asking (blueprint 6.12, item 49). */
+	sandboxAllowedDomains: [] as string[],
+	/**
+	 * Whether automatic permission review (`review` mode) may read the person's original message in the
+	 * main conversation when checking a step triggered by a delegated letter (blueprint 6.1, item 6).
+	 */
+	reviewTraceMain: true as boolean,
 	/**
 	 * Which browser the built-in browser server drives: the person's own Chrome through Playwright's
 	 * extension, with their sign-ins (founder, 11-18), or a separate window of its own.
@@ -121,6 +132,11 @@ export function readSettings(store: Store): Settings {
 		opening: store.getSetting("opening", SETTING_DEFAULTS.opening),
 		sandboxCredentials: store.getSetting("sandboxCredentials", SETTING_DEFAULTS.sandboxCredentials),
 		hiddenFolders: store.getSetting("hiddenFolders", SETTING_DEFAULTS.hiddenFolders),
+		sandboxAllowedDomains: store.getSetting(
+			"sandboxAllowedDomains",
+			SETTING_DEFAULTS.sandboxAllowedDomains,
+		),
+		reviewTraceMain: store.getSetting("reviewTraceMain", SETTING_DEFAULTS.reviewTraceMain),
 		browser: store.getSetting("browser", SETTING_DEFAULTS.browser),
 		updateCheck: store.getSetting("updateCheck", SETTING_DEFAULTS.updateCheck),
 	};
@@ -163,4 +179,113 @@ export function resolveLogFile(path: string): string {
 		throw invalid(`${path} is not a file.`, "decisionLog");
 	}
 	return file;
+}
+
+const MAX_SANDBOX_DOMAINS = 50;
+const MAX_EXTRA_DIRS = 10;
+const DOMAIN_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const FORBIDDEN_DOMAIN_SUFFIXES = [".localhost", ".local", ".internal", ".lan", ".home.arpa"];
+
+/**
+ * Validates one sandbox allowlist domain (`example.com` or `*.example.com`). Refuses IPs, bare
+ * wildcards, single-label wildcards (`*.com`), local/private names, schemes, ports and paths.
+ */
+export function validateSandboxDomain(raw: unknown, field = "sandboxAllowedDomains"): string {
+	if (typeof raw !== "string") throw invalid("Each domain must be text.", field);
+	const domain = raw.trim().toLowerCase().replace(/\.$/, "");
+	if (!domain || domain.length > 253) {
+		throw invalid(`"${String(raw)}" is not a valid domain name.`, field);
+	}
+	if (/[\s/:@\\[\]]/.test(domain) || domain === "*") {
+		throw invalid(
+			`"${domain}" must be a bare domain or wildcard like *.example.com (no protocol, port or path).`,
+			field,
+		);
+	}
+	const wildcard = domain.startsWith("*.");
+	const host = wildcard ? domain.slice(2) : domain;
+	if (!host || host.includes("*")) {
+		throw invalid(`"${domain}" has an invalid wildcard; use *.example.com.`, field);
+	}
+	if (
+		host === "localhost" ||
+		FORBIDDEN_DOMAIN_SUFFIXES.some((suffix) => host.endsWith(suffix)) ||
+		/^\d+(?:\.\d+){1,3}$/.test(host) ||
+		/^(?:0x[0-9a-f]+|\d+)$/.test(host)
+	) {
+		throw invalid(
+			`"${domain}" cannot be added: local addresses and IP literals stay blocked.`,
+			field,
+		);
+	}
+	const labels = host.split(".");
+	if (labels.length < 2) {
+		throw invalid(
+			`"${domain}" must include at least two domain labels (for example, example.com).`,
+			field,
+		);
+	}
+	if (labels.some((label) => !DOMAIN_LABEL.test(label))) {
+		throw invalid(`"${domain}" is not a valid domain name.`, field);
+	}
+	return wildcard ? `*.${host}` : host;
+}
+
+export function parseSandboxDomains(value: unknown[], field = "sandboxAllowedDomains"): string[] {
+	if (value.length > MAX_SANDBOX_DOMAINS) {
+		throw invalid(`At most ${MAX_SANDBOX_DOMAINS} domains can be allowed.`, field);
+	}
+	const out: string[] = [];
+	for (const item of value) {
+		if (typeof item === "string" && !item.trim()) continue;
+		out.push(validateSandboxDomain(item, field));
+	}
+	return [...new Set(out)];
+}
+
+/**
+ * Checks additional workspace folders for a session: existing directories only, canonicalized,
+ * never `/` or the home directory, and never inside credentials, Yew's data or hidden folders.
+ */
+export function parseExtraDirs(
+	value: unknown[],
+	options: { offLimits: string[]; userHome?: string; field?: string },
+): ExtraDir[] {
+	const field = options.field ?? "extraDirs";
+	if (value.length > MAX_EXTRA_DIRS) {
+		throw invalid(`At most ${MAX_EXTRA_DIRS} additional folders can be added.`, field);
+	}
+	const home = canonical(options.userHome ?? homedir());
+	const byPath = new Map<string, ExtraDirAccess>();
+	for (const item of value) {
+		if (!item || typeof item !== "object" || Array.isArray(item)) {
+			throw invalid("Each additional folder must be an object with path and access.", field);
+		}
+		const fields = item as Record<string, unknown>;
+		if (typeof fields.path !== "string" || !fields.path.trim()) {
+			throw invalid("Each additional folder needs a path.", field);
+		}
+		const access = fields.access;
+		if (typeof access !== "string" || !(EXTRA_DIR_ACCESS as readonly string[]).includes(access)) {
+			throw invalid("access must be read or write.", field);
+		}
+		const raw = fields.path.trim();
+		const expanded =
+			raw === "~" || raw.startsWith("~/") ? join(options.userHome ?? homedir(), raw.slice(2)) : raw;
+		let resolved: string;
+		try {
+			resolved = resolveWorkingFolder(expanded);
+		} catch (error) {
+			throw invalid((error as Error).message, field);
+		}
+		if (resolved === "/" || resolved === home) {
+			throw invalid(`${raw} is too broad; pick a specific folder inside it.`, field);
+		}
+		if (isSecretPath(resolved, options.offLimits)) {
+			throw invalid(`${raw} is protected or hidden and cannot be added to a session.`, field);
+		}
+		const existing = byPath.get(resolved);
+		if (!existing || access === "write") byPath.set(resolved, access as ExtraDirAccess);
+	}
+	return [...byPath.entries()].map(([path, access]) => ({ path, access }));
 }

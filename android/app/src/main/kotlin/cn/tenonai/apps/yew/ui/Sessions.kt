@@ -1,14 +1,26 @@
 package cn.tenonai.apps.yew.ui
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -17,15 +29,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +51,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -44,18 +65,26 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import cn.tenonai.apps.yew.AppModel
 import cn.tenonai.apps.yew.Page
 import cn.tenonai.apps.yew.R
+import cn.tenonai.apps.yew.api.AttachmentRef
 import cn.tenonai.apps.yew.api.Entry
 import cn.tenonai.apps.yew.api.MessageText
+import cn.tenonai.apps.yew.api.PermissionNote
 import cn.tenonai.apps.yew.api.SessionSummary
 import cn.tenonai.apps.yew.api.Step
+import cn.tenonai.apps.yew.api.ToolCallItem
 import cn.tenonai.apps.yew.api.ToolKinds
 import cn.tenonai.apps.yew.api.obj
 import cn.tenonai.apps.yew.api.str
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 
@@ -130,13 +159,21 @@ private fun StatusMark(session: SessionSummary) {
     Box(Modifier.size(8.dp).background(color, CircleShape).semantics { contentDescription = text })
 }
 
+private data class StagedPhoto(
+    val id: String,
+    val ref: AttachmentRef,
+    val preview: ImageBitmap,
+)
+
 /**
  * One session: its record, kept current from the computer's event stream, and a field to write to
  * it. While the session works, the answer appears as it is written, and the send button stops it.
  */
 @Composable
 fun SessionScreen(model: AppModel, session: SessionSummary, close: () -> Unit) {
+    val context = LocalContext.current
     var entries by remember { mutableStateOf(listOf<Entry>()) }
+    var toolNotes by remember { mutableStateOf(mapOf<String, List<PermissionNote>>()) }
     var status by remember { mutableStateOf(session.status) }
     var draft by remember { mutableStateOf<String?>(null) }
     var loaded by remember { mutableStateOf(false) }
@@ -145,6 +182,28 @@ fun SessionScreen(model: AppModel, session: SessionSummary, close: () -> Unit) {
     var loadingOlder by remember { mutableStateOf(false) }
     var message by rememberSaveable { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
+    var staged by remember { mutableStateOf(listOf<StagedPhoto>()) }
+    var uploading by remember { mutableStateOf(false) }
+    var lightbox by remember { mutableStateOf<AttachmentRef?>(null) }
+
+    val pickPhotos = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(4)) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        uploading = true
+        model.go {
+            try {
+                for (uri in uris) {
+                    if (staged.size >= 4) break
+                    val compressed = withContext(Dispatchers.IO) { compressImageUri(context, uri) } ?: continue
+                    val (jpeg, bitmap) = compressed
+                    val name = "photo-${System.currentTimeMillis()}.jpg"
+                    val ref = model.uploadAttachment(session.id, name, "image/jpeg", jpeg) ?: continue
+                    staged = staged + StagedPhoto(ref.id, ref, bitmap.asImageBitmap())
+                }
+            } finally {
+                uploading = false
+            }
+        }
+    }
 
     suspend fun load(): Int? {
         val transcript = model.transcript(session.id) ?: return null
@@ -153,6 +212,13 @@ fun SessionScreen(model: AppModel, session: SessionSummary, close: () -> Unit) {
         val kept = if (first == null) emptyList() else entries.filter { it.seq < first }
         if (kept.isEmpty()) older = transcript.olderCursor
         entries = kept + transcript.entries
+        val nextNotes = toolNotes.toMutableMap()
+        for (call in transcript.toolCalls) {
+            val note = call.note ?: continue
+            val current = nextNotes[call.messageId].orEmpty()
+            if (note !in current) nextNotes[call.messageId] = current + note
+        }
+        toolNotes = nextNotes
         status = transcript.session.status
         loaded = true
         return transcript.session.eventSeq
@@ -177,6 +243,13 @@ fun SessionScreen(model: AppModel, session: SessionSummary, close: () -> Unit) {
                                 }
                                 if (entry.kind == Entry.Kind.Assistant) draft = null
                             }
+                            "toolCall" -> json.obj("toolCall")?.let(ToolCallItem::from)?.let { call ->
+                                val note = call.note ?: return@let
+                                val current = toolNotes[call.messageId].orEmpty()
+                                if (note !in current) {
+                                    toolNotes = toolNotes + (call.messageId to (current + note))
+                                }
+                            }
                             "session" -> json.obj("session")?.str("status")?.let { status = it }
                         }
                         "live" -> when (json.str("type")) {
@@ -195,7 +268,7 @@ fun SessionScreen(model: AppModel, session: SessionSummary, close: () -> Unit) {
         }
     }
 
-    val steps = remember(entries) { Step.of(entries) }
+    val steps = remember(entries, toolNotes) { Step.of(entries, toolNotes) }
     val list = rememberLazyListState()
     val working = status == "working"
     val rows = steps.size + (if (!draft.isNullOrEmpty()) 1 else 0) + (if (working) 1 else 0)
@@ -212,13 +285,24 @@ fun SessionScreen(model: AppModel, session: SessionSummary, close: () -> Unit) {
                 onChange = { message = it },
                 working = working,
                 sending = sending,
+                uploading = uploading,
+                staged = staged,
+                onPickPhotos = {
+                    pickPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
+                onRemovePhoto = { photo ->
+                    staged = staged.filterNot { it.id == photo.id }
+                    model.go { model.deletePendingAttachment(session.id, photo.id) }
+                },
                 send = {
                     val text = message.trim()
-                    if (text.isNotEmpty()) {
+                    val ids = staged.map { it.id }
+                    if (text.isNotEmpty() || ids.isNotEmpty()) {
                         sending = true
                         model.go {
-                            if (model.send(text, session.id)) {
+                            if (model.send(text, session.id, ids)) {
                                 message = ""
+                                staged = emptyList()
                                 load()
                             }
                             sending = false
@@ -260,7 +344,7 @@ fun SessionScreen(model: AppModel, session: SessionSummary, close: () -> Unit) {
                             }
                         }
                     }
-                    items(steps, key = { it.id }) { StepView(it) }
+                    items(steps, key = { it.id }) { StepView(model, it) { ref -> lightbox = ref } }
                     if (!draft.isNullOrEmpty()) item(key = "draft") { AnswerText(draft.orEmpty()) }
                     if (working) {
                         item(key = "working") {
@@ -274,43 +358,137 @@ fun SessionScreen(model: AppModel, session: SessionSummary, close: () -> Unit) {
             }
         }
     }
+
+    lightbox?.let { ref ->
+        AttachmentLightbox(model, ref) { lightbox = null }
+    }
+}
+
+private fun compressImageUri(context: Context, uri: Uri, maxDimension: Int = 2048): Pair<ByteArray, Bitmap>? {
+    val raw = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+    val decoded = BitmapFactory.decodeByteArray(raw, 0, raw.size) ?: return null
+    val longest = maxOf(decoded.width, decoded.height)
+    val scaled = if (longest > maxDimension && longest > 0) {
+        val ratio = maxDimension.toFloat() / longest.toFloat()
+        Bitmap.createScaledBitmap(
+            decoded,
+            maxOf(1, (decoded.width * ratio).toInt()),
+            maxOf(1, (decoded.height * ratio).toInt()),
+            true,
+        )
+    } else {
+        decoded
+    }
+    val out = ByteArrayOutputStream()
+    if (!scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)) return null
+    return out.toByteArray() to scaled
 }
 
 @Composable
-private fun Composer(message: String, onChange: (String) -> Unit, working: Boolean, sending: Boolean, send: () -> Unit, stop: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().background(colors.paper).navigationBarsPadding().imePadding()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+private fun Composer(
+    message: String,
+    onChange: (String) -> Unit,
+    working: Boolean,
+    sending: Boolean,
+    uploading: Boolean,
+    staged: List<StagedPhoto>,
+    onPickPhotos: () -> Unit,
+    onRemovePhoto: (StagedPhoto) -> Unit,
+    send: () -> Unit,
+    stop: () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxWidth().background(colors.paper).navigationBarsPadding().imePadding(),
     ) {
-        GrowingField(message, onChange, stringResource(R.string.message_hint), Modifier.weight(1f))
-        val stopping = working && message.isBlank()
-        val enabled = stopping || (message.isNotBlank() && !sending)
-        val label = stringResource(if (stopping) R.string.stop else R.string.send)
-        Surface(
-            onClick = if (stopping) stop else send,
-            enabled = enabled,
-            shape = CircleShape,
-            color = if (enabled) colors.ink else colors.primary,
-            contentColor = if (enabled) colors.paper else colors.soft,
-            modifier = Modifier.size(48.dp).semantics { contentDescription = label },
+        if (staged.isNotEmpty() || uploading) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                staged.forEach { photo ->
+                    Box(Modifier.size(60.dp)) {
+                        Image(
+                            bitmap = photo.preview,
+                            contentDescription = photo.ref.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(56.dp).align(Alignment.BottomStart).clip(RoundedCornerShape(10.dp)),
+                        )
+                        val removeDesc = stringResource(R.string.remove_attachment)
+                        Surface(
+                            onClick = { onRemovePhoto(photo) },
+                            shape = CircleShape,
+                            color = Color.Black.copy(alpha = 0.7f),
+                            contentColor = Color.White,
+                            modifier = Modifier.size(20.dp).align(Alignment.TopEnd).semantics { contentDescription = removeDesc },
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Close, null, Modifier.size(12.dp))
+                            }
+                        }
+                    }
+                }
+                if (uploading) {
+                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp, color = colors.soft)
+                }
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(if (stopping) Icons.Stop else Icons.Up, null, Modifier.size(24.dp))
+            val attachDesc = stringResource(R.string.attach_photo)
+            Surface(
+                onClick = onPickPhotos,
+                enabled = staged.size < 4 && !uploading && !sending,
+                shape = CircleShape,
+                color = colors.bubble,
+                contentColor = colors.ink,
+                modifier = Modifier.size(44.dp).semantics { contentDescription = attachDesc },
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Attach, null, Modifier.size(20.dp))
+                }
+            }
+            GrowingField(message, onChange, stringResource(R.string.message_hint), Modifier.weight(1f))
+            val stopping = working && message.isBlank() && staged.isEmpty()
+            val enabled = stopping || ((message.isNotBlank() || staged.isNotEmpty()) && !sending && !uploading)
+            val label = stringResource(if (stopping) R.string.stop else R.string.send)
+            Surface(
+                onClick = if (stopping) stop else send,
+                enabled = enabled,
+                shape = CircleShape,
+                color = if (enabled) colors.ink else colors.primary,
+                contentColor = if (enabled) colors.paper else colors.soft,
+                modifier = Modifier.size(48.dp).semantics { contentDescription = label },
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(if (stopping) Icons.Stop else Icons.Up, null, Modifier.size(24.dp))
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StepView(step: Step) {
+private fun StepView(model: AppModel, step: Step, onOpenImage: (AttachmentRef) -> Unit) {
     when (step) {
-        is Step.User -> Box(Modifier.fillMaxWidth().padding(start = 40.dp), contentAlignment = Alignment.CenterEnd) {
-            Text(
-                step.entry.text,
-                modifier = Modifier.background(colors.bubble, RoundedCornerShape(18.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
-            )
+        is Step.User -> Column(
+            Modifier.fillMaxWidth().padding(start = 40.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (step.entry.attachments.isNotEmpty()) {
+                EntryAttachments(model, step.entry.attachments, onOpenImage)
+            }
+            if (step.entry.text.isNotEmpty()) {
+                Text(
+                    step.entry.text,
+                    modifier = Modifier.background(colors.bubble, RoundedCornerShape(18.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+            }
         }
         is Step.Letter -> Column(
             Modifier.fillMaxWidth().border(1.dp, colors.control, RoundedCornerShape(14.dp)).padding(12.dp),
@@ -326,14 +504,129 @@ private fun StepView(step: Step) {
             Text(step.letter.body)
         }
         is Step.Answer -> AnswerText(step.entry.text)
-        is Step.Tools -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Icon(Icons.Tools, null, Modifier.size(16.dp), tint = colors.soft)
-            Text(toolSummary(step.names), color = colors.soft, style = MaterialTheme.typography.bodySmall)
+        is Step.Tools -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Tools, null, Modifier.size(16.dp), tint = colors.soft)
+                Text(toolSummary(step.names), color = colors.soft, style = MaterialTheme.typography.bodySmall)
+            }
+            if (step.reviewed || step.risky) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (step.reviewed) Tag(stringResource(R.string.auto_checked))
+                    if (step.risky) Tag(stringResource(R.string.risky_step), warning = true)
+                }
+            }
         }
+        is Step.Renew -> RenewDivider(step.entry.text)
         is Step.Notice -> Text(
             step.entry.text, color = colors.soft, style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+@Composable
+private fun RenewDivider(brief: String) {
+    var open by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HorizontalDivider(Modifier.weight(1f), color = colors.control)
+            Text(stringResource(R.string.renew_divider), color = colors.soft, style = MaterialTheme.typography.labelSmall)
+            HorizontalDivider(Modifier.weight(1f), color = colors.control)
+        }
+        if (brief.isNotEmpty()) {
+            Text(
+                stringResource(R.string.renew_brief),
+                color = colors.soft,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.align(Alignment.CenterHorizontally).clickable { open = !open }.padding(4.dp),
+            )
+            if (open) {
+                Text(inlineMarkdown(brief), color = colors.soft, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EntryAttachments(model: AppModel, attachments: List<AttachmentRef>, onOpenImage: (AttachmentRef) -> Unit) {
+    val images = attachments.filter { it.kind == "image" }
+    val files = attachments.filter { it.kind != "image" }
+    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (images.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                images.forEach { ref ->
+                    AttachmentThumbnail(model, ref) { onOpenImage(ref) }
+                }
+            }
+        }
+        files.forEach { file ->
+            Row(
+                Modifier.background(colors.bubble, RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(Icons.Artifacts, null, Modifier.size(14.dp), tint = colors.soft)
+                Text(file.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (file.pages != null) {
+                    Text("${file.pages}p", color = colors.soft, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttachmentThumbnail(model: AppModel, ref: AttachmentRef, onClick: () -> Unit) {
+    var bitmap by remember(ref.id) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(ref.id) {
+        val bytes = model.fetchAttachmentBytes(ref.id, thumb = true) ?: return@LaunchedEffect
+        bitmap = withContext(Dispatchers.IO) {
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }
+    }
+    Box(
+        Modifier.size(96.dp).clip(RoundedCornerShape(12.dp)).background(colors.bubble).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        val img = bitmap
+        if (img != null) {
+            Image(img, ref.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        } else {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = colors.soft)
+        }
+    }
+}
+
+@Composable
+private fun AttachmentLightbox(model: AppModel, ref: AttachmentRef, onDismiss: () -> Unit) {
+    var bitmap by remember(ref.id) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(ref.id) {
+        val bytes = model.fetchAttachmentBytes(ref.id, thumb = false) ?: return@LaunchedEffect
+        bitmap = withContext(Dispatchers.IO) {
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }
+    }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize(), color = colors.paper) {
+            Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(ref.name, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) }
+                }
+                Box(Modifier.fillMaxWidth().weight(1f).padding(16.dp), contentAlignment = Alignment.Center) {
+                    val img = bitmap
+                    if (img != null) {
+                        Image(img, ref.name, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+                    } else {
+                        CircularProgressIndicator(color = colors.soft)
+                    }
+                }
+            }
+        }
     }
 }
 

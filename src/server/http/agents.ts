@@ -4,7 +4,7 @@ import type { Agents } from "../agent/runner.ts";
 import { invalid } from "../errors.ts";
 import type { Store } from "../store.ts";
 import { idempotent } from "./idempotency.ts";
-import { optArray, optEnum, optString, readJson, reqString } from "./input.ts";
+import { optArray, optBoolean, optEnum, optString, readJson, reqString } from "./input.ts";
 import type { AppEnv } from "./problem.ts";
 
 /** One answer of a structured question card: option indexes and the person's own words. */
@@ -27,15 +27,17 @@ function questionAnswer(value: unknown): QuestionAnswer {
 /** Sending messages, stopping, continuing, and answering approvals and questions. */
 /**
  * A decision made on a paired phone. "Always allow" for a tool that acts with the person's sign-ins
- * is only given where its scope is said (spec 21.2), and the phone's card does not show that yet:
- * from a phone it allows this one call. Security review, 2026-11-16.
+ * is only given where its scope is said (spec 21.2): older phone builds that do not send
+ * `confirmedWarning: true` are safely downgraded to `allow_once`; updated builds that display the
+ * warning and require explicit confirmation pass `confirmedWarning: true`.
  */
 export function decisionFromPhone<T extends string>(
 	decision: T,
 	request: unknown,
+	confirmedWarning = false,
 ): T | "allow_once" {
 	const warned = (request as { warning?: unknown } | null)?.warning !== undefined;
-	return decision === "allow_always" && warned ? "allow_once" : decision;
+	return decision === "allow_always" && warned && !confirmedWarning ? "allow_once" : decision;
 }
 
 export function agentRoutes(
@@ -51,7 +53,21 @@ export function agentRoutes(
 
 	app.post("/sessions/:id/messages", once, async (c) => {
 		const fields = await readJson(c);
-		const result = agents.send(c.req.param("id"), reqString(fields, "text", 100_000));
+		const text = optString(fields, "text", 100_000) ?? "";
+		const rawAttachments = optArray(fields, "attachments");
+		let attachmentIds: string[] | undefined;
+		if (rawAttachments !== undefined) {
+			if (
+				rawAttachments.length > 10 ||
+				rawAttachments.some(
+					(item) => typeof item !== "string" || item.length === 0 || item.length > 100,
+				)
+			) {
+				throw invalid("attachments must be a list of at most 10 attachment ids.", "attachments");
+			}
+			attachmentIds = rawAttachments as string[];
+		}
+		const result = agents.send(c.req.param("id"), text, attachmentIds);
 		return c.json(result, "entry" in result ? 201 : 202);
 	});
 
@@ -82,12 +98,23 @@ export function agentRoutes(
 		return c.body(null, 202);
 	});
 
+	app.post("/sessions/:id/renew", async (c) => {
+		const id = c.req.param("id");
+		store.getSession(id);
+		const contentType = c.req.header("Content-Type") ?? "";
+		const fields = /^application\/json\b/i.test(contentType) ? await readJson(c) : {};
+		const summarize = optBoolean(fields, "summarize") ?? true;
+		const status = await agents.renewNow(id, summarize);
+		return c.json({ status, session: store.getSession(id) });
+	});
+
 	app.post("/approvals/:id", async (c) => {
 		const fields = await readJson(c);
 		const asked = optEnum(fields, "decision", ["allow_once", "allow_always", "deny"] as const);
+		const confirmedWarning = optBoolean(fields, "confirmedWarning") ?? false;
 		const decision =
 			asked && c.env?.device
-				? decisionFromPhone(asked, store.getApproval(c.req.param("id")).request)
+				? decisionFromPhone(asked, store.getApproval(c.req.param("id")).request, confirmedWarning)
 				: asked;
 		const reason = optString(fields, "reason", 2000);
 		const answer = optString(fields, "answer", 10_000);

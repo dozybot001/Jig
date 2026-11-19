@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, relative } from "node:path";
 import { createTwoFilesPatch } from "diff";
-import type { JsonObject } from "../../shared/messages.ts";
+import type { ImageBlock, JsonObject, TextBlock } from "../../shared/messages.ts";
 import type { Session } from "../../shared/types.ts";
+import { isPdfBuffer, readPdf } from "../pdf.ts";
 import { resolvePath } from "../permissions/paths.ts";
 import { countOccurrences, findUnique } from "./match.ts";
 import { MAX_BYTES, MAX_LINES } from "./process.ts";
@@ -20,6 +21,7 @@ import {
 
 const MAX_LINE_CHARS = 2000;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
+const MAX_PDF_BYTES = 50 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_DIFF_CHARS = 200_000;
 const MAX_PREVIEW_CHARS = 40_000;
@@ -129,10 +131,49 @@ function splitLines(content: string): string[] {
 	return lines;
 }
 
+async function readPdfToolResult(
+	shown: string,
+	path: string,
+	data: Buffer,
+	pages: string | undefined,
+	ctx: Parameters<ToolDefinition["run"]>[1],
+): Promise<ToolResult> {
+	let result: Awaited<ReturnType<typeof readPdf>>;
+	try {
+		result = await readPdf(data, { pages, renderScanned: ctx.acceptsImages });
+	} catch (error) {
+		return errorResult(`Could not read PDF ${shown}: ${(error as Error).message}`);
+	}
+	ctx.readState?.record(path, data);
+	const notes: string[] = [];
+	const lastRead = result.readPages.at(-1) ?? 0;
+	if ((result.truncatedPages || result.truncatedBytes) && lastRead < result.totalPages) {
+		notes.push(
+			`[Showing ${result.readPages.length} of ${result.totalPages} pages. Continue with pages "${lastRead + 1}-${Math.min(result.totalPages, lastRead + 20)}".]`,
+		);
+	}
+	if (result.scannedUnrenderedPages.length > 0) {
+		const why = ctx.acceptsImages
+			? "Only up to 5 scanned pages are rendered per call; pass a narrower pages range to view them."
+			: "The current model cannot read images, so scanned pages could not be rendered.";
+		notes.push(
+			`[Scanned pages without images: ${result.scannedUnrenderedPages.join(", ")}. ${why}]`,
+		);
+	}
+	const header = `PDF ${shown} (${result.totalPages} page${result.totalPages === 1 ? "" : "s"}):`;
+	const body = [header, result.text, ...notes].filter(Boolean).join("\n\n");
+	const content: (TextBlock | ImageBlock)[] = [text(body)];
+	for (const img of result.images) {
+		content.push(text(`Rendered PDF page ${img.page} of ${shown}:`));
+		content.push({ type: "image", data: img.data.toString("base64"), mimeType: img.mimeType });
+	}
+	return { content };
+}
+
 export const readTool: ToolDefinition = {
 	name: "read",
 	description:
-		"Read a text file or an image. Text comes back with line numbers. A read stops at 2000 lines or 50 KB; use offset (first line, from 1) and limit (number of lines) to read more. Paths are absolute or relative to the working folder.",
+		"Read a text file, a PDF or an image. Text comes back with line numbers and stops at 2000 lines or 50 KB (use offset and limit to read more). For PDF files, text is extracted by page (up to 20 pages or 50 KB at a time; pass pages like '1-5' or '3' to read specific pages; scanned pages are rendered as images when the model accepts images). Paths are absolute or relative to the working folder.",
 	parameters: {
 		type: "object",
 		properties: {
@@ -143,6 +184,10 @@ export const readTool: ToolDefinition = {
 				minimum: 1,
 				maximum: MAX_LINES,
 				description: "Number of lines to read.",
+			},
+			pages: {
+				type: "string",
+				description: "For PDF files: page range to read, such as '1-5', '3', or '1,3-6'.",
 			},
 		},
 		required: ["path"],
@@ -159,17 +204,19 @@ export const readTool: ToolDefinition = {
 		const shown = display(path, ctx.session);
 		const offset = int(args, "offset", 1, Number.MAX_SAFE_INTEGER) ?? 1;
 		const limit = int(args, "limit", 1, MAX_LINES) ?? MAX_LINES;
+		const pages = str(args, "pages");
 		if (!existsSync(path)) return errorResult(`There is no file at ${shown}.`);
 		const stat = statSync(path);
 		if (stat.isDirectory())
 			return errorResult(`${shown} is a folder. Use glob to list files in it.`);
 
-		const imageType = IMAGE_TYPES[extname(path).toLowerCase()];
+		const ext = extname(path).toLowerCase();
+		const imageType = IMAGE_TYPES[ext];
 		if (imageType) {
 			if (!ctx.acceptsImages) return errorResult("The current model cannot read images.");
 			if (stat.size > MAX_IMAGE_BYTES) return errorResult(`${shown} is larger than 5 MB.`);
 			const data = readFileSync(path);
-			ctx.readState.record(path, data);
+			ctx.readState?.record(path, data);
 			return {
 				content: [
 					text(`Image ${shown}:`),
@@ -177,16 +224,28 @@ export const readTool: ToolDefinition = {
 				],
 			};
 		}
+		if (ext === ".pdf" || pages !== undefined) {
+			if (stat.size > MAX_PDF_BYTES) {
+				return errorResult(`${shown} is larger than 50 MB.`);
+			}
+			const data = readFileSync(path);
+			if (isPdfBuffer(data)) {
+				return readPdfToolResult(shown, path, data, pages, ctx);
+			}
+		}
 		if (stat.size > MAX_FILE_BYTES) {
 			return errorResult(
 				`${shown} is larger than 20 MB. Use grep, or head and tail in the shell, to look inside it.`,
 			);
 		}
 		const data = readFileSync(path);
+		if (isPdfBuffer(data)) {
+			return readPdfToolResult(shown, path, data, pages, ctx);
+		}
 		if (data.subarray(0, 8192).includes(0)) {
 			return errorResult(`${shown} looks like a binary file, so it was not read.`);
 		}
-		ctx.readState.record(path, data);
+		ctx.readState?.record(path, data);
 		const lines = splitLines(data.toString("utf8").replace(/^﻿/, ""));
 		if (lines.length === 0 || (lines.length === 1 && lines[0] === "")) {
 			return { content: [text(`${shown} is empty.`)] };

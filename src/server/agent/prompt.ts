@@ -3,6 +3,7 @@ import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { release } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import {
+	type ExtraDir,
 	normalizePermissionMode,
 	type PermissionMode,
 	permissionModeOf,
@@ -18,6 +19,8 @@ export interface ContextSnapshot {
 	platform: string;
 	shell: string;
 	cwd: string | null;
+	/** Additional folders this session may read or write alongside cwd. */
+	extraDirs?: ExtraDir[];
 	git: string | null;
 	instructions: InstructionFile[];
 	/** Absent in snapshots saved before the approval modes. */
@@ -45,6 +48,7 @@ export interface Told {
 	/** Absent in what was told before sessions could be renamed and moved by the main conversation. */
 	name?: string;
 	team?: string | null;
+	extraDirs?: ExtraDir[];
 }
 
 export interface SessionRef {
@@ -202,6 +206,7 @@ export function takeSnapshot(
 		platform: platformName(),
 		shell: loginShell(),
 		cwd: session.cwd,
+		...(session.options.extraDirs?.length ? { extraDirs: session.options.extraDirs } : {}),
 		git: session.cwd ? gitStatus(session.cwd) : null,
 		instructions: loadInstructions(session.cwd, yewHome, extras),
 		permissionMode: permissionModeOf(session.options),
@@ -337,6 +342,11 @@ export function systemPrompt(
 			? `- Working folder: ${snapshot.cwd}`
 			: "- No working folder: this session is a chat, without file or shell tools.",
 	];
+	if (snapshot.extraDirs && snapshot.extraDirs.length > 0) {
+		environment.push(
+			`- Additional folders: ${snapshot.extraDirs.map((d) => `${d.path} (${d.access === "write" ? "read-write" : "read-only"})`).join(", ")}`,
+		);
+	}
 	if (snapshot.git) environment.push(`- git status at the start of the session:\n${snapshot.git}`);
 	parts.push(`Environment:\n${environment.join("\n")}`);
 	if (snapshot.instructions.length > 0) {
@@ -353,6 +363,12 @@ export const SUMMARY_PROMPT = `You write the summary that lets a working session
 - what has been done: files read or changed, commands run and their results;
 - problems still open, and what was about to happen next.
 Keep exact names: file paths, functions, commands, error messages, numbers. Include only what the transcript shows. Do not add a preamble.`;
+
+export const RENEW_PROMPT = `The person is renewing this standing session's context window in place so it can start fresh without losing important long-term context. Distill the conversation below into a concise carry-over brief in the language of the conversation:
+- lasting decisions, conventions, and preferences the person established;
+- ongoing work streams, their current status, and exact file paths or identifiers;
+- open commitments or unresolved items still waiting on this session or others.
+Be brief, concrete, and factual. Include only what the transcript shows. Do not add a preamble.`;
 
 /**
  * What a helper is told (blueprint 6.11, item 43): one task, tools that only look, nobody to ask, and

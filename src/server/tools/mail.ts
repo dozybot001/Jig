@@ -400,6 +400,26 @@ export const manageYewTool: ToolDefinition = {
 						},
 						can_post_cards: { type: "boolean" },
 						can_manage: { type: "boolean", description: "May use manage_yew." },
+						extra_dirs: {
+							type: "array",
+							description:
+								"Additional folders this session may read or write alongside its working folder.",
+							items: {
+								type: "object",
+								properties: {
+									path: TEXT,
+									access: { type: "string", enum: ["read", "write"] },
+								},
+								required: ["path", "access"],
+								additionalProperties: false,
+							},
+						},
+						allowed_domains: {
+							type: "array",
+							description:
+								"Additional domains this session's sandboxed commands may reach without asking.",
+							items: TEXT,
+						},
 						pinned: { type: "boolean" },
 						archived: { type: "boolean" },
 					},
@@ -428,6 +448,17 @@ export const manageYewTool: ToolDefinition = {
 							description:
 								"Permission mode for its runs; session (the default) keeps the session's own.",
 						},
+						mode: {
+							type: "string",
+							enum: ["letter", "task_session"],
+							description:
+								"letter (default): sends a letter to the standing session; task_session: spawns a fresh isolated task session inheriting the standing session's config and reports back.",
+						},
+						auto_archive: {
+							type: "boolean",
+							description:
+								"In task_session mode, automatically archive the temporary task session when it finishes cleanly (default true).",
+						},
 						catch_up: {
 							type: "boolean",
 							description: "Run once after a time missed while Yew was not running (default true).",
@@ -454,6 +485,11 @@ export const manageYewTool: ToolDefinition = {
 					},
 					add_workspace: { type: "string", description: "A folder to add to the workspaces." },
 					remove_workspace: { type: "string", description: "A workspace, by folder or name." },
+					sandbox_allowed_domains: {
+						type: "array",
+						description: "Additional domains all sandboxed commands may reach without asking.",
+						items: TEXT,
+					},
 					theme: { type: "string", enum: ["system", "light", "dark"] },
 					language: { type: "string", enum: ["system", "zh", "en"] },
 				},

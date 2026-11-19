@@ -1,16 +1,20 @@
 import { CronError, nextRun, parseCron } from "../shared/cron.ts";
-import type {
-	Letter,
-	PermissionMode,
-	Schedule,
-	ScheduleSkip,
-	ScheduleStatus,
-	Session,
+import {
+	type Letter,
+	type PermissionMode,
+	permissionModeOf,
+	SCHEDULE_MODES,
+	type Schedule,
+	type ScheduleMode,
+	type ScheduleSkip,
+	type ScheduleStatus,
+	type Session,
 } from "../shared/types.ts";
 import { conflict, invalid, notFound } from "./errors.ts";
 import { newId } from "./ids.ts";
 import { BODY_MAX, type PostOffice, SUMMARY_MAX } from "./mail/post.ts";
-import type { Store } from "./store.ts";
+import { inheritableRules } from "./permissions/engine.ts";
+import { type Store, validateSessionName } from "./store.ts";
 
 interface ScheduleRow {
 	id: string;
@@ -19,6 +23,8 @@ interface ScheduleRow {
 	session_id: string;
 	message: string;
 	permission_mode: PermissionMode | null;
+	mode: ScheduleMode;
+	auto_archive: number;
 	catch_up: number;
 	enabled: number;
 	next_run_at: number | null;
@@ -26,6 +32,7 @@ interface ScheduleRow {
 	last_status: ScheduleStatus | null;
 	last_detail: string | null;
 	last_letter_id: string | null;
+	last_session_id: string | null;
 	created_at: number;
 	updated_at: number;
 }
@@ -38,6 +45,8 @@ function toSchedule(row: ScheduleRow): Schedule {
 		sessionId: row.session_id,
 		message: row.message,
 		permissionMode: row.permission_mode,
+		mode: row.mode ?? "letter",
+		autoArchive: row.auto_archive === 1,
 		catchUp: row.catch_up === 1,
 		enabled: row.enabled === 1,
 		nextRunAt: row.next_run_at,
@@ -45,6 +54,7 @@ function toSchedule(row: ScheduleRow): Schedule {
 		lastStatus: row.last_status,
 		lastDetail: row.last_detail,
 		lastLetterId: row.last_letter_id,
+		lastSessionId: row.last_session_id,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
 	};
@@ -57,6 +67,8 @@ export interface ScheduleFields {
 	session?: string;
 	message?: string;
 	permissionMode?: PermissionMode | null;
+	mode?: ScheduleMode;
+	autoArchive?: boolean;
 	catchUp?: boolean;
 	enabled?: boolean;
 }
@@ -68,6 +80,8 @@ export interface ScheduleValues {
 	sessionId: string;
 	message: string;
 	permissionMode: PermissionMode | null;
+	mode: ScheduleMode;
+	autoArchive: boolean;
 	catchUp: boolean;
 	enabled: boolean;
 }
@@ -172,6 +186,10 @@ export class ScheduleBook {
 		if ([...message].length > BODY_MAX) {
 			throw invalid(`The letter can be at most ${BODY_MAX} characters.`, "message");
 		}
+		const mode: ScheduleMode = fields.mode ?? current?.mode ?? "letter";
+		if (!(SCHEDULE_MODES as readonly string[]).includes(mode)) {
+			throw invalid(`mode must be one of ${SCHEDULE_MODES.join(", ")}.`, "mode");
+		}
 		return {
 			name,
 			cron,
@@ -181,6 +199,8 @@ export class ScheduleBook {
 				fields.permissionMode === undefined
 					? (current?.permissionMode ?? null)
 					: fields.permissionMode,
+			mode,
+			autoArchive: fields.autoArchive ?? current?.autoArchive ?? true,
 			catchUp: fields.catchUp ?? current?.catchUp ?? true,
 			enabled: fields.enabled ?? current?.enabled ?? true,
 		};
@@ -213,8 +233,8 @@ export class ScheduleBook {
 		this.#store.tx(() => {
 			this.#store.db
 				.prepare(
-					`INSERT INTO schedules (id, name, cron, session_id, message, permission_mode, catch_up, enabled,
-						next_run_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					`INSERT INTO schedules (id, name, cron, session_id, message, permission_mode, mode, auto_archive, catch_up, enabled,
+						next_run_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				)
 				.run(
 					id,
@@ -223,6 +243,8 @@ export class ScheduleBook {
 					values.sessionId,
 					values.message,
 					values.permissionMode,
+					values.mode,
+					values.autoArchive ? 1 : 0,
 					values.catchUp ? 1 : 0,
 					values.enabled ? 1 : 0,
 					values.enabled ? nextAfter(values.cron, now) : null,
@@ -248,7 +270,7 @@ export class ScheduleBook {
 			this.#store.db
 				.prepare(
 					`UPDATE schedules SET name = ?, cron = ?, session_id = ?, message = ?, permission_mode = ?,
-						catch_up = ?, enabled = ?, next_run_at = ?, updated_at = ? WHERE id = ?`,
+						mode = ?, auto_archive = ?, catch_up = ?, enabled = ?, next_run_at = ?, updated_at = ? WHERE id = ?`,
 				)
 				.run(
 					values.name,
@@ -256,6 +278,8 @@ export class ScheduleBook {
 					values.sessionId,
 					values.message,
 					values.permissionMode,
+					values.mode,
+					values.autoArchive ? 1 : 0,
 					values.catchUp ? 1 : 0,
 					values.enabled ? 1 : 0,
 					next,
@@ -298,13 +322,13 @@ export class ScheduleBook {
 		this.#publish();
 	}
 
-	/** A run started: its letter is on its way. */
-	started(id: string, letterId: string, at: number): void {
+	/** A run started: its letter (and optional fresh task session) is on its way. */
+	started(id: string, letterId: string, at: number, sessionId: string | null = null): void {
 		this.#store.db
 			.prepare(
-				"UPDATE schedules SET last_run_at = ?, last_status = 'running', last_detail = NULL, last_letter_id = ? WHERE id = ?",
+				"UPDATE schedules SET last_run_at = ?, last_status = 'running', last_detail = NULL, last_letter_id = ?, last_session_id = ? WHERE id = ?",
 			)
-			.run(at, letterId, id);
+			.run(at, letterId, sessionId, id);
 		this.#publish();
 	}
 
@@ -378,35 +402,77 @@ export class Scheduler {
 		this.#log = log;
 	}
 
-	/** Sends the task's letter now, unless the session is archived or the last run is still going. */
-	run(id: string, now = Date.now()): { letter: Letter } | { skipped: ScheduleSkip } {
+	/** Sends the task's letter (or spawns a fresh task session) now, unless archived or busy. */
+	run(
+		id: string,
+		now = Date.now(),
+	): { letter: Letter; session?: Session } | { skipped: ScheduleSkip } {
 		const schedule = this.book.get(id);
-		let session: Session | null = null;
+		let owner: Session | null = null;
 		try {
-			session = this.#store.getSession(schedule.sessionId);
+			owner = this.#store.getSession(schedule.sessionId);
 		} catch {
-			session = null;
+			owner = null;
 		}
-		if (!session || session.archivedAt !== null) {
+		if (!owner || owner.archivedAt !== null) {
 			this.book.skipped(id, "archived", now);
 			return { skipped: "archived" };
 		}
-		if (schedule.lastLetterId && this.#open(schedule.lastLetterId)) {
+		if (
+			(schedule.lastLetterId && this.#open(schedule.lastLetterId)) ||
+			(schedule.lastSessionId && this.#sessionBusy(schedule.lastSessionId))
+		) {
 			this.book.skipped(id, "busy", now);
 			return { skipped: "busy" };
 		}
-		// A run stands in for the person: a full quota of letters again and a new chain, as when they write.
-		this.#store.resetLettersSent(session.id);
-		this.#post.resetChain(session.id);
 		const [first = "", ...rest] = schedule.message.split("\n");
 		const line = first.trim();
 		const summary = clip(line, SUMMARY_MAX);
 		const body = summary === line ? rest.join("\n").trim() : schedule.message;
+
+		if (schedule.mode === "task_session") {
+			const stamp = formatRunStamp(now);
+			const rawBase = `${schedule.name.replace(/@/g, "")} · ${stamp}`;
+			const valid = validateSessionName(clip(rawBase, 55));
+			let name = valid;
+			for (let n = 2; this.#store.findSessionByName(name); n++) {
+				name = `${valid.slice(0, 50)} ${n}`;
+			}
+			const taskSession = this.#store.createSession({
+				name,
+				kind: "task",
+				groupId: owner.groupId,
+				cwd: owner.cwd,
+				responsibility: owner.responsibility,
+				provider: owner.provider,
+				model: owner.model,
+				thinking: owner.thinking,
+				rules: inheritableRules(owner.rules),
+				options: {
+					permissionMode: schedule.permissionMode ?? permissionModeOf(owner.options),
+					...(owner.options.extraDirs?.length ? { extraDirs: owner.options.extraDirs } : {}),
+					...(owner.options.allowedDomains?.length
+						? { allowedDomains: owner.options.allowedDomains }
+						: {}),
+				},
+				parentId: owner.id,
+			});
+			const letter = this.#post.send(
+				{ kind: "schedule", schedule },
+				{ to: taskSession.id, kind: "request", summary, body },
+			);
+			this.book.started(id, letter.id, now, taskSession.id);
+			return { letter, session: taskSession };
+		}
+
+		// Letter mode: stands in for the person on the standing session with a fresh quota and chain.
+		this.#store.resetLettersSent(owner.id);
+		this.#post.resetChain(owner.id);
 		const letter = this.#post.send(
 			{ kind: "schedule", schedule },
-			{ to: session.id, kind: "request", summary, body },
+			{ to: owner.id, kind: "request", summary, body },
 		);
-		this.book.started(id, letter.id, now);
+		this.book.started(id, letter.id, now, null);
 		return { letter };
 	}
 
@@ -465,6 +531,21 @@ export class Scheduler {
 			return false;
 		}
 	}
+
+	#sessionBusy(sessionId: string): boolean {
+		try {
+			const status = this.#store.getSession(sessionId).status;
+			return status === "working" || status === "waiting";
+		} catch {
+			return false;
+		}
+	}
+}
+
+function formatRunStamp(ms: number): string {
+	const d = new Date(ms);
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 /** The run of a task was refused because it still runs, for the HTTP layer and the command line. */
