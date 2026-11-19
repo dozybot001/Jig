@@ -2,6 +2,12 @@
 
 本文件记录 Yew Harness（原名 Jig，1.3.0、1.4.0 叫 Yew）各版本中用户能感知的变化。格式参照 [Keep a Changelog 1.1.0](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### 修复
+
+- `yew app install` 在签名之后才去掉应用上的隔离属性：由仍带着这个属性的旧 Yew Harness 更新时，签名会重写程序，原来的做法会让程序又带上它。
+
 ## [1.8.2] - 2026-11-19
 
 ### 变更

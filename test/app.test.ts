@@ -110,6 +110,8 @@ describe("yew app", () => {
 		assert.ok(existsSync(join(app, "Contents", "Resources", "AppIcon.icns")));
 		const signing = calls.indexOf(`codesign --force --sign - ${app}`);
 		assert.ok(signing > calls.findIndex((call) => call.startsWith("iconutil")));
+		// The download mark comes off after signing, which writes the program anew.
+		assert.ok(calls.indexOf(`xattr -r -d com.apple.quarantine ${app}`) > signing);
 		assert.deepEqual(JSON.parse((await run(host, ["status", "--json"])).out), {
 			installed: true,
 			app,
