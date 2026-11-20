@@ -7,7 +7,7 @@ export const POLICY_VERSION = "2.9";
 
 export const POLICY = {
 	zh: {
-		date: "2026 年 11 月 19 日",
+		date: "2026 年 11 月 20 日",
 		privacy: [
 			"Yew Harness 是在你自己的电脑上运行的软件，手机上的 Yew Harness（iPhone 和安卓）只连接你自己电脑上的 Yew Harness；安卓应用另外会查有没有新版本，见下文。榫卯 Tenon AI 不收集、不接收你在 Yew Harness 里的内容，Yew Harness 里没有统计、遥测或上报代码。",
 			"保存在你电脑上的数据：会话、消息、工具调用记录、操作授权、会话之间的信件、你在审批中心做的决定、定时任务和设置存在 Yew Harness 的数据目录（默认 ~/.yew）里的数据库中；服务商的 API Key，以及你在浏览器里登录 MCP 服务得到的访问令牌、刷新令牌和 Yew Harness 为它注册的客户端，存在系统钥匙串里；MCP 服务的配置写在数据目录的 mcp.json 里，包括你填的密钥和你自己建的 Google 客户端的 ID 和密钥；超长的命令输出存在数据目录的 tmp 文件夹里；会话存下的产物（文档、页面、数据和图表）的各个版本存在数据目录的 artifacts 文件夹里。Yew Harness 自带的浏览器默认经 Playwright 扩展使用你自己的 Chrome，Cookie、缓存和浏览记录留在你的 Chrome 里；在设置里改用单独的窗口时，那个窗口的资料（你在里面登录过的网站的 Cookie、缓存和浏览记录）存在数据目录的 browser 文件夹里。用 yew service 设了开机启动时，运行日志（启动、出错和连接中继的记录，不含对话内容）存在数据目录的 logs 文件夹里。用 Mac 应用打开界面时，macOS 替这个应用把登录 Yew Harness 用的 Cookie（30 天不用就失效）、界面文件的缓存、界面的几项本地设置和窗口的位置大小，存在 ~/Library 里 cn.tenonai.apps.yew.desktop 名下，不含会话内容。这些数据一直保存，直到你删除。你在设置里指定了审批记录文件时，Yew Harness 把每个决定追加到那个文件里。",
@@ -24,7 +24,7 @@ export const POLICY = {
 		],
 	},
 	en: {
-		date: "Nov 19, 2026",
+		date: "Nov 20, 2026",
 		privacy: [
 			"Yew Harness runs on your own computer, and Yew Harness on your phone (iPhone or Android) connects only to Yew Harness on your own computer; the Android app also checks for new versions, as described below. Tenon AI does not collect or receive your content in Yew Harness, and Yew Harness contains no analytics, telemetry or reporting code.",
 			"Data kept on your computer: sessions, messages, tool call records, permissions you granted, letters between sessions, the decisions you make in the approval center, scheduled tasks and settings are stored in a database in Yew Harness's data folder (~/.yew by default); provider API keys, and the access tokens, refresh tokens and client registrations Yew Harness gets when you sign in to an MCP server in your browser, are stored in the system keychain; MCP server settings are kept in mcp.json in the data folder, including keys you enter and the ID and secret of a Google client you created yourself; very long command output is stored in the tmp folder of the data folder; every version of the artifacts sessions save (documents, pages, data and charts) is stored in its artifacts folder. Yew Harness's built-in browser uses your own Chrome by default, through the Playwright extension, and its cookies, cache and history stay in your Chrome; if you choose a separate window in Settings, that window's profile (cookies, cache and history of the sites you signed in to there) is stored in the browser folder of the data folder. When you set Yew Harness to start at login with yew service, its service log (start-up, errors and relay connection lines, without conversation content) is stored in the logs folder of the data folder. When you open the interface in the Mac app, macOS keeps for it, under cn.tenonai.apps.yew.desktop in ~/Library, the cookie that signs you in to Yew Harness (it expires after 30 days without use), a cache of the interface's files, a few local interface settings and the window's position and size, without any session content. This data stays until you delete it. If you set a decision log file in Settings, Yew Harness adds each decision to that file.",
