@@ -5,9 +5,7 @@
 set -Eeuo pipefail
 cd "$(dirname "$0")/../.."
 [[ "$(git symbolic-ref --short HEAD)" == main ]] || { echo 'Publish from main.' >&2; exit 1; }
-# The Android app is written in the same checkout by another session and is not part of the relay,
-# so its work in progress does not block a release.
-[[ -z "$(git status --porcelain -- . ':!android' ':!docs/android.md')" ]] || { echo 'Commit the complete release before publishing.' >&2; exit 1; }
+[[ -z "$(git status --porcelain)" ]] || { echo 'Commit the complete release before publishing.' >&2; exit 1; }
 release="$(git rev-parse HEAD)"
 # A secret scan over the whole history, a dependency audit and the checks block a release.
 gitleaks git --no-banner --redact --log-level warn .

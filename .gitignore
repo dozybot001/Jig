@@ -18,3 +18,8 @@ ios/**/xcuserdata/
 *.xcuserstate
 ios/build/
 /build/
+
+# Agent tools (instructions live in AGENTS.md)
+.claude/
+.codex/
+.intent/

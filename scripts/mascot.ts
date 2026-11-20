@@ -1,5 +1,5 @@
 /**
- * Turns the mascot's generated pictures into the files Yew shows (docs/mascot.md, section 7).
+ * Turns the mascot's generated pictures into the files Yew shows (the pose list in Tenon-AI, docs/products/yew/mascot.md, section 7).
  *
  * Poses: every <pose>.png in the source folder (by default ~/Pictures/素材/Yew/poses, where the
  * originals stay out of git) becomes web/public/mascot/<pose>.webp:
@@ -13,7 +13,7 @@
  *   FIT);
  * - the WebP is written at the highest quality that stays within about 50 KB.
  *
- * The portrait (docs/mascot.md, section 6) is cut the same way, cropped to her and kept large, its long
+ * The portrait (mascot.md, section 6) is cut the same way, cropped to her and kept large, its long
  * side at least 2400 pixels.
  *
  * The pixels are worked on in Google Chrome, which also encodes the WebP: headless, driven by

@@ -1,6 +1,6 @@
 # Yew Harness 对外介绍
 
-版本 0.43（2026-11-20）。官网产品库、README、App Store 描述和各渠道介绍 Yew Harness 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是[产品蓝图](blueprint.md)第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
+版本 0.43（2026-11-20）。官网产品库、README、App Store 描述和各渠道介绍 Yew Harness 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是产品蓝图（Tenon-AI 的 `docs/products/yew/blueprint.md`）第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
 
 ## 一、定义
 
@@ -47,7 +47,7 @@ Yew Harness 的特点不在单个会话多能干，而在一组会话怎样组�
   - 定时任务：按时以定时任务的名义给一个常设会话寄信，会话无人值守地做完，回报寄给主对话。讲主次结构时可以带上。
   - 每日费用上限：给一个会话或全部会话设每天最多花多少美元（按服务商的价格估算），到 80% 提醒，到上限会话停下，点继续当天再给同样多的额度。提醒现在写在会话记录里，不写「推送提醒」。
   - 开机启动：`yew service install` 让 Yew Harness 在登录后自动启动，macOS 和 Linux 都支持。
-- **写手机时**：会话仍在 Mac 上的 Yew Harness 里运行，手机经中继连到这台 Mac，所以 Mac 上要开着 Yew Harness。安卓版已发布（1.0.1 起），安装包在 GitHub 和 Gitee 的 Releases 里，由公司签名；介绍下载时只指向官网 Yew Harness 页的「安卓版」一节（`https://tenonai.cn/zh/products/yew/#android`），那里有两个下载入口和签名证书指纹，不直链安装包文件。iPhone 应用还没上架，之后经 TestFlight 和 App Store 发布，不写成可以下载。安卓版和 iPhone 版不同的地方见 [安卓版文档](android.md) 第 5 节：安卓不用推送服务，打开通知后由应用在后台保持到中继的连接，系统会显示一条常驻通知。安卓版只在模拟器上走查过，真机和真实中继上的配对、通知没验过，写的时候不说「实测」。API Key、配对和移除手机只在 Mac 上操作。
+- **写手机时**：会话仍在 Mac 上的 Yew Harness 里运行，手机经中继连到这台 Mac，所以 Mac 上要开着 Yew Harness。安卓版已发布（1.0.1 起），安装包在 GitHub 和 Gitee 的 Releases 里，由公司签名；介绍下载时只指向官网 Yew Harness 页的「安卓版」一节（`https://tenonai.cn/zh/products/yew/#android`），那里有两个下载入口和签名证书指纹，不直链安装包文件。iPhone 应用还没上架，之后经 TestFlight 和 App Store 发布，不写成可以下载。安卓版和 iPhone 版不同的地方见安卓版文档（Tenon-AI 的 `docs/products/yew/android.md`）第 5 节：安卓不用推送服务，打开通知后由应用在后台保持到中继的连接，系统会显示一条常驻通知。安卓版只在模拟器上走查过，真机和真实中继上的配对、通知没验过，写的时候不说「实测」。API Key、配对和移除手机只在 Mac 上操作。
 - **写模型时**：模型接入用开源库 pi-ai；Agent 循环、工具和权限是 Yew Harness 自己写的，所以不写「基于 Pi Agent」。设置里列出 pi-ai 内置的 33 个服务商入口，来自 23 家（同一家的不同地区、套餐分开列），还能添加兼容 OpenAI 接口的服务商或本机运行的模型。每个会话单独选，默认 DeepSeek。
   - 通知：审批中心有新的待办、会话出错、任务做完、费用到上限时通知手机，内容端到端加密。中继已上线（`wss://relay.tenonai.cn`）。iPhone 的通知只在模拟器上验到 Apple 接受为止，真机上没验过，写的时候不说「实测」。
   - 产物：会话把文档、页面、数据和图表存成产物，有版本，在电脑和手机上看；HTML 页面在隔离环境里显示。
@@ -127,7 +127,7 @@ Yew Harness 的特点不在单个会话多能干，而在一组会话怎样组�
 
 ## 七、标识与截图
 
-- **产品图形**：一枝红豆杉，红色的果（`#C8323F`，带深绿的种子）和一片叶子；叶子浅色主题用深绿 `#1F3A2E`，深色主题用浅灰绿 `#E3E8E4`（蓝图第十二节）。文件是 `web/public/icons/yew-mark.svg`；字标是 Young Serif 描出的「Yew」（`web/src/components/icons.tsx` 的 `YewWordmark`），产品名的地方后面配一个小一号的「Harness」（`ProductName`）。组合标志不带 Tenon 标志，Tenon 标志只用在关于页的出品方（规范 2.35 第 1 节）。红发女孩的名字是 Yew（创始人 11-18：「不要说吉祥物，它的名字就是 Yew」），对外不叫吉祥物、mascot；她的 38 个姿势和一张高清立绘（`portrait.webp`，1108×2400，透明底）在 `web/public/mascot/`，清单见[出图清单](mascot.md)。
+- **产品图形**：一枝红豆杉，红色的果（`#C8323F`，带深绿的种子）和一片叶子；叶子浅色主题用深绿 `#1F3A2E`，深色主题用浅灰绿 `#E3E8E4`（蓝图第十二节）。文件是 `web/public/icons/yew-mark.svg`；字标是 Young Serif 描出的「Yew」（`web/src/components/icons.tsx` 的 `YewWordmark`），产品名的地方后面配一个小一号的「Harness」（`ProductName`）。组合标志不带 Tenon 标志，Tenon 标志只用在关于页的出品方（规范 2.35 第 1 节）。红发女孩的名字是 Yew（创始人 11-18：「不要说吉祥物，它的名字就是 Yew」），对外不叫吉祥物、mascot；她的 38 个姿势和一张高清立绘（`portrait.webp`，1108×2400，透明底）在 `web/public/mascot/`，清单见出图清单（Tenon-AI 的 `docs/products/yew/mascot.md`）。
 - **截图**：真实界面加本地演示数据：用临时数据目录，不读真实的 `~/.yew`；模型回复由脚本模拟，会话、信件和卡片都由 Yew Harness 自己的代码生成。网页是 1280×720 的窗口按 2 倍截取，2560×1440 PNG；iPhone 是模拟器 iPhone 17 Pro 的竖屏原图，1206×2622 PNG，调试版应用直接连同一个演示服务，状态栏统一为 9:41、满格、满电。中英文、深浅色各一套，文件名 `yew-{画面}-{zh|en}-{light|dark}.png`。六种画面讲同一件事：你让统筹上线首页改版、修好登录问题，统筹分给网站和后端。官网页脚写明「界面截图使用本地演示数据，不代表生产记录。」；页面只给截图加一道淡边框，手机截图不画机身，交原图即可。
 - **文件**：六种画面的原图都在本仓库 [docs/assets/](assets/)（11-18 从 docs/screenshots/ 挪过来，开源仓库规范要求图片放在这里），命名为 `yew-<画面>-<zh|en>-<light|dark>.png`，由 `node scripts/screenshots.ts` 生成（2026-11-18 按 Yew 的标识重拍，同日产品改名后、撤掉 Tenon 小标后，网页的五种又各重拍一次，手机那张不变；做法和参数见脚本开头）。
 

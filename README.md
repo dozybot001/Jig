@@ -92,12 +92,11 @@ The phone app connects only to the Yew Harness on your own computer: scan a QR c
 
 The documents are written in Chinese.
 
-- [Product blueprint](docs/blueprint.md): why, what, what not, and how it is accepted
 - [The system sandbox](docs/sandbox.md): what sessions' commands can and cannot do (also in English)
 - [Hooks](docs/hooks.md): commands of your own that run at set points of a session (also in English)
 - [External introduction](docs/introduction.md): the definition and capabilities used on the website and in stores
 - [Data inventory](docs/data-inventory.md): what Yew Harness keeps on your computer, and how to delete it
-- [Development conventions](AGENTS.md), [changelog](CHANGELOG.md), and the [M1](docs/archive/m1-plan.md), [M2](docs/archive/m2-plan.md) and [M3](docs/archive/m3-plan.md) implementation plans
+- [Development conventions](AGENTS.md) and [changelog](CHANGELOG.md)
 
 ## Where your data goes
 
