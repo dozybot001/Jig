@@ -522,17 +522,33 @@ const CONFIG_FLAGS = new Set([
 	"--path",
 ]);
 
-/** Whether a flag among `args` is one of `flags`, alone or as `--flag=value`, or a short one in a cluster. */
-function hasFlag(args: string[], long: string[], short = ""): boolean {
-	return args.some(
-		(arg) =>
-			long.some((flag) => arg === flag || arg.startsWith(`${flag}=`)) ||
-			(short.length > 0 &&
-				/^-[a-zA-Z]+/.test(arg) &&
-				!arg.startsWith("--") &&
-				[...arg.slice(1)].some((letter) => short.includes(letter))),
-	);
-}
+/** git init and clone options that never run anything (the security group, 11-20), in full. */
+const SETUP_FLAGS = new Set([
+	"--depth",
+	"--branch",
+	"-b",
+	"--single-branch",
+	"--no-single-branch",
+	"--no-tags",
+	"--origin",
+	"-o",
+	"--quiet",
+	"-q",
+	"--progress",
+	"--filter",
+	"--bare",
+	"--initial-branch",
+]);
+/** Those of them that take a value. */
+const SETUP_VALUE_FLAGS = new Set([
+	"--depth",
+	"--branch",
+	"-b",
+	"--origin",
+	"-o",
+	"--filter",
+	"--initial-branch",
+]);
 
 /**
  * Whether `git ...` is a plain local repository setup the guard may let write its repository's
@@ -544,32 +560,32 @@ function plainGitSetup(argv: string[]): boolean {
 	const sub = argv[1];
 	if (!sub || sub.startsWith("-")) return false;
 	const rest = argv.slice(2);
-	if (sub === "init") return !hasFlag(rest, ["--template", "--separate-git-dir"]);
-	if (sub === "clone") {
-		return !hasFlag(
-			rest,
-			[
-				"--upload-pack",
-				"--config",
-				"--template",
-				"--separate-git-dir",
-				"--reference",
-				"--server-option",
-			],
-			"uc",
-		);
+	// init and clone: only options that cannot run anything, written out in full. git takes any
+	// unambiguous abbreviation of a long option, so a list of refused ones would not hold.
+	if (sub === "init" || sub === "clone") {
+		for (let index = 0; index < rest.length; index++) {
+			const arg = rest[index] as string;
+			if (arg === "--") break;
+			if (!arg.startsWith("-")) continue;
+			const name = arg.split("=")[0] as string;
+			if (!SETUP_FLAGS.has(name)) return false;
+			if (SETUP_VALUE_FLAGS.has(name) && !arg.includes("=")) index++;
+		}
+		return true;
 	}
 	if (sub === "remote") return true;
 	if (sub === "config") {
 		let words = rest;
 		if (words[0] === "set" || words[0] === "unset") words = words.slice(1);
 		let key: string | null = null;
-		for (const word of words) {
+		for (const [index, word] of words.entries()) {
 			if (word.startsWith("-")) {
 				if (!CONFIG_FLAGS.has(word) && !word.startsWith("--type=")) return false;
 				continue;
 			}
 			key = word;
+			// Nothing that looks like an option after the key either.
+			if (words.slice(index + 1).some((later) => later.startsWith("-"))) return false;
 			break;
 		}
 		return key !== null && SAFE_CONFIG_KEY.test(key);

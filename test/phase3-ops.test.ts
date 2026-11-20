@@ -137,6 +137,14 @@ describe("phase 3.1: outer guard split & ssh/scp preview", () => {
 			"git config --file /tmp/c user.name A",
 			"git config --edit",
 			"git init > /tmp/out",
+			// Abbreviated long options, which git takes as the full ones.
+			"git clone --conf=core.fsmonitor=evil https://example.com/r.git",
+			"git clone --upload-pa=evil https://example.com/r.git",
+			"git clone --templ=/tmp/t https://example.com/r.git",
+			"git init --templ=/tmp/t",
+			"git init --separate-git=/tmp/g",
+			"git clone --conf core.fsmonitor=evil https://example.com/r.git",
+			"git config user.name A --file=/tmp/c",
 		]) {
 			assert.equal(classifyGuardMode(cmd), "default", cmd);
 		}
@@ -147,6 +155,9 @@ describe("phase 3.1: outer guard split & ssh/scp preview", () => {
 			"git config branch.main.remote origin",
 			"git config init.defaultBranch main",
 			"git remote set-url origin https://example.com/r.git",
+			"git clone --depth 1 --branch main https://example.com/r.git work",
+			"git clone -b main --single-branch https://example.com/r.git",
+			"git init --initial-branch=main",
 		]) {
 			assert.equal(classifyGuardMode(cmd), "git-setup", cmd);
 		}
