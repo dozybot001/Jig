@@ -3,6 +3,8 @@ import { MCP_PRESETS, type McpPreset, presetEntry } from "../../../src/shared/mc
 import { POLICY_VERSION } from "../../../src/shared/policy.ts";
 import {
 	DEFAULT_RELAY_URL,
+	FILE_OPENERS,
+	type FileOpener,
 	PERMISSION_MODES,
 	type PermissionMode,
 	type Session,
@@ -1149,6 +1151,7 @@ function PersonalDialog({ onClose }: { onClose: () => void }) {
 	const languageId = useId();
 	const mascotId = useId();
 	const openingId = useId();
+	const openerId = useId();
 	const save = (patch: Parameters<typeof saveSettings>[0]) =>
 		void saveSettings(patch).catch(() => {});
 	const mascot = settings?.mascot !== false;
@@ -1176,6 +1179,19 @@ function PersonalDialog({ onClose }: { onClose: () => void }) {
 							{ value: "en", label: "English" },
 						]}
 						onChange={(value) => save({ language: value as "system" | "zh" | "en" })}
+					/>
+				</SettingRow>
+			</SettingGroup>
+			<SettingGroup title={t("personal_files")}>
+				<SettingRow label={t("fileOpener")} hint={t("fileOpenerHint")} labelId={openerId}>
+					<Select
+						labelledBy={openerId}
+						value={settings?.fileOpener ?? "system"}
+						options={FILE_OPENERS.map((value) => ({
+							value,
+							label: t(`fileOpener_${value}`),
+						}))}
+						onChange={(value) => save({ fileOpener: value as FileOpener })}
 					/>
 				</SettingRow>
 			</SettingGroup>

@@ -6,6 +6,7 @@ import type {
 	Card,
 	Device,
 	Entry,
+	FileOpener,
 	Group,
 	Letter,
 	PermissionMode,
@@ -64,6 +65,8 @@ export interface Settings {
 	browser: "own" | "separate";
 	/** Yew Harness asks npm for a new version once a day (blueprint, "版本与更新"). */
 	updateCheck: boolean;
+	/** Default program used when clicking a local file link in replies. */
+	fileOpener: FileOpener;
 }
 
 /** This browser remembers "off" here, so the opening knows before the settings arrive. */

@@ -1,4 +1,7 @@
 import { execFile } from "node:child_process";
+import { statSync } from "node:fs";
+import { dirname } from "node:path";
+import type { FileOpener } from "../shared/types.ts";
 import { conflict, YewError } from "./errors.ts";
 
 /** Runs a program with its arguments, without a shell; rejects when it cannot start or fails. */
@@ -51,5 +54,113 @@ export async function showInFileManager(
 		await (options.run ?? runProgram)(program.command, program.args);
 	} catch {
 		throw new YewError("reveal-failed", 500, "The folder could not be shown.");
+	}
+}
+
+function encodeFileUrlPath(absPath: string): string {
+	return absPath
+		.split("/")
+		.map((segment) => encodeURIComponent(segment))
+		.join("/");
+}
+
+/**
+ * Builds the command that opens a local file or folder with the chosen program, jumping to
+ * `line`/`column` when the editor supports it. Never invokes a shell.
+ */
+export function openFileCommand(
+	targetPath: string,
+	options: {
+		opener: FileOpener;
+		line?: number;
+		column?: number;
+		platform?: string;
+		isDir?: boolean;
+	},
+): { command: string; args: string[] } | null {
+	const platform = options.platform ?? process.platform;
+	const { opener, line, column, isDir } = options;
+	const lineSuffix =
+		!isDir && line && line > 0 ? `:${line}${column && column > 0 ? `:${column}` : ""}` : "";
+	if (platform === "darwin") {
+		switch (opener) {
+			case "system":
+				return { command: "open", args: [targetPath] };
+			case "finder":
+				return { command: "open", args: ["-R", targetPath] };
+			case "vscode":
+				return lineSuffix
+					? {
+							command: "open",
+							args: [`vscode://file${encodeFileUrlPath(targetPath)}${lineSuffix}`],
+						}
+					: { command: "open", args: ["-a", "Visual Studio Code", targetPath] };
+			case "cursor":
+				return lineSuffix
+					? {
+							command: "open",
+							args: [`cursor://file${encodeFileUrlPath(targetPath)}${lineSuffix}`],
+						}
+					: { command: "open", args: ["-a", "Cursor", targetPath] };
+			case "zed":
+				return lineSuffix
+					? { command: "open", args: [`zed://file${encodeFileUrlPath(targetPath)}${lineSuffix}`] }
+					: { command: "open", args: ["-a", "Zed", targetPath] };
+		}
+	}
+	if (platform === "linux") {
+		switch (opener) {
+			case "system":
+				return { command: "xdg-open", args: [targetPath] };
+			case "finder":
+				return { command: "xdg-open", args: [isDir ? targetPath : dirname(targetPath)] };
+			case "vscode":
+				return lineSuffix
+					? { command: "code", args: ["--goto", `${targetPath}${lineSuffix}`] }
+					: { command: "code", args: [targetPath] };
+			case "cursor":
+				return lineSuffix
+					? { command: "cursor", args: ["--goto", `${targetPath}${lineSuffix}`] }
+					: { command: "cursor", args: [targetPath] };
+			case "zed":
+				return { command: "zed", args: [lineSuffix ? `${targetPath}${lineSuffix}` : targetPath] };
+		}
+	}
+	return null;
+}
+
+/** Opens a verified local file or folder in the person's configured editor or file manager. */
+export async function openLocalFile(
+	targetPath: string,
+	options: {
+		opener: FileOpener;
+		line?: number;
+		column?: number;
+		platform?: string;
+		run?: RunCommand;
+	},
+): Promise<void> {
+	let isDir = false;
+	try {
+		isDir = statSync(targetPath).isDirectory();
+	} catch {
+		// Caller already verified existence; treat as file if stat races.
+	}
+	const program = openFileCommand(targetPath, { ...options, isDir });
+	if (!program) {
+		throw conflict(
+			"Opening local files works on macOS and Linux.",
+			{ field: "path" },
+			"not-on-this-system",
+		);
+	}
+	try {
+		await (options.run ?? runProgram)(program.command, program.args);
+	} catch {
+		throw new YewError(
+			"open-file-failed",
+			500,
+			`Could not open ${targetPath} with ${options.opener}. Check that the app is installed.`,
+		);
 	}
 }

@@ -200,6 +200,7 @@ const COMPUTER_ONLY = [
 	"/api/system",
 	"/api/skills",
 	"/api/data",
+	"/api/open-file",
 	// Updating and restarting Yew Harness change what runs on this computer.
 	"/api/updates",
 ];

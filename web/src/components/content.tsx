@@ -12,24 +12,135 @@ import {
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import { openLocalFileLink } from "../actions.ts";
 import { t } from "../i18n.ts";
+import { getState, useAppState } from "../state.ts";
+import { NotesIcon } from "./icons.tsx";
 
 const SAFE_PROTOCOLS = /^(https?:|mailto:)/i;
+const YEW_FILE_PREFIX = "yew-file:";
 
-/** Model output is untrusted: no raw HTML, only http(s) and mailto links, opened without referrer (M1 plan, section 10). */
+interface ParsedFileLink {
+	path: string;
+	line?: number;
+	column?: number;
+}
+
+function decodeSafe(value: string): string {
+	try {
+		return decodeURIComponent(value);
+	} catch {
+		return value;
+	}
+}
+
+/**
+ * Recognizes local file links in Markdown (`file://...`, `/abs/path`, `~/path`, `./rel`, `dir/file.md`),
+ * with optional `#L12`, `#L12-L20`, `:12` or `:12:5` line/column anchors. Rejects unknown URI schemes.
+ */
+export function parseLocalFileHref(raw: string): ParsedFileLink | null {
+	const trimmed = raw.trim();
+	if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("//")) return null;
+	if (SAFE_PROTOCOLS.test(trimmed)) return null;
+
+	let body = trimmed;
+	let line: number | undefined;
+	let column: number | undefined;
+
+	const hashIndex = body.indexOf("#");
+	if (hashIndex >= 0) {
+		const fragment = body.slice(hashIndex + 1);
+		body = body.slice(0, hashIndex);
+		const match = /^L?(\d+)(?:-L?\d+)?$/i.exec(fragment);
+		if (match) line = Number.parseInt(match[1] as string, 10);
+	}
+
+	const isFileUrl = /^file:\/\//i.test(body);
+	const lineMatch = /:(\d+)(?::(\d+))?$/.exec(body);
+	if (lineMatch && lineMatch.index > (isFileUrl ? 7 : 0)) {
+		if (line === undefined) line = Number.parseInt(lineMatch[1] as string, 10);
+		if (lineMatch[2]) column = Number.parseInt(lineMatch[2], 10);
+		body = body.slice(0, lineMatch.index);
+	}
+
+	if (!body) return null;
+	if (isFileUrl) {
+		return {
+			path: body,
+			...(line !== undefined ? { line } : {}),
+			...(column !== undefined ? { column } : {}),
+		};
+	}
+
+	// Refuse any non-file URI scheme such as javascript:, data:, vbscript:, tel:, etc.
+	if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(body)) return null;
+	return {
+		path: decodeSafe(body),
+		...(line !== undefined ? { line } : {}),
+		...(column !== undefined ? { column } : {}),
+	};
+}
+
+/** Model output is untrusted: no raw HTML; web links open without referrer, local file links route via API. */
 function urlTransform(url: string): string {
-	return SAFE_PROTOCOLS.test(url.trim()) ? url : "";
+	const trimmed = url.trim();
+	if (SAFE_PROTOCOLS.test(trimmed)) return trimmed;
+	if (parseLocalFileHref(trimmed)) return `${YEW_FILE_PREFIX}${encodeURIComponent(trimmed)}`;
+	return "";
+}
+
+function FileLink({
+	raw,
+	sessionId,
+	children,
+}: {
+	raw: string;
+	sessionId?: string | null;
+	children: ReactNode;
+}) {
+	const opener = useAppState((state) => state.settings?.fileOpener ?? "system");
+	const [error, setError] = useState<string | null>(null);
+	const parsed = parseLocalFileHref(raw);
+	if (!parsed) return <span>{children}</span>;
+	const displayPath = parsed.path.replace(/^file:\/\//i, "");
+	const location = parsed.line
+		? `${decodeSafe(displayPath)}:${parsed.line}${parsed.column ? `:${parsed.column}` : ""}`
+		: decodeSafe(displayPath);
+	const open = async () => {
+		setError(null);
+		try {
+			await openLocalFileLink(parsed.path, {
+				sessionId: sessionId ?? getState().selectedId,
+				...(parsed.line !== undefined ? { line: parsed.line } : {}),
+				...(parsed.column !== undefined ? { column: parsed.column } : {}),
+			});
+		} catch (caught) {
+			const message = caught instanceof Error ? caught.message : t("openFileFailed");
+			setError(message);
+			window.setTimeout(() => setError(null), 4000);
+		}
+	};
+	return (
+		<span className="file-link-wrap">
+			<button
+				type="button"
+				className="file-link"
+				title={t("openFileTooltip", { path: location, app: t(`fileOpener_${opener}`) })}
+				onClick={() => void open()}
+			>
+				<NotesIcon />
+				<span>{children}</span>
+			</button>
+			{error && (
+				<span className="file-link-error" role="alert">
+					{error}
+				</span>
+			)}
+		</span>
+	);
 }
 
 const baseComponents: Components = {
-	a: ({ href, children }) =>
-		href ? (
-			<a href={href} target="_blank" rel="noopener noreferrer">
-				{children}
-			</a>
-		) : (
-			<span>{children}</span>
-		),
 	// Remote images are blocked by the page's CSP anyway; show where they point instead.
 	img: ({ src, alt }) => (
 		<a href={typeof src === "string" ? src : undefined} target="_blank" rel="noopener noreferrer">
@@ -219,21 +330,41 @@ export const Markdown = memo(function Markdown({
 	text,
 	live = false,
 	breaks = false,
+	sessionId,
 }: {
 	text: string;
 	live?: boolean;
 	breaks?: boolean;
+	sessionId?: string | null;
 }) {
 	const components = useMemo<Components>(
 		() => ({
 			...baseComponents,
+			a: ({ href, children }) => {
+				if (!href) return <span>{children}</span>;
+				if (href.startsWith(YEW_FILE_PREFIX)) {
+					return (
+						<FileLink
+							raw={decodeURIComponent(href.slice(YEW_FILE_PREFIX.length))}
+							sessionId={sessionId}
+						>
+							{children}
+						</FileLink>
+					);
+				}
+				return (
+					<a href={href} target="_blank" rel="noopener noreferrer">
+						{children}
+					</a>
+				);
+			},
 			pre: ({ children }) => (
 				<Capped as="pre" label={t("codeBlock")} follow={live}>
 					{children}
 				</Capped>
 			),
 		}),
-		[live],
+		[live, sessionId],
 	);
 	return (
 		<div className="markdown">

@@ -87,6 +87,10 @@ export const DEFAULT_RELAY_URL = "wss://relay.tenonai.cn";
 export const PERMISSION_MODES = ["default", "review", "skip"] as const;
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
 
+/** Program used to open local file links clicked in replies. */
+export const FILE_OPENERS = ["system", "vscode", "cursor", "zed", "finder"] as const;
+export type FileOpener = (typeof FILE_OPENERS)[number];
+
 /**
  * A mode as stored or sent: the three of now, and the ones before 1.7 (founder, 11-18): "auto"
  * (ask when needed) is the default now, and "manual" (ask each time) is gone and reads as default.

@@ -6,6 +6,7 @@ import {
 	EXTRA_DIR_ACCESS,
 	type ExtraDir,
 	type ExtraDirAccess,
+	type FileOpener,
 	normalizePermissionMode,
 	type PermissionMode,
 	type ThinkingLevel,
@@ -88,6 +89,8 @@ export const SETTING_DEFAULTS = {
 	browser: "own" as BrowserMode,
 	/** Whether Yew Harness asks npm for a new version once a day (blueprint, "版本与更新"). */
 	updateCheck: true as boolean,
+	/** Program used to open local file links clicked in replies (system default, VS Code, Cursor, Zed or Finder). */
+	fileOpener: "system" as FileOpener,
 };
 
 export const BROWSER_MODES = ["own", "separate"] as const;
@@ -139,6 +142,7 @@ export function readSettings(store: Store): Settings {
 		reviewTraceMain: store.getSetting("reviewTraceMain", SETTING_DEFAULTS.reviewTraceMain),
 		browser: store.getSetting("browser", SETTING_DEFAULTS.browser),
 		updateCheck: store.getSetting("updateCheck", SETTING_DEFAULTS.updateCheck),
+		fileOpener: store.getSetting("fileOpener", SETTING_DEFAULTS.fileOpener),
 	};
 }
 

@@ -347,4 +347,38 @@ describe("taking a conversation back", () => {
 		});
 		assert.throws(() => agents.rewind(site.id, reply.id), /summarized/);
 	});
+
+	test("restores contextTokens from surviving replies instead of resetting to zero", async () => {
+		const { store, agents, site, scripts } = setup();
+		scripts.set("Website", [
+			fauxAssistantMessage("First answer with enough words to count."),
+			fauxAssistantMessage("Second answer that adds noticeably more tokens to the context window."),
+		]);
+
+		agents.send(site.id, "Turn one.");
+		await agents.whenIdle(site.id);
+		const turnOneTokens = store.getSession(site.id).contextTokens;
+		assert.ok(turnOneTokens > 0, "turn one should record context tokens");
+
+		agents.send(site.id, "Turn two with extra detail to grow the context.");
+		await agents.whenIdle(site.id);
+		const turnTwoTokens = store.getSession(site.id).contextTokens;
+		assert.ok(turnTwoTokens > turnOneTokens, "turn two should grow context tokens");
+
+		const entries = store.listEntries(site.id, { limit: 50 }).entries;
+		const turnOneUser = entries.find((e) => e.role === "user") as Entry;
+		const turnOneReply = entries.find((e) => e.role === "assistant") as Entry;
+
+		// Forking at turn one preserves turn one's context size.
+		const forked = store.forkSession(site.id, turnOneReply.id, "Website 分叉");
+		assert.equal(store.getSession(forked.id).contextTokens, turnOneTokens);
+
+		// Rewinding to turn one restores turnOneTokens instead of 0.
+		assert.equal(agents.rewind(site.id, turnOneReply.id), 2);
+		assert.equal(store.getSession(site.id).contextTokens, turnOneTokens);
+
+		// Rewinding before the very first message leaves no context, so it drops to 0.
+		assert.equal(agents.rewind(site.id, turnOneUser.id), 2);
+		assert.equal(store.getSession(site.id).contextTokens, 0);
+	});
 });

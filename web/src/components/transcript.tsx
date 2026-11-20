@@ -51,6 +51,7 @@ import {
 	t,
 	useLang,
 } from "../i18n.ts";
+import { isImeEvent } from "../ime.ts";
 import { tally, YEW_NOTE } from "../progress.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
 import { ArtifactChip } from "./artifacts.tsx";
@@ -462,7 +463,9 @@ export function PermissionCard({ approval, session }: { approval: Approval; sess
 					aria-label={t("denyReason")}
 					value={reason}
 					onChange={(event) => setReason(event.target.value)}
-					onKeyDown={(event) => event.key === "Enter" && void action.run("deny")}
+					onKeyDown={(event) =>
+						event.key === "Enter" && !isImeEvent(event) && void action.run("deny")
+					}
 				/>
 			)}
 			{/* What "always allow" covers for a tool that acts with the person's sign-ins. */}
@@ -1031,40 +1034,57 @@ function MessageActions({
 		dateStyle: "medium",
 		timeStyle: "short",
 	}).format(entry.createdAt);
+	const copyButton = (
+		<Button
+			variant="icon"
+			aria-label={copied ? t("copied") : t("copy")}
+			title={copied ? t("copied") : t("copy")}
+			onClick={() => void copy()}
+		>
+			{copied ? <CheckIcon /> : <CopyIcon />}
+		</Button>
+	);
+	const rewindButton = canRewind ? (
+		<Button
+			variant="icon"
+			aria-label={t("rewindHere")}
+			title={session.status === "working" ? t("rewindBusy") : t("rewindHere")}
+			disabled={session.status === "working"}
+			busy={rewind.busy}
+			onClick={() => setConfirming(true)}
+		>
+			<RewindIcon />
+		</Button>
+	) : null;
+	const forkButton = (
+		<Button
+			variant="icon"
+			aria-label={t("forkFromHere")}
+			title={t(mine ? "forkBeforeHint" : "forkFromHereHint")}
+			busy={fork.busy}
+			onClick={() => void fork.run()}
+		>
+			<ForkIcon />
+		</Button>
+	);
 	return (
 		<div className={mine ? "message-actions message-actions-mine" : "message-actions"}>
 			<time className="hint" dateTime={new Date(entry.createdAt).toISOString()} title={when}>
 				{formatAgo(entry.createdAt, now)}
 			</time>
-			<Button
-				variant="icon"
-				aria-label={copied ? t("copied") : t("copy")}
-				title={copied ? t("copied") : t("copy")}
-				onClick={() => void copy()}
-			>
-				{copied ? <CheckIcon /> : <CopyIcon />}
-			</Button>
-			{canRewind && (
-				<Button
-					variant="icon"
-					aria-label={t("rewindHere")}
-					title={session.status === "working" ? t("rewindBusy") : t("rewindHere")}
-					disabled={session.status === "working"}
-					busy={rewind.busy}
-					onClick={() => setConfirming(true)}
-				>
-					<RewindIcon />
-				</Button>
+			{mine ? (
+				<>
+					{forkButton}
+					{rewindButton}
+					{copyButton}
+				</>
+			) : (
+				<>
+					{copyButton}
+					{rewindButton}
+					{forkButton}
+				</>
 			)}
-			<Button
-				variant="icon"
-				aria-label={t("forkFromHere")}
-				title={t(mine ? "forkBeforeHint" : "forkFromHereHint")}
-				busy={fork.busy}
-				onClick={() => void fork.run()}
-			>
-				<ForkIcon />
-			</Button>
 			<ErrorBox error={fork.error ?? rewind.error} />
 			{confirming && (
 				<ConfirmDialog
@@ -1299,7 +1319,7 @@ function LetterEntry({ letter }: { letter: LetterRef }) {
 }
 
 /** A message from the person, a letter, or a notice from Yew. */
-function EntryView({ entry }: { entry: Entry }) {
+function EntryView({ entry, sessionId }: { entry: Entry; sessionId: string }) {
 	switch (entry.role) {
 		case "user": {
 			if (entry.letter) return <LetterEntry letter={entry.letter} />;
@@ -1309,7 +1329,11 @@ function EntryView({ entry }: { entry: Entry }) {
 				<Capped className="msg-user" label={t("you")}>
 					<span className="visually-hidden">{t("you")}: </span>
 					{attached.length > 0 && <MessageAttachments attachments={attached} />}
-					{text && <div className="msg-user-text">{text}</div>}
+					{text && (
+						<div className="msg-user-text">
+							<Markdown text={text} breaks sessionId={sessionId} />
+						</div>
+					)}
 				</Capped>
 			);
 		}
@@ -1517,7 +1541,7 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 						if (session && entry.role === "user" && !entry.letter) {
 							return (
 								<div key={item.key} className="message message-mine">
-									<EntryView entry={entry} />
+									<EntryView entry={entry} sessionId={transcript.sessionId} />
 									<MessageActions
 										session={session}
 										entry={entry}
@@ -1528,12 +1552,12 @@ export function Transcript({ transcript }: { transcript: TranscriptState }) {
 								</div>
 							);
 						}
-						return <EntryView key={item.key} entry={entry} />;
+						return <EntryView key={item.key} entry={entry} sessionId={transcript.sessionId} />;
 					}
 					if (item.kind === "text") {
 						return (
 							<div key={item.key} className="msg-assistant">
-								<Markdown text={item.text} live={item.live} />
+								<Markdown text={item.text} live={item.live} sessionId={transcript.sessionId} />
 								{item.forkFrom && session && byId.get(item.forkFrom) && (
 									<MessageActions
 										session={session}

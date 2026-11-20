@@ -780,6 +780,10 @@ export class Store {
 				options: source.options,
 			});
 			this.#copyHistory(id, copy.id, through);
+			const restoredTokens = this.#contextTokensThrough(id, through);
+			if (restoredTokens > 0) {
+				this.#q("UPDATE sessions SET context_tokens = ? WHERE id = ?").run(restoredTokens, copy.id);
+			}
 			return this.#emitSession(copy.id);
 		});
 	}
@@ -861,8 +865,13 @@ export class Store {
 			// Earlier events can carry what was taken back. A client that missed some loads the
 			// conversation again, as it does after a rewind anyway.
 			this.#q("DELETE FROM session_events WHERE session_id = ?").run(id);
-			// A fresh look at the folder and instruction files next turn; the context is measured again.
-			this.#q("UPDATE sessions SET context = NULL, context_tokens = 0 WHERE id = ?").run(id);
+			// Recompute context_tokens from the surviving transcript instead of zeroing the meter.
+			const restoredTokens = this.#contextTokensThrough(id, throughSeq);
+			// A fresh look at the folder and instruction files next turn; context_tokens reflects the kept history.
+			this.#q("UPDATE sessions SET context = NULL, context_tokens = ? WHERE id = ?").run(
+				restoredTokens,
+				id,
+			);
 			this.appendEvent(id, { type: "rewound", throughSeq });
 			this.#emitSession(id);
 			return gone.length;
@@ -874,6 +883,72 @@ export class Store {
 			// Another connection is reading; the log is overwritten later.
 		}
 		return count;
+	}
+
+	/**
+	 * Restores the context size at `throughSeq` after a rewind or fork: uses the exact provider-reported
+	 * token total from the last surviving assistant reply after the latest compaction, plus a rough
+	 * estimate for any trailing user/tool entries (or compaction summary when no reply followed it).
+	 */
+	#contextTokensThrough(id: string, throughSeq: number): number {
+		if (throughSeq <= 0) return 0;
+		const compaction = this.#q(
+			"SELECT seq, body FROM messages WHERE session_id = ? AND seq <= ? AND rewound = 0 AND role = 'compaction' ORDER BY seq DESC LIMIT 1",
+		).get(id, throughSeq) as { seq: number; body: string } | undefined;
+		const startSeq = compaction ? compaction.seq : 0;
+		const rows = this.#q(
+			"SELECT seq, role, body FROM messages WHERE session_id = ? AND seq >= ? AND seq <= ? AND rewound = 0 ORDER BY seq ASC",
+		).all(id, startSeq, throughSeq) as { seq: number; role: string; body: string }[];
+
+		let baseTokens = 0;
+		let afterIndex = 0;
+		for (let i = rows.length - 1; i >= 0; i--) {
+			const row = rows[i];
+			if (row?.role !== "assistant") continue;
+			try {
+				const parsed = JSON.parse(row.body) as {
+					message?: {
+						usage?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
+					};
+				};
+				const usage = parsed.message?.usage;
+				if (usage) {
+					const total =
+						(usage.input ?? 0) +
+						(usage.cacheRead ?? 0) +
+						(usage.cacheWrite ?? 0) +
+						(usage.output ?? 0);
+					if (total > 0) {
+						baseTokens = total;
+						afterIndex = i + 1;
+						break;
+					}
+				}
+			} catch {
+				// Ignore malformed row and keep scanning earlier replies.
+			}
+		}
+
+		// Estimate any entries after the anchor reply (or after the compaction boundary if no reply yet).
+		let extraChars = 0;
+		for (let i = afterIndex; i < rows.length; i++) {
+			const row = rows[i];
+			if (!row) continue;
+			if (row.role === "notice") continue;
+			try {
+				const parsed = JSON.parse(row.body) as EntryBody;
+				if (parsed.role === "compaction") {
+					extraChars += parsed.compaction.summary.length;
+				} else if (parsed.role === "user" || parsed.role === "toolResult") {
+					extraChars += messageText(parsed.message).length;
+				} else if (parsed.role === "assistant") {
+					extraChars += messageText(parsed.message).length;
+				}
+			} catch {
+				// Skip unreadable row.
+			}
+		}
+		return baseTokens + Math.ceil(extraChars / 4);
 	}
 
 	duplicateSession(id: string, name: string): Session {

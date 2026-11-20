@@ -1303,6 +1303,19 @@ async function reloadIfReplaced(): Promise<void> {
 	}
 }
 
+/** Opens a local file or folder clicked in a reply using the configured opener. */
+export async function openLocalFileLink(
+	path: string,
+	options: { sessionId?: string | null; line?: number; column?: number } = {},
+): Promise<void> {
+	await api("POST", "/api/open-file", {
+		path,
+		...(options.sessionId ? { sessionId: options.sessionId } : {}),
+		...(options.line !== undefined ? { line: options.line } : {}),
+		...(options.column !== undefined ? { column: options.column } : {}),
+	});
+}
+
 export function toolCallFor(
 	calls: Record<string, ToolCallView>,
 	messageId: string,

@@ -1,4 +1,12 @@
-import { type DragEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import {
+	type DragEvent,
+	type ReactNode,
+	useEffect,
+	useId,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import type { AttachmentRef } from "../../../src/shared/messages.ts";
 import {
 	PERMISSION_MODES,
@@ -25,6 +33,13 @@ import {
 	withdrawQueued,
 } from "../actions.ts";
 import { formatCost, formatNumber, permissionHint, t, useLang } from "../i18n.ts";
+import { useImeGuard } from "../ime.ts";
+import {
+	continueMarkdownList,
+	hasMarkdownSyntax,
+	indentMarkdownList,
+	type TextEdit,
+} from "../markdown-edit.ts";
 import {
 	type ModelInfo,
 	setState,
@@ -42,7 +57,7 @@ import {
 	StagedAttachmentStrip,
 } from "./attachments.tsx";
 import { ComposerMenu, useComposerMenu } from "./composer-menu.tsx";
-import { Capped } from "./content.tsx";
+import { Capped, Markdown } from "./content.tsx";
 import { NewSessionDialog } from "./dialogs.tsx";
 import {
 	ArrowUpIcon,
@@ -54,6 +69,8 @@ import {
 	CompactIcon,
 	CompactViewIcon,
 	DetailedViewIcon,
+	EyeIcon,
+	EyeOffIcon,
 	MenuIcon,
 	NotesIcon,
 	PlayIcon,
@@ -78,6 +95,7 @@ import {
 	Menu,
 	type MenuEntry,
 	type MenuItem,
+	place,
 	Select,
 	useAction,
 } from "./ui.tsx";
@@ -300,10 +318,24 @@ function SessionHeader({
 	);
 }
 
-/** How full the context is: a small pie next to the send button, drawn like the other line icons. */
-function ContextPie({ used, total }: { used: number; total: number }) {
+/**
+ * How full the context is: a small clickable pie next to the send button. Clicking opens a popover
+ * with exact token counts, remaining capacity, auto-compaction threshold and cumulative usage.
+ */
+function ContextPie({ session, total }: { session: Session; total: number }) {
 	useLang();
+	const [open, setOpen] = useState(false);
+	const button = useRef<HTMLButtonElement>(null);
+	const pop = useRef<HTMLDivElement>(null);
+	const id = useId();
+
+	const used = session.contextTokens;
 	const percent = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+	const threshold = session.options.compactAt ?? Math.floor(total * 0.8);
+	const thresholdPercent = total > 0 ? Math.min(100, Math.round((threshold / total) * 100)) : 80;
+	const remaining = Math.max(0, total - used);
+	const cumulative =
+		session.usage.input + session.usage.output + session.usage.cacheRead + session.usage.cacheWrite;
 	const label = t("contextPercent", {
 		p: percent,
 		used: formatNumber(used),
@@ -312,29 +344,125 @@ function ContextPie({ used, total }: { used: number; total: number }) {
 	const angle = ((percent / 100) * 360 - 90) * (Math.PI / 180);
 	const x = 12 + 6 * Math.cos(angle);
 	const y = 12 + 6 * Math.sin(angle);
+
+	useLayoutEffect(() => {
+		const element = pop.current;
+		if (!element || !button.current) return;
+		if (open) {
+			element.showPopover?.();
+			place(element, button.current, 304);
+		} else if (element.matches(":popover-open")) {
+			element.hidePopover?.();
+		}
+	}, [open]);
+
+	useEffect(() => {
+		if (!open) return;
+		const onKey = (event: globalThis.KeyboardEvent) => event.key === "Escape" && setOpen(false);
+		const onDown = (event: MouseEvent) => {
+			const target = event.target as Node;
+			if (!pop.current?.contains(target) && !button.current?.contains(target)) setOpen(false);
+		};
+		document.addEventListener("keydown", onKey);
+		document.addEventListener("mousedown", onDown);
+		return () => {
+			document.removeEventListener("keydown", onKey);
+			document.removeEventListener("mousedown", onDown);
+		};
+	}, [open]);
+
 	return (
-		// biome-ignore lint/a11y/useSemanticElements: a native <meter> cannot be drawn as a pie; the role carries the same meaning
-		<span
-			className={percent >= 80 ? "context-pie context-pie-high" : "context-pie"}
-			role="meter"
-			aria-valuemin={0}
-			aria-valuemax={100}
-			aria-valuenow={percent}
-			aria-label={label}
-			title={label}
-		>
-			<svg viewBox="0 0 24 24" width={16} height={16} aria-hidden="true">
-				<circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
-				{percent >= 100 ? (
-					<circle cx="12" cy="12" r="6" fill="currentColor" />
-				) : percent > 0 ? (
-					<path
-						d={`M12 12V6A6 6 0 ${percent > 50 ? 1 : 0} 1 ${x.toFixed(2)} ${y.toFixed(2)}Z`}
-						fill="currentColor"
+		<>
+			<button
+				ref={button}
+				type="button"
+				className={
+					percent >= thresholdPercent
+						? "btn btn-ghost context-pie context-pie-high"
+						: "btn btn-ghost context-pie"
+				}
+				aria-label={label}
+				aria-expanded={open}
+				aria-controls={open ? id : undefined}
+				title={label}
+				onClick={() => setOpen((value) => !value)}
+			>
+				<svg viewBox="0 0 24 24" width={16} height={16} aria-hidden="true">
+					<circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
+					{percent >= 100 ? (
+						<circle cx="12" cy="12" r="6" fill="currentColor" />
+					) : percent > 0 ? (
+						<path
+							d={`M12 12V6A6 6 0 ${percent > 50 ? 1 : 0} 1 ${x.toFixed(2)} ${y.toFixed(2)}Z`}
+							fill="currentColor"
+						/>
+					) : null}
+				</svg>
+			</button>
+			<div
+				ref={pop}
+				id={id}
+				popover="manual"
+				role="dialog"
+				aria-label={t("contextDetailTitle")}
+				className="context-popover"
+			>
+				<div className="context-popover-head">
+					<strong>{t("contextDetailTitle")}</strong>
+					<span
+						className={
+							percent >= thresholdPercent ? "context-popover-pct high" : "context-popover-pct"
+						}
+					>
+						{percent}%
+					</span>
+				</div>
+				<div className="context-meter" aria-hidden="true">
+					<div
+						className={
+							percent >= thresholdPercent ? "context-meter-fill high" : "context-meter-fill"
+						}
+						style={{ width: `${percent}%` }}
 					/>
-				) : null}
-			</svg>
-		</span>
+					{thresholdPercent > 0 && thresholdPercent < 100 && (
+						<span className="context-meter-mark" style={{ left: `${thresholdPercent}%` }} />
+					)}
+				</div>
+				<dl className="context-stats">
+					<div>
+						<dt>{t("contextDetailUsed")}</dt>
+						<dd>
+							{formatNumber(used)} / {formatNumber(total)}
+						</dd>
+					</div>
+					<div>
+						<dt>{t("contextDetailRemaining")}</dt>
+						<dd>{formatNumber(remaining)}</dd>
+					</div>
+					<div>
+						<dt>{t("contextDetailThreshold")}</dt>
+						<dd>
+							{formatNumber(threshold)} ({thresholdPercent}%)
+						</dd>
+					</div>
+					{cumulative > 0 && (
+						<div>
+							<dt>{t("contextDetailSessionTotal")}</dt>
+							<dd>
+								{formatNumber(cumulative)} · {formatCost(session.usage.cost)}
+							</dd>
+						</div>
+					)}
+					{session.usage.cacheRead > 0 && (
+						<div>
+							<dt>{t("contextDetailCacheRead")}</dt>
+							<dd>{formatNumber(session.usage.cacheRead)}</dd>
+						</div>
+					)}
+				</dl>
+				<p className="hint context-popover-note">{t("contextDetailNote")}</p>
+			</div>
+		</>
 	);
 }
 
@@ -410,6 +538,8 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 	useLang();
 	const sandboxed = useAppState((state) => (state.health?.sandbox ?? "none") !== "none");
 	const [text, setText] = useState("");
+	const [preview, setPreview] = useState(false);
+	const ime = useImeGuard();
 	const [staged, setStaged] = useState<StagedAttachment[]>([]);
 	const [dragging, setDragging] = useState(false);
 	const fileInput = useRef<HTMLInputElement>(null);
@@ -419,6 +549,7 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 	// Clear staged attachments and object URLs when switching sessions or unmounting.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: reset staged attachments per session id
 	useEffect(() => {
+		setPreview(false);
 		setStaged((current) => {
 			for (const item of current) if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
 			return [];
@@ -513,6 +644,7 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 		}
 		setStaged([]);
 		setText("");
+		setPreview(false);
 	});
 	const stop = useAction(() => stopSession(session.id));
 	const cont = useAction(() => continueSession(session.id));
@@ -548,6 +680,14 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 	const switchFolder = useAction(async (cwd: string | null) => {
 		await updateSession(session.id, { cwd });
 	});
+	const showPreviewToggle = preview || hasMarkdownSyntax(text);
+	const applyEdit = (edit: TextEdit) => {
+		setText(edit.value);
+		setCaret(edit.caret);
+		requestAnimationFrame(() => {
+			ref.current?.setSelectionRange(edit.caret, edit.caret);
+		});
+	};
 	const sendLabel = working ? t("queueSend") : t("send");
 
 	const onDragOver = (event: DragEvent) => {
@@ -608,40 +748,80 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 							{t("attachNoVision")}
 						</p>
 					)}
-					<textarea
-						ref={ref}
-						rows={1}
-						value={text}
-						placeholder={
-							dragging
-								? t("attachHintDrop")
-								: working
-									? t("composerQueued")
-									: t("composerPlaceholder", { name: session.name })
-						}
-						aria-label={t("composerPlaceholder", { name: session.name })}
-						aria-controls={menu.open ? menu.listId : undefined}
-						onChange={(event) => {
-							setText(event.target.value);
-							setCaret(event.target.selectionStart ?? event.target.value.length);
-						}}
-						onSelect={(event) =>
-							setCaret(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
-						}
-						onPaste={(event) => {
-							const files = filesFromClipboard(event);
-							if (files.length === 0) return;
-							if (!event.clipboardData.getData("text/plain")) event.preventDefault();
-							addFiles(files);
-						}}
-						onKeyDown={(event) => {
-							if (menu.onKeyDown(event)) return;
-							if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-								event.preventDefault();
-								void send.run();
+					{preview ? (
+						<Capped className="composer-preview" label={t("previewMarkdown")}>
+							{text.trim() ? (
+								<Markdown text={text} breaks sessionId={session.id} />
+							) : (
+								<p className="hint">{t("previewEmpty")}</p>
+							)}
+						</Capped>
+					) : (
+						<textarea
+							ref={ref}
+							rows={1}
+							value={text}
+							placeholder={
+								dragging
+									? t("attachHintDrop")
+									: working
+										? t("composerQueued")
+										: t("composerPlaceholder", { name: session.name })
 							}
-						}}
-					/>
+							aria-label={t("composerPlaceholder", { name: session.name })}
+							aria-controls={menu.open ? menu.listId : undefined}
+							onCompositionStart={ime.onCompositionStart}
+							onCompositionEnd={ime.onCompositionEnd}
+							onChange={(event) => {
+								setText(event.target.value);
+								setCaret(event.target.selectionStart ?? event.target.value.length);
+							}}
+							onSelect={(event) =>
+								setCaret(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
+							}
+							onPaste={(event) => {
+								const files = filesFromClipboard(event);
+								if (files.length === 0) return;
+								if (!event.clipboardData.getData("text/plain")) event.preventDefault();
+								addFiles(files);
+							}}
+							onKeyDown={(event) => {
+								if (ime.isComposing(event)) return;
+								if (menu.onKeyDown(event)) return;
+								if (event.key === "Enter" && event.shiftKey) {
+									const el = event.currentTarget;
+									const edit = continueMarkdownList(
+										text,
+										el.selectionStart ?? text.length,
+										el.selectionEnd ?? text.length,
+									);
+									if (edit) {
+										event.preventDefault();
+										applyEdit(edit);
+									}
+									return;
+								}
+								if (event.key === "Tab") {
+									const el = event.currentTarget;
+									const edit = indentMarkdownList(
+										text,
+										el.selectionStart ?? text.length,
+										el.selectionEnd ?? text.length,
+										event.shiftKey,
+									);
+									if (edit) {
+										event.preventDefault();
+										applyEdit(edit);
+									}
+									return;
+								}
+								if (event.key === "Enter" && !event.shiftKey) {
+									event.preventDefault();
+									void send.run();
+								}
+							}}
+						/>
+					)}
 					<div className="composer-bar">
 						<div className="composer-chips">
 							<Button
@@ -680,6 +860,17 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 							/>
 						</div>
 						<div className="composer-actions">
+							{showPreviewToggle && (
+								<Button
+									variant="icon"
+									aria-pressed={preview}
+									aria-label={t(preview ? "editMarkdown" : "previewMarkdown")}
+									title={t(preview ? "editMarkdown" : "previewMarkdown")}
+									onClick={() => setPreview((value) => !value)}
+								>
+									{preview ? <EyeOffIcon /> : <EyeIcon />}
+								</Button>
+							)}
 							{!working && session.contextTokens > 0 && (
 								<>
 									<Button
@@ -713,7 +904,7 @@ function Composer({ session, transcript }: { session: Session; transcript: Trans
 									<PlayIcon />
 								</Button>
 							)}
-							{info && <ContextPie used={session.contextTokens} total={info.contextWindow} />}
+							{info && <ContextPie session={session} total={info.contextWindow} />}
 							{working && !canSend ? (
 								<Button
 									className="send-button"
@@ -848,6 +1039,8 @@ function HomeView() {
 	const settings = useAppState((state) => state.settings);
 	const homeFolder = useAppState((state) => state.homeFolder);
 	const [text, setText] = useState("");
+	const [preview, setPreview] = useState(false);
+	const ime = useImeGuard();
 	// The default workspace from the settings is chosen to start with; the bar changes it.
 	const [folder, setFolder] = useState<string | null>(
 		() =>
@@ -954,6 +1147,14 @@ function HomeView() {
 		if (next === "chat") setFolder(null);
 		ref.current?.focus();
 	};
+	const showPreviewToggle = preview || hasMarkdownSyntax(text);
+	const applyEdit = (edit: TextEdit) => {
+		setText(edit.value);
+		setCaret(edit.caret);
+		requestAnimationFrame(() => {
+			ref.current?.setSelectionRange(edit.caret, edit.caret);
+		});
+	};
 	const onDragOver = (event: DragEvent) => {
 		if (!event.dataTransfer.types.includes("Files")) return;
 		event.preventDefault();
@@ -1004,34 +1205,74 @@ function HomeView() {
 							{t("attachNoVision")}
 						</p>
 					)}
-					<textarea
-						ref={ref}
-						rows={2}
-						value={text}
-						placeholder={dragging ? t("attachHintDrop") : t("homePlaceholder")}
-						aria-label={t("homeTitle")}
-						aria-controls={menu.open ? menu.listId : undefined}
-						onChange={(event) => {
-							setText(event.target.value);
-							setCaret(event.target.selectionStart ?? event.target.value.length);
-						}}
-						onSelect={(event) =>
-							setCaret(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
-						}
-						onPaste={(event) => {
-							const files = filesFromClipboard(event);
-							if (files.length === 0) return;
-							if (!event.clipboardData.getData("text/plain")) event.preventDefault();
-							addFiles(files);
-						}}
-						onKeyDown={(event) => {
-							if (menu.onKeyDown(event)) return;
-							if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-								event.preventDefault();
-								void start.run();
+					{preview ? (
+						<Capped className="composer-preview" label={t("previewMarkdown")}>
+							{text.trim() ? (
+								<Markdown text={text} breaks />
+							) : (
+								<p className="hint">{t("previewEmpty")}</p>
+							)}
+						</Capped>
+					) : (
+						<textarea
+							ref={ref}
+							rows={2}
+							value={text}
+							placeholder={dragging ? t("attachHintDrop") : t("homePlaceholder")}
+							aria-label={t("homeTitle")}
+							aria-controls={menu.open ? menu.listId : undefined}
+							onCompositionStart={ime.onCompositionStart}
+							onCompositionEnd={ime.onCompositionEnd}
+							onChange={(event) => {
+								setText(event.target.value);
+								setCaret(event.target.selectionStart ?? event.target.value.length);
+							}}
+							onSelect={(event) =>
+								setCaret(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
 							}
-						}}
-					/>
+							onPaste={(event) => {
+								const files = filesFromClipboard(event);
+								if (files.length === 0) return;
+								if (!event.clipboardData.getData("text/plain")) event.preventDefault();
+								addFiles(files);
+							}}
+							onKeyDown={(event) => {
+								if (ime.isComposing(event)) return;
+								if (menu.onKeyDown(event)) return;
+								if (event.key === "Enter" && event.shiftKey) {
+									const el = event.currentTarget;
+									const edit = continueMarkdownList(
+										text,
+										el.selectionStart ?? text.length,
+										el.selectionEnd ?? text.length,
+									);
+									if (edit) {
+										event.preventDefault();
+										applyEdit(edit);
+									}
+									return;
+								}
+								if (event.key === "Tab") {
+									const el = event.currentTarget;
+									const edit = indentMarkdownList(
+										text,
+										el.selectionStart ?? text.length,
+										el.selectionEnd ?? text.length,
+										event.shiftKey,
+									);
+									if (edit) {
+										event.preventDefault();
+										applyEdit(edit);
+									}
+									return;
+								}
+								if (event.key === "Enter" && !event.shiftKey) {
+									event.preventDefault();
+									void start.run();
+								}
+							}}
+						/>
+					)}
 					<div className="composer-bar">
 						<div className="composer-chips">
 							<Button
@@ -1047,6 +1288,17 @@ function HomeView() {
 							<ModelPicker {...model} onChange={(patch) => setModel((m) => ({ ...m, ...patch }))} />
 						</div>
 						<div className="composer-actions">
+							{showPreviewToggle && (
+								<Button
+									variant="icon"
+									aria-pressed={preview}
+									aria-label={t(preview ? "editMarkdown" : "previewMarkdown")}
+									title={t(preview ? "editMarkdown" : "previewMarkdown")}
+									onClick={() => setPreview((value) => !value)}
+								>
+									{preview ? <EyeOffIcon /> : <EyeIcon />}
+								</Button>
+							)}
 							<Button
 								className="send-button"
 								aria-label={t("send")}

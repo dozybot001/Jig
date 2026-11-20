@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { saveSettings } from "../actions.ts";
 import { api } from "../api.ts";
 import { t, useLang } from "../i18n.ts";
+import { isImeEvent } from "../ime.ts";
 import { getState, useAppState, type Workspace } from "../state.ts";
 import { FolderIcon, PlusIcon } from "./icons.tsx";
 import { Button, Dialog, ErrorBox, Field, Select, useAction } from "./ui.tsx";
@@ -108,7 +109,7 @@ export function WorkspaceDialog({
 						spellCheck={false}
 						onChange={(event) => setPath(event.target.value)}
 						onKeyDown={(event) => {
-							if (event.key === "Enter" && !event.nativeEvent.isComposing && path.trim()) {
+							if (event.key === "Enter" && !isImeEvent(event) && path.trim()) {
 								event.preventDefault();
 								void create.run();
 							}

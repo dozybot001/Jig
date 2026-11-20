@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
-import { type Dirent, readdirSync } from "node:fs";
+import { type Dirent, existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join, relative, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import { RELAY_URL } from "../../remote/protocol.ts";
 import type {
@@ -14,17 +15,19 @@ import type {
 } from "../../shared/types.ts";
 import {
 	DEFAULT_RELAY_URL,
+	FILE_OPENERS,
 	PERMISSION_MODES,
 	RECEIVE_POLICIES,
 	SESSION_KINDS,
 	THINKING_LEVELS,
 } from "../../shared/types.ts";
 import { isBudget, isDay, lastDays, localDay } from "../budget.ts";
-import { invalid } from "../errors.ts";
+import { invalid, notFound, YewError } from "../errors.ts";
 import { type ExportLanguage, exportFileName, sessionMarkdown } from "../export.ts";
 import { pickFolder } from "../folder-picker.ts";
 import { resolveWorkingFolder } from "../paths.ts";
 import { canonical, isSecretPath, secretLocations } from "../permissions/paths.ts";
+import { openLocalFile, type RunCommand } from "../reveal.ts";
 import {
 	BROWSER_MODES,
 	type DefaultModel,
@@ -68,6 +71,10 @@ export interface ApiDeps {
 	checkModel?: ModelCheck;
 	/** Opens the system folder picker; replaced in tests so they never open a window. */
 	pickFolder?: () => Promise<string | null>;
+	/** Runs the editor/file-manager command for POST /api/open-file; replaced in tests. */
+	openFile?: RunCommand;
+	/** Overrides process.platform for POST /api/open-file tests. */
+	platform?: string;
 	/** A session was archived: the runner drops letters waiting for it. */
 	onArchived?: (sessionId: string) => void;
 	/** Phone access was turned on or off, or the relay changed. */
@@ -507,6 +514,8 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		}
 		const updateCheck = optBoolean(fields, "updateCheck");
 		if (updateCheck !== undefined) store.setSetting("updateCheck", updateCheck);
+		const fileOpener = optEnum(fields, "fileOpener", FILE_OPENERS);
+		if (fileOpener) store.setSetting("fileOpener", fileOpener);
 		const credentials = optBoolean(fields, "sandboxCredentials");
 		if (credentials !== undefined) store.setSetting("sandboxCredentials", credentials);
 		const hidden = optArray(fields, "hiddenFolders");
@@ -642,7 +651,89 @@ export function api(deps: ApiDeps): Hono<AppEnv> {
 		return c.json(detail);
 	});
 
+	// Opens a local file or folder clicked from a reply, using the person's configured editor/Finder.
+	// Computer-only (enforced by deviceLimits): paired phones never launch local apps.
+	app.post("/open-file", async (c) => {
+		if (c.env?.device) {
+			throw new YewError(
+				"mac-only",
+				403,
+				"Opening local files is only available on this computer.",
+			);
+		}
+		const fields = await readJson(c);
+		const raw = reqString(fields, "path", 4096).trim();
+		const sessionId = optString(fields, "sessionId", 100);
+		const line = optNumber(fields, "line");
+		const column = optNumber(fields, "column");
+		const opener = optEnum(fields, "opener", FILE_OPENERS) ?? readSettings(store).fileOpener;
+		if (line !== undefined && (!Number.isInteger(line) || line < 1 || line > 10_000_000)) {
+			throw invalid("line must be a positive integer.", "line");
+		}
+		if (column !== undefined && (!Number.isInteger(column) || column < 1 || column > 100_000)) {
+			throw invalid("column must be a positive integer.", "column");
+		}
+		const homeDir = deps.userHome ?? homedir();
+		const target = resolveOpenFileTarget(raw, {
+			homeDir,
+			session: sessionId ? store.getSession(sessionId) : null,
+		});
+		const settings = readSettings(store);
+		const offLimits = [
+			...settings.hiddenFolders,
+			...(deps.yewHome ? secretLocations(deps.yewHome) : secretLocations("/nonexistent-yew-home")),
+		];
+		const resolved = canonical(target);
+		if (isSecretPath(resolved, offLimits)) {
+			throw new YewError("forbidden", 403, "That file is in a folder kept from Yew Harness.");
+		}
+		if (!existsSync(resolved)) {
+			throw notFound("file", raw);
+		}
+		await openLocalFile(resolved, {
+			opener,
+			...(line !== undefined ? { line } : {}),
+			...(column !== undefined ? { column } : {}),
+			...(deps.platform ? { platform: deps.platform } : {}),
+			...(deps.openFile ? { run: deps.openFile } : {}),
+		});
+		return c.body(null, 204);
+	});
+
 	return app;
+}
+
+/** Resolves a file:// URI, ~/path, absolute path or session-relative path to an absolute filesystem path. */
+function resolveOpenFileTarget(
+	raw: string,
+	options: { homeDir: string; session: Session | null },
+): string {
+	let target = raw;
+	if (/^file:\/\//i.test(target)) {
+		try {
+			target = fileURLToPath(target);
+		} catch {
+			throw invalid("Invalid file:// URL.", "path");
+		}
+	} else if (target === "~" || target.startsWith("~/")) {
+		target = join(options.homeDir, target.slice(2));
+	}
+	if (isAbsolute(target)) return resolve(target);
+
+	const session = options.session;
+	const roots: string[] = [];
+	if (session?.cwd) roots.push(session.cwd);
+	for (const extra of session?.options.extraDirs ?? []) {
+		roots.push(extra.path);
+	}
+	if (roots.length === 0) {
+		throw invalid("Relative file links need a session working folder.", "path");
+	}
+	for (const root of roots) {
+		const candidate = resolve(root, target);
+		if (existsSync(candidate)) return candidate;
+	}
+	return resolve(roots[0] as string, target);
 }
 
 export interface SessionFileItem {

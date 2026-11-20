@@ -22,6 +22,7 @@ import {
 } from "../actions.ts";
 import { ApiError } from "../api.ts";
 import { formatCost, t, useLang } from "../i18n.ts";
+import { isImeEvent } from "../ime.ts";
 import { useAppState } from "../state.ts";
 import { CheckIcon, CloseIcon, FolderIcon, PlusIcon } from "./icons.tsx";
 import { ModelPicker } from "./session.tsx";
@@ -403,7 +404,7 @@ export function SessionSettingsDialog({
 							value={newDirPath}
 							onChange={(event) => setNewDirPath(event.target.value)}
 							onKeyDown={(event) => {
-								if (event.key === "Enter") {
+								if (event.key === "Enter" && !isImeEvent(event)) {
 									event.preventDefault();
 									addTypedDir();
 								}
@@ -584,7 +585,9 @@ export function GroupDialog({
 					value={name}
 					maxLength={60}
 					onChange={(event) => setName(event.target.value)}
-					onKeyDown={(event) => event.key === "Enter" && name.trim() && void save.run()}
+					onKeyDown={(event) =>
+						event.key === "Enter" && !isImeEvent(event) && name.trim() && void save.run()
+					}
 				/>
 			</Field>
 			<ErrorBox error={save.error} />

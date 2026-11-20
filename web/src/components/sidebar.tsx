@@ -18,6 +18,7 @@ import {
 } from "../actions.ts";
 import { api } from "../api.ts";
 import { formatAgo, t, useLang } from "../i18n.ts";
+import { isImeEvent } from "../ime.ts";
 import { blockedSessions } from "../progress.ts";
 import {
 	centerCount,
@@ -130,7 +131,7 @@ function InlineRename({
 						cancelled.current = true;
 						onDone();
 					}
-					if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+					if (event.key === "Enter" && !isImeEvent(event)) {
 						event.preventDefault();
 						void save.run();
 					}

@@ -17,12 +17,12 @@ import { hasMessage, type MessageKey, t } from "../i18n.ts";
 import { CloseIcon, InfoIcon, SubmenuIcon } from "./icons.tsx";
 
 /** Places a top-layer popover next to its trigger, flipping above when there is no room below (spec 5.9). */
-function place(popover: HTMLElement, trigger: HTMLElement, width?: number): void {
+export function place(popover: HTMLElement, trigger: HTMLElement, width?: number): void {
 	const rect = trigger.getBoundingClientRect();
 	const margin = 16;
 	const gap = 8;
-	const w = width ?? Math.max(rect.width, popover.offsetWidth);
 	popover.style.minWidth = `${Math.max(rect.width, 180)}px`;
+	const w = width ?? Math.max(rect.width, popover.offsetWidth);
 	let left = Math.min(rect.left, window.innerWidth - w - margin);
 	left = Math.max(margin, left);
 	const below = window.innerHeight - rect.bottom - gap - margin;

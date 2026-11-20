@@ -15,6 +15,7 @@ import {
 	searchSessionFiles,
 } from "../actions.ts";
 import { t, useLang } from "../i18n.ts";
+import { isImeEvent } from "../ime.ts";
 import { useAppState } from "../state.ts";
 import { CompactIcon, FolderIcon, RenewIcon, SkillsIcon, TeamIcon } from "./icons.tsx";
 
@@ -284,7 +285,7 @@ export function useComposerMenu(options: UseComposerMenuOptions): ComposerMenuCo
 
 	const onKeyDown = useCallback(
 		(event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
-			if (!open || event.nativeEvent.isComposing) return false;
+			if (!open || isImeEvent(event)) return false;
 			if (event.key === "ArrowDown") {
 				event.preventDefault();
 				setActiveIndex((current) => (current + 1) % items.length);

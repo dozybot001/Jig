@@ -749,6 +749,9 @@ a.btn {
 	box-shadow: var(--shadow);
 	min-width: 180px;
 }
+.listbox {
+	max-width: min(340px, calc(100vw - 32px));
+}
 .listbox,
 .menu {
 	max-height: min(400px, 64dvh);
@@ -777,6 +780,7 @@ a.btn {
 }
 .listbox [role="option"][aria-selected="true"]::after {
 	content: "✓";
+	flex: none;
 	margin-left: auto;
 }
 .listbox [role="option"].active,
@@ -789,6 +793,8 @@ a.btn {
 }
 .listbox .option-text {
 	display: flex;
+	flex: 1;
+	min-width: 0;
 	flex-direction: column;
 	gap: 1px;
 	padding: 3px 0;
@@ -796,6 +802,9 @@ a.btn {
 .listbox .option-hint {
 	font-size: var(--fs-s);
 	font-weight: 400;
+	line-height: 1.45;
+	white-space: normal;
+	overflow-wrap: anywhere;
 	color: var(--text-3);
 }
 .listbox .group-label {
@@ -1956,7 +1965,6 @@ body.scroll-locked {
 	padding: 9px 14px;
 	border-radius: var(--radius-l);
 	background: var(--user-bubble);
-	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
 .msg-assistant {
@@ -2035,6 +2043,47 @@ body.scroll-locked {
 .markdown h3 {
 	font-size: var(--fs-l);
 	margin: 18px 0 8px;
+}
+.file-link-wrap {
+	display: inline-flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 4px;
+	max-width: 100%;
+}
+.file-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	max-width: 100%;
+	padding: 0 5px;
+	margin: 0 1px;
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-s);
+	background: var(--code-bg);
+	color: var(--text);
+	font: inherit;
+	font-size: 0.92em;
+	line-height: 1.45;
+	text-align: left;
+	vertical-align: baseline;
+	cursor: pointer;
+}
+.file-link > svg {
+	width: 13px;
+	height: 13px;
+	flex: none;
+	color: var(--text-3);
+}
+@media (hover: hover) {
+	.file-link:hover {
+		border-color: var(--control-strong);
+		background: var(--hover);
+	}
+}
+.file-link-error {
+	font-size: var(--fs-s);
+	color: var(--danger);
 }
 .markdown pre,
 .code {
@@ -2427,10 +2476,98 @@ body.scroll-locked {
 	flex: none;
 	display: inline-grid;
 	place-items: center;
+	padding: 0;
 	color: var(--text-2);
 }
 .context-pie-high {
 	color: var(--warning);
+}
+.context-popover {
+	position: fixed;
+	margin: 0;
+	width: min(304px, calc(100vw - 32px));
+	padding: 12px 14px;
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-l);
+	background: var(--surface);
+	color: var(--text);
+	box-shadow: var(--shadow);
+	font-size: var(--fs-s);
+}
+.context-popover-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 8px;
+	font-size: var(--fs-m);
+}
+.context-popover-pct {
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-2);
+}
+.context-popover-pct.high {
+	color: var(--warning);
+}
+.context-meter {
+	position: relative;
+	height: 6px;
+	margin-bottom: 10px;
+	border-radius: 999px;
+	background: var(--hover);
+}
+.context-meter-fill {
+	height: 100%;
+	border-radius: 999px;
+	background: var(--text);
+	transition: width 160ms ease;
+}
+.context-meter-fill.high {
+	background: var(--warning);
+}
+.context-meter-mark {
+	position: absolute;
+	top: -2px;
+	bottom: -2px;
+	width: 2px;
+	border-radius: 1px;
+	background: var(--text-3);
+	transform: translateX(-1px);
+}
+.context-stats {
+	margin: 0;
+	display: grid;
+	gap: 5px;
+}
+.context-stats > div {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+}
+.context-stats dt {
+	color: var(--text-3);
+}
+.context-stats dd {
+	margin: 0;
+	font-variant-numeric: tabular-nums;
+	color: var(--text);
+	text-align: right;
+}
+.context-popover-note {
+	margin: 10px 0 0;
+	padding-top: 8px;
+	border-top: 1px solid var(--divider);
+	line-height: 1.5;
+}
+.composer-preview {
+	min-height: 44px;
+	max-height: min(34dvh, 260px);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding: 10px 12px 6px;
+	font-size: var(--fs-m);
 }
 .send-button {
 	flex: none;
@@ -2760,9 +2897,7 @@ button.about-row {
 	top: 8px;
 	right: 16px;
 	z-index: 5;
-	width: max-content;
-	min-width: min(220px, calc(100% - 32px));
-	max-width: min(360px, calc(100% - 32px));
+	width: min(320px, calc(100% - 32px));
 	border: 1px solid var(--divider);
 	border-radius: var(--radius-l);
 	background: var(--surface);
@@ -2792,11 +2927,12 @@ button.about-row {
 	font-variant-numeric: tabular-nums;
 }
 .todo-current {
+	flex: 1;
 	min-width: 0;
-	max-width: 220px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	text-align: left;
 	color: var(--text);
 }
 .todo-card .todo-toggle svg.chevron {
@@ -4595,4 +4731,30 @@ button.about-row {
 .view-mode-toggle.view-mode-detailed {
 	color: var(--text);
 	background: var(--selected);
+}
+.msg-user .markdown {
+	line-height: 1.55;
+}
+.msg-user .markdown p {
+	margin: 0.45em 0;
+}
+.msg-user .markdown ul,
+.msg-user .markdown ol {
+	margin: 0.4em 0;
+	padding-left: 1.4em;
+}
+.msg-user .markdown li + li {
+	margin-top: 0.2em;
+}
+.msg-user .markdown h1,
+.msg-user .markdown h2,
+.msg-user .markdown h3 {
+	font-size: var(--fs-m);
+	margin: 0.6em 0 0.3em;
+}
+.msg-user .markdown > :first-child {
+	margin-top: 0;
+}
+.msg-user .markdown > :last-child {
+	margin-bottom: 0;
 }
