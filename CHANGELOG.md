@@ -18,6 +18,7 @@
 
 ### 变更
 
+- 用户协议更新到 2.9：不在 MIT 许可证授权范围内的名称写全为「榫卯 Tenon AI」。
 - 沙箱外命令的外层保护拆分：核心保护（Yew Harness 数据、Mac 应用登录存储、启动项、shell 配置、`~/.gitconfig`、`~/.ssh/config`、`.git/hooks`、`appleevent-send`）继续永久锁死；单条静态的本地仓库初始化/配置命令（`git init`、`git clone`、`git remote`、`git config --local`）和拉起桌面应用命令（`open -a`）归为三种方式下都必须由你审批的事项，批准单次执行时外层保护仅放开对应单项，仓库配置命令强制清空 `GIT_TEMPLATE_DIR` 并在结束后审计 `.git/config`。
 
 ### 修复
