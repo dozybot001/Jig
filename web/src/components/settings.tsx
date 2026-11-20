@@ -2567,9 +2567,11 @@ function SkillsDialog({ onClose }: { onClose: () => void }) {
 	const globalPaths = list?.folders.find((group) => group.source.kind === "global")?.paths ?? [];
 	const inGroup = (source: SkillList["folders"][number]["source"]) =>
 		(list?.items ?? []).filter((item) =>
-			source.kind === "global"
-				? item.source.kind === "global"
-				: item.source.kind === "workspace" && item.source.path === source.path,
+			source.kind === "builtin"
+				? item.source.kind === "builtin"
+				: source.kind === "global"
+					? item.source.kind === "global"
+					: item.source.kind === "workspace" && item.source.path === source.path,
 		);
 	return (
 		<Dialog title={t("skillsTitle")} size="l" onClose={onClose}>
@@ -2579,15 +2581,17 @@ function SkillsDialog({ onClose }: { onClose: () => void }) {
 			{list === null && !error && <p className="hint">{t("loading")}</p>}
 			{(list?.folders ?? []).map(({ source }) => {
 				const skills = inGroup(source);
-				// A workspace without skills folders is left out; the global group always shows.
-				if (source.kind === "workspace" && skills.length === 0) return null;
+				// Empty workspace or empty built-in groups are left out; the global group always shows.
+				if (source.kind !== "global" && skills.length === 0) return null;
 				return (
 					<SettingGroup
-						key={source.kind === "global" ? "global" : source.path}
+						key={source.kind === "workspace" ? source.path : source.kind}
 						title={
-							source.kind === "global"
-								? t("skillsGlobal")
-								: `${source.name}${t("hintSeparator")}${source.path}`
+							source.kind === "builtin"
+								? t("skillsBuiltin")
+								: source.kind === "global"
+									? t("skillsGlobal")
+									: `${source.name}${t("hintSeparator")}${source.path}`
 						}
 					>
 						{skills.length === 0 && (

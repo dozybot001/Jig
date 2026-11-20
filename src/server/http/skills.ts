@@ -12,6 +12,8 @@ export interface SkillRoutesOptions {
 	home: string;
 	/** The person's home folder, for `~/.claude/skills`; null reads nothing outside Yew's folder. */
 	userHome: string | null;
+	/** Bundled official skills folder; defaults to Yew's `skills-builtin/`, null disables it in tests. */
+	builtinDir?: string | null;
 	/** Replace the system and the program runner; tests use them so no window opens. */
 	platform?: string;
 	run?: RunCommand;
@@ -28,7 +30,13 @@ export function skillRoutes(store: Store, options: SkillRoutesOptions): Hono<App
 
 	const listing = (): SkillListing => {
 		const settings = readSettings(store);
-		return listSkills(settings.workspaces, options.home, options.userHome, settings.disabledSkills);
+		return listSkills(
+			settings.workspaces,
+			options.home,
+			options.userHome,
+			settings.disabledSkills,
+			options.builtinDir,
+		);
 	};
 	// Only a folder in the list is ever acted on: the request names one, it never supplies a path.
 	const listed = (id: string): SkillEntry => {

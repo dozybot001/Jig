@@ -38,6 +38,7 @@
 		"dist",
 		"web/dist",
 		"mcp-builtin",
+		"skills-builtin",
 		"THIRD-PARTY-NOTICES.md",
 		"CHANGELOG.md"
 	],

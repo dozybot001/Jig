@@ -50,7 +50,7 @@ function folders() {
 describe("skills: what the settings list", () => {
 	test("skills are listed by source, and folders that cannot be read carry the reason", () => {
 		const { yewHome, userHome, cwd, ids, workspaces } = folders();
-		const listing = listSkills(workspaces, yewHome, userHome, [ids.pdf]);
+		const listing = listSkills(workspaces, yewHome, userHome, [ids.pdf], null);
 		const workspace = { kind: "workspace", name: "App", path: cwd };
 		assert.deepEqual(
 			listing.items.map((item) => [item.name, item.source, item.problem, item.disabled, item.id]),
@@ -82,10 +82,12 @@ describe("skills: what the settings list", () => {
 		const { yewHome, userHome, ids } = folders();
 		chmodSync(join(ids.pdf, "SKILL.md"), 0o000);
 		t.after(() => chmodSync(join(ids.pdf, "SKILL.md"), 0o600));
-		const pdf = listSkills([], yewHome, userHome).items.find((item) => item.id === ids.pdf);
+		const pdf = listSkills([], yewHome, userHome, [], null).items.find(
+			(item) => item.id === ids.pdf,
+		);
 		assert.equal(pdf?.problem, "unreadable");
 		assert.deepEqual(
-			findSkills(null, yewHome, userHome).map((s) => s.name),
+			findSkills(null, yewHome, userHome, [], null).map((s) => s.name),
 			["release"],
 		);
 	});
@@ -94,10 +96,49 @@ describe("skills: what the settings list", () => {
 		const { yewHome, workspaces } = folders();
 		skill(join(yewHome, "skills"), "own", body("own", "Yew's"));
 		assert.deepEqual(
-			listSkills([], yewHome, null).items.map((item) => item.name),
+			listSkills([], yewHome, null, [], null).items.map((item) => item.name),
 			["own"],
 		);
-		assert.equal(listSkills(workspaces, yewHome, null).items.length, 4);
+		assert.equal(listSkills(workspaces, yewHome, null, [], null).items.length, 4);
+	});
+
+	test("built-in skills are listed under the builtin group and toggled by stable ID", async () => {
+		const { yewHome, userHome } = folders();
+		const listing = listSkills([], yewHome, userHome);
+		const builtin = listing.items.find((item) => item.id === "builtin:markdown-writing");
+		assert.ok(builtin);
+		assert.deepEqual(builtin.source, { kind: "builtin" });
+		assert.equal(builtin.disabled, false);
+
+		const { store } = newStore();
+		const ran: { command: string; args: string[] }[] = [];
+		const app = createApp({
+			store,
+			skills: {
+				home: yewHome,
+				userHome,
+				platform: "darwin",
+				run: async (command, args) => {
+					ran.push({ command, args });
+				},
+			},
+		});
+		const toggle = await app.request("/api/skills", {
+			method: "PATCH",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ id: "builtin:markdown-writing", disabled: true }),
+		});
+		assert.equal(toggle.status, 200);
+		assert.deepEqual(store.getSetting("disabledSkills", []), ["builtin:markdown-writing"]);
+
+		const reveal = await app.request("/api/skills/reveal", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ id: "builtin:markdown-writing" }),
+		});
+		assert.equal(reveal.status, 204);
+		assert.equal(ran[0]?.command, "open");
+		assert.deepEqual(ran[0]?.args, ["-R", builtin.dir]);
 	});
 });
 
@@ -107,18 +148,20 @@ describe("skills: the switch", () => {
 
 	test("a skill that is off is left out of what a session gets; the others stay", async () => {
 		const { yewHome, userHome, cwd, ids } = folders();
-		assert.deepEqual(names(findSkills(cwd, yewHome, userHome, [ids.pdf])), [
+		assert.deepEqual(names(findSkills(cwd, yewHome, userHome, [ids.pdf], null)), [
 			"deploy: Ship it",
 			"release: The project's",
 		]);
 		// The prompt no longer lists it and the tool no longer reads it.
-		const note = loadInstructions(cwd, yewHome, { userHome, disabledSkills: [ids.pdf] }).find(
-			(file) => file.path === "skills",
-		);
+		const note = loadInstructions(cwd, yewHome, {
+			userHome,
+			disabledSkills: [ids.pdf],
+			builtinSkillsDir: null,
+		}).find((file) => file.path === "skills");
 		assert.equal(note?.content.includes("- pdf"), false);
 		assert.ok(note?.content.includes("- deploy: Ship it"));
 		let off = [ids.pdf];
-		const tool = skillTool(yewHome, userHome, () => off);
+		const tool = skillTool(yewHome, userHome, () => off, null);
 		const session = { cwd } as Session;
 		const run = (name: string) => tool.run({ name }, { session } as ToolContext);
 		assert.equal((await run("pdf")).isError, true);
@@ -182,7 +225,7 @@ describe("skills: the routes", () => {
 		const { send, ids, cwd } = setup();
 		const { status, body: list } = await send("GET", "/api/skills");
 		assert.equal(status, 200);
-		assert.equal(list.items.length, 6);
+		assert.equal(list.items.length, 7);
 		assert.equal(list.reveal, "finder");
 		assert.equal(list.nextCursor, null);
 		assert.deepEqual(
@@ -197,7 +240,9 @@ describe("skills: the routes", () => {
 				problem: "no-file",
 			},
 		);
-		assert.deepEqual(list.folders[1].source, { kind: "workspace", name: "App", path: cwd });
+		assert.deepEqual(list.folders[0].source, { kind: "builtin" });
+		assert.deepEqual(list.folders[1].source, { kind: "global" });
+		assert.deepEqual(list.folders[2].source, { kind: "workspace", name: "App", path: cwd });
 	});
 
 	test("the switch is saved per skill; wrong input is refused and an unknown skill is 404", async () => {

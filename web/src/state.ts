@@ -108,8 +108,11 @@ export interface McpServerView {
 	package?: string;
 }
 
-/** Where a skill comes from: the global folders, or a saved workspace's. */
-export type SkillSource = { kind: "global" } | { kind: "workspace"; name: string; path: string };
+/** Where a skill comes from: official built-in, the global folders, or a saved workspace's. */
+export type SkillSource =
+	| { kind: "builtin" }
+	| { kind: "global" }
+	| { kind: "workspace"; name: string; path: string };
 
 /** A skill folder Yew found; `problem` says why one could not be read, and such a row has no switch. */
 export interface SkillView {

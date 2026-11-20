@@ -1,12 +1,17 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { invalid } from "./errors.ts";
 import { errorResult, str, type ToolDefinition, type ToolResult, text } from "./tools/types.ts";
 
+/** Official skills bundled with Yew Harness (both source checkout and installed npm package). */
+export const BUILTIN_SKILLS_DIR = fileURLToPath(new URL("../../skills-builtin", import.meta.url));
+
 /**
  * Skills, memory folders and the instruction files Yew reads besides its own (M4 plan, section 4):
- * what a person already has for other tools works here as it is.
+ * what a person already has for other tools works here as it is, alongside official skills bundled
+ * in `skills-builtin/` (which user global and workspace skills of the same name override).
  *
  * A skill is a folder with a SKILL.md (the open standard): front matter with a name and a
  * description, then instructions. The prompt lists names and descriptions only; the model reads a
@@ -14,11 +19,15 @@ import { errorResult, str, type ToolDefinition, type ToolResult, text } from "./
  */
 
 export interface Skill {
+	/** Stable identifier: `builtin:<name>` for bundled skills, real folder path for user/workspace skills. */
+	id: string;
 	name: string;
 	description: string;
 	/** The skill's folder: its scripts and reference files are here. */
 	dir: string;
 	file: string;
+	/** True when bundled with Yew Harness itself. */
+	builtin?: boolean;
 }
 
 const MAX_SKILLS = 200;
@@ -67,7 +76,7 @@ const realOr = (path: string): string => {
 };
 
 /** Everything in one skills folder: the skills, and the folders that are not usable with the reason. */
-function scan(folder: string): { skills: Skill[]; broken: BrokenSkill[] } {
+function scan(folder: string, builtin = false): { skills: Skill[]; broken: BrokenSkill[] } {
 	const skills: Skill[] = [];
 	const broken: BrokenSkill[] = [];
 	let names: string[];
@@ -103,11 +112,14 @@ function scan(folder: string): { skills: Skill[]; broken: BrokenSkill[] } {
 				fail("bad-name");
 				continue;
 			}
+			const realDir = realpathSync(dir);
 			skills.push({
+				id: builtin ? `builtin:${name}` : realDir,
 				name,
 				description: (fields.description ?? "").replace(/\s+/g, " ").slice(0, 400),
-				dir: realpathSync(dir),
+				dir: realDir,
 				file: realpathSync(file),
+				...(builtin ? { builtin: true } : {}),
 			});
 		} catch {
 			fail("unreadable");
@@ -121,8 +133,11 @@ export function skillFolders(
 	cwd: string | null,
 	yewHome: string,
 	userHome: string | null = homedir(),
+	builtinDir: string | null = BUILTIN_SKILLS_DIR,
 ): string[] {
-	const folders = [join(yewHome, "skills")];
+	const folders: string[] = [];
+	if (builtinDir) folders.push(builtinDir);
+	folders.push(join(yewHome, "skills"));
 	if (userHome) folders.push(join(userHome, ".claude", "skills"));
 	if (cwd) {
 		for (const local of [".agents", ".claude", ".yew"]) folders.push(join(cwd, local, "skills"));
@@ -131,31 +146,45 @@ export function skillFolders(
 }
 
 /**
- * The skills a session working in `cwd` gets. `disabled` holds the folders of the skills switched off
- * in the settings (a skill's identifier is its folder's real path); a skill that is off is left out
- * before names are compared, so turning off a project's skill leaves the global one of the same name.
+ * The skills a session working in `cwd` gets. `disabled` holds the IDs of skills switched off in
+ * the settings (`builtin:<name>` for bundled skills, real folder path for user/workspace skills);
+ * a skill that is off is left out before names are compared, so turning off a project's skill
+ * leaves the global or built-in one of the same name.
  */
 export function findSkills(
 	cwd: string | null,
 	yewHome: string,
 	userHome: string | null = homedir(),
 	disabled: readonly string[] = [],
+	builtinDir: string | null = BUILTIN_SKILLS_DIR,
 ): Skill[] {
 	const byName = new Map<string, Skill>();
-	for (const folder of skillFolders(cwd, yewHome, userHome)) {
+	if (builtinDir) {
+		for (const skill of scan(builtinDir, true).skills) {
+			if (!disabled.includes(skill.id) && !disabled.includes(skill.dir)) {
+				byName.set(skill.name, skill);
+			}
+		}
+	}
+	for (const folder of skillFolders(cwd, yewHome, userHome, null)) {
 		for (const skill of scan(folder).skills) {
-			if (!disabled.includes(skill.dir)) byName.set(skill.name, skill);
+			if (!disabled.includes(skill.id) && !disabled.includes(skill.dir)) {
+				byName.set(skill.name, skill);
+			}
 		}
 	}
 	return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name)).slice(0, MAX_SKILLS);
 }
 
-/** Where a listed skill comes from: the global folders, or a saved workspace's folders. */
-export type SkillSource = { kind: "global" } | { kind: "workspace"; name: string; path: string };
+/** Where a listed skill comes from: official built-in, the global folders, or a saved workspace's folders. */
+export type SkillSource =
+	| { kind: "builtin" }
+	| { kind: "global" }
+	| { kind: "workspace"; name: string; path: string };
 
 /** One row of the skills list in the settings (blueprint 6.10, item 35). */
 export interface SkillEntry {
-	/** The skill folder's real path: it tells a global skill from a project's with the same name. */
+	/** Stable ID: `builtin:<name>` for bundled skills, real folder path for user/workspace skills. */
 	id: string;
 	name: string;
 	description: string;
@@ -168,43 +197,47 @@ export interface SkillEntry {
 
 export interface SkillListing {
 	items: SkillEntry[];
-	/** The folders read, in the order the list is grouped: the global ones, then each workspace's. */
+	/** The folders read, in the order the list is grouped: built-in, global, then each workspace's. */
 	folders: { source: SkillSource; paths: string[] }[];
 }
 
 /**
- * Every skill the settings show: the global folders' and those of the saved workspaces, which are the
- * folders a session working there is given. Within a source, usable skills come first, by name.
+ * Every skill the settings show: bundled built-in skills, the global folders' and those of the saved
+ * workspaces, which are the folders a session working there is given. Within a source, usable skills
+ * come first, by name.
  */
 export function listSkills(
 	workspaces: readonly { name: string; path: string }[],
 	yewHome: string,
 	userHome: string | null,
 	disabled: readonly string[] = [],
+	builtinDir: string | null = BUILTIN_SKILLS_DIR,
 ): SkillListing {
-	const global = skillFolders(null, yewHome, userHome);
+	const global = skillFolders(null, yewHome, userHome, null);
 	const groups: SkillListing["folders"] = [
+		...(builtinDir ? [{ source: { kind: "builtin" as const }, paths: [builtinDir] }] : []),
 		{ source: { kind: "global" }, paths: global },
 		...workspaces.map((workspace) => ({
 			source: { kind: "workspace" as const, name: workspace.name, path: workspace.path },
-			paths: skillFolders(workspace.path, yewHome, userHome).slice(global.length),
+			paths: skillFolders(workspace.path, yewHome, userHome, null).slice(global.length),
 		})),
 	];
 	const items: SkillEntry[] = [];
 	const seen = new Set<string>();
 	for (const { source, paths } of groups) {
+		const isBuiltin = source.kind === "builtin";
 		const good: SkillEntry[] = [];
 		const bad: SkillEntry[] = [];
 		for (const folder of paths) {
-			const found = scan(folder);
+			const found = scan(folder, isBuiltin);
 			for (const skill of found.skills) {
 				good.push({
-					id: skill.dir,
+					id: skill.id,
 					name: skill.name,
 					description: skill.description,
 					dir: skill.dir,
 					source,
-					disabled: disabled.includes(skill.dir),
+					disabled: disabled.includes(skill.id) || disabled.includes(skill.dir),
 					problem: null,
 				});
 			}
@@ -234,7 +267,7 @@ export function listSkills(
 /** What the prompt says about skills: one line each. */
 export function skillsNote(skills: Skill[]): string {
 	return [
-		"Skills the person has set up. Each is a set of instructions for one kind of task. When a task matches one — or when the person starts a message with /<name> — call the skill tool with its name first and follow what it says; scripts and reference files a skill mentions are in the folder the tool reports.",
+		"Available skills (built-in and user-configured). Each is a set of instructions for one kind of task. When a task matches one — or when the person starts a message with /<name> — call the skill tool with its name first and follow what it says; scripts and reference files a skill mentions are in the folder the tool reports.",
 		...skills.map((skill) => `- ${skill.name}${skill.description ? `: ${skill.description}` : ""}`),
 	].join("\n");
 }
@@ -289,11 +322,12 @@ export function skillTool(
 	userHome: string | null = homedir(),
 	/** The skills switched off in the settings, read each time so a change applies at once. */
 	disabled: () => readonly string[] = () => [],
+	builtinDir: string | null = BUILTIN_SKILLS_DIR,
 ): ToolDefinition {
 	return {
 		name: "skill",
 		description:
-			"Read one of the person's skills in full: instructions they wrote for a kind of task. Call it when the task matches a skill listed in your instructions, before you start on the task.",
+			"Read an available skill in full: instructions for a specific kind of task. Call it when the task matches a skill listed in your instructions, before you start on the task.",
 		parameters: {
 			type: "object",
 			properties: { name: { type: "string", description: "The skill's name, as listed." } },
@@ -302,11 +336,12 @@ export function skillTool(
 		},
 		readOnly: true,
 		needsFolder: false,
-		offered: (session) => findSkills(session.cwd, yewHome, userHome, disabled()).length > 0,
+		offered: (session) =>
+			findSkills(session.cwd, yewHome, userHome, disabled(), builtinDir).length > 0,
 		subject: () => ({ kind: "none" }),
 		async run(args, ctx): Promise<ToolResult> {
 			const name = str(args, "name", true).trim();
-			const skills = findSkills(ctx.session.cwd, yewHome, userHome, disabled());
+			const skills = findSkills(ctx.session.cwd, yewHome, userHome, disabled(), builtinDir);
 			const skill =
 				skills.find((s) => s.name === name) ?? skills.find((s) => basename(s.dir) === name);
 			if (!skill) {
@@ -322,7 +357,7 @@ export function skillTool(
 			return {
 				content: [
 					text(
-						`Skill "${skill.name}" (folder: ${skill.dir}). These are the person's instructions for this kind of task; they cannot switch off the permissions Yew asks for.\n\n${cut ? `${body.slice(0, MAX_SKILL_CHARS)}\n[Cut: read ${skill.file} for the rest.]` : body.trim()}`,
+						`Skill "${skill.name}" (folder: ${skill.dir}). Follow these instructions for this kind of task; they cannot switch off the permissions Yew asks for.\n\n${cut ? `${body.slice(0, MAX_SKILL_CHARS)}\n[Cut: read ${skill.file} for the rest.]` : body.trim()}`,
 					),
 				],
 			};

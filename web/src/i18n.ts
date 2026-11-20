@@ -1136,6 +1136,7 @@ const zh = {
 	skillsTitle: "技能",
 	skillsHelp:
 		"技能是一个含 SKILL.md 的文件夹，写着某一类任务的做法；会话遇到对应的任务时读它。Yew Harness 读这些位置的技能：{global}，以及已保存工作区里的 .agents/skills、.claude/skills 和 .yew/skills。这里只能停用和启用，内容在文件夹里改。",
+	skillsBuiltin: "内置技能",
 	skillsGlobal: "全局",
 	skillsNone: "还没有技能。把技能的文件夹放进 {folder}，这里就会列出它。",
 	skillNoDescription: "没有说明",
@@ -2370,6 +2371,7 @@ const en: Record<MessageKey, string> = {
 	skillsTitle: "Skills",
 	skillsHelp:
 		"A skill is a folder with a SKILL.md that says how to do one kind of task; a session reads it when a task matches. Yew Harness reads skills from {global}, and from .agents/skills, .claude/skills and .yew/skills in your saved workspaces. Here you can only turn a skill off or on; edit its content in its folder.",
+	skillsBuiltin: "Built-in",
 	skillsGlobal: "Global",
 	skillsNone: "No skills yet. Put a skill's folder in {folder} and it is listed here.",
 	skillNoDescription: "No description",

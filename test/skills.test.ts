@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { loadInstructions } from "../src/server/agent/prompt.ts";
 import { createApp } from "../src/server/http/app.ts";
 import { PermissionEngine } from "../src/server/permissions/engine.ts";
-import { findSkills, frontMatter, skillTool } from "../src/server/skills.ts";
+import { BUILTIN_SKILLS_DIR, findSkills, frontMatter, skillTool } from "../src/server/skills.ts";
 import type { ToolContext } from "../src/server/tools/types.ts";
 import type { Session } from "../src/shared/types.ts";
 import { newStore, sessionInput, tempDir } from "./helpers/store.ts";
@@ -55,7 +55,7 @@ describe("skills", () => {
 		);
 		skill(join(cwd, ".yew", "skills"), "bad name", "---\nname: not a name!\n---\nE");
 		mkdirSync(join(yewHome, "skills", "empty"), { recursive: true });
-		const found = findSkills(cwd, yewHome, userHome);
+		const found = findSkills(cwd, yewHome, userHome, [], null);
 		assert.deepEqual(
 			found.map((s) => [s.name, s.description]),
 			[
@@ -65,9 +65,53 @@ describe("skills", () => {
 		);
 		// Without the person's home folder nothing outside Yew's folder and the project is read.
 		assert.deepEqual(
-			findSkills(null, yewHome, null).map((s) => s.description),
+			findSkills(null, yewHome, null, [], null).map((s) => s.description),
 			["Yew's own"],
 		);
+	});
+
+	test("official built-in skills load by default, ship in package.json, and are overridden by user skills", async () => {
+		const { yewHome, userHome, cwd } = homes();
+		const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+			files: string[];
+		};
+		assert.ok(pkg.files.includes("skills-builtin"), "package.json must bundle skills-builtin");
+
+		const defaults = findSkills(null, yewHome, null);
+		const md = defaults.find((s) => s.name === "markdown-writing");
+		assert.ok(md, "markdown-writing should be loaded from BUILTIN_SKILLS_DIR");
+		assert.equal(md.id, "builtin:markdown-writing");
+		assert.equal(md.builtin, true);
+		assert.ok(md.dir.startsWith(realpathSync(BUILTIN_SKILLS_DIR)));
+
+		// The skill tool reads the bundled markdown-writing skill cleanly.
+		const tool = skillTool(yewHome, null);
+		const read = await tool.run({ name: "markdown-writing" }, {
+			session: { cwd: null } as Session,
+		} as ToolContext);
+		const out = read.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+		assert.match(out, /Markdown Writing Standards/);
+		assert.equal(out.includes("description:"), false);
+
+		// Disabling by stable ID hides the built-in skill.
+		assert.equal(
+			findSkills(null, yewHome, null, ["builtin:markdown-writing"]).some(
+				(s) => s.name === "markdown-writing",
+			),
+			false,
+		);
+
+		// A user/workspace skill with the same name overrides the built-in one.
+		skill(
+			join(cwd, ".yew", "skills"),
+			"markdown-writing",
+			"---\nname: markdown-writing\ndescription: Custom team Markdown guide\n---\nTeam rules",
+		);
+		const overridden = findSkills(cwd, yewHome, userHome).find(
+			(s) => s.name === "markdown-writing",
+		);
+		assert.equal(overridden?.description, "Custom team Markdown guide");
+		assert.equal(overridden?.builtin, undefined);
 	});
 
 	test("the skill tool gives the instructions without the front matter, and the folder", async () => {
@@ -77,11 +121,14 @@ describe("skills", () => {
 			"pdf",
 			"---\nname: pdf\ndescription: PDF work\n---\n# PDF\nRun scripts/fill.py",
 		);
-		const tool = skillTool(yewHome, userHome);
+		const tool = skillTool(yewHome, userHome, () => [], null);
 		const session = { cwd } as Session;
 		assert.equal(tool.offered?.(session, { canPostCards: false, canOrganize: false }), true);
 		assert.equal(
-			skillTool(yewHome, null).offered?.(session, { canPostCards: false, canOrganize: false }),
+			skillTool(yewHome, null, () => [], null).offered?.(session, {
+				canPostCards: false,
+				canOrganize: false,
+			}),
 			false,
 		);
 		const run = async (name: string) => {
@@ -107,13 +154,13 @@ describe("instructions, memory folders and what may be read", () => {
 		mkdirSync(join(userHome, ".claude"));
 		writeFileSync(join(userHome, ".claude", "CLAUDE.md"), "用简体中文。");
 		assert.deepEqual(
-			loadInstructions(null, yewHome, { userHome }).map((f) => f.content),
+			loadInstructions(null, yewHome, { userHome, builtinSkillsDir: null }).map((f) => f.content),
 			["用简体中文。"],
 		);
-		assert.deepEqual(loadInstructions(null, yewHome), []);
+		assert.deepEqual(loadInstructions(null, yewHome, { builtinSkillsDir: null }), []);
 		writeFileSync(join(yewHome, "AGENTS.md"), "Yew 的说明。");
 		assert.deepEqual(
-			loadInstructions(null, yewHome, { userHome }).map((f) => f.content),
+			loadInstructions(null, yewHome, { userHome, builtinSkillsDir: null }).map((f) => f.content),
 			["Yew 的说明。"],
 		);
 	});

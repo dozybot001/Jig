@@ -532,10 +532,10 @@ describe("phase 3.3: composer /files and /skills endpoints", () => {
 		const body1 = (await res1.json()) as { items: { name: string; description: string }[] };
 		assert.deepEqual(
 			body1.items.map((s) => s.name),
-			["deploy-check", "release-notes"],
+			["deploy-check", "markdown-writing", "release-notes"],
 		);
 
-		store.setSetting("disabledSkills", [realpathSync(skillA)]);
+		store.setSetting("disabledSkills", [realpathSync(skillA), "builtin:markdown-writing"]);
 		const res2 = await app.request(`/api/sessions/${session.id}/skills`);
 		assert.equal(res2.status, 200);
 		const body2 = (await res2.json()) as { items: { name: string; description: string }[] };

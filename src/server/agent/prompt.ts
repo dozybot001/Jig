@@ -182,7 +182,7 @@ export function loadInstructions(
 			if (index && !seen.has(index.path)) files.push(index);
 		}
 	}
-	const skills = findSkills(cwd, yewHome, userHome, extras.disabledSkills);
+	const skills = findSkills(cwd, yewHome, userHome, extras.disabledSkills, extras.builtinSkillsDir);
 	if (skills.length > 0) files.push({ path: "skills", content: skillsNote(skills) });
 	return files;
 }
@@ -193,8 +193,10 @@ export interface InstructionExtras {
 	memoryDirs?: string[];
 	/** The person's home folder, for `~/.claude`; absent, nothing outside Yew's folder is read. */
 	userHome?: string | null;
-	/** The skills switched off in the settings, by folder; they are not listed. */
+	/** The skills switched off in the settings, by ID; they are not listed. */
 	disabledSkills?: string[];
+	/** Bundled official skills directory; defaults to Yew's `skills-builtin/`, null disables it in tests. */
+	builtinSkillsDir?: string | null;
 }
 
 export function takeSnapshot(
