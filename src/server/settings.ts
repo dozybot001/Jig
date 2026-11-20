@@ -1,6 +1,6 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import {
 	DEFAULT_RELAY_URL,
 	EXTRA_DIR_ACCESS,
@@ -12,7 +12,7 @@ import {
 } from "../shared/types.ts";
 import { invalid } from "./errors.ts";
 import { resolveWorkingFolder } from "./paths.ts";
-import { canonical, isSecretPath } from "./permissions/paths.ts";
+import { canonical, isInside, isSecretPath } from "./permissions/paths.ts";
 import type { Store } from "./store.ts";
 
 /** Yew's settings: what the settings menu and new sessions read, shared by the API and manage_yew. */
@@ -281,7 +281,14 @@ export function parseExtraDirs(
 		if (resolved === "/" || resolved === home) {
 			throw invalid(`${raw} is too broad; pick a specific folder inside it.`, field);
 		}
-		if (isSecretPath(resolved, options.offLimits)) {
+		// Not a protected place, not a folder that holds one (the security group, 11-20: /Users or
+		// ~/.config written to would reach them), not ~/Library (LaunchAgents, app data) and not a
+		// hidden folder of the home folder, read-only included.
+		const holdsSecret = options.offLimits.some((secret) => isInside(secret, resolved));
+		const library = isInside(resolved, join(home, "Library"));
+		const dotFolder =
+			isInside(resolved, home) && resolved !== home && relative(home, resolved).startsWith(".");
+		if (isSecretPath(resolved, options.offLimits) || holdsSecret || library || dotFolder) {
 			throw invalid(`${raw} is protected or hidden and cannot be added to a session.`, field);
 		}
 		const existing = byPath.get(resolved);

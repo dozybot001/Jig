@@ -125,8 +125,17 @@ function openPdf(data: Uint8Array) {
 		cMapPacked: true,
 		standardFontDataUrl: STANDARD_FONT_URL,
 		useSystemFonts: false,
+		// No isEvalSupported here: pdfjs 6 dropped the option along with its eval path; it builds
+		// no code from a file's fonts or functions (checked 11-20 for the security group).
 		verbosity: pdfjs.VerbosityLevel.ERRORS,
 	});
+}
+
+/** The longest one PDF is read for; then its reading is stopped, so a hostile file cannot hold the service. */
+const PDF_TIME_LIMIT_MS = 60_000;
+
+function stopAfterLimit(task: { destroy(): Promise<void> }): NodeJS.Timeout {
+	return setTimeout(() => void task.destroy().catch(() => {}), PDF_TIME_LIMIT_MS);
 }
 
 function formatTextItems(items: readonly unknown[]): string {
@@ -149,10 +158,12 @@ function formatTextItems(items: readonly unknown[]): string {
 /** Returns the page count of a PDF document. */
 export async function inspectPdf(data: Uint8Array): Promise<{ pages: number }> {
 	const loadingTask = openPdf(data);
+	const limit = stopAfterLimit(loadingTask);
 	try {
 		const doc = await loadingTask.promise;
 		return { pages: doc.numPages };
 	} finally {
+		clearTimeout(limit);
 		await loadingTask.destroy().catch(() => {});
 	}
 }
@@ -176,6 +187,7 @@ export async function readPdf(
 	const maxBytes = options.maxBytes ?? MAX_BYTES;
 	const maxScannedImages = options.maxScannedImages ?? DEFAULT_MAX_SCANNED_IMAGES;
 	const loadingTask = openPdf(data);
+	const limit = stopAfterLimit(loadingTask);
 	try {
 		const doc = await loadingTask.promise;
 		const totalPages = doc.numPages;
@@ -246,6 +258,7 @@ export async function readPdf(
 			scannedUnrenderedPages,
 		};
 	} finally {
+		clearTimeout(limit);
 		await loadingTask.destroy().catch(() => {});
 	}
 }

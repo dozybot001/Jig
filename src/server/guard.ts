@@ -30,7 +30,7 @@ export type GuardKind = "macos" | "linux" | "none";
 /**
  * Guard relaxation mode for explicitly human-approved Decisions (blueprint, section 11):
  * - "default": full outer guard (blocks Yew data, WebKit storage, startup items, git hooks/config, lsopen, appleevent-send).
- * - "git-setup": unlocks workspace `.git/config` ONLY (Core Guard stays locked: Yew data, WebKit, startup items,
+ * - "git-setup": unlocks `.git/config` ONLY in the repositories of the folders the session may write (Core Guard stays locked: Yew data, WebKit, startup items,
  *   `~/.gitconfig`, `~/.ssh/config`, `.git/hooks`, `lsopen`, `appleevent-send`). Paired with post-run `.git/config` audit.
  * - "launch-app": unlocks `lsopen` ONLY so `open -a <App>` works while all write locks stay in force.
  */
@@ -100,9 +100,14 @@ const GIT_CONFIGS = [
 ];
 
 /** The macOS profile: everything allowed, except what the guard closes for `mode`. */
-export function guardProfile(places: string[], home: string, mode: GuardMode = "default"): string {
+export function guardProfile(
+	places: string[],
+	home: string,
+	mode: GuardMode = "default",
+	writable: string[] = [],
+): string {
 	const startup = startupPlaces(home);
-	const gitPatterns = mode === "git-setup" ? GIT_HOOKS : [...GIT_HOOKS, ...GIT_CONFIGS];
+	const gitPatterns = [...GIT_HOOKS, ...GIT_CONFIGS];
 	const lines = [
 		"(version 1)",
 		"(allow default)",
@@ -113,6 +118,16 @@ export function guardProfile(places: string[], home: string, mode: GuardMode = "
 			...gitPatterns.map((pattern) => `(regex #"${pattern}")`),
 		].join(" ")})`,
 	];
+	// git-setup: repositories' own settings files, only under the folders the session may write
+	// (the security group, 11-20); a later rule wins in a Seatbelt profile.
+	if (mode === "git-setup") {
+		const configs = GIT_CONFIGS.map((pattern) => `(regex #"${pattern}")`).join(" ");
+		for (const root of writable.map(resolved)) {
+			lines.push(
+				`(allow file-write* (require-all (subpath ${quoted(root)}) (require-any ${configs})))`,
+			);
+		}
+	}
 	if (mode !== "launch-app") lines.push("(deny lsopen)");
 	lines.push("(deny appleevent-send)");
 	return lines.join("\n");
@@ -151,12 +166,13 @@ export function guardedArgs(
 	cwd: string,
 	state: Guard = guard,
 	mode: GuardMode = "default",
+	writable: string[] = [cwd],
 ): { file: string; args: string[] } | null {
 	if (state.kind === "none" || !state.program || state.places.length === 0) return null;
 	if (state.kind === "macos") {
 		return {
 			file: state.program,
-			args: ["-p", guardProfile(state.places, state.home, mode), shell, "-lc", command],
+			args: ["-p", guardProfile(state.places, state.home, mode, writable), shell, "-lc", command],
 		};
 	}
 	// An empty folder over each closed folder; bubblewrap cannot lay one over a file. What runs by

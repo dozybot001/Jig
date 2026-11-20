@@ -356,7 +356,7 @@ export function snapshotRepositories(folders: string[]): RepositoryState {
 
 /** Settings that make git run a program: worth naming when a command wrote them. */
 const RUNS_PROGRAMS =
-	/^\s*(hookspath|fsmonitor|sshcommand|askpass|gitproxy|pager|editor)\s*=|^\s*\[(filter|diff|merge)\s+"/gim;
+	/^\s*(hookspath|fsmonitor|sshcommand|askpass|gitproxy|pager|editor|textconv|program|helper|uploadpack|receivepack)\s*=|^\s*\[(filter|diff|merge|alias|credential|include|includeif|sequence|gpg)\b/gim;
 
 /**
  * After a command (Linux): a hook it added or changed in a repository of its working folder is

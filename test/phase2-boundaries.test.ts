@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
 import type { Context } from "@earendil-works/pi-ai";
 import { tracedMainWords, verifiedDecisions } from "../src/server/agent/review.ts";
@@ -67,6 +67,35 @@ describe("phase 2.1: multi-directory workspaces (extraDirs)", () => {
 		assert.throws(
 			() => parseExtraDirs([{ path: hiddenDir, access: "write" }], { offLimits }),
 			/protected|hidden/i,
+		);
+	});
+
+	test("parseExtraDirs refuses folders that hold protected places, ~/Library and hidden home folders", () => {
+		const userHome = realpathSync(tempDir("yew-user-"));
+		for (const dir of ["Library/Application Support", ".config", ".ssh", "Documents/project"]) {
+			mkdirSync(join(userHome, dir), { recursive: true });
+		}
+		const offLimits = [join(userHome, ".ssh")];
+		for (const path of [
+			dirname(userHome),
+			join(userHome, "Library"),
+			join(userHome, "Library", "Application Support"),
+			join(userHome, ".config"),
+		]) {
+			for (const access of ["read", "write"]) {
+				assert.throws(
+					() => parseExtraDirs([{ path, access }], { offLimits, userHome }),
+					/protected|hidden|broad/i,
+					`${path} (${access})`,
+				);
+			}
+		}
+		assert.deepEqual(
+			parseExtraDirs([{ path: join(userHome, "Documents", "project"), access: "write" }], {
+				offLimits,
+				userHome,
+			}),
+			[{ path: join(userHome, "Documents", "project"), access: "write" }],
 		);
 	});
 

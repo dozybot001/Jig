@@ -171,7 +171,7 @@ export async function startCommand(options: {
 	const gitAudit = !box && guardMode === "git-setup" ? snapshotRepositories(writable) : null;
 	const guarded = box
 		? null
-		: guardedArgs(shell, options.command, options.cwd, undefined, guardMode);
+		: guardedArgs(shell, options.command, options.cwd, undefined, guardMode, writable);
 	const outsideEnv =
 		outside || guardMode === "git-setup"
 			? {

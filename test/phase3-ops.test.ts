@@ -43,7 +43,7 @@ describe("phase 3.1: outer guard split & ssh/scp preview", () => {
 		assert.match(def, /\(deny lsopen\)/);
 		assert.match(def, /\(deny appleevent-send\)/);
 
-		const gitSetup = guardProfile(places, home, "git-setup");
+		const gitSetup = guardProfile(places, home, "git-setup", ["/Users/tester/work"]);
 		// Core stays locked: hooks, ~/.gitconfig, ~/.ssh/config, ~/.yew, lsopen, appleevent-send
 		assert.match(gitSetup, /deny file-read\* file-write\*.*\.yew/);
 		assert.match(gitSetup, /\.gitconfig/);
@@ -51,8 +51,13 @@ describe("phase 3.1: outer guard split & ssh/scp preview", () => {
 		assert.match(gitSetup, /hooks/);
 		assert.match(gitSetup, /\(deny lsopen\)/);
 		assert.match(gitSetup, /\(deny appleevent-send\)/);
-		// Workspace .git/config regex is omitted in git-setup mode
-		assert.doesNotMatch(gitSetup, /config\(\\\.worktree\)\?/);
+		// Repository settings stay closed everywhere, and are let through only under the writable folders.
+		assert.match(gitSetup, /\(deny file-write\*[^\n]*config\(\\\.worktree\)\?/);
+		assert.match(
+			gitSetup,
+			/\(allow file-write\* \(require-all \(subpath "\/Users\/tester\/work"\)[^\n]*config/,
+		);
+		assert.doesNotMatch(def, /\(allow file-write\*/);
 
 		const launchApp = guardProfile(places, home, "launch-app");
 		// Only lsopen is relaxed; every file lock and appleevent-send stay locked
@@ -95,17 +100,90 @@ describe("phase 3.1: outer guard split & ssh/scp preview", () => {
 			}
 		}
 
+		// Only a plain local setup opens the guard (the security group, 11-20): nothing that points
+		// git elsewhere, sets things on the way, runs a program or uses a template.
+		for (const cmd of [
+			"git -C /tmp/other init",
+			"git --git-dir=/tmp/x/.git config user.name A",
+			"git --work-tree=/tmp init",
+			"git --namespace=x remote add o u",
+			"git -c core.fsmonitor=evil init",
+			"GIT_DIR=/tmp/x/.git git config user.name A",
+			"GIT_CONFIG_GLOBAL=/tmp/c git init",
+			"GIT_EXEC_PATH=/tmp git init",
+			"env git init",
+			"env GIT_DIR=/tmp/x git init",
+			"git clone --upload-pack=evil https://example.com/r.git",
+			"git clone -u evil https://example.com/r.git",
+			"git clone --config core.hooksPath=/tmp https://example.com/r.git",
+			"git clone -c core.fsmonitor=evil https://example.com/r.git",
+			"git clone --template=/tmp/t https://example.com/r.git",
+			"git clone --separate-git-dir=/tmp/g https://example.com/r.git",
+			"git init --template=/tmp/t",
+			"git config core.fsmonitor evil",
+			"git config core.hooksPath /tmp/h",
+			"git config core.sshCommand evil",
+			"git config core.pager evil",
+			"git config core.editor evil",
+			"git config core.askPass evil",
+			"git config credential.helper evil",
+			"git config diff.x.textconv evil",
+			"git config filter.x.clean evil",
+			"git config alias.x !evil",
+			"git config gpg.program evil",
+			"git config sequence.editor evil",
+			"git config include.path /tmp/c",
+			"git config includeIf.gitdir:/x.path /tmp/c",
+			"git config --file /tmp/c user.name A",
+			"git config --edit",
+			"git init > /tmp/out",
+		]) {
+			assert.equal(classifyGuardMode(cmd), "default", cmd);
+		}
+		for (const cmd of [
+			"git config user.email a@example.com",
+			"git config set user.name A",
+			"git config remote.origin.url https://example.com/r.git",
+			"git config branch.main.remote origin",
+			"git config init.defaultBranch main",
+			"git remote set-url origin https://example.com/r.git",
+		]) {
+			assert.equal(classifyGuardMode(cmd), "git-setup", cmd);
+		}
+
 		// Global git config and compound commands never receive git-setup relaxation
 		assert.equal(classifyGuardMode("git config --global user.name Evil"), "default");
 		assert.equal(classifyGuardMode("git init && rm -rf /tmp/foo"), "default");
 		assert.equal(classifyGuardMode("git init; echo hi"), "default");
 
-		// Launch app
-		assert.equal(classifyGuardMode("open -a Xcode"), "launch-app");
+		// Launch app: only `open -a <name>` for an app installed for everyone, not a terminal or a
+		// script runner, nothing else on the line (the security group, 11-20).
+		const apps = realpathSync(tempDir("yew-apps-"));
+		for (const app of ["Xcode", "Safari", "Visual Studio Code", "Terminal", "Script Editor"]) {
+			mkdirSync(join(apps, `${app}.app`));
+		}
+		mkdirSync(join(cwd, "Evil.app"));
+		assert.equal(classifyGuardMode("open -a Safari", [apps]), "launch-app");
+		assert.equal(classifyGuardMode('open -a "Visual Studio Code"', [apps]), "launch-app");
+		for (const cmd of [
+			"open -a Safari notes.txt",
+			"open -a Safari https://example.com",
+			"open -a Safari --args --x",
+			"open -n -a Safari",
+			"open -a /Applications/Safari.app",
+			`open -a ${join(cwd, "Evil.app")}`,
+			"open -a Evil",
+			"open -a Terminal",
+			'open -a "Script Editor"',
+			"open -a Nowhere",
+		]) {
+			assert.equal(classifyGuardMode(cmd, [apps]), "default", cmd);
+		}
+		assert.equal(classifyGuardMode("open -a Xcode", [apps]), "launch-app");
 		const parsedApp = parseShell("open -a Xcode");
 		assert.equal(parsedApp.understood, true);
 		assert.equal(mustConfirmReason(parsedApp.segments[0]?.argv ?? []), "launch-app");
-		assert.equal(classifyGuardMode("open -a Xcode && echo hi"), "default");
+		assert.equal(classifyGuardMode("open -a Xcode && echo hi", [apps]), "default");
 		const appVerdict = engine.decide(
 			{ kind: "command", tool: "shell", command: "open -a Xcode" },
 			skipSession,

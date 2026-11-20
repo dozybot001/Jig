@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { classifyGuardMode, sshPreview } from "../permissions/shell.ts";
+import { classifyGuardMode, guardPreview, sshPreview } from "../permissions/shell.ts";
 import { activeSandbox, type SiteQuestion } from "../sandbox.ts";
 import { validateSandboxDomain } from "../settings.ts";
 import { startCommand } from "./process.ts";
@@ -67,11 +67,13 @@ export const shellTool: ToolDefinition = {
 			...(outsideSandbox(args) ? { outsideSandbox: true } : {}),
 		};
 	},
-	preview(args) {
+	preview(args, session) {
 		const command = typeof args.command === "string" ? args.command : "";
 		const description = typeof args.description === "string" ? args.description.trim() : "";
 		const ssh = command ? sshPreview(command) : null;
-		const combined = [ssh, description].filter(Boolean).join("\n");
+		// A command that opens the outer guard says what it changes, or that the app runs unprotected.
+		const guard = command ? guardPreview(command, session.cwd) : null;
+		const combined = [guard, ssh, description].filter(Boolean).join("\n");
 		return combined ? { description: combined.slice(0, 600) } : {};
 	},
 	async run(args, ctx): Promise<ToolResult> {

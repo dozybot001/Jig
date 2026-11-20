@@ -1,4 +1,5 @@
-import { basename } from "node:path";
+import { existsSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import type { ConfirmReason } from "../../shared/types.ts";
 import type { GuardMode } from "../guard.ts";
 
@@ -506,39 +507,150 @@ export function mustConfirmReason(argv: string[]): ConfirmReason | null {
 	return null;
 }
 
+/** git config keys that only name things and never make git run a program (the security group, 11-20). */
+const SAFE_CONFIG_KEY =
+	/^(user\.[a-z0-9-]+|remote\.[^\s=]+\.(url|pushurl|fetch)|branch\.[^\s=]+\.(remote|merge|rebase|pushremote|description)|init\.defaultbranch)$/i;
+/** git config flags that keep to the repository's own file and do nothing else. */
+const CONFIG_FLAGS = new Set([
+	"--local",
+	"--unset",
+	"--unset-all",
+	"--add",
+	"--replace-all",
+	"--bool",
+	"--int",
+	"--path",
+]);
+
+/** Whether a flag among `args` is one of `flags`, alone or as `--flag=value`, or a short one in a cluster. */
+function hasFlag(args: string[], long: string[], short = ""): boolean {
+	return args.some(
+		(arg) =>
+			long.some((flag) => arg === flag || arg.startsWith(`${flag}=`)) ||
+			(short.length > 0 &&
+				/^-[a-zA-Z]+/.test(arg) &&
+				!arg.startsWith("--") &&
+				[...arg.slice(1)].some((letter) => short.includes(letter))),
+	);
+}
+
+/**
+ * Whether `git ...` is a plain local repository setup the guard may let write its repository's
+ * settings: no options before the subcommand (-C, --git-dir, -c and the like point git elsewhere or
+ * set things), no clone or init option that runs a program or uses a template, and for git config
+ * only keys that never make git run anything.
+ */
+function plainGitSetup(argv: string[]): boolean {
+	const sub = argv[1];
+	if (!sub || sub.startsWith("-")) return false;
+	const rest = argv.slice(2);
+	if (sub === "init") return !hasFlag(rest, ["--template", "--separate-git-dir"]);
+	if (sub === "clone") {
+		return !hasFlag(
+			rest,
+			[
+				"--upload-pack",
+				"--config",
+				"--template",
+				"--separate-git-dir",
+				"--reference",
+				"--server-option",
+			],
+			"uc",
+		);
+	}
+	if (sub === "remote") return true;
+	if (sub === "config") {
+		let words = rest;
+		if (words[0] === "set" || words[0] === "unset") words = words.slice(1);
+		let key: string | null = null;
+		for (const word of words) {
+			if (word.startsWith("-")) {
+				if (!CONFIG_FLAGS.has(word) && !word.startsWith("--type=")) return false;
+				continue;
+			}
+			key = word;
+			break;
+		}
+		return key !== null && SAFE_CONFIG_KEY.test(key);
+	}
+	return false;
+}
+
+/** Desktop apps that would run commands for whoever asks them: never launched with the guard open. */
+const COMMAND_APPS =
+	/^(terminal|iterm|iterm2|warp|ghostty|alacritty|kitty|wezterm|hyper|tabby|script editor|automator|shortcuts|console)$/i;
+
+/** The app `open -a <name>` names, when it is one installed for everyone; null otherwise. */
+export function launchableApp(
+	argv: string[],
+	folders: string[] = ["/Applications", "/System/Applications"],
+): string | null {
+	if (argv.length !== 3 || argv[1] !== "-a") return null;
+	const name = (argv[2] ?? "").replace(/\.app$/i, "");
+	if (!name || name.includes("/") || name.startsWith(".") || COMMAND_APPS.test(name)) return null;
+	for (const folder of folders) {
+		const app = join(folder, `${name}.app`);
+		if (existsSync(app)) return app;
+	}
+	return null;
+}
+
 /**
  * Picks the outer guard relaxation mode for a human-approved command running outside the sandbox.
- * Only a single static, fully understood command that asks for local `git-setup` OR `launch-app`
- * receives the corresponding single-purpose unlock; compound, dynamic or global-config commands
- * stay in `"default"`.
+ * Only one plain command, written out as is (no environment assignments, `env` or other wrapper in
+ * front), gets the single-purpose unlock: a local repository setup (plainGitSetup) or opening an app
+ * installed for everyone that is not a terminal or a script runner (launchableApp). Anything else
+ * runs in the full guard.
  */
-export function classifyGuardMode(command: string): GuardMode {
+export function classifyGuardMode(command: string, appFolders?: string[]): GuardMode {
 	const parsed = parseShell(command);
 	if (!parsed.understood || parsed.segments.length !== 1) return "default";
 	const segment = parsed.segments[0];
-	if (!segment || segment.dynamic) return "default";
-	const inner = unwrap(segment.argv);
-	if (!inner.understood || inner.commands.length !== 1) return "default";
-	const argv = inner.commands[0] ?? [];
-	const reason = mustConfirmReason(argv);
-	if (reason === "git-setup") {
-		// Global/system/arbitrary-file git config must never relax the outer guard.
-		if (
-			argv.some(
-				(arg) =>
-					arg === "--global" ||
-					arg === "--system" ||
-					arg === "--file" ||
-					arg === "-f" ||
-					arg.startsWith("--file="),
-			)
-		) {
-			return "default";
-		}
+	if (!segment || segment.dynamic || segment.redirects.length > 0) return "default";
+	const argv = segment.argv;
+	const name = argv[0] ?? "";
+	if (name === "git" && mustConfirmReason(argv) === "git-setup" && plainGitSetup(argv)) {
 		return "git-setup";
 	}
-	if (reason === "launch-app") return "launch-app";
+	if (name === "open" && launchableApp(argv, appFolders)) return "launch-app";
 	return "default";
+}
+
+/**
+ * The repository a git-setup command changes, as an absolute path: the folder git init or clone
+ * makes or fills, or the repository around the working folder.
+ */
+export function gitSetupTarget(argv: string[], cwd: string): string {
+	const sub = argv[1];
+	const operands = argv.slice(2).filter((arg) => !arg.startsWith("-"));
+	if (sub === "init") return resolve(cwd, operands[0] ?? ".");
+	if (sub === "clone") {
+		const [source, folder] = operands;
+		if (folder) return resolve(cwd, folder);
+		const last = (source ?? "").replace(/\/+$/, "").split(/[/:]/).at(-1) ?? "";
+		return resolve(cwd, last.replace(/\.git$/, "") || ".");
+	}
+	let dir = resolve(cwd);
+	while (!existsSync(join(dir, ".git"))) {
+		const up = dirname(dir);
+		if (up === dir) return resolve(cwd);
+		dir = up;
+	}
+	return dir;
+}
+
+/** What a card for a command that opens the guard says, besides the command; null for any other. */
+export function guardPreview(command: string, cwd: string | null): string | null {
+	const mode = classifyGuardMode(command);
+	const argv = parseShell(command).segments[0]?.argv ?? [];
+	if (mode === "git-setup") {
+		return `Changes the git repository at ${gitSetupTarget(argv, cwd ?? process.cwd())}: only its own settings file is let through the outer guard for this one command.`;
+	}
+	if (mode === "launch-app") {
+		return `Opens ${launchableApp(argv)}. The app runs outside Yew Harness's protection and can do anything you can.`;
+	}
+	return null;
 }
 
 const SSH_VALUE_FLAGS = new Set([
