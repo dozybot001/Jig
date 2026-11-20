@@ -115,7 +115,7 @@ To report a security problem, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-[MIT](LICENSE). Copyright (c) 2026 Changsha Tenon Artificial Intelligence Technology Co., Ltd.
+[MIT](LICENSE). Copyright (c) 2026 Tenon Artificial Intelligence Technology Co., Ltd. (长沙榫卯人工智能科技有限公司)
 
 The third-party packages used at run time and in the web interface are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 

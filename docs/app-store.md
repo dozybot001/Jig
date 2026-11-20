@@ -50,7 +50,7 @@
 | 年龄分级 | 4+（照问卷如实答的结果） | 4+ |
 | 价格 | 免费，没有内购 | Free, no in-app purchases |
 | 销售范围 | 先不含中国大陆（App 备案推后，规范 17.9），拿到备案号后再开 | |
-| 版权 | 公司英文全称，和 PassBy 相同 | 2026 Changsha Tenon Artificial Intelligence Technology Co., Ltd. |
+| 版权 | 公司英文全称（11-19 起不加长沙；App Store Connect 里还是旧名，交审核前改） | 2026 Tenon Artificial Intelligence Technology Co., Ltd. |
 
 描述（中文）：
 
