@@ -9,7 +9,7 @@ import { EventBus } from "../src/server/events.ts";
 import { api } from "../src/server/http/api.ts";
 import { createApp } from "../src/server/http/app.ts";
 import { errorHandler } from "../src/server/http/problem.ts";
-import { openFileCommand } from "../src/server/reveal.ts";
+import { openFileCommand, revealOnly } from "../src/server/reveal.ts";
 import { Store } from "../src/server/store.ts";
 import {
 	continueMarkdownList,
@@ -162,18 +162,47 @@ describe("POST /api/open-file and fileOpener setting", () => {
 		}
 	});
 
-	test("shows apps, scripts and executables in Finder instead of opening them with the system default", async () => {
-		const root = mkdtempSync(join(tmpdir(), "yew-open-launchable-"));
+	test("the system default opens only documents; everything else is shown in the file manager", async () => {
+		const root = mkdtempSync(join(tmpdir(), "yew-open-reveal-"));
 		const yewHome = join(root, ".yew");
 		mkdirSync(yewHome, { recursive: true });
-		const script = join(root, "run.command");
-		const binary = join(root, "tool");
+		const shown = [
+			"run.command",
+			"tool.sh",
+			"launch.py",
+			"launch.pyw",
+			"start.jnlp",
+			"profile.mobileconfig",
+			"addition.osax",
+			"look.qlgenerator",
+			"find.mdimporter",
+			"ext.safariextz",
+			"flow.alfredworkflow",
+			"setup.exe",
+			"setup.msi",
+			"go.bat",
+			"link.lnk",
+			"pkg.deb",
+			"pkg.rpm",
+			"pkg.snap",
+			"app.flatpakref",
+			"repo.flatpakrepo",
+			"setup.run",
+			"blob.bin",
+			"mystery.foo",
+			"noextension",
+		];
+		for (const name of shown) writeFileSync(join(root, name), "x\n", "utf8");
+		const executable = join(root, "notes.txt.exe-bit.md");
+		writeFileSync(executable, "#!/bin/sh\n", { mode: 0o755 });
 		const bundle = join(root, "Some.app");
-		const note = join(root, "note.md");
-		writeFileSync(script, "echo hi\n", "utf8");
-		writeFileSync(binary, "#!/bin/sh\n", { mode: 0o755 });
 		mkdirSync(bundle);
+		const folder = join(root, "plain");
+		mkdirSync(folder);
+		const note = join(root, "note.md");
+		const picture = join(root, "photo.png");
 		writeFileSync(note, "# Note\n", "utf8");
+		writeFileSync(picture, "x", "utf8");
 		const db = openDatabase(":memory:");
 		const store = new Store(db, new EventBus());
 		const launched: { command: string; args: string[] }[] = [];
@@ -187,23 +216,61 @@ describe("POST /api/open-file and fileOpener setting", () => {
 			},
 		});
 		app.onError(errorHandler(() => {}));
-		const open = (path: string) =>
-			app.request("/open-file", {
+		const open = async (path: string) => {
+			const response = await app.request("/open-file", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
 				body: JSON.stringify({ path, opener: "system" }),
 			});
+			assert.equal(response.status, 204, path);
+			return launched.at(-1);
+		};
 		try {
-			for (const path of [script, binary, bundle]) {
-				assert.equal((await open(path)).status, 204);
-				assert.deepEqual(launched.at(-1), { command: "open", args: ["-R", realpathSync(path)] });
+			for (const path of [...shown.map((name) => join(root, name)), executable, bundle]) {
+				assert.deepEqual(
+					await open(path),
+					{ command: "open", args: ["-R", realpathSync(path)] },
+					path,
+				);
 			}
-			assert.equal((await open(note)).status, 204);
-			assert.deepEqual(launched.at(-1), { command: "open", args: [realpathSync(note)] });
+			for (const path of [note, picture, folder]) {
+				assert.deepEqual(await open(path), { command: "open", args: [realpathSync(path)] }, path);
+			}
 		} finally {
 			db.close();
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	test("editors open single files; folders and workspace files are shown in the file manager", () => {
+		const folder = { isDirectory: () => true, mode: 0o755 };
+		const file = { isDirectory: () => false, mode: 0o644 };
+		for (const opener of ["vscode", "cursor", "zed"] as const) {
+			assert.equal(revealOnly("/work/project", folder, opener), true);
+			assert.equal(revealOnly("/work/team.code-workspace", file, opener), true);
+			assert.equal(revealOnly("/work/ext.vsix", file, opener), true);
+			assert.equal(revealOnly("/work/app.ts", file, opener), false);
+			assert.deepEqual(
+				openFileCommand("/work/project", { opener, platform: "darwin", isDir: true, reveal: true }),
+				{ command: "open", args: ["-R", "/work/project"] },
+			);
+			assert.deepEqual(
+				openFileCommand("/work/project", { opener, platform: "linux", isDir: true, reveal: true }),
+				{ command: "xdg-open", args: ["/work/project"] },
+			);
+		}
+		assert.deepEqual(
+			openFileCommand("/work/app.ts", { opener: "vscode", platform: "darwin", reveal: false }),
+			{ command: "open", args: ["-a", "Visual Studio Code", "/work/app.ts"] },
+		);
+		assert.deepEqual(
+			openFileCommand("/work/team.code-workspace", {
+				opener: "vscode",
+				platform: "darwin",
+				reveal: true,
+			}),
+			{ command: "open", args: ["-R", "/work/team.code-workspace"] },
+		);
 	});
 
 	test("blocks paired phones from calling /api/open-file", async () => {

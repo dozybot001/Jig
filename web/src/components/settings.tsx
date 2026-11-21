@@ -83,6 +83,7 @@ import {
 	CheckIcon,
 	ChevronIcon,
 	CloseIcon,
+	CodeIcon,
 	CopyIcon,
 	DataIcon,
 	ExportIcon,
@@ -96,6 +97,7 @@ import {
 	PowerIcon,
 	ProductName,
 	PulseIcon,
+	RefuseIcon,
 	RenameIcon,
 	RetryIcon,
 	SignInIcon,
@@ -857,9 +859,9 @@ function releaseNotes(version: string): string {
 }
 
 /**
- * The version on the About page, and on the same line how it stands (blueprint, "版本与更新"): the
- * newest, a new one to install with one click (or the command, where Yew Harness cannot run it), or
- * an installed one a restart takes up. A button only where there is something to do.
+ * The version on the About page as one card (blueprint, "版本与更新"): an icon for how it stands, a
+ * title and a line of detail, and the one button there is something to do with: check, update, or
+ * restart. Where Yew Harness cannot install, the command; where an update failed, why.
  */
 function VersionLine() {
 	useLang();
@@ -877,11 +879,23 @@ function VersionLine() {
 	useEffect(() => {
 		void loadUpdates();
 	}, []);
-	const version = `${t("version", { v: health?.version ?? "" })}${
-		health?.build ? ` · ${t("build", { b: health.build })}` : ""
-	}`;
-	let status: ReactNode = null;
-	let action: ReactNode = null;
+	const versionText = t("version", { v: health?.version ?? "" });
+	const buildText = health?.build ? t("build", { b: health.build }) : null;
+	const join = (...parts: ReactNode[]) =>
+		parts
+			.filter((part) => part !== null && part !== undefined && part !== "")
+			.flatMap((part, index) => (index === 0 ? [part] : [" · ", part]));
+	const checkButton = (
+		<Button busy={check.busy} onClick={() => void check.run()}>
+			<RetryIcon />
+			{t("update_check")}
+		</Button>
+	);
+	let state = "current";
+	let icon: ReactNode = <CheckIcon />;
+	let title: ReactNode = versionText;
+	let detail: ReactNode[] = join(buildText);
+	let action: ReactNode = checkButton;
 	let below: ReactNode = null;
 	if (updates) {
 		const { job, latest } = updates;
@@ -912,11 +926,23 @@ function VersionLine() {
 				</div>
 			</div>
 		) : null;
+		const notes = (version: string) => (
+			<a href={releaseNotes(version)} target="_blank" rel="noopener noreferrer">
+				{t("update_notes")}
+			</a>
+		);
 		if (job?.state === "installing") {
-			status = t("update_installing", { v: job.version });
+			state = "busy";
+			icon = <RetryIcon />;
+			title = t("update_installing", { v: job.version });
+			detail = join(versionText);
+			action = null;
 		} else if (job?.state === "failed" && !updates.restart) {
 			// What went wrong, then what can be done: the command, or trying again.
-			status = t("update_failed", { v: job.version });
+			state = "failed";
+			icon = <RefuseIcon />;
+			title = t("update_failed", { v: job.version });
+			detail = join(versionText);
 			action = installButton;
 			below = (
 				<>
@@ -928,11 +954,16 @@ function VersionLine() {
 				</>
 			);
 		} else if (updates.restart || job?.state === "installed") {
-			status =
+			state = "ready";
+			icon = <RetryIcon />;
+			title =
 				updates.kind === "source" && updates.installed.version === updates.version
-					? t("update_sourceChanged", { b: updates.installed.build ?? "" })
-					: t("update_installed", { v: updates.installed.version });
-			if (updates.restartPending) status = `${status} · ${t("update_restartWaiting")}`;
+					? t("update_sourceChangedTitle", { b: updates.installed.build ?? "" })
+					: t("update_installedTitle", { v: updates.installed.version });
+			detail = join(
+				updates.restartPending ? t("update_restartWaiting") : t("update_restartHint"),
+				versionText,
+			);
 			action = (
 				<Button
 					variant="primary"
@@ -944,47 +975,45 @@ function VersionLine() {
 				</Button>
 			);
 		} else if (updates.available && latest) {
-			status = (
-				<>
-					{t("update_available", { v: latest.version })}{" "}
-					<a href={releaseNotes(latest.version)} target="_blank" rel="noopener noreferrer">
-						{t("update_notes")}
-					</a>
-				</>
-			);
+			state = "available";
+			icon = <ArrowUpIcon />;
+			title = t("update_available", { v: latest.version });
+			detail = join(versionText, notes(latest.version));
 			action = installButton;
 			below = manualBlock;
 		} else if (updates.kind === "source") {
-			status = t("update_source");
-		} else {
-			if (latest) {
-				const ago = formatAgo(latest.checkedAt, now);
-				status =
-					now - latest.checkedAt < 60_000
-						? t("update_currentNow")
-						: t("update_current", { time: ago });
-			}
-			action = (
-				<Button
-					variant="icon"
-					aria-label={t("update_check")}
-					title={t("update_check")}
-					busy={check.busy}
-					onClick={() => void check.run()}
-				>
-					<RetryIcon />
-				</Button>
+			state = "source";
+			icon = <CodeIcon />;
+			title = t("update_source");
+			detail = join(versionText, buildText);
+			action = null;
+		} else if (latest) {
+			title = t("update_upToDate");
+			detail = join(
+				versionText,
+				buildText,
+				now - latest.checkedAt < 60_000
+					? t("update_checkedNow")
+					: t("update_checked", { time: formatAgo(latest.checkedAt, now) }),
 			);
 		}
 	}
 	return (
 		<>
-			<div className="about-version">
-				<span>{version}</span>
-				{status && <span aria-live="polite">· {status}</span>}
-				{action}
+			<div className="update-card" data-state={state}>
+				<span
+					className={state === "busy" ? "update-icon update-spin" : "update-icon"}
+					aria-hidden="true"
+				>
+					{icon}
+				</span>
+				<div className="update-text" aria-live="polite">
+					<div className="update-title">{title}</div>
+					{detail.length > 0 && <div className="update-detail">{detail}</div>}
+				</div>
+				{action && <div className="update-action">{action}</div>}
+				{below && <div className="update-below">{below}</div>}
 			</div>
-			{below}
 			<ErrorBox error={check.error ?? install.error ?? restart.error ?? copy.error} />
 			{asking && updates && (
 				<Dialog

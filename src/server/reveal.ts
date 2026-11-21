@@ -76,15 +76,13 @@ export function openFileCommand(
 		column?: number;
 		platform?: string;
 		isDir?: boolean;
-		/** The target would run as a program if opened with the system default (see `isLaunchable`). */
-		launchable?: boolean;
+		/** Show the target in the file manager whatever the opener (see `revealOnly`). */
+		reveal?: boolean;
 	},
 ): { command: string; args: string[] } | null {
 	const platform = options.platform ?? process.platform;
 	const { line, column, isDir } = options;
-	// A link in a reply is written by the model. Opening an app, a script or an installer with the
-	// system default would run it outside the sandbox on one click, so those are only shown.
-	const opener = options.opener === "system" && options.launchable ? "finder" : options.opener;
+	const opener = options.reveal ? "finder" : options.opener;
 	const lineSuffix =
 		!isDir && line && line > 0 ? `:${line}${column && column > 0 ? `:${column}` : ""}` : "";
 	if (platform === "darwin") {
@@ -134,43 +132,44 @@ export function openFileCommand(
 	return null;
 }
 
-/** Bundles and file types that macOS or a Linux desktop runs, installs or follows when opened. */
-const LAUNCHABLE_TYPES = new Set([
-	".app",
-	".action",
-	".appimage",
-	".applescript",
-	".bundle",
-	".command",
-	".desktop",
-	".dmg",
-	".fileloc",
-	".inetloc",
-	".jar",
-	".kext",
-	".mpkg",
-	".pkg",
-	".plugin",
-	".prefpane",
-	".saver",
-	".scpt",
-	".scptd",
-	".service",
-	".sh",
-	".shortcut",
-	".terminal",
-	".tool",
-	".webloc",
-	".workflow",
-]);
+/**
+ * What the system default may open: documents, pictures, PDFs, audio and video. Anything else could be
+ * run, installed or followed by the program registered for it (scripts, apps, profiles, installers),
+ * and third-party apps register more of those, so only this list is opened (the security group, 11-21).
+ */
+const DOCUMENT_TYPES = new Set(
+	(
+		"txt md markdown rst log csv tsv json jsonl yaml yml toml " +
+		"png jpg jpeg gif webp heic heif bmp tif tiff ico pdf " +
+		"mp3 m4a wav aac flac ogg opus mp4 m4v mov webm mkv avi " +
+		"rtf doc docx xls xlsx ppt pptx odt ods odp pages numbers key"
+	)
+		.split(" ")
+		.map((type) => `.${type}`),
+);
 
-/** True when opening the path with the system default would run something: a known type or an executable file. */
-export function isLaunchable(
+/** Files an editor opens as a project or installs rather than shows: they load tasks and settings. */
+const EDITOR_PROJECT_TYPES = new Set([".code-workspace", ".vsix"]);
+
+/**
+ * True when the target is only shown in the file manager. A link in a reply is written by the model,
+ * and one click must not run anything outside the sandbox. With the system default, a folder whose
+ * name has an extension (an app is a folder), a file that is not a known document, and an executable
+ * file are only shown. With an editor, a folder or a workspace file is only shown: the editor would
+ * load the project's tasks and settings (`.vscode/tasks.json` can run a command when a folder
+ * opens); a single file opened on its own loads none of them.
+ */
+export function revealOnly(
 	targetPath: string,
 	stat: { isDirectory(): boolean; mode: number } | null,
+	opener: FileOpener,
 ): boolean {
-	if (LAUNCHABLE_TYPES.has(extname(targetPath).toLowerCase())) return true;
-	return stat !== null && !stat.isDirectory() && (stat.mode & 0o111) !== 0;
+	const type = extname(targetPath).toLowerCase();
+	const isDir = stat?.isDirectory() ?? false;
+	if (opener === "finder") return false;
+	if (opener !== "system") return isDir || EDITOR_PROJECT_TYPES.has(type);
+	if (isDir) return type !== "";
+	return !DOCUMENT_TYPES.has(type) || (stat !== null && (stat.mode & 0o111) !== 0);
 }
 
 /** Opens a verified local file or folder in the person's configured editor or file manager. */
@@ -191,8 +190,8 @@ export async function openLocalFile(
 		// Caller already verified existence; treat as file if stat races.
 	}
 	const isDir = stat?.isDirectory() ?? false;
-	const launchable = isLaunchable(targetPath, stat);
-	const program = openFileCommand(targetPath, { ...options, isDir, launchable });
+	const reveal = revealOnly(targetPath, stat, options.opener);
+	const program = openFileCommand(targetPath, { ...options, isDir, reveal });
 	if (!program) {
 		throw conflict(
 			"Opening local files works on macOS and Linux.",
