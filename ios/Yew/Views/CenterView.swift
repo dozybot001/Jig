@@ -102,15 +102,16 @@ struct PermissionRow: View {
 	@State private var confirmingActsAsYou = false
 
 	private var req: ApprovalItem.Request { approval.request }
-	private var isDecision: Bool { req.matter == true }
+	/// Cannot be taken back, or reaches other people: the automatic mode asks the person directly.
+	private var cannotUndo: Bool { req.matter == true }
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 10) {
 			HStack(spacing: 6) {
-				Tag(
-					text: isDecision ? String(localized: "Approval") : String(localized: "Permission"),
-					warning: isDecision
-				)
+				Tag(text: String(localized: "Permission"))
+				if cannotUndo {
+					Tag(text: String(localized: "Can't be undone"), warning: true)
+				}
 				if req.mustConfirm == true {
 					Tag(text: String(localized: "Asks every time"))
 				}

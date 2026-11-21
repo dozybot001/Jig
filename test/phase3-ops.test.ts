@@ -69,7 +69,7 @@ describe("phase 3.1: outer guard split & ssh/scp preview", () => {
 		assert.match(launchApp, /\(deny appleevent-send\)/);
 	});
 
-	test("git-setup and launch-app require human decision in all modes and reject compound commands", () => {
+	test("git-setup and launch-app are the person's to permit, skip mode runs them marked, and compound commands are rejected", () => {
 		const home = realpathSync(tempDir("yew-p3-home-"));
 		const cwd = realpathSync(tempDir("yew-p3-cwd-"));
 		const engine = new PermissionEngine(home);
@@ -79,6 +79,10 @@ describe("phase 3.1: outer guard split & ssh/scp preview", () => {
 			cwd,
 			options: { permissionMode: "skip" },
 		});
+		// The default and the automatic mode ask the person, not the check.
+		const askingSessions = (["default", "review"] as const).map((permissionMode) =>
+			store.createSession({ ...sessionInput(permissionMode), cwd, options: { permissionMode } }),
+		);
 
 		for (const cmd of [
 			"git init",
@@ -90,14 +94,23 @@ describe("phase 3.1: outer guard split & ssh/scp preview", () => {
 			const parsed = parseShell(cmd);
 			assert.equal(parsed.understood, true, cmd);
 			assert.equal(mustConfirmReason(parsed.segments[0]?.argv ?? []), "git-setup", cmd);
-			const verdict = engine.decide({ kind: "command", tool: "shell", command: cmd }, skipSession);
-			assert.equal(verdict.effect, "ask", cmd);
-			if (verdict.effect === "ask") {
-				assert.deepEqual(verdict.request.reasons, ["git-setup"]);
-				assert.equal(verdict.request.mustConfirm, true);
-				assert.equal(verdict.request.matter, true);
-				assert.equal(verdict.request.rememberRules, undefined);
+			for (const asking of askingSessions) {
+				const verdict = engine.decide({ kind: "command", tool: "shell", command: cmd }, asking);
+				assert.equal(verdict.effect, "ask", cmd);
+				if (verdict.effect === "ask") {
+					assert.deepEqual(verdict.request.reasons, ["git-setup"]);
+					assert.equal(verdict.request.mustConfirm, true);
+					assert.equal(verdict.request.matter, true);
+					assert.equal(verdict.request.rememberRules, undefined);
+					assert.equal(verdict.review, undefined);
+				}
 			}
+			// Skip mode asks about no permission (the founder, 11-21) and marks it in the record.
+			assert.deepEqual(
+				engine.decide({ kind: "command", tool: "shell", command: cmd }, skipSession),
+				{ effect: "allow", note: { risk: ["git-setup"] } },
+				cmd,
+			);
 		}
 
 		// Only a plain local setup opens the guard (the security group, 11-20): nothing that points
@@ -195,16 +208,22 @@ describe("phase 3.1: outer guard split & ssh/scp preview", () => {
 		assert.equal(parsedApp.understood, true);
 		assert.equal(mustConfirmReason(parsedApp.segments[0]?.argv ?? []), "launch-app");
 		assert.equal(classifyGuardMode("open -a Xcode && echo hi", [apps]), "default");
-		const appVerdict = engine.decide(
-			{ kind: "command", tool: "shell", command: "open -a Xcode" },
-			skipSession,
-		);
-		assert.equal(appVerdict.effect, "ask");
-		if (appVerdict.effect === "ask") {
-			assert.deepEqual(appVerdict.request.reasons, ["launch-app"]);
-			assert.equal(appVerdict.request.mustConfirm, true);
-			assert.equal(appVerdict.request.matter, true);
+		for (const asking of askingSessions) {
+			const appVerdict = engine.decide(
+				{ kind: "command", tool: "shell", command: "open -a Xcode" },
+				asking,
+			);
+			assert.equal(appVerdict.effect, "ask");
+			if (appVerdict.effect === "ask") {
+				assert.deepEqual(appVerdict.request.reasons, ["launch-app"]);
+				assert.equal(appVerdict.request.mustConfirm, true);
+				assert.equal(appVerdict.request.matter, true);
+			}
 		}
+		assert.deepEqual(
+			engine.decide({ kind: "command", tool: "shell", command: "open -a Xcode" }, skipSession),
+			{ effect: "allow", note: { risk: ["launch-app"] } },
+		);
 	});
 
 	test("sshPreview formats ssh, scp and rsync commands cleanly", () => {

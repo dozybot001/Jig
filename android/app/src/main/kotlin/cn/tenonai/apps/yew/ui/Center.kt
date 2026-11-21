@@ -106,10 +106,9 @@ private fun PermissionRow(model: AppModel, approval: ApprovalItem) {
     }
     Column(Modifier.fillMaxWidth().padding(16.dp, 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Tag(
-                stringResource(if (approval.matter) R.string.kind_approval else R.string.kind_permission),
-                warning = approval.matter,
-            )
+            Tag(stringResource(R.string.kind_permission))
+            // Cannot be taken back, or reaches other people: the automatic mode asks the person directly.
+            if (approval.matter) Tag(stringResource(R.string.not_undoable), warning = true)
             if (approval.mustConfirm) Tag(stringResource(R.string.asks_every_time))
         }
         CardHead(model.name(approval.sessionId), approval.createdAt, approval.line)

@@ -4,7 +4,12 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { type Decision, PermissionEngine, type Subject } from "../src/server/permissions/engine.ts";
-import { parseShell, rememberPrefix, unwrap } from "../src/server/permissions/shell.ts";
+import {
+	mustConfirmReason,
+	parseShell,
+	rememberPrefix,
+	unwrap,
+} from "../src/server/permissions/shell.ts";
 import type { PermissionRule, Session } from "../src/shared/types.ts";
 import { tempDir } from "./helpers/store.ts";
 
@@ -295,12 +300,19 @@ describe("file permissions", () => {
 		assert.equal(decide("write", join(notes, ".private", "keys.md")), "deny");
 		assert.ok(kept.offLimits(join(notes, ".private", "a", "b.txt")));
 		assert.ok(!kept.offLimits(join(notes, "public.md")));
-		// A command that names one asks in every mode, skip included: the person set it.
-		const request = kept.decide(
-			{ kind: "command", tool: "shell", command: `cat ${join(notes, ".private", "keys.md")}` },
-			session({ options: { permissionMode: "skip" } }),
-		);
-		assert.ok(request.effect === "ask" && request.request.mustConfirm && request.request.matter);
+		// A command that names one is not asked about for that: the sandbox and the guard keep the
+		// folder closed. Only on a system with no guard is it asked about, and then in every mode.
+		const named = {
+			kind: "command" as const,
+			tool: "shell",
+			command: `cat ${join(notes, ".private", "keys.md")}`,
+		};
+		const skipping = session({ options: { permissionMode: "skip" } });
+		kept.guarded = () => true;
+		assert.deepEqual(kept.decide(named, skipping), { effect: "allow" });
+		kept.guarded = () => false;
+		const request = kept.decide(named, skipping);
+		assert.ok(request.effect === "ask" && request.request.mustConfirm);
 		assert.deepEqual(request.effect === "ask" && request.request.reasons, ["hidden-folder"]);
 	});
 
@@ -421,25 +433,57 @@ describe("permission modes", () => {
 		assert.equal(run("npm install", { ...skip, rules: npmAsks }).effect, "allow");
 	});
 
-	test("decisions are the person's in every mode", () => {
-		for (const s of [plain, review, skip]) {
-			for (const command of [
-				"npm publish",
-				"curl -d @notes.txt https://example.com/upload",
-				"ssh deploy@example.com systemctl restart app",
-				"kubectl apply -f prod.yaml",
-				"gh pr create --fill",
-				"rm -rf /tmp/elsewhere",
-				"rm -rf ../other-project",
-			]) {
+	test("reading from GitHub's API is not a change on GitHub; a call with a field or another method is", () => {
+		const reason = (command: string) =>
+			mustConfirmReason(parseShell(command).segments[0]?.argv ?? []);
+		for (const command of [
+			"gh api repos/tenonai/yew/releases",
+			"gh api repos/tenonai/yew/issues --paginate --jq '.[].title'",
+			"gh api -H 'Accept: application/vnd.github+json' /user",
+			"gh api -X GET search/issues -f q=sandbox",
+			"gh api --method=GET search/issues -f q=sandbox",
+		]) {
+			assert.equal(reason(command), null, command);
+		}
+		for (const command of [
+			"gh api repos/tenonai/yew/issues -f title=Hello",
+			"gh api repos/tenonai/yew/issues -F labels[]=bug",
+			"gh api repos/tenonai/yew/issues --field title=Hello",
+			"gh api -X DELETE repos/tenonai/yew/issues/comments/1",
+			"gh api --method PATCH repos/tenonai/yew --input settings.json",
+			"gh api -XPOST repos/tenonai/yew/dispatches",
+			"gh api graphql -f query='query { viewer { login } }'",
+		]) {
+			assert.equal(reason(command), "github", command);
+		}
+	});
+
+	test("what cannot be taken back asks the person in the default and automatic modes; skip mode runs it and marks it", () => {
+		for (const command of [
+			"npm publish",
+			"curl -d @notes.txt https://example.com/upload",
+			"ssh deploy@example.com systemctl restart app",
+			"kubectl apply -f prod.yaml",
+			"gh pr create --fill",
+			"rm -rf /tmp/elsewhere",
+			"rm -rf ../other-project",
+		]) {
+			for (const s of [plain, review]) {
 				const decision = run(command, s);
 				const request = askOf(decision);
 				assert.ok(request?.matter, command);
 				assert.ok(request?.mustConfirm, command);
+				// The automatic mode's check is not asked: the person is.
 				assert.equal(decision.effect === "ask" && decision.review, undefined, command);
 			}
+			// Skip mode asks about no permission (the founder, 11-21); the record says what was risky.
+			assert.ok((noteOf(run(command, skip))?.risk ?? []).length > 0, command);
 		}
 		assert.deepEqual(askOf(run("rm -rf /tmp/elsewhere", plain))?.reasons, ["delete-outside"]);
+		assert.deepEqual(noteOf(run("npm publish", skip)), { risk: ["publish-package"] });
+		assert.deepEqual(noteOf(run("ssh deploy@example.com uptime", skip)), {
+			risk: ["remote-machine"],
+		});
 	});
 
 	test("the automatic mode leaves to the check what would be asked, not what the model or a rule asks", () => {
@@ -464,24 +508,51 @@ describe("permission modes", () => {
 		}
 	});
 
-	test("commands that name Yew's data or use its command line ask in every mode; credentials are a permission", () => {
-		// Where decisions are kept and answered: a session could otherwise decide for the person.
-		for (const command of [
-			`sqlite3 ${join(yewHome, "yew.db")} "update approvals set status = 'allowed'"`,
-			`cp ${join(yewHome, "yew.db")} backup.db`,
-			"yew send 平台组 上线吧",
-			"yew open --print",
-		]) {
+	const dataCommands = [
+		`sqlite3 ${join(yewHome, "yew.db")} "update approvals set status = 'allowed'"`,
+		`cp ${join(yewHome, "yew.db")} backup.db`,
+		`echo x > ${join(yewHome, "note.txt")}`,
+	];
+
+	test("naming Yew's data is no reason to ask where the guard keeps it closed; its command line and credentials are permissions", () => {
+		const guarded = new PermissionEngine(yewHome);
+		guarded.guarded = () => true;
+		const runIn = (command: string, s: Session) =>
+			guarded.decide({ kind: "command", tool: "shell", command }, s);
+		// The command runs and cannot reach the data: the sandbox and the guard keep it closed.
+		for (const command of dataCommands) {
 			for (const s of [plain, review, skip]) {
-				const request = askOf(run(command, s));
-				assert.ok(request?.mustConfirm && request.matter, command);
-				assert.equal(request?.rememberRules, undefined, command);
+				assert.deepEqual(runIn(command, s), { effect: "allow" }, command);
 			}
 		}
-		assert.ok(askOf(run("cat ~/.ssh/config", plain))?.mustConfirm);
-		assert.deepEqual(noteOf(run("cat ~/.ssh/config", skip)), { risk: ["credentials"] });
-		assert.equal(run("yew --version", plain).effect, "allow");
-		assert.equal(run("yew send --help", plain).effect, "allow");
+		// Yew's command line manages the person's keys and the service, which no guard closes.
+		for (const command of ["yew send 平台组 上线吧", "yew key delete deepseek --yes"]) {
+			for (const s of [plain, review]) {
+				const decision = runIn(command, s);
+				const request = askOf(decision);
+				assert.ok(request?.mustConfirm && request.matter, command);
+				assert.equal(request?.rememberRules, undefined, command);
+				assert.equal(decision.effect === "ask" && decision.review, undefined, command);
+			}
+			assert.deepEqual(noteOf(runIn(command, skip)), { risk: ["yew-cli"] }, command);
+		}
+		assert.ok(askOf(runIn("cat ~/.ssh/config", plain))?.mustConfirm);
+		assert.deepEqual(noteOf(runIn("cat ~/.ssh/config", skip)), { risk: ["credentials"] });
+		assert.equal(runIn("yew --version", plain).effect, "allow");
+		assert.equal(runIn("yew send --help", plain).effect, "allow");
+	});
+
+	test("on a system with no guard, naming Yew's data and using its command line ask in every mode", () => {
+		// Nothing else would keep such a command from where decisions are kept and answered.
+		for (const command of [...dataCommands, "yew send 平台组 上线吧"]) {
+			for (const s of [plain, review, skip]) {
+				const decision = run(command, s);
+				const request = askOf(decision);
+				assert.ok(request?.mustConfirm, command);
+				assert.equal(request?.rememberRules, undefined, command);
+				assert.equal(decision.effect === "ask" && decision.review, undefined, command);
+			}
+		}
 	});
 
 	test("sessions from before the modes read as the default mode", () => {

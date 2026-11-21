@@ -124,6 +124,34 @@ export function parseQuestions(args: JsonObject): Question[] {
 }
 
 /**
+ * The choices a model wrote for a question that came without any (CHOICES_PROMPT), checked like a
+ * session's own: JSON with "options" and perhaps "recommended", anywhere in its reply. Null when that
+ * is not what it wrote, or when it gave fewer than two: one choice is no choice.
+ */
+export function choicesFrom(text: string): Pick<Question, "options" | "recommended"> | null {
+	const start = text.indexOf("{");
+	const end = text.lastIndexOf("}");
+	if (start < 0 || end < start) return null;
+	try {
+		const wrote = JSON.parse(text.slice(start, end + 1)) as JsonObject;
+		const options = Array.isArray(wrote.options) ? wrote.options.slice(0, MAX_OPTIONS) : [];
+		if (options.length < 2) return null;
+		const pick = wrote.recommended;
+		const named =
+			typeof pick === "number" && Number.isInteger(pick) && pick >= 1 && pick <= options.length;
+		const [question] = parseQuestions({
+			questions: [{ question: "?", options, ...(named ? { recommended: pick } : {}) }],
+		});
+		return {
+			options: question?.options ?? [],
+			...(question?.recommended === undefined ? {} : { recommended: question.recommended }),
+		};
+	} catch {
+		return null;
+	}
+}
+
+/**
  * Checks the person's answer against the questions and writes it as the session reads it: the options
  * picked, then their own words. Several questions get one line each.
  */
@@ -170,7 +198,7 @@ export function settleAnswer(
 export const askUserTool: ToolDefinition = {
 	name: "ask_user",
 	description:
-		"Ask the person and wait for the answer; it waits for them in the approval center. Use it when you cannot go on without an answer only they can give. Up to 4 questions at once; options and a recommendation are optional, and the person can always answer in their own words.",
+		"Ask the person and wait for the answer; it waits for them in the approval center. Use it when you cannot go on without an answer only they can give. Up to 4 questions at once. When the answer is a choice, give the options and the one you recommend, so the person answers with one click; leave them out only for what the person has to put in their own words, such as a name or a number. They can always answer in their own words.",
 	parameters: {
 		type: "object",
 		properties: {

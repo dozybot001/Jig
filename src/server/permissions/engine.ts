@@ -1,11 +1,11 @@
 import { dirname } from "node:path";
 import {
 	type ConfirmReason,
-	DECISION_REASONS,
 	type PermissionNote,
 	type PermissionRequest,
 	type PermissionRule,
 	permissionModeOf,
+	personOnly,
 	type RuleEffect,
 	type Session,
 } from "../../shared/types.ts";
@@ -32,12 +32,13 @@ export type Subject =
 	| { kind: "none" }
 	| { kind: "read"; tool: string; paths: string[]; summary: string }
 	| { kind: "write"; tool: string; paths: string[]; summary: string }
-	/** `outsideSandbox`: the command asks to run outside the system sandbox, so it asks every time. */
+	/** `outsideSandbox`: the command asks to run outside the system sandbox, which no rule remembers. */
 	| { kind: "command"; tool: string; command: string; outsideSandbox?: boolean }
 	| { kind: "url"; tool: string; url: string }
 	/**
 	 * Something that is neither a file, a command nor a URL, such as opening a session. `scope` names
-	 * what "always allow" remembers; `always` asks in every mode; `reasons` make it must-confirm.
+	 * what "always allow" remembers; `always` is asked about every time, with no rule to remember it;
+	 * `reasons` say why it is asked.
 	 */
 	| {
 			kind: "act";
@@ -68,6 +69,26 @@ export type Decision =
 const SAFE_REDIRECT_TARGETS = new Set(["/dev/null", "/dev/stdout", "/dev/stderr", "&1", "&2", "-"]);
 
 /**
+ * Places the sandbox and the outer guard keep closed: Yew's own data and the folders the person
+ * keeps from sessions. A command that names one runs and cannot reach it, so naming one is no
+ * reason to ask (blueprint, section 11).
+ */
+const HELD_PLACES: ReadonlySet<ConfirmReason> = new Set<ConfirmReason>([
+	"yew-data",
+	"hidden-folder",
+]);
+
+/**
+ * What is asked about in every mode on a system with no guard, where nothing else keeps a command
+ * from Yew's own data: running outside the sandbox, Yew's command line, and naming those places.
+ */
+const UNGUARDED: ReadonlySet<ConfirmReason> = new Set<ConfirmReason>([
+	"outside-sandbox",
+	"yew-cli",
+	...HELD_PLACES,
+]);
+
+/**
  * The rules a new session takes over from the one it was opened by or copied from. "Always allow"
  * for the tools of Yew's own browser and computer control was given for one session, with its scope
  * said at the time (spec 21.2): it does not travel.
@@ -89,9 +110,13 @@ function strongest(effects: RuleEffect[]): RuleEffect | null {
  * Decides whether a tool call may run, must be asked about, or is refused (M1 plan, section 8;
  * blueprint 6.1, item 6). Order: credential locations are refused; operations asked about every time
  * cannot be remembered; then the session's rules, where deny beats ask beats allow; then the
- * built-in defaults. What is asked is then settled by its kind and the session's mode: a decision
- * (审批: DECISION_REASONS) is the person's in every mode; a permission (授权) is asked in the default
- * mode, goes to the check first in review mode, and runs with its risk marked in skip mode.
+ * built-in defaults. What is asked is a permission (授权), settled by the session's mode: asked in
+ * the default mode, put to the check first in review mode (except what only the person gives:
+ * DECISION_REASONS), and run with its risk marked in skip mode, which asks about no permission
+ * (the founder, 11-21). Yew's own data and the folders the person keeps from sessions are closed by
+ * the sandbox and the outer guard, not by a question: a command that names one is not asked about
+ * for that. Only on a system with no guard are they asked about, with running outside the sandbox
+ * and Yew's command line, and then in every mode.
  * Text in the transcript never counts as approval: only the person's answer in Yew does.
  */
 export class PermissionEngine {
@@ -103,8 +128,9 @@ export class PermissionEngine {
 	/** Folders the person keeps from sessions (the settings): refused like credential locations. */
 	hidden: () => string[] = () => [];
 	/**
-	 * Whether commands outside the sandbox run in the guard (guard.ts). Without it, running outside
-	 * the sandbox is asked about in every mode: such a command could answer a decision itself.
+	 * Whether commands outside the sandbox run in the guard (guard.ts), which keeps them out of Yew's
+	 * own data and the folders the person keeps from sessions. Without it, what the guard would keep
+	 * closed is asked about in every mode (UNGUARDED).
 	 */
 	guarded: () => boolean = () => false;
 
@@ -124,22 +150,23 @@ export class PermissionEngine {
 	}
 
 	/**
-	 * `flagged` is the model's own judgment, through the `confirm` argument: in the automatic mode a
-	 * flagged call is asked about, others run. Must-confirm operations, explicit "ask" rules and commands
-	 * Yew cannot read are asked about in every mode.
+	 * `flagged` is the model's own judgment, through the `confirm` argument: in the default and
+	 * automatic modes a flagged call is asked about. Skip mode asks about no permission; Yew's
+	 * read-only helpers are asked about everything in every mode.
 	 */
 	decide(subject: Subject, session: Session, flagged = false): Decision {
 		const decision = this.#decide(subject, session, flagged);
 		if (decision.effect !== "ask") return decision;
 		const reasons = decision.request.reasons ?? [];
-		const always = (reason: ConfirmReason) =>
-			DECISION_REASONS.has(reason) || (reason === "outside-sandbox" && !this.guarded());
-		if (reasons.some(always)) {
+		// A helper that may only look never runs anything unasked, whatever its session's mode.
+		const mode = session.options.readerOnly ? "default" : permissionModeOf(session.options);
+		// Without a guard nothing else keeps a command from Yew's own data: the person is asked.
+		if (!this.guarded() && reasons.some((reason) => UNGUARDED.has(reason))) return decision;
+		if (personOnly(reasons, mode)) {
 			decision.request.matter = true;
 			return decision;
 		}
 		if (session.options.readerOnly) return decision;
-		const mode = permissionModeOf(session.options);
 		if (mode === "skip") {
 			const risk: ConfirmReason[] =
 				reasons.length > 0 ? reasons : decision.unreadable ? ["unreadable-command"] : [];
@@ -309,11 +336,13 @@ export class PermissionEngine {
 			if (reason === "delete-files" && !this.#allInside(argv, cwd, writable)) {
 				reasons.add("delete-outside");
 			} else if (reason) reasons.add(reason);
-			// File tools cannot touch these places at all; a command that names one asks.
+			// File tools cannot touch these places at all. A command that names Yew's data or a folder
+			// kept from sessions runs and cannot reach it: the sandbox and the guard keep it closed.
+			// Without a guard, it asks.
 			for (const arg of pathArguments(argv)) {
 				const path = resolvePath(arg, cwd);
 				const kind = path === null ? null : this.#placeOf(path);
-				if (kind) reasons.add(kind);
+				if (kind && !this.#held(kind)) reasons.add(kind);
 			}
 		}
 		if (privileged) reasons.add("admin");
@@ -321,8 +350,11 @@ export class PermissionEngine {
 		for (const target of redirectTargets) {
 			const path = resolvePath(target, cwd);
 			const kind = path === null ? null : this.#placeOf(path);
-			if (kind === "yew-data" || kind === "hidden-folder") reasons.add(kind);
-			else if (!path || !writable.some((dir) => isInside(path, dir))) reasons.add("write-outside");
+			if (kind === "yew-data" || kind === "hidden-folder") {
+				// The write fails there, so there is nothing to ask; without a guard, it asks.
+				if (!this.#held(kind)) reasons.add(kind);
+			} else if (!path || !writable.some((dir) => isInside(path, dir)))
+				reasons.add("write-outside");
 			else if (kind) reasons.add("write-credentials");
 		}
 
@@ -360,10 +392,15 @@ export class PermissionEngine {
 		);
 	}
 
+	/** Whether the sandbox and the guard keep this place closed, so that naming it is no reason to ask. */
+	#held(place: ConfirmReason): boolean {
+		return this.guarded() && HELD_PLACES.has(place);
+	}
+
 	/**
 	 * Which kind of place sessions may not touch a path is in: Yew's own data and the folders the
-	 * person keeps from sessions are asked about in every mode; other credential locations are a
-	 * permission. Null for anywhere else.
+	 * person keeps from sessions are closed by the sandbox and the guard; other credential locations
+	 * are a permission. Null for anywhere else.
 	 */
 	#placeOf(path: string): "yew-data" | "hidden-folder" | "credentials" | null {
 		if (isInside(path, this.#home)) return "yew-data";

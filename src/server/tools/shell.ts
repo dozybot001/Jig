@@ -35,7 +35,7 @@ const PARAMETERS = {
 const OUTSIDE_SANDBOX = {
 	type: "boolean",
 	description:
-		"Run outside the sandbox when the command needs saved credentials (such as git push), repository setup (git init, clone, remote or local git config), launching a desktop app (open -a), listening on a local port, or writing outside the session's folders. Permissions follow the session's mode; decisions such as repository setup, launching apps and remote machines always ask the person.",
+		"Run outside the sandbox when the command needs saved credentials (such as git push), repository setup (git init, clone, remote or local git config), launching a desktop app (open -a), listening on a local port, or writing outside the session's folders. Whether the person is asked follows the session's permission mode.",
 };
 
 export const shellTool: ToolDefinition = {

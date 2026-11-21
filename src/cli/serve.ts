@@ -219,10 +219,13 @@ export function serveCommand(): Command {
 				[home, ...sandbox.appWebData({ userHome: userHome() })],
 				userHome(),
 				(name) => sandbox.findProgram(name, io.env as NodeJS.ProcessEnv),
+				process.platform,
+				// The folders the person keeps from sessions stay closed outside the sandbox too.
+				() => store.getSetting<string[]>("hiddenFolders", []),
 			);
 			if (guardState.kind === "none") {
 				io.stderr.write(
-					`Commands outside the sandbox have no guard${guardState.problem ? ` (${guardState.problem})` : ""}, so running one is asked about in every permission mode.\n`,
+					`Commands outside the sandbox have no guard${guardState.problem ? ` (${guardState.problem})` : ""}, so running one, or naming Yew Harness's own data, is asked about in every permission mode.\n`,
 				);
 			}
 			const stuck = store.recoverAfterRestart();

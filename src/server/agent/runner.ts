@@ -14,11 +14,11 @@ import {
 import {
 	type Approval,
 	type ApprovalDecision,
-	DECISION_REASONS,
 	type Entry,
 	type PermissionNote,
 	type PermissionRequest,
 	permissionModeOf,
+	personOnly,
 	type QuestionAnswer,
 	type QuestionRequest,
 	type QueuedMessage,
@@ -45,7 +45,7 @@ import { ScheduleBook } from "../schedules.ts";
 import { skillFolders } from "../skills.ts";
 import { type Store, validateSessionName } from "../store.ts";
 import { Jobs } from "../tools/jobs.ts";
-import { settleAnswer } from "../tools/misc.ts";
+import { choicesFrom, settleAnswer } from "../tools/misc.ts";
 import { ReadState } from "../tools/read-state.ts";
 import { ALL_TOOLS, specs, toolsFor } from "../tools/registry.ts";
 import {
@@ -69,6 +69,7 @@ import { Held } from "./held.ts";
 import { runHelper } from "./helper.ts";
 import { freeName, Mailroom } from "./mailroom.ts";
 import {
+	CHOICES_PROMPT,
 	type ContextSnapshot,
 	helperPrompt,
 	type InstructionExtras,
@@ -260,6 +261,8 @@ export class Agents {
 	readonly #mail: Mailroom;
 	/** Each working session's latest written reply in this turn. */
 	readonly #lastText = new Map<string, string>();
+	/** Sessions whose question from a reply is getting its choices: stopped when the question goes. */
+	readonly #choosing = new Map<string, AbortController>();
 	readonly #userHome: string | null;
 	/**
 	 * Sessions the person stopped (letters wait until the person writes to them or continues them) and
@@ -1351,9 +1354,9 @@ export class Agents {
 	}
 
 	/**
-	 * A permission a running command asks for, such as reaching a site (blueprint 6.1, item 6): a
-	 * decision goes to the person; otherwise skip mode allows it, and the automatic mode's check
-	 * decides first. True when allowed; else the request to ask the person with.
+	 * A permission a running command asks for, such as reaching a site (blueprint 6.1, item 6): what
+	 * only the person gives in the session's mode goes to them; otherwise skip mode allows it, and the
+	 * automatic mode's check decides first. True when allowed; else the request to ask the person with.
 	 */
 	async #settlePermit(
 		sessionId: string,
@@ -1361,11 +1364,9 @@ export class Agents {
 		request: PermissionRequest,
 		live: Live,
 	): Promise<PermissionRequest | true> {
-		if ((request.reasons ?? []).some((reason) => DECISION_REASONS.has(reason))) {
-			return { ...request, matter: true };
-		}
 		const session = this.#store.getSession(sessionId);
 		const mode = permissionModeOf(this.#mail.withRunMode(session).options);
+		if (personOnly(request.reasons ?? [], mode)) return { ...request, matter: true };
 		if (mode === "skip") {
 			this.#notePermission(callId, { risk: request.reasons ?? [] });
 			return true;
@@ -1667,15 +1668,67 @@ export class Agents {
 		const older = this.#replyQuestions(session.id);
 		const asked = askedInReply(said);
 		if (asked) {
-			for (const approval of older) this.#store.cancelApproval(approval.id);
-			this.#store.createApproval({
+			this.#dropReplyQuestions(session.id);
+			const card = this.#store.createApproval({
 				sessionId: session.id,
 				toolCallId: null,
 				kind: "question",
 				request: { questions: [{ question: asked }], fromReply: true },
 			});
+			const choosing = new AbortController();
+			this.#choosing.set(session.id, choosing);
+			this.#offerChoices(session, card.id, asked, said, choosing.signal)
+				.catch((error: unknown) =>
+					this.#log(
+						`session ${session.id}: no choices for its question: ${(error as Error).message}`,
+					),
+				)
+				.finally(() => {
+					if (this.#choosing.get(session.id) === choosing) this.#choosing.delete(session.id);
+				});
 		}
 		if (asked || older.length > 0) this.#store.setStatus(session.id, "waiting", null);
+	}
+
+	/**
+	 * Gives a question taken from a reply its choices, so the person answers with one click (founder,
+	 * 11-21: what waits for the person is a choice wherever it can be). The session's own model writes
+	 * them from the end of the reply. The card is there meanwhile, and stays as it is when this fails,
+	 * when the question has no fixed answers, or when the person has answered by then.
+	 */
+	async #offerChoices(
+		session: Session,
+		approvalId: string,
+		asked: string,
+		said: string,
+		signal: AbortSignal,
+	): Promise<void> {
+		const model = this.#gateway.model(session.provider, session.model);
+		if (!model) return;
+		const reply = await this.#gateway.stream({
+			provider: session.provider,
+			model: model.id,
+			thinking: "off",
+			systemPrompt: CHOICES_PROMPT,
+			messages: [
+				{
+					role: "user",
+					content: `The end of the reply:\n${said.slice(-3000)}\n\nThe question:\n${asked}`,
+					timestamp: Date.now(),
+				},
+			],
+			tools: [],
+			signal,
+		});
+		const now = this.#store.getSession(session.id);
+		this.#store.addUsage(session.id, usageTotals(reply), now.contextTokens);
+		const wrote = reply.content.map((block) => (block.type === "text" ? block.text : "")).join("");
+		const choices = choicesFrom(wrote);
+		if (!choices || signal.aborted) return;
+		this.#store.amendApproval(approvalId, {
+			questions: [{ question: asked, ...choices }],
+			fromReply: true,
+		});
 	}
 
 	#replyQuestions(sessionId: string): Approval[] {
@@ -1685,6 +1738,8 @@ export class Agents {
 	}
 
 	#dropReplyQuestions(sessionId: string): void {
+		this.#choosing.get(sessionId)?.abort();
+		this.#choosing.delete(sessionId);
 		for (const approval of this.#replyQuestions(sessionId)) this.#store.cancelApproval(approval.id);
 	}
 

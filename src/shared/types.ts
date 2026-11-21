@@ -41,8 +41,9 @@ export interface SessionOptions {
 	/**
 	 * How permission (授权) works for the session's calls (blueprint 6.1, item 6): default (calls run
 	 * unless risky or marked with confirm), review (what would be asked goes to a separate check by
-	 * the model first) or skip (nothing is asked; risky calls are marked). Decisions (审批) are the
-	 * person's in every mode. Earlier modes ("auto", "manual") read as default.
+	 * the model first) or skip (no permission is asked; what would have been asked is marked).
+	 * Approvals (审批) are another thing: what a session puts to the person to decide, with ask_user
+	 * or a card; no mode skips those. Earlier modes ("auto", "manual") read as default.
 	 */
 	permissionMode?: PermissionMode;
 	/** Yew's read-only helpers only (never stored): anything but looking is asked about. */
@@ -426,8 +427,9 @@ export interface PermissionRequest {
 	 */
 	running?: { kind: "command" | "job" | "mcp"; text: string }[];
 	/**
-	 * A decision (审批, blueprint 6.1, item 6) rather than a permission: the operation cannot be taken
-	 * back on this computer or reaches other people, so the person decides in every mode.
+	 * A permission only the person gives (the card marks it; blueprint 6.1, item 6): the operation
+	 * cannot be taken back on this computer or reaches other people, so the automatic mode's check
+	 * is not asked (personOnly says when).
 	 */
 	matter?: boolean;
 	/** The automatic mode's check did not allow the call: why, in its words, for the person to see. */
@@ -435,16 +437,14 @@ export interface PermissionRequest {
 }
 
 /**
- * What is asked about in every mode (blueprint 6.1, item 6). Decisions (审批): what cannot be taken
- * back on this computer or reaches other people. With them, what would let a session get around a
- * decision or a boundary the person set: Yew Harness's own data and command line, where decisions
- * are kept and answered, and the folders the person keeps from sessions. Everything else that is
- * asked about is a permission (授权), which the session's mode settles.
+ * Permissions (授权) only the person gives (blueprint 6.1, item 6): what cannot be taken back on
+ * this computer or reaches other people, and Yew Harness's own command line, which manages the
+ * person's keys and the service. The default mode asks about them like any risky call; the
+ * automatic mode does not put them to its check; skip mode asks about no permission, these included
+ * (the founder, 11-21: 「跳过模式跳过所有授权」), and marks them in the record.
  */
 export const DECISION_REASONS: ReadonlySet<ConfirmReason> = new Set<ConfirmReason>([
-	"yew-data",
 	"yew-cli",
-	"hidden-folder",
 	"git-setup",
 	"launch-app",
 	"publish-package",
@@ -462,9 +462,20 @@ export const DECISION_REASONS: ReadonlySet<ConfirmReason> = new Set<ConfirmReaso
 	"raise-budget",
 ]);
 
+/**
+ * Whether only the person answers a request asked for these reasons under `mode`. In skip mode one
+ * thing is left: raising a spending limit, which is an approval (审批) of the person's money rather
+ * than a permission, so no mode skips it.
+ */
+export function personOnly(reasons: readonly ConfirmReason[], mode: PermissionMode): boolean {
+	return reasons.some((reason) =>
+		mode === "skip" ? reason === "raise-budget" : DECISION_REASONS.has(reason),
+	);
+}
+
 /** What a call that ran without being asked about carried (blueprint 6.1, item 6), for its row. */
 export interface PermissionNote {
-	/** Skip mode: the risks it would have been asked about in the default mode. */
+	/** Skip mode: what it would have been asked about in the default mode. */
 	risk?: ConfirmReason[];
 	/** Review mode: the check allowed it, and why. */
 	reviewed?: string;

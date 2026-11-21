@@ -384,7 +384,7 @@ export const manageYewTool: ToolDefinition = {
 							type: "string",
 							enum: ["default", "review", "skip"],
 							description:
-								"default: risky calls are asked about; review: a check by the model decides them first; skip: nothing is asked. Decisions are the person's in every mode.",
+								"default: risky calls are asked about; review: a check by the model decides them first, and what cannot be taken back goes straight to the person; skip: no call is asked about.",
 						},
 						receive: { type: "string", enum: ["accept", "hold", "refuse"] },
 						letter_quota: {
@@ -578,7 +578,8 @@ const CARD_PROPERTIES = {
 	options: {
 		type: "array",
 		maxItems: 6,
-		description: "The choices; the person can also answer with a note.",
+		description:
+			"The choices. Give them whenever the decision is a choice, so the person decides with one click; they can also answer with a note.",
 		items: {
 			type: "object",
 			properties: {

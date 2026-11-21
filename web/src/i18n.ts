@@ -183,14 +183,14 @@ const zh = {
 	perm_default_hint_sandbox: "常用的操作直接执行，有风险的先问你；命令在沙箱里运行",
 	perm_review: "自动",
 	perm_review_hint:
-		"本来要问你的，先由一次单独的模型检查判断，它拿不准再问你；命令以你的系统账户运行",
+		"本来要问你的，先由一次单独的模型检查判断，它拿不准再问你，做错了收不回的直接问你；命令以你的系统账户运行",
 	perm_review_hint_sandbox:
-		"本来要问你的，先由一次单独的模型检查判断，它拿不准再问你；命令在沙箱里运行",
+		"本来要问你的，先由一次单独的模型检查判断，它拿不准再问你，做错了收不回的直接问你；命令在沙箱里运行",
 	perm_skip: "跳过",
 	perm_skip_hint:
-		"什么都不问，有风险的在记录里标出来；看得出来的对外操作照样进审批中心等你决定，脚本里发出去的看不出；命令以你的系统账户运行",
+		"什么都不问，对外发布和远程主机上的命令也直接执行，有风险的在记录里标出来；只有提高花费上限还问你。命令以你的系统账户运行",
 	perm_skip_hint_sandbox:
-		"什么都不问，有风险的在记录里标出来；看得出来的对外操作照样进审批中心等你决定，脚本里发出去的看不出；命令在沙箱里运行",
+		"什么都不问，对外发布和远程主机上的命令也直接执行，有风险的在记录里标出来；只有提高花费上限还问你。命令在沙箱里运行",
 	loadEarlier: "加载更早的记录",
 	emptyTranscript: "发一条消息开始。",
 	composerPlaceholder: "给 {name} 发消息（Enter 发送，Shift+Enter 换行）",
@@ -270,8 +270,8 @@ const zh = {
 	// approvals
 	approvalTitle: "需要你授权",
 	askedInReply: "在回复里问你",
-	matterTag: "要你决定",
-	matterTagHint: "做错了收不回或会落到别人身上，三种授权方式下都由你决定",
+	matterTag: "不可撤回",
+	matterTagHint: "做错了收不回，或会落到别人身上；自动方式不交给检查，直接问你",
 	reviewDeclined: "自动检查没有放行：{reason}",
 	reviewDeclinedPlain: "自动检查没有放行，要你来定",
 	permRisk: "有风险",
@@ -831,7 +831,7 @@ const zh = {
 	scheduleNext: "下次 {time}",
 	scheduleOff: "已关闭",
 	scheduleSkips: "跳过方式",
-	scheduleSkipsHint: "这个任务运行时什么都不问，只有要你决定的事会停下来等你",
+	scheduleSkipsHint: "这个任务运行时什么都不问，对外发布和远程主机上的命令也直接执行",
 	scheduleNeverRan: "还没运行过",
 	scheduleLast: "上次 {time} · {status}",
 	scheduleResult: "{status}：{detail}",
@@ -1169,9 +1169,9 @@ const zh = {
 	notify_budget_hint: "到每日上限的 80% 和到上限时",
 	defaultPermission: "新会话的默认授权方式",
 	defaultPermissionHelp:
-		"新建的会话用这种授权方式，之后可以在会话里改。会话自己开的会话不会高于它本身的授权方式。已有的会话不受影响。按需授权和完全授权下，不问就跑的命令以你的系统账户运行，能改 Yew Harness 自己的记录（包括决定和授权），也能读它保存的密钥。会话要处理网页、邮件、MCP 返回这类外来内容时，建议用逐项授权，让命令每次都先问你。",
+		"新建的会话用这种授权方式，之后可以在会话里改。会话自己开的会话不会高于它本身的授权方式。已有的会话不受影响。这台电脑没有开系统沙箱：不问就跑的命令以你的系统账户运行，你的账户能读写的文件它都能读写，也读得到钥匙串。会话要处理网页、邮件、MCP 返回这类外来内容时，建议用默认方式，有风险的操作先问你。",
 	defaultPermissionHelpSandbox:
-		"新建的会话用这种授权方式，之后可以在会话里改。会话自己开的会话不会高于它本身的授权方式。已有的会话不受影响。按需授权和完全授权下，不问就跑的命令在系统沙箱里运行：读写不了 Yew Harness 的数据，读不到钥匙串，只能写工作区、临时文件夹和沙箱自己的缓存；要在沙箱外跑的命令每次都问你。会话要处理网页、邮件、MCP 返回这类外来内容时，仍建议用逐项授权，让命令每次都先问你。",
+		"新建的会话用这种授权方式，之后可以在会话里改。会话自己开的会话不会高于它本身的授权方式。已有的会话不受影响。三种方式下，命令都在系统沙箱里运行：读写不了 Yew Harness 的数据，读不到钥匙串，只能写工作区、临时文件夹和沙箱自己的缓存；要在沙箱外跑的命令，默认方式先问你，自动方式先检查，跳过方式不问。会话要处理网页、邮件、MCP 返回这类外来内容时，建议用默认方式，有风险的操作先问你。",
 	defaultWorkspace: "新会话的默认工作区",
 	defaultWorkspaceHelp: "在首页和新建会话时先选中这个工作区，开始前可以改。",
 	defaultWorkspaceNone: "不选",
@@ -1386,14 +1386,14 @@ const en: Record<MessageKey, string> = {
 		"Runs common operations and asks before risky ones; commands run in the sandbox",
 	perm_review: "Auto",
 	perm_review_hint:
-		"What would be asked goes to a separate check by the model first; you're asked when it isn't sure. Commands run as your user account",
+		"What would be asked goes to a separate check by the model first; you're asked when it isn't sure, and directly about what can't be taken back. Commands run as your user account",
 	perm_review_hint_sandbox:
-		"What would be asked goes to a separate check by the model first; you're asked when it isn't sure. Commands run in the sandbox",
+		"What would be asked goes to a separate check by the model first; you're asked when it isn't sure, and directly about what can't be taken back. Commands run in the sandbox",
 	perm_skip: "Skip",
 	perm_skip_hint:
-		"Asks nothing and marks risky calls in the record; outward actions Yew Harness can see still wait for your decision, but ones a script sends can't be seen. Commands run as your user account",
+		"Asks nothing, publishing and commands on other machines included, and marks risky calls in the record; only raising a spending limit still asks. Commands run as your user account",
 	perm_skip_hint_sandbox:
-		"Asks nothing and marks risky calls in the record; outward actions Yew Harness can see still wait for your decision, but ones a script sends can't be seen. Commands run in the sandbox",
+		"Asks nothing, publishing and commands on other machines included, and marks risky calls in the record; only raising a spending limit still asks. Commands run in the sandbox",
 	loadEarlier: "Load earlier messages",
 	emptyTranscript: "Send a message to start.",
 	composerPlaceholder: "Message {name} (Enter to send, Shift+Enter for a new line)",
@@ -1471,9 +1471,9 @@ const en: Record<MessageKey, string> = {
 	linesRemoved: "−{n}",
 	approvalTitle: "Needs your permission",
 	askedInReply: "Asked in a reply",
-	matterTag: "Your decision",
+	matterTag: "Can't be undone",
 	matterTagHint:
-		"Can't be taken back or reaches other people, so it's yours to decide in every permission mode",
+		"Can't be taken back, or reaches other people; automatic mode asks you directly instead of checking it",
 	reviewDeclined: "The check didn't allow it: {reason}",
 	reviewDeclinedPlain: "The check didn't allow it, so it's up to you",
 	permRisk: "Risky",
@@ -2054,7 +2054,7 @@ const en: Record<MessageKey, string> = {
 	scheduleNext: "Next {time}",
 	scheduleOff: "Off",
 	scheduleSkips: "Skip mode",
-	scheduleSkipsHint: "Its runs ask nothing; only your decisions stop them and wait for you",
+	scheduleSkipsHint: "Its runs ask nothing, publishing and commands on other machines included",
 	scheduleNeverRan: "Has not run yet",
 	scheduleLast: "Last {time} · {status}",
 	scheduleResult: "{status}: {detail}",
@@ -2413,9 +2413,9 @@ const en: Record<MessageKey, string> = {
 	notify_budget_hint: "At 80% of a daily limit and at the limit",
 	defaultPermission: "Default permission mode for new sessions",
 	defaultPermissionHelp:
-		"New sessions start with this mode; you can change it in the session. A session opened by another session never gets more than that session has. Existing sessions are not affected. With Ask when needed and Full access, commands that run without asking run as your user account: they can change Yew Harness's own records, decisions and permissions included, and read the keys it keeps. For a session that handles outside content, such as web pages, mail or what MCP servers return, Ask each time makes each command ask you first.",
+		"New sessions start with this mode; you can change it in the session. A session opened by another session never gets more than that session has. Existing sessions are not affected. The system sandbox is off on this computer: commands that run without asking run as your user account, read and write whatever your account can, and can read the keychain. For a session that handles outside content, such as web pages, mail or what MCP servers return, use the default mode, which asks before risky operations.",
 	defaultPermissionHelpSandbox:
-		"New sessions start with this mode; you can change it in the session. A session opened by another session never gets more than that session has. Existing sessions are not affected. With Ask when needed and Full access, commands that run without asking run in the system sandbox: they cannot read or change Yew Harness's data or read the keychain, and write only in the workspace, temporary folders and the sandbox's own caches; a command that has to run outside asks you every time. For a session that handles outside content, such as web pages, mail or what MCP servers return, Ask each time still makes each command ask you first.",
+		"New sessions start with this mode; you can change it in the session. A session opened by another session never gets more than that session has. Existing sessions are not affected. In all three modes commands run in the system sandbox: they cannot read or change Yew Harness's data or read the keychain, and write only in the workspace, temporary folders and the sandbox's own caches; a command that has to run outside asks you in the default mode, goes to the check in the automatic mode and is not asked about in skip mode. For a session that handles outside content, such as web pages, mail or what MCP servers return, use the default mode, which asks before risky operations.",
 	defaultWorkspace: "Default workspace for new sessions",
 	defaultWorkspaceHelp:
 		"Preselected on the home page and in the new session dialog; you can change it before you start.",

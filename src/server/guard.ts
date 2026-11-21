@@ -10,7 +10,8 @@ import { findRepositories } from "./sandbox.ts";
  * place, even in skip mode, in ways Yew cannot see in the command's text:
  *
  * - it cannot read or write where decisions are kept and answered: Yew Harness's data folder, and
- *   the Mac app's web storage, which holds its sign-in;
+ *   the Mac app's web storage, which holds its sign-in; nor the folders the person keeps from
+ *   sessions (a setting), so that skip mode need not ask about a command that names one;
  * - it cannot start a program outside the guard: on macOS no LaunchServices (`open`) and no Apple
  *   Events (osascript telling another program); on Linux no session bus or user systemd
  *   (`/run/user/<uid>`), so no Secret Service either;
@@ -28,7 +29,8 @@ import { findRepositories } from "./sandbox.ts";
 export type GuardKind = "macos" | "linux" | "none";
 
 /**
- * Guard relaxation mode for explicitly human-approved Decisions (blueprint, section 11):
+ * Guard relaxation mode for the two operations that need one (blueprint, section 11); the default
+ * and automatic modes ask the person before each, skip mode does not:
  * - "default": full outer guard (blocks Yew data, WebKit storage, startup items, git hooks/config, lsopen, appleevent-send).
  * - "git-setup": unlocks `.git/config` ONLY in the repositories of the folders the session may write (Core Guard stays locked: Yew data, WebKit, startup items,
  *   `~/.gitconfig`, `~/.ssh/config`, `.git/hooks`, `lsopen`, `appleevent-send`). Paired with post-run `.git/config` audit.
@@ -41,13 +43,22 @@ export interface Guard {
 	program: string | null;
 	/** Closed for reading and writing. */
 	places: string[];
+	/** The folders the person keeps from sessions now (a setting): closed like the places. */
+	hidden: () => string[];
 	/** The person's home folder, where the files that run by themselves are. */
 	home: string;
 	/** Linux: the session bus and user systemd, closed. */
 	runtime: string | null;
 }
 
-const NONE: Guard = { kind: "none", program: null, places: [], home: "", runtime: null };
+const NONE: Guard = {
+	kind: "none",
+	program: null,
+	places: [],
+	hidden: () => [],
+	home: "",
+	runtime: null,
+};
 let guard: Guard = NONE;
 
 /** A path as the system sees it: links resolved, through its nearest folder that exists. */
@@ -169,17 +180,18 @@ export function guardedArgs(
 	writable: string[] = [cwd],
 ): { file: string; args: string[] } | null {
 	if (state.kind === "none" || !state.program || state.places.length === 0) return null;
+	const closed = [...new Set([...state.places, ...state.hidden().map(resolved)])];
 	if (state.kind === "macos") {
 		return {
 			file: state.program,
-			args: ["-p", guardProfile(state.places, state.home, mode, writable), shell, "-lc", command],
+			args: ["-p", guardProfile(closed, state.home, mode, writable), shell, "-lc", command],
 		};
 	}
 	// An empty folder over each closed folder; bubblewrap cannot lay one over a file. What runs by
 	// itself later is bound read-only where it exists: a placeholder for a missing one would be made
 	// in the person's real home folder.
 	const isFolder = (path: string) => existsSync(path) && statSync(path).isDirectory();
-	const covers = [...state.places, ...(state.runtime ? [state.runtime] : [])]
+	const covers = [...closed, ...(state.runtime ? [state.runtime] : [])]
 		.filter(isFolder)
 		.flatMap((place) => ["--tmpfs", place]);
 	const startup = startupPlaces(state.home);
@@ -197,14 +209,16 @@ export function guardedArgs(
 }
 
 /**
- * Starts the guard for these places. It first runs a command in it that must not see an entry of the
- * data folder; a system where that does not work gets no guard, and the reason.
+ * Starts the guard for these places, and for the folders `hidden` names when a command starts. It
+ * first runs a command in it that must not see an entry of the data folder; a system where that does
+ * not work gets no guard, and the reason.
  */
 export function startGuard(
 	places: string[],
 	home: string,
 	find: (name: string) => string | null,
 	platform: NodeJS.Platform = process.platform,
+	hidden: () => string[] = () => [],
 ): { kind: GuardKind; problem: string | null } {
 	const program =
 		platform === "darwin" ? "/usr/bin/sandbox-exec" : platform === "linux" ? find("bwrap") : null;
@@ -219,6 +233,7 @@ export function startGuard(
 		kind,
 		program,
 		places: [...new Set(places.map(resolved))],
+		hidden,
 		home: resolved(home),
 		runtime: runtime && existsSync(runtime) ? runtime : null,
 	};

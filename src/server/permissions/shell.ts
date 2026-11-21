@@ -384,6 +384,25 @@ function gitSubcommand(args: string[]): { sub: string | undefined; rest: string[
 	return { sub: args[k], rest: args.slice(k + 1) };
 }
 
+/**
+ * Whether a `gh api` call only reads. gh sends GET until a field or a body is given, and POST from
+ * then on; `--method` overrides both. Anything unclear counts as a call that changes something.
+ */
+function ghApiReads(args: string[]): boolean {
+	let method: string | null = null;
+	let sends = false;
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i] as string;
+		if (arg === "--method" || arg === "-X") method = args[++i] ?? "";
+		else if (arg.startsWith("--method=")) method = arg.slice("--method=".length);
+		else if (/^-X./.test(arg)) method = arg.slice(2);
+		else if (/^--(field|raw-field|input)(=|$)/.test(arg)) sends = true;
+		// Short flags written together, such as -iX, or with their value attached, such as -fname=1.
+		else if (/^-[^-]/.test(arg) && /[XfF]/.test(arg)) sends = true;
+	}
+	return method === null ? !sends : method.toUpperCase() === "GET";
+}
+
 /** Why an operation must be confirmed every time (spec 21.2), or null. Checked on unwrapped commands. */
 export function mustConfirmReason(argv: string[]): ConfirmReason | null {
 	const name = basename(argv[0] ?? "");
@@ -453,12 +472,13 @@ export function mustConfirmReason(argv: string[]): ConfirmReason | null {
 	if (name === "gh") {
 		const action = `${args[0] ?? ""} ${args[1] ?? ""}`;
 		if (
-			/^(release (create|delete|upload|edit)|repo (delete|create|edit|rename|archive)|pr (merge|close|create)|issue (create|close|delete|comment)|secret (set|delete)|workflow run|api) ?/.test(
+			/^(release (create|delete|upload|edit)|repo (delete|create|edit|rename|archive)|pr (merge|close|create)|issue (create|close|delete|comment)|secret (set|delete)|workflow run) /.test(
 				`${action} `,
 			)
 		) {
 			return "github";
 		}
+		if (args[0] === "api" && !ghApiReads(args.slice(1))) return "github";
 	}
 	if (["ssh", "scp", "sftp", "mosh", "telnet", "ftp", "sshpass"].includes(name)) {
 		return "remote-machine";

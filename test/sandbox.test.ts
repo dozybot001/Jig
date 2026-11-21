@@ -251,11 +251,11 @@ describe("a command outside the sandbox", () => {
 		assert.ok(reviewed.effect === "ask" && reviewed.review);
 	});
 
-	test("without the guard it is asked about in every mode, since it could answer a decision itself", () => {
+	test("without the guard it is asked about in every mode, since nothing else keeps it from Yew's data", () => {
 		const unguarded = new PermissionEngine(places.home);
 		for (const mode of ["default", "review", "skip"]) {
 			const decision = unguarded.decide(outside, session(mode));
-			assert.ok(decision.effect === "ask" && decision.request.matter, mode);
+			assert.ok(decision.effect === "ask" && !decision.review, mode);
 		}
 	});
 });

@@ -264,7 +264,6 @@
     <string name="demo_reply">This is the demo: no session received your message.</string>
 
     <!-- Approvals & multimodal alignment -->
-    <string name="kind_approval">Approval</string>
     <string name="kind_permission">Permission</string>
     <string name="review_held">Auto-check did not allow: %s</string>
     <string name="site_running">Running in the sandbox at the time:</string>

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { run } from "../src/cli/run.ts";
@@ -352,6 +352,34 @@ describe("scheduled runs", () => {
 		await until(() => store.pendingApprovals(design.id).length === 1);
 		agents.stop(design.id);
 		await until(() => !agents.isRunning(design.id));
+	});
+
+	test("a run in skip mode asks about no permission, what cannot be taken back included", async () => {
+		const { store, agents, scheduler, make, script, said } = harness();
+		const design = make("设计", { options: { permissionMode: "default" } });
+		const task = agents.schedules.create({
+			name: "清理",
+			cron: "0 18 * * *",
+			session: "设计",
+			message: "清掉旧的导出",
+			permissionMode: "skip",
+		});
+		// Outside the working folder, where git cannot bring a file back.
+		const elsewhere = realpathSync(tempDir("yew-elsewhere-"));
+		writeFileSync(join(elsewhere, "old.txt"), "old\n");
+		script(design, [
+			toolUse(fauxToolCall("shell", { command: `rm ${join(elsewhere, "old.txt")}` }, { id: "c1" })),
+			fauxAssistantMessage("清掉了"),
+		]);
+		scheduler.run(task.id);
+		await until(() => said(design).some((text) => text.includes("清掉了")));
+		await until(() => !agents.isRunning(design.id));
+		// Nobody was watching and nothing needed them: the run did it and the record marks the risk.
+		assert.equal(existsSync(join(elsewhere, "old.txt")), false);
+		assert.equal(store.pendingApprovals(design.id).length, 0);
+		const removed = store.toolCallsByStatus(design.id, ["done"]).find((c) => c.callId === "c1");
+		assert.deepEqual(removed?.detail?.permission, { risk: ["delete-outside"] });
+		assert.equal(agents.schedules.get(task.id).lastStatus, "done");
 	});
 
 	test("the main conversation sets up tasks with manage_yew; a run mode wider than the session's is confirmed", async () => {

@@ -521,6 +521,18 @@ function answeredText(questions: Question[], response: Approval["response"]): st
 	return t("answered", { a: parts.join(t("clauseSeparator")) });
 }
 
+/** An answer nobody has touched: the recommended option chosen, or the person's own words when there are no options. */
+function startingDraft(question: Question): Draft {
+	return {
+		choices:
+			question.recommended !== undefined && question.options?.[question.recommended]
+				? [question.recommended]
+				: [],
+		other: !question.options?.length,
+		text: "",
+	};
+}
+
 /**
  * Questions from a session, up to four on one card. Each lists its options with what they mean, the
  * recommended one chosen to start with; the last row takes the person's own words instead. One answer
@@ -528,16 +540,20 @@ function answeredText(questions: Question[], response: Approval["response"]): st
  */
 export function QuestionCard({ approval, session }: { approval: Approval; session?: ReactNode }) {
 	const questions = questionsOf(approval.request as QuestionRequest);
-	const [drafts, setDrafts] = useState<Draft[]>(() =>
-		questions.map((question) => ({
-			choices:
-				question.recommended !== undefined && question.options?.[question.recommended]
-					? [question.recommended]
-					: [],
-			other: !question.options?.length,
-			text: "",
-		})),
-	);
+	const [drafts, setDrafts] = useState<Draft[]>(() => questions.map(startingDraft));
+	// A question Yew took from a reply gets its choices a moment after the card shows: an answer the
+	// person has not started takes them up, one they have started stays as it is.
+	const shape = questions.map((question) => question.options?.length ?? 0).join();
+	const [shown, setShown] = useState(shape);
+	if (shown !== shape) {
+		setShown(shape);
+		setDrafts((all) =>
+			questions.map((question, index) => {
+				const had = all[index];
+				return had && (had.text.trim() || had.choices.length > 0) ? had : startingDraft(question);
+			}),
+		);
+	}
 	const now = useNow();
 	const id = useId();
 	const action = useAction(() =>

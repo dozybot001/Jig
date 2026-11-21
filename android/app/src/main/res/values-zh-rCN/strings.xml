@@ -234,7 +234,6 @@
     <string name="demo_not_pushed">没有推送。</string>
     <string name="demo_reply">这是演示，消息没有发给真实的会话。</string>
 
-    <string name="kind_approval">审批</string>
     <string name="kind_permission">授权</string>
     <string name="review_held">自动检查未放行：%s</string>
     <string name="site_running">当时在沙箱里运行的：</string>

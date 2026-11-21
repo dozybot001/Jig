@@ -10,12 +10,15 @@ import { MemoryKeyStore } from "../src/server/keys.ts";
 import { ModelGateway } from "../src/server/model/gateway.ts";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "../src/server/model/testing.ts";
 import { PermissionEngine } from "../src/server/permissions/engine.ts";
+import { choicesFrom } from "../src/server/tools/misc.ts";
 import { ALL_TOOLS } from "../src/server/tools/registry.ts";
 import { type ToolDefinition, text } from "../src/server/tools/types.ts";
 import {
 	defaultCompactAt,
 	type Entry,
 	type PermissionRequest,
+	type QuestionRequest,
+	questionsOf,
 	type Session,
 } from "../src/shared/types.ts";
 import { newStore, tempDir } from "./helpers/store.ts";
@@ -259,9 +262,29 @@ describe("agent loop", () => {
 		assert.deepEqual(push?.detail?.permission, { risk: ["push"] });
 	});
 
-	test("in skip mode a decision still waits for the person", async () => {
+	test("skip mode asks about no permission: what cannot be taken back runs and is marked", async () => {
 		const { faux, store, agents, session } = setup();
 		store.updateSession(session.id, { options: { permissionMode: "skip" } });
+		// Outside the working folder, where git cannot bring a file back.
+		const elsewhere = realpathSync(tempDir("yew-elsewhere-"));
+		writeFileSync(join(elsewhere, "old.txt"), "old\n");
+		faux.setResponses([
+			toolUse(fauxToolCall("shell", { command: `rm ${join(elsewhere, "old.txt")}` }, { id: "c1" })),
+			fauxAssistantMessage("删掉了。"),
+		]);
+		agents.send(session.id, "把那个旧文件删了");
+		await agents.whenIdle(session.id);
+		assert.deepEqual(store.pendingApprovals(session.id), []);
+		assert.equal(existsSync(join(elsewhere, "old.txt")), false);
+		const removed = store
+			.toolCallsByStatus(session.id, ["done"])
+			.find((call) => call.callId === "c1");
+		assert.deepEqual(removed?.detail?.permission, { risk: ["delete-outside"] });
+	});
+
+	test("in the default mode what cannot be taken back waits for the person, marked as such", async () => {
+		const { faux, store, agents, session } = setup();
+		store.updateSession(session.id, { options: { permissionMode: "default" } });
 		faux.setResponses([
 			toolUse(fauxToolCall("shell", { command: "ssh deploy@example.com true" }, { id: "c1" })),
 			fauxAssistantMessage("好，不连了。"),
@@ -436,10 +459,16 @@ describe("agent loop", () => {
 		assert.equal(askedInReply(""), null);
 	});
 
-	test("a question left at the end of a reply goes to the approval center; answering it continues the session", async () => {
+	test("a question left at the end of a reply goes to the approval center and gets choices; picking one continues the session", async () => {
 		const { faux, store, agents, session, contexts, capture } = setup();
 		faux.setResponses([
 			fauxAssistantMessage("改好了，检查都通过。\n\n没有推送。要推到 Gitee 和 GitHub 吗？"),
+			// Apart from the conversation, Yew asks the session's model for the choices.
+			capture(
+				fauxAssistantMessage(
+					'{"options":[{"label":"推送","detail":"推到两个仓库"},{"label":"先不推"}],"recommended":1}',
+				),
+			),
 			capture(fauxAssistantMessage("好，推送了。")),
 		]);
 		agents.send(session.id, "改一下按钮");
@@ -447,28 +476,87 @@ describe("agent loop", () => {
 		const [card] = store.pendingApprovals(session.id);
 		assert.ok(card);
 		assert.equal(card.toolCallId, null);
-		assert.deepEqual(card.request, {
-			questions: [{ question: "没有推送。要推到 Gitee 和 GitHub 吗？" }],
+		assert.equal(store.getSession(session.id).status, "waiting");
+		const request = () => store.getApproval(card.id).request as QuestionRequest;
+		await until(() => questionsOf(request())[0]?.options !== undefined);
+		assert.deepEqual(request(), {
+			questions: [
+				{
+					question: "没有推送。要推到 Gitee 和 GitHub 吗？",
+					options: [{ label: "推送", detail: "推到两个仓库" }, { label: "先不推" }],
+					recommended: 0,
+				},
+			],
 			fromReply: true,
 		});
-		assert.equal(store.getSession(session.id).status, "waiting");
-		agents.answer(card.id, { answers: [{ choices: [], text: "推吧" }] });
+		// It was asked with the end of the reply alone, not with the conversation.
+		const asked = contexts[0]?.messages.filter((message) => message.role === "user") ?? [];
+		assert.equal(asked.length, 1);
+		assert.match(textOf(asked[0]), /The question:\\n没有推送。要推到 Gitee 和 GitHub 吗？/);
+		assert.equal(store.contextEntries(session.id).length, 2);
+		agents.answer(card.id, { answers: [{ choices: [0] }] });
 		await agents.whenIdle(session.id);
-		assert.match(textOf(contexts[0]?.messages.at(-1)), /推吧/);
+		assert.match(textOf(contexts[1]?.messages.at(-1)), /"推送"/);
 		assert.equal(store.pendingApprovals(session.id).length, 0);
 		assert.equal(store.getSession(session.id).status, "idle");
+	});
+
+	test("a question from a reply stays as it is when no choices come; the person's own words answer it", async () => {
+		const { faux, store, agents, session, contexts, capture } = setup();
+		faux.setResponses([
+			fauxAssistantMessage("新的会话叫什么名字？"),
+			fauxAssistantMessage('{"options":[]}'),
+			capture(fauxAssistantMessage("好，建好了。")),
+		]);
+		agents.send(session.id, "建一个会话");
+		await agents.whenIdle(session.id);
+		const [card] = store.pendingApprovals(session.id);
+		assert.ok(card);
+		await until(() => faux.getPendingResponseCount() === 1);
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		assert.deepEqual(store.getApproval(card.id).request, {
+			questions: [{ question: "新的会话叫什么名字？" }],
+			fromReply: true,
+		});
+		agents.answer(card.id, { answers: [{ choices: [], text: "官网" }] });
+		await agents.whenIdle(session.id);
+		assert.match(textOf(contexts[0]?.messages.at(-1)), /官网/);
+		assert.equal(store.getSession(session.id).status, "idle");
+	});
+
+	test("choices a model wrote are checked: two at least, six at most, the recommended one among them", () => {
+		assert.deepEqual(
+			choicesFrom(
+				'好的：\n```json\n{"options":["推送",{"label":" 先不推 "}],"recommended":2}\n```',
+			),
+			{
+				options: [{ label: "推送" }, { label: "先不推" }],
+				recommended: 1,
+			},
+		);
+		assert.deepEqual(choicesFrom('{"options":["a","b"],"recommended":3}'), {
+			options: [{ label: "a" }, { label: "b" }],
+		});
+		assert.equal(choicesFrom('{"options":["1","2","3","4","5","6","7"]}')?.options?.length, 6);
+		assert.equal(choicesFrom('{"options":["只有一个"]}'), null);
+		assert.equal(choicesFrom('{"options":[]}'), null);
+		assert.equal(choicesFrom('{"options":["a",{"label":""}]}'), null);
+		assert.equal(choicesFrom("推送，还是先不推？"), null);
+		assert.equal(choicesFrom('{"options":["a","b"'), null);
 	});
 
 	test("writing to the session takes the question away; replies without a question or in chats leave none", async () => {
 		const { faux, store, agents, session } = setup();
 		faux.setResponses([
 			fauxAssistantMessage("如需推送，告诉我即可。"),
+			fauxAssistantMessage('{"options":["推送","先不推"]}'),
 			fauxAssistantMessage("好的，先不推。"),
 		]);
 		agents.send(session.id, "改一下");
 		await agents.whenIdle(session.id);
 		const [card] = store.pendingApprovals(session.id);
 		assert.ok(card);
+		await until(() => faux.getPendingResponseCount() === 1);
 		agents.send(session.id, "先不推");
 		await agents.whenIdle(session.id);
 		assert.equal(store.getApproval(card.id).status, "cancelled");
@@ -757,11 +845,18 @@ describe("system prompt", () => {
 		const alone = systemPrompt(session, { ...snapshot("/tmp/demo"), permissionMode: "skip" });
 		assert.match(alone, /only they can decide or do: ask with ask_user\./);
 		assert.match(alone, /take it instead of offering it; for example, commit/);
+		// Skip mode asks about no call: what the role keeps for the person, the session puts to them itself.
 		assert.match(
 			alone,
-			/When the work calls for one, make the call: Yew puts it in the approval center/,
+			/Permission mode: skip\. Yew asks nothing before your calls, publishing and commands on other machines included/,
 		);
-		assert.match(alone, /Permission mode: skip\. Yew asks nothing before your calls/);
+		assert.match(alone, /keep for the person to approve, put to them before you do it\./);
+		assert.doesNotMatch(alone, /the person's decision in every mode/);
+		const asking = systemPrompt(session, { ...snapshot("/tmp/demo"), permissionMode: "default" });
+		assert.match(
+			asking,
+			/make the call, and their answer is the confirmation any instructions ask for/,
+		);
 		assert.doesNotMatch(alone, /Take extra care/);
 		assert.match(alone, /how you checked it, and what is left\./);
 		assert.doesNotMatch(alone, /what the person needs to do/);

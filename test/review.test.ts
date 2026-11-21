@@ -108,7 +108,7 @@ describe("the automatic mode's check", () => {
 		assert.ok(existsSync(join(cwd, "src")));
 	});
 
-	test("a decision never goes to it", async () => {
+	test("what cannot be taken back never goes to it", async () => {
 		const { faux, store, agents, session } = setup();
 		faux.setResponses([
 			toolUse(fauxToolCall("shell", { command: "npm publish" }, { id: "c1" })),

@@ -1,6 +1,7 @@
 // The outer guard (guard.ts; the security group, 11-18): commands that do not run in the system
-// sandbox are still kept out of Yew's data folder and the Mac app's web storage. The normal flow
-// only; whether it can be got around is the security group's to test.
+// sandbox are still kept out of Yew's data folder, the Mac app's web storage and the folders the
+// person keeps from sessions. The normal flow only; whether it can be got around is the security
+// group's to test.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -45,6 +46,7 @@ describe("the guard", () => {
 			kind: "linux",
 			program: "/usr/bin/bwrap",
 			places: [data, "/nowhere/file"],
+			hidden: () => [],
 			home,
 			runtime: null,
 		});
@@ -105,5 +107,41 @@ describe("the guard", () => {
 		assert.ok(write);
 		assert.equal(spawnSync(write.file, write.args).status, 0);
 		assert.equal(readFileSync(join(work, "out", "a.txt"), "utf8"), "done\n");
+	});
+
+	test("a folder the person keeps from sessions is closed as the setting stands when a command starts", {
+		skip: runs ? false : "no sandbox-exec or bubblewrap here",
+	}, () => {
+		const data = tempDir("yew-data-");
+		writeFileSync(join(data, "yew.db"), "the decisions");
+		const kept = tempDir("yew-kept-");
+		writeFileSync(join(kept, "notes.txt"), "kept from sessions");
+		const work = tempDir("yew-work-");
+		const hidden: string[] = [];
+		const started = startGuard(
+			[data],
+			tempDir("yew-person-"),
+			(name) => findProgram(name),
+			process.platform,
+			() => hidden,
+		);
+		if (started.kind === "none") {
+			assert.ok(started.problem);
+			return;
+		}
+		const cat = `cat '${join(resolved(kept), "notes.txt")}'`;
+		const open = guardedArgs("/bin/sh", cat, work);
+		assert.ok(open);
+		assert.equal(
+			spawnSync(open.file, open.args, { encoding: "utf8" }).stdout,
+			"kept from sessions",
+		);
+		// The person adds the folder in the settings: the next command cannot read it.
+		hidden.push(kept);
+		const closed = guardedArgs("/bin/sh", cat, work);
+		assert.ok(closed);
+		const denied = spawnSync(closed.file, closed.args, { encoding: "utf8" });
+		assert.notEqual(denied.status, 0);
+		assert.doesNotMatch(denied.stdout, /kept from sessions/);
 	});
 });
