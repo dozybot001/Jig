@@ -787,10 +787,12 @@ function About() {
 			{/* In the order of spec 2.2: lockup, version, the text, publisher, website; then 2.3. */}
 			<div className="about-head">
 				{/* Full lockup on the About page (spec 1.6), named by the product's name (1.7). */}
-				<Mascot pose="gift" height={112} className="about-mascot" />
-				<div className="lockup" role="img" aria-label={t("lockupName")}>
-					<YewMark className="lockup-mark" size={22} />
-					<ProductName />
+				<div className="about-hero">
+					<Mascot pose="gift" height={112} className="about-mascot" />
+					<div className="lockup about-lockup" role="img" aria-label={t("lockupName")}>
+						<YewMark className="lockup-mark" size={44} />
+						<ProductName />
+					</div>
 				</div>
 				<VersionLine />
 			</div>

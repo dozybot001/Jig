@@ -261,8 +261,36 @@ a {
 	margin: 0 auto;
 }
 /* On About it lines up with the lockup under it. */
-.about-mascot {
-	margin-bottom: 6px;
+/* About: the mascot on the left, the lockup beside her at twice its usual size. */
+.about-hero {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+.about-lockup {
+	gap: 14px;
+}
+.about-lockup .lockup-mark {
+	width: 44px;
+	height: 44px;
+}
+.about-lockup .product-name {
+	--word-h: 44px;
+}
+@media (max-width: 480px) {
+	.about-hero {
+		gap: 10px;
+	}
+	.about-lockup {
+		gap: 9px;
+	}
+	.about-lockup .lockup-mark {
+		width: 30px;
+		height: 30px;
+	}
+	.about-lockup .product-name {
+		--word-h: 30px;
+	}
 }
 .page-mascot {
 	margin-bottom: 12px;
