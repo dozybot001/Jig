@@ -4,7 +4,8 @@
  * for review, sessions at work, a new version; otherwise that nothing waits. In the first minute after
  * the interface opens she greets first. Her pose follows what she says: holding a card when a
  * permission waits, and on duty when nothing does but scheduled tasks are on (blueprint, section 11).
- * She can be dragged anywhere in the window; where she stands is worked out at the end of this file.
+ * She can be dragged anywhere in the window; where she stands, and whether a window has room for her,
+ * is worked out at the end of this file.
  */
 import type { Session, ToolCallView } from "../../src/shared/types.ts";
 import type { MascotPose } from "./poses.ts";
@@ -203,15 +204,31 @@ export interface Size {
 	height: number;
 }
 
-/** How close to the window's edges she may stand. */
+/** How close to the window's edges she may stand, and how far she keeps from the composer. */
 export const EDGE = 8;
+/** The widest her bubble gets before a line wraps. */
+export const BUBBLE_WIDTH = 220;
+/** The composer's widest (`.composer-inner` in app.css); it stands in the middle of the page. */
+const COMPOSER_WIDTH = 760;
+/** How far right of the sidebar she starts. */
+const START_GAP = 16;
+
+/** Until she is moved she stands at the bottom of the window, just right of the sidebar. */
+export function defaultSpot(sidebarWidth: number): Spot {
+	return { x: "left", dx: sidebarWidth + START_GAP, y: "bottom", dy: 12 };
+}
 
 /**
- * Until she is moved she stands at the bottom of the window, just right of the sidebar; a composer that
- * would reach under her there starts to her right instead (`data-yew-docked` in app.css).
+ * What fits where she starts, left of the composer, in a page this wide right of the sidebar: nothing
+ * when she would reach under the composer, so she is not shown (founder 11-21: 「窄屏可以隐藏宠物，
+ * 如果一直不好适配的话」); only she when her bubble reaching right would cover the composer's corner,
+ * so there it reaches back over the sidebar; else both. Each side of the composer then has room for
+ * her gap from the sidebar, her width or her bubble's, and EDGE.
  */
-export function defaultSpot(sidebarWidth: number): Spot {
-	return { x: "left", dx: sidebarWidth + 16, y: "bottom", dy: 12 };
+export function roomBesideComposer(page: number, size: Size): "none" | "mascot" | "both" {
+	const needs = (width: number) => COMPOSER_WIDTH + 2 * (START_GAP + width + EDGE);
+	if (page < needs(size.width)) return "none";
+	return page < needs(BUBBLE_WIDTH) ? "mascot" : "both";
 }
 
 /** Keeps her whole box inside the window; one too small for her pins her to the top left. */
@@ -251,15 +268,18 @@ export function spotOf(box: Box, view: Size, size: Size): Spot {
 /**
  * Where her bubble goes: over her head in the lower half of the window and under her feet in the upper
  * half (`align` is the half she is in), reaching toward the middle (`side`), so it stays in the window
- * wherever she is and clear of the composer while she is at the bottom.
+ * wherever she is, also while she is dragged. Where she starts in a page with room for her but not
+ * for her bubble beside the composer (`cramped`, see roomBesideComposer), it reaches back over the
+ * sidebar instead.
  */
 export function bubbleSide(
 	box: Box,
 	view: Size,
 	size: Size,
+	cramped = false,
 ): { side: "left" | "right"; align: "top" | "bottom" } {
 	return {
-		side: box.left + size.width / 2 < view.width / 2 ? "right" : "left",
+		side: !cramped && box.left + size.width / 2 < view.width / 2 ? "right" : "left",
 		align: box.top + size.height / 2 < view.height / 2 ? "top" : "bottom",
 	};
 }

@@ -15,6 +15,7 @@ import {
 	POSES,
 	parseSpot,
 	poseForTool,
+	roomBesideComposer,
 	spotOf,
 } from "../web/src/companion.ts";
 import { MASCOT_POSES } from "../web/src/poses.ts";
@@ -151,6 +152,19 @@ describe("where the floating Yew stands", () => {
 		assert.deepEqual(box, { left: 276, top: 900 - 76 - 12 });
 		assert.deepEqual(bubbleSide(box, view, size), { side: "right", align: "bottom" });
 		assert.equal(boxAt(defaultSpot(56), view, size).left, 72);
+	});
+
+	test("she shows only with room beside the 760 px composer, and her bubble reaches right only with room for it", () => {
+		// 16 px from the sidebar, 71 px of her and 8 px on each side of the composer.
+		assert.equal(roomBesideComposer(949, size), "none");
+		assert.equal(roomBesideComposer(950, size), "mascot");
+		// Her bubble at its widest, 220 px, instead of her.
+		assert.equal(roomBesideComposer(1247, size), "mascot");
+		assert.equal(roomBesideComposer(1248, size), "both");
+		// A 1440 px window with the sidebar open: her bubble reaches back over the sidebar.
+		assert.equal(roomBesideComposer(1440 - 260, size), "mascot");
+		const box = boxAt(defaultSpot(260), view, size);
+		assert.deepEqual(bubbleSide(box, view, size, true), { side: "left", align: "bottom" });
 	});
 
 	test("a place she is put down is kept from its nearer edges, and she keeps to them", () => {

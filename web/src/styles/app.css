@@ -321,7 +321,7 @@ a {
  */
 
 /* Her bubble is over her head in the lower half of the window and under her feet in the upper half,
-   reaching toward the middle, so it stays clear of the composer at the bottom. */
+   reaching toward the middle; where she starts it keeps clear of the composer (companion.ts). */
 .companion {
 	position: fixed;
 	z-index: 12;
@@ -2496,30 +2496,6 @@ body.scroll-locked {
 	display: grid;
 	gap: 8px;
 }
-/*
- * While Yew stands where she starts (16 px right of the sidebar, 71 px wide), a composer that would
- * reach under her starts 8 px to her right and keeps its right edge with the conversation's; her bubble
- * then reaches back over the sidebar (companion.tsx, which sets data-yew-docked). She is not shown in a
- * window under 621 px tall.
- */
-@media (max-width: 1209px) and (min-height: 621px) {
-	:root[data-yew-docked] .app:not(.app-collapsed) .composer {
-		padding-left: 95px;
-		padding-right: max(20px, calc((100% - 760px) / 2));
-	}
-	:root[data-yew-docked] .app:not(.app-collapsed) .composer-inner {
-		max-width: none;
-	}
-}
-@media (max-width: 1005px) and (min-height: 621px) {
-	:root[data-yew-docked] .app.app-collapsed .composer {
-		padding-left: 95px;
-		padding-right: max(20px, calc((100% - 760px) / 2));
-	}
-	:root[data-yew-docked] .app.app-collapsed .composer-inner {
-		max-width: none;
-	}
-}
 .composer-box {
 	position: relative;
 	display: grid;
@@ -4517,7 +4493,8 @@ button.about-row {
 /*
  * --- the time a session's turn or wait has taken, in the middle of its header (blueprint 6.9) ---
  * While it shows, the header becomes three columns with equal sides, so the time sits in the middle
- * whatever the title and the usage take; a narrow header keeps it in line after the title.
+ * whatever the title and the usage take, with a wide gap so it does not read as part of them; a
+ * narrow header keeps it in line after the title.
  */
 
 .session-clock {
@@ -4534,6 +4511,7 @@ button.about-row {
 	.session-header-clock {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+		column-gap: 28px;
 	}
 }
 /* The steps for making a client of one's own (Google's MCP servers). */

@@ -1,15 +1,9 @@
-import {
-	type CSSProperties,
-	type PointerEvent,
-	useEffect,
-	useLayoutEffect,
-	useRef,
-	useState,
-} from "react";
+import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } from "react";
 import { openCenter, openSettings, selectSession } from "../actions.ts";
 import {
 	activeToolPose,
 	type Box,
+	BUBBLE_WIDTH,
 	boxAt,
 	bubbleSide,
 	type CompanionLine,
@@ -19,6 +13,7 @@ import {
 	defaultSpot,
 	EDGE,
 	parseSpot,
+	roomBesideComposer,
 	type Size,
 	type Spot,
 	spotOf,
@@ -36,15 +31,11 @@ const HEIGHT = 76;
 const SIZE: Size = { width: Math.round((HEIGHT * 373) / 400), height: HEIGHT };
 /** How far the pointer moves before a press becomes a drag instead of a click. */
 const DRAG_SLOP = 4;
-/** The widest her bubble gets before a line wraps. */
-const BUBBLE_WIDTH = 220;
-/** The sidebar's width open and folded (`.app` in app.css), for where she stands until moved. */
-const SIDEBAR_WIDTH = { open: 260, folded: 56 };
 /**
- * Below this width of the page beside the sidebar there is no room for her next to a 760 px composer
- * (95 px each side), so the composer starts to her right (`data-yew-docked` in app.css).
+ * The sidebar's width open and folded (`.app` in app.css), for where she stands until moved and how
+ * wide the page beside it is.
  */
-const CROWDED_PAGE = 950;
+const SIDEBAR_WIDTH = { open: 260, folded: 56 };
 const SPOT_KEY = "yew.companionSpot";
 
 function rememberedSpot(): Spot | null {
@@ -81,10 +72,8 @@ function useViewport(): Size {
 	return size;
 }
 
-type Side = { side: "left" | "right"; align: "top" | "bottom" };
-
 /** A press on her: where it began, and once it drags, where she is now. */
-interface Press extends Side {
+interface Press {
 	id: number;
 	x: number;
 	y: number;
@@ -122,10 +111,11 @@ export function moodText(mood: CompanionMood): string {
  * Yew floating over the window (blueprint, section 12). Her bubble says the one thing that matters
  * most now; when it names a place, the bubble is a button that goes there. She can be dragged anywhere
  * in the window, and this browser remembers where; a press that does not move is a poke, and she
- * answers it. Until moved she stands at the bottom, just right of the sidebar, and a narrower window's
- * composer starts to her right. The picture is decoration and screen readers skip it; a bubble that
- * goes nowhere is skipped too, since the sidebar already says the same. Only the picture and a bubble
- * that goes somewhere take clicks; the rest of her box lets them through to what is under it.
+ * answers it. Until moved she stands at the bottom, just right of the sidebar; a window with no room
+ * for her there beside the composer does not show her. The picture is decoration and screen readers
+ * skip it; a bubble that goes nowhere is skipped too, since the sidebar already says the same. Only
+ * the picture and a bubble that goes somewhere take clicks; the rest of her box lets them through to
+ * what is under it.
  */
 export function Companion() {
 	useLang();
@@ -141,20 +131,14 @@ export function Companion() {
 	const folded = useAppState((state) => state.sidebarCollapsed);
 	const view = useViewport();
 	const [spot, setSpot] = useState<Spot | null>(rememberedSpot);
-	const [drag, setDrag] = useState<(Side & { box: Box }) | null>(null);
+	const [drag, setDrag] = useState<Box | null>(null);
 	const press = useRef<Press | null>(null);
 	const dragged = useRef(false);
 	// Often enough to end the greeting about on time; the pose itself changes every ten minutes.
 	const now = useNow(15_000);
-	// While she stands where she starts, a composer that would reach under her starts to her right
-	// (app.css), so she covers none of its buttons.
-	const docked = enabled && spot === null;
-	useLayoutEffect(() => {
-		if (!docked) return;
-		document.documentElement.setAttribute("data-yew-docked", "");
-		return () => document.documentElement.removeAttribute("data-yew-docked");
-	}, [docked]);
-	if (!enabled) return null;
+	const sidebarWidth = folded ? SIDEBAR_WIDTH.folded : SIDEBAR_WIDTH.open;
+	const fit = roomBesideComposer(view.width - sidebarWidth, SIZE);
+	if (!enabled || fit === "none") return null;
 	const waiting = centerCount(center);
 	const liveSessions = Object.values(sessions);
 	const mood = companionMood({
@@ -192,13 +176,15 @@ export function Companion() {
 				: mood.pose;
 	const pose = activeReaction ? activeReaction.pose : basePose;
 
-	const sidebarWidth = folded ? SIDEBAR_WIDTH.folded : SIDEBAR_WIDTH.open;
-	const box = drag?.box ?? boxAt(spot ?? defaultSpot(sidebarWidth), view, SIZE);
-	const placed = bubbleSide(box, view, SIZE);
-	// Where she starts in a narrower window, her bubble reaches back over the sidebar, clear of the
-	// composer beside her. While she is dragged it keeps its side; it moves over when she is put down.
-	const crowded = docked && view.width - sidebarWidth < CROWDED_PAGE;
-	const { side, align } = drag ?? (crowded ? { ...placed, side: "left" as const } : placed);
+	const box = drag ?? boxAt(spot ?? defaultSpot(sidebarWidth), view, SIZE);
+	// Where she starts in a narrower page her bubble reaches back over the sidebar, clear of the
+	// composer beside her; anywhere else, and while she is dragged, toward the middle of the window.
+	const { side, align } = bubbleSide(
+		box,
+		view,
+		SIZE,
+		spot === null && drag === null && fit === "mascot",
+	);
 	// Pinned by her own edges away from the bubble, so a longer line grows toward the middle.
 	const place: CSSProperties = {
 		...(side === "right" ? { left: box.left } : { right: view.width - box.left - SIZE.width }),
@@ -234,8 +220,6 @@ export function Companion() {
 			y: event.clientY,
 			from: box,
 			at: null,
-			side,
-			align,
 		};
 		event.currentTarget.setPointerCapture(event.pointerId);
 	};
@@ -246,7 +230,7 @@ export function Companion() {
 		const dy = event.clientY - current.y;
 		if (!current.at && Math.hypot(dx, dy) < DRAG_SLOP) return;
 		current.at = clampBox({ left: current.from.left + dx, top: current.from.top + dy }, view, SIZE);
-		setDrag({ box: current.at, side: current.side, align: current.align });
+		setDrag(current.at);
 	};
 	const onPointerEnd = (event: PointerEvent<HTMLButtonElement>) => {
 		const current = press.current;
