@@ -1530,17 +1530,10 @@ body.scroll-locked {
 		background: var(--hover);
 	}
 }
-/* The pages opened less often sit one step in, under the entry that holds them. */
-.nav-sub {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr);
-	gap: 6px;
-}
-.nav-sub[hidden] {
-	display: none;
-}
-.nav-sub .nav-row {
-	padding-left: 36px;
+/* The entry whose menu shows beside it stays marked while the menu is open. */
+.nav-row[aria-expanded="true"]:not([aria-current="page"]),
+.rail .btn-icon[aria-expanded="true"]:not([aria-current="page"]) {
+	background: var(--hover);
 }
 .sidebar-search {
 	position: relative;
@@ -2215,16 +2208,12 @@ body.scroll-locked {
 	color: var(--text-3);
 	transition: transform 0.15s;
 }
-/* The sidebar entry that holds the pages opened less often has the arrow at its end. */
+/* The sidebar entry whose menu shows beside it has the arrow at its end, pointing at the menu. */
 .nav-row .chevron {
-	width: 12px;
-	height: 12px;
 	margin-left: auto;
-	color: var(--text-3);
 }
-/* An open sidebar list, or that entry when open: the arrow points down. */
-.heading-toggle[aria-expanded="true"] .chevron,
-.nav-row[aria-expanded="true"] .chevron {
+/* An open sidebar list: the arrow points down. */
+.heading-toggle[aria-expanded="true"] .chevron {
 	transform: rotate(90deg);
 }
 .activity[open] > summary .chevron {

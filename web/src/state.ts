@@ -308,8 +308,6 @@ export interface AppState {
 	sidebarCollapsed: boolean;
 	/** The sidebar lists folded to their heading (remembered in this browser). */
 	foldedSections: SidebarSection[];
-	/** The sidebar's "more" entry shows its pages: artifacts, the sessions map and usage (remembered in this browser). */
-	navMoreOpen: boolean;
 	/** Conversation timeline view: false for concise (default), true for full audit notices & notes. */
 	transcriptDetail: boolean;
 	/** Narrow screens: the sidebar drawer is open. */
@@ -361,7 +359,6 @@ export const NO_TEAM = "(none)";
 
 const SIDEBAR_KEY = "yew.sidebar";
 const SECTIONS_KEY = "yew.sidebarFolded";
-const NAV_MORE_KEY = "yew.sidebarMore";
 const SECTIONS: SidebarSection[] = ["teams", "workspaces", "sessions"];
 const TRANSCRIPT_DETAIL_KEY = "yew.transcriptDetail";
 
@@ -382,14 +379,6 @@ function rememberedFolded(): SidebarSection[] {
 	}
 }
 
-function rememberedNavMore(): boolean {
-	try {
-		return localStorage.getItem(NAV_MORE_KEY) === "open";
-	} catch {
-		return false;
-	}
-}
-
 function rememberedTranscriptDetail(): boolean {
 	try {
 		return localStorage.getItem(TRANSCRIPT_DETAIL_KEY) === "1";
@@ -404,18 +393,6 @@ export function setSidebarCollapsed(collapsed: boolean): void {
 	try {
 		if (collapsed) localStorage.setItem(SIDEBAR_KEY, "collapsed");
 		else localStorage.removeItem(SIDEBAR_KEY);
-	} catch {
-		// Storage can be unavailable (private windows); the choice then lasts for this page only.
-	}
-}
-
-/** Shows or folds the pages under the sidebar's "more" entry, and remembers it in this browser only. */
-export function setNavMoreOpen(open: boolean): void {
-	if (state.navMoreOpen === open) return;
-	setState({ navMoreOpen: open });
-	try {
-		if (open) localStorage.setItem(NAV_MORE_KEY, "open");
-		else localStorage.removeItem(NAV_MORE_KEY);
 	} catch {
 		// Storage can be unavailable (private windows); the choice then lasts for this page only.
 	}
@@ -467,7 +444,6 @@ let state: AppState = {
 	homeFolder: null,
 	sidebarCollapsed: rememberedCollapse(),
 	foldedSections: rememberedFolded(),
-	navMoreOpen: rememberedNavMore(),
 	transcriptDetail: rememberedTranscriptDetail(),
 	drawerOpen: false,
 	center: { approvals: {}, cards: {}, held: {} },

@@ -24,7 +24,6 @@ import {
 	centerCount,
 	NO_TEAM,
 	type SidebarSection,
-	setNavMoreOpen,
 	setSectionFolded,
 	setSidebarCollapsed,
 	setState,
@@ -764,6 +763,49 @@ function nest(list: Session[]): { session: Session; depth: number }[] {
  * The fixed entries at the top: the main conversation, the approval center (M2 plan, 10) and the
  * scheduled tasks (M3 plan, 9).
  */
+/**
+ * The pages opened less often (artifacts, the session map, usage) are in a menu that shows beside its
+ * entry: the top of the sidebar stays short, and nothing under it moves when the menu opens. While one
+ * of them is open the entry is the selected one and names the page.
+ */
+function MoreMenu({ variant }: { variant: "row" | "icon" }) {
+	useLang();
+	const page = useAppState((state) => state.page);
+	const pages = [
+		{ page: "artifacts", label: t("artifacts"), icon: <ArtifactIcon />, open: openArtifacts },
+		{ page: "map", label: t("map"), icon: <MapIcon />, open: openMap },
+		{ page: "usage", label: t("usage"), icon: <UsageIcon />, open: openUsage },
+	];
+	const current = pages.find((entry) => entry.page === page) ?? null;
+	return (
+		<Menu
+			flyout
+			label={current ? `${t("navMore")} · ${current.label}` : t("navMore")}
+			items={pages.map((entry) => ({
+				label: entry.label,
+				icon: entry.icon,
+				checked: entry === current,
+				onSelect: () => entry.open(),
+			}))}
+			trigger={{
+				className: variant === "row" ? "nav-row" : "btn btn-ghost btn-icon",
+				current: current !== null,
+				content:
+					variant === "row" ? (
+						<>
+							<MoreIcon />
+							<span className="nav-label">{t("navMore")}</span>
+							{current && <span className="nav-detail">{current.label}</span>}
+							<ChevronIcon />
+						</>
+					) : (
+						<MoreIcon />
+					),
+			}}
+		/>
+	);
+}
+
 function FixedEntries() {
 	useLang();
 	const mainId = useAppState((state) => state.settings?.mainSessionId ?? null);
@@ -772,17 +814,6 @@ function FixedEntries() {
 	const count = useAppState((state) => centerCount(state.center));
 	const open = useAppState((state) => state.page === "center");
 	const onSchedules = useAppState((state) => state.page === "schedules");
-	const onArtifacts = useAppState((state) => state.page === "artifacts");
-	const onUsage = useAppState((state) => state.page === "usage");
-	const onMap = useAppState((state) => state.page === "map");
-	const moreOpen = useAppState((state) => state.navMoreOpen);
-	// The pages opened less often sit one level down, so the top of the sidebar stays short.
-	const morePage = onArtifacts ? t("artifacts") : onMap ? t("map") : onUsage ? t("usage") : null;
-	const onMore = morePage !== null;
-	// Reaching one of them from elsewhere opens the level, so the sidebar shows where you are.
-	useEffect(() => {
-		if (onMore) setNavMoreOpen(true);
-	}, [onMore]);
 	return (
 		<>
 			{mainId && mainName && (
@@ -826,53 +857,7 @@ function FixedEntries() {
 				<ScheduleIcon />
 				<span className="nav-label">{t("schedules")}</span>
 			</button>
-			{/* Folded while one of its pages is open, the row stands for that page and names it. */}
-			<button
-				type="button"
-				className="nav-row"
-				aria-expanded={moreOpen}
-				aria-controls="sidebar-more"
-				aria-current={!moreOpen && onMore ? "page" : undefined}
-				onClick={() => setNavMoreOpen(!moreOpen)}
-			>
-				<MoreIcon />
-				<span className="nav-label">{t("navMore")}</span>
-				{!moreOpen && morePage && <span className="nav-detail">{morePage}</span>}
-				<ChevronIcon />
-			</button>
-			<div id="sidebar-more" className="nav-sub" hidden={!moreOpen}>
-				{moreOpen && (
-					<>
-						<button
-							type="button"
-							className="nav-row"
-							aria-current={onArtifacts ? "page" : undefined}
-							onClick={() => openArtifacts()}
-						>
-							<ArtifactIcon />
-							<span className="nav-label">{t("artifacts")}</span>
-						</button>
-						<button
-							type="button"
-							className="nav-row"
-							aria-current={onMap ? "page" : undefined}
-							onClick={() => openMap()}
-						>
-							<MapIcon />
-							<span className="nav-label">{t("map")}</span>
-						</button>
-						<button
-							type="button"
-							className="nav-row"
-							aria-current={onUsage ? "page" : undefined}
-							onClick={() => openUsage()}
-						>
-							<UsageIcon />
-							<span className="nav-label">{t("usage")}</span>
-						</button>
-					</>
-				)}
-			</div>
+			<MoreMenu variant="row" />
 		</>
 	);
 }
@@ -1016,9 +1001,6 @@ export function SidebarRail() {
 	const count = useAppState((state) => centerCount(state.center));
 	const onCenter = useAppState((state) => state.page === "center");
 	const onSchedules = useAppState((state) => state.page === "schedules");
-	const onArtifacts = useAppState((state) => state.page === "artifacts");
-	const onUsage = useAppState((state) => state.page === "usage");
-	const onMap = useAppState((state) => state.page === "map");
 	const [dialog, setDialog] = useState<"team" | "workspace" | null>(null);
 	return (
 		<nav className="rail" aria-label={t("sessions")}>
@@ -1074,33 +1056,7 @@ export function SidebarRail() {
 			>
 				<ScheduleIcon />
 			</Button>
-			<Button
-				variant="icon"
-				aria-label={t("artifacts")}
-				title={t("artifacts")}
-				aria-current={onArtifacts ? "page" : undefined}
-				onClick={() => openArtifacts()}
-			>
-				<ArtifactIcon />
-			</Button>
-			<Button
-				variant="icon"
-				aria-label={t("map")}
-				title={t("map")}
-				aria-current={onMap ? "page" : undefined}
-				onClick={() => openMap()}
-			>
-				<MapIcon />
-			</Button>
-			<Button
-				variant="icon"
-				aria-label={t("usage")}
-				title={t("usage")}
-				aria-current={onUsage ? "page" : undefined}
-				onClick={() => openUsage()}
-			>
-				<UsageIcon />
-			</Button>
+			<MoreMenu variant="icon" />
 			<Button
 				variant="icon"
 				aria-label={t("search")}

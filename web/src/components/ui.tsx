@@ -512,6 +512,29 @@ function placeBeside(popover: HTMLElement, anchor: HTMLElement): void {
 	popover.style.top = `${top}px`;
 }
 
+/** From a flyout's trigger to the flyout: past the sidebar's own padding. */
+const FLYOUT_GAP = 14;
+/** The pointer rests on a flyout's trigger this long before it opens: crossing the row opens nothing. */
+const FLYOUT_OPENS_MS = 100;
+/** A flyout opened by the pointer stays this long after the pointer leaves, so it can cross the gap. */
+const FLYOUT_STAYS_MS = 250;
+
+/**
+ * Puts a flyout to the right of its trigger, its first item level with it and clear of the sidebar's
+ * edge. False when the window has no room there, as on a phone, where the sidebar takes the width.
+ */
+function placeRightOf(popover: HTMLElement, trigger: HTMLElement): boolean {
+	const rect = trigger.getBoundingClientRect();
+	const margin = 8;
+	popover.style.minWidth = "";
+	const left = rect.right + FLYOUT_GAP;
+	if (left + popover.offsetWidth > window.innerWidth - margin) return false;
+	const top = Math.min(rect.top - 6, window.innerHeight - margin - popover.offsetHeight);
+	popover.style.left = `${left}px`;
+	popover.style.top = `${Math.max(margin, top)}px`;
+	return true;
+}
+
 function MenuItemButton({
 	item,
 	close,
@@ -655,7 +678,12 @@ function usePress(toggle: () => void) {
 
 /**
  * A menu behind a button (APG menu button): by default a "…" icon button, or a visible trigger such as
- * the sidebar's settings row. It can be opened from outside (a keyboard shortcut) through `open`.
+ * a sidebar entry. It can be opened from outside (a keyboard shortcut) through `open`.
+ *
+ * A flyout is the menu of a sidebar entry: it shows beside the entry, so nothing in the sidebar
+ * moves, and the pointer resting on the entry opens it. Opened that way it leaves the focus where it
+ * is and closes once the pointer has left both; a click or the keyboard opens it as any menu, and
+ * then it stays until something is chosen or it is dismissed.
  */
 export function Menu({
 	label,
@@ -664,6 +692,7 @@ export function Menu({
 	open: controlled,
 	onOpenChange,
 	width = 200,
+	flyout = false,
 }: {
 	label: string;
 	items: MenuEntry[];
@@ -674,10 +703,13 @@ export function Menu({
 		disabled?: boolean;
 		busy?: boolean;
 		labelledBy?: string;
+		/** The trigger stands for the page that is open: one of the pages its menu holds. */
+		current?: boolean;
 	};
 	open?: boolean;
 	onOpenChange?: (open: boolean) => void;
 	width?: number;
+	flyout?: boolean;
 }) {
 	const [own, setOwn] = useState(false);
 	const open = controlled ?? own;
@@ -693,7 +725,40 @@ export function Menu({
 	const [sub, setSub] = useState<{ key: string; anchor: HTMLButtonElement; focus: boolean } | null>(
 		null,
 	);
-	const press = usePress(() => setOpen(!open));
+	// A flyout the pointer opened, and the timer that opens or closes it.
+	const hovered = useRef({ open: false, timer: 0 });
+	const firstItem = () => menu.current?.querySelector<HTMLElement>("[role^=menuitem]");
+	const press = usePress(() => {
+		window.clearTimeout(hovered.current.timer);
+		// Clicking the entry of a flyout that is already showing keeps it: from then on it stays.
+		if (open && hovered.current.open) {
+			hovered.current.open = false;
+			firstItem()?.focus();
+			return;
+		}
+		hovered.current.open = false;
+		setOpen(!open);
+	});
+	const pointer = flyout
+		? {
+				onPointerEnter: (event: { pointerType: string }) => {
+					if (event.pointerType !== "mouse") return;
+					window.clearTimeout(hovered.current.timer);
+					if (open) return;
+					hovered.current.timer = window.setTimeout(() => {
+						hovered.current.open = true;
+						setOpen(true);
+					}, FLYOUT_OPENS_MS);
+				},
+				onPointerLeave: (event: { pointerType: string }) => {
+					if (event.pointerType !== "mouse") return;
+					window.clearTimeout(hovered.current.timer);
+					if (open && hovered.current.open) {
+						hovered.current.timer = window.setTimeout(() => setOpen(false), FLYOUT_STAYS_MS);
+					}
+				},
+			}
+		: {};
 	// Moving the mouse across other items on the way to an open submenu must not close or swap it:
 	// while the pointer heads toward the submenu, what the item under it would do waits a moment,
 	// and is dropped when the pointer arrives.
@@ -720,16 +785,25 @@ export function Menu({
 		if (!element || !button.current) return;
 		if (open) {
 			element.showPopover?.();
-			place(element, button.current, width);
-			(element.querySelector("[role^=menuitem]") as HTMLElement | null)?.focus();
+			if (!flyout || !placeRightOf(element, button.current)) place(element, button.current, width);
+			if (!hovered.current.open) {
+				(element.querySelector("[role^=menuitem]") as HTMLElement | null)?.focus();
+			}
 		} else if (element.matches(":popover-open")) {
 			element.hidePopover?.();
 		}
 		if (!open) {
 			window.clearTimeout(aim.current.timer);
+			window.clearTimeout(hovered.current.timer);
+			hovered.current.open = false;
 			setSub(null);
 		}
-	}, [open, width]);
+	}, [open, width, flyout]);
+
+	useEffect(() => {
+		const state = hovered.current;
+		return () => window.clearTimeout(state.timer);
+	}, []);
 
 	useLayoutEffect(() => {
 		const element = subMenu.current;
@@ -757,7 +831,7 @@ export function Menu({
 	const onKeyDown = (event: KeyboardEvent) => {
 		const entries = [...(menu.current?.querySelectorAll<HTMLElement>("[role^=menuitem]") ?? [])];
 		const index = entries.indexOf(document.activeElement as HTMLElement);
-		if (event.key === "Escape") {
+		if (event.key === "Escape" || (flyout && event.key === "ArrowLeft")) {
 			setOpen(false);
 			button.current?.focus();
 		} else if (event.key === "ArrowDown") {
@@ -836,9 +910,26 @@ export function Menu({
 				aria-haspopup="menu"
 				aria-expanded={open}
 				aria-controls={id}
+				aria-current={trigger?.current ? "page" : undefined}
 				disabled={trigger?.disabled || trigger?.busy}
 				aria-busy={trigger?.busy ? "true" : undefined}
 				{...press}
+				{...pointer}
+				// A click leaves the focus on the trigger in some browsers, and a hover always does: Escape
+				// closes the menu from here too, and an arrow goes into it (a flyout's opens it as well).
+				onKeyDown={(event) => {
+					if (open && event.key === "Escape") {
+						setOpen(false);
+					} else if (
+						(open && event.key === "ArrowDown") ||
+						(flyout && event.key === "ArrowRight")
+					) {
+						event.preventDefault();
+						hovered.current.open = false;
+						if (open) firstItem()?.focus();
+						else setOpen(true);
+					}
+				}}
 			>
 				{trigger ? trigger.content : <span aria-hidden="true">⋯</span>}
 			</button>
@@ -850,6 +941,7 @@ export function Menu({
 				popover="manual"
 				className="menu"
 				onKeyDown={onKeyDown}
+				{...pointer}
 				onPointerMove={(event) => {
 					aim.current.dx = event.clientX - aim.current.x;
 					aim.current.dy = event.clientY - aim.current.y;
