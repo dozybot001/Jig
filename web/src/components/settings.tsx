@@ -790,7 +790,7 @@ function About() {
 				<div className="about-hero">
 					<Mascot pose="gift" height={112} className="about-mascot" />
 					<div className="lockup about-lockup" role="img" aria-label={t("lockupName")}>
-						<YewMark className="lockup-mark" size={44} />
+						<YewMark className="lockup-mark" size={56} />
 						<ProductName />
 					</div>
 				</div>

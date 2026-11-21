@@ -261,38 +261,38 @@ a {
 	margin: 0 auto;
 }
 /* On About it lines up with the lockup under it. */
-/* About: the mascot on the left, the lockup beside her at twice its usual size. */
+/* About: the mascot on the left, the lockup beside her, larger than anywhere else. */
 .about-hero {
 	display: flex;
 	align-items: flex-end;
 	gap: 16px;
 }
-/* Below the middle, level with her hands and the berries she holds out. */
+/* Close to her feet: the lockup's baseline near the bottom of the picture. */
 .about-lockup {
-	gap: 14px;
-	margin-bottom: 24px;
+	gap: 18px;
+	margin-bottom: 8px;
 }
 .about-lockup .lockup-mark {
-	width: 44px;
-	height: 44px;
+	width: 56px;
+	height: 56px;
 }
 .about-lockup .product-name {
-	--word-h: 44px;
+	--word-h: 56px;
 }
 @media (max-width: 480px) {
 	.about-hero {
 		gap: 10px;
 	}
 	.about-lockup {
-		gap: 9px;
-		margin-bottom: 20px;
+		gap: 10px;
+		margin-bottom: 8px;
 	}
 	.about-lockup .lockup-mark {
-		width: 30px;
-		height: 30px;
+		width: 34px;
+		height: 34px;
 	}
 	.about-lockup .product-name {
-		--word-h: 30px;
+		--word-h: 34px;
 	}
 }
 .page-mascot {
