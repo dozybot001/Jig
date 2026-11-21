@@ -306,6 +306,8 @@ export interface AppState {
 	homeFolder: string | null;
 	/** Wide screens: the sidebar folded to a narrow rail (remembered in this browser). */
 	sidebarCollapsed: boolean;
+	/** The sidebar lists folded to their heading (remembered in this browser). */
+	foldedSections: SidebarSection[];
 	/** Conversation timeline view: false for concise (default), true for full audit notices & notes. */
 	transcriptDetail: boolean;
 	/** Narrow screens: the sidebar drawer is open. */
@@ -346,7 +348,12 @@ export function centerCount(center: CenterState): number {
 	);
 }
 
+/** The sidebar's three lists; each folds to its heading on its own. */
+export type SidebarSection = "teams" | "workspaces" | "sessions";
+
 const SIDEBAR_KEY = "yew.sidebar";
+const SECTIONS_KEY = "yew.sidebarFolded";
+const SECTIONS: SidebarSection[] = ["teams", "workspaces", "sessions"];
 const TRANSCRIPT_DETAIL_KEY = "yew.transcriptDetail";
 
 function rememberedCollapse(): boolean {
@@ -354,6 +361,15 @@ function rememberedCollapse(): boolean {
 		return localStorage.getItem(SIDEBAR_KEY) === "collapsed";
 	} catch {
 		return false;
+	}
+}
+
+function rememberedFolded(): SidebarSection[] {
+	try {
+		const saved = (localStorage.getItem(SECTIONS_KEY) ?? "").split(",");
+		return SECTIONS.filter((section) => saved.includes(section));
+	} catch {
+		return [];
 	}
 }
 
@@ -371,6 +387,19 @@ export function setSidebarCollapsed(collapsed: boolean): void {
 	try {
 		if (collapsed) localStorage.setItem(SIDEBAR_KEY, "collapsed");
 		else localStorage.removeItem(SIDEBAR_KEY);
+	} catch {
+		// Storage can be unavailable (private windows); the choice then lasts for this page only.
+	}
+}
+
+/** Folds one sidebar list to its heading or opens it again, and remembers it in this browser only. */
+export function setSectionFolded(section: SidebarSection, folded: boolean): void {
+	const others = state.foldedSections.filter((name) => name !== section);
+	const next = folded ? [...others, section] : others;
+	setState({ foldedSections: next });
+	try {
+		if (next.length > 0) localStorage.setItem(SECTIONS_KEY, next.join(","));
+		else localStorage.removeItem(SECTIONS_KEY);
 	} catch {
 		// Storage can be unavailable (private windows); the choice then lasts for this page only.
 	}
@@ -408,6 +437,7 @@ let state: AppState = {
 	phones: null,
 	homeFolder: null,
 	sidebarCollapsed: rememberedCollapse(),
+	foldedSections: rememberedFolded(),
 	transcriptDetail: rememberedTranscriptDetail(),
 	drawerOpen: false,
 	center: { approvals: {}, cards: {}, held: {} },

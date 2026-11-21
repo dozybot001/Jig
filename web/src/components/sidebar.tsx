@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { Group, Session } from "../../../src/shared/types.ts";
 import {
 	deleteGroup,
@@ -22,6 +22,8 @@ import { isImeEvent } from "../ime.ts";
 import { blockedSessions } from "../progress.ts";
 import {
 	centerCount,
+	type SidebarSection,
+	setSectionFolded,
 	setSidebarCollapsed,
 	setState,
 	useAppState,
@@ -35,6 +37,7 @@ import {
 	ArtifactIcon,
 	CenterIcon,
 	ChatIcon,
+	ChevronIcon,
 	CloseIcon,
 	CodeIcon,
 	CollapseIcon,
@@ -284,7 +287,11 @@ function TeamRow({
 					type="button"
 					className="session-row"
 					aria-pressed={active}
-					onClick={() => setState({ teamFilter: active ? null : group.id })}
+					onClick={() => {
+						setState({ teamFilter: active ? null : group.id });
+						// Choosing a team is asking for its sessions: open that list if it is folded.
+						if (!active) setSectionFolded("sessions", false);
+					}}
 					onDoubleClick={() => setRenaming(true)}
 				>
 					<span className="session-icon" aria-hidden="true">
@@ -320,6 +327,48 @@ function TeamRow({
 	);
 }
 
+function useFolded(section: SidebarSection): boolean {
+	return useAppState((state) => state.foldedSections.includes(section));
+}
+
+/** A list's heading: its name folds the list to this line or opens it again; buttons sit after it. */
+function SectionHeading({
+	section,
+	children,
+	actions,
+}: {
+	section: SidebarSection;
+	children: ReactNode;
+	actions?: ReactNode;
+}) {
+	const folded = useFolded(section);
+	return (
+		<div className="group-heading">
+			<button
+				type="button"
+				className="heading-toggle"
+				aria-expanded={!folded}
+				aria-controls={`sidebar-${section}`}
+				onClick={() => setSectionFolded(section, !folded)}
+			>
+				<span className="heading-text">{children}</span>
+				<ChevronIcon />
+			</button>
+			{actions}
+		</div>
+	);
+}
+
+/** A list's rows, left out while the list is folded. */
+function SectionBody({ section, children }: { section: SidebarSection; children: ReactNode }) {
+	const folded = useFolded(section);
+	return (
+		<div id={`sidebar-${section}`} hidden={folded}>
+			{!folded && children}
+		</div>
+	);
+}
+
 function Teams() {
 	useLang();
 	const groups = useAppState((state) => state.groups);
@@ -339,32 +388,38 @@ function Teams() {
 	}
 	return (
 		<section aria-label={t("teams")}>
-			<div className="group-heading">
-				<span>{t("teams")}</span>
-				<Button
-					variant="icon"
-					className="heading-add"
-					aria-label={t("newGroup")}
-					title={t("newGroup")}
-					onClick={() => setDialog({ kind: "create" })}
-				>
-					<NewTeamIcon />
-				</Button>
-			</div>
-			{groups.length === 0 ? (
-				<p className="empty-box">{t("noTeams")}</p>
-			) : (
-				groups.map((group) => (
-					<TeamRow
-						key={group.id}
-						group={group}
-						count={counts.get(group.id) ?? 0}
-						active={filter === group.id}
-						onNewSession={() => setDialog({ kind: "session", groupId: group.id })}
-						onDelete={() => setDialog({ kind: "delete", group })}
-					/>
-				))
-			)}
+			<SectionHeading
+				section="teams"
+				actions={
+					<Button
+						variant="icon"
+						className="heading-add"
+						aria-label={t("newGroup")}
+						title={t("newGroup")}
+						onClick={() => setDialog({ kind: "create" })}
+					>
+						<NewTeamIcon />
+					</Button>
+				}
+			>
+				{t("teams")}
+			</SectionHeading>
+			<SectionBody section="teams">
+				{groups.length === 0 ? (
+					<p className="empty-box">{t("noTeams")}</p>
+				) : (
+					groups.map((group) => (
+						<TeamRow
+							key={group.id}
+							group={group}
+							count={counts.get(group.id) ?? 0}
+							active={filter === group.id}
+							onNewSession={() => setDialog({ kind: "session", groupId: group.id })}
+							onDelete={() => setDialog({ kind: "delete", group })}
+						/>
+					))
+				)}
+			</SectionBody>
 			{dialog?.kind === "create" && <GroupDialog onClose={() => setDialog(null)} />}
 			{dialog?.kind === "session" && (
 				<NewSessionDialog groupId={dialog.groupId} onClose={() => setDialog(null)} />
@@ -392,25 +447,31 @@ function Workspaces() {
 	const [creating, setCreating] = useState(false);
 	return (
 		<section aria-label={t("workspaces")}>
-			<div className="group-heading">
-				<span>{t("workspaces")}</span>
-				<Button
-					variant="icon"
-					className="heading-add"
-					aria-label={t("newWorkspace")}
-					title={t("newWorkspace")}
-					onClick={() => setCreating(true)}
-				>
-					<NewWorkspaceIcon />
-				</Button>
-			</div>
-			{workspaces.length === 0 ? (
-				<p className="empty-box">{t("noWorkspaces")}</p>
-			) : (
-				workspaces.map((workspace) => (
-					<WorkspaceRow key={workspace.id} workspace={workspace} all={workspaces} />
-				))
-			)}
+			<SectionHeading
+				section="workspaces"
+				actions={
+					<Button
+						variant="icon"
+						className="heading-add"
+						aria-label={t("newWorkspace")}
+						title={t("newWorkspace")}
+						onClick={() => setCreating(true)}
+					>
+						<NewWorkspaceIcon />
+					</Button>
+				}
+			>
+				{t("workspaces")}
+			</SectionHeading>
+			<SectionBody section="workspaces">
+				{workspaces.length === 0 ? (
+					<p className="empty-box">{t("noWorkspaces")}</p>
+				) : (
+					workspaces.map((workspace) => (
+						<WorkspaceRow key={workspace.id} workspace={workspace} all={workspaces} />
+					))
+				)}
+			</SectionBody>
 			{creating && (
 				<WorkspaceDialog
 					onClose={() => setCreating(false)}
@@ -1100,44 +1161,50 @@ export function Sidebar() {
 				<Teams />
 				<Workspaces />
 				<section aria-label={filterName ? `${t("sessions")} · ${filterName}` : t("sessions")}>
-					<div className="group-heading">
-						<span className="heading-text">
-							{t("sessions")}
-							{filterName && <span className="heading-filter"> · {filterName}</span>}
-						</span>
-						{filter && (
-							<Button
-								variant="icon"
-								className="heading-add"
-								aria-label={t("showAllSessions")}
-								title={t("showAllSessions")}
-								onClick={() => setState({ teamFilter: null })}
-							>
-								<CloseIcon />
-							</Button>
+					<SectionHeading
+						section="sessions"
+						actions={
+							<>
+								{filter && (
+									<Button
+										variant="icon"
+										className="heading-add"
+										aria-label={t("showAllSessions")}
+										title={t("showAllSessions")}
+										onClick={() => setState({ teamFilter: null })}
+									>
+										<CloseIcon />
+									</Button>
+								)}
+								<Button
+									variant="icon"
+									className="heading-add"
+									aria-label={filter ? t("newSessionHere") : t("newSession")}
+									title={filter ? t("newSessionHere") : t("newSession")}
+									onClick={() => {
+										if (filter) {
+											setNewSession(filter);
+											return;
+										}
+										closeDrawer();
+										void selectSession(null);
+									}}
+								>
+									<ComposeIcon />
+								</Button>
+							</>
+						}
+					>
+						{t("sessions")}
+						{filterName && <span className="heading-filter"> · {filterName}</span>}
+					</SectionHeading>
+					<SectionBody section="sessions">
+						{listed.length === 0 ? (
+							<p className="empty-box">{filter ? t("emptyGroup") : t("emptySidebar")}</p>
+						) : (
+							rows(listed)
 						)}
-						<Button
-							variant="icon"
-							className="heading-add"
-							aria-label={filter ? t("newSessionHere") : t("newSession")}
-							title={filter ? t("newSessionHere") : t("newSession")}
-							onClick={() => {
-								if (filter) {
-									setNewSession(filter);
-									return;
-								}
-								closeDrawer();
-								void selectSession(null);
-							}}
-						>
-							<ComposeIcon />
-						</Button>
-					</div>
-					{listed.length === 0 ? (
-						<p className="empty-box">{filter ? t("emptyGroup") : t("emptySidebar")}</p>
-					) : (
-						rows(listed)
-					)}
+					</SectionBody>
 				</section>
 				{hasArchived && (
 					<>
