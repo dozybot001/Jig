@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { statSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, extname } from "node:path";
 import type { FileOpener } from "../shared/types.ts";
 import { conflict, YewError } from "./errors.ts";
 
@@ -76,10 +76,15 @@ export function openFileCommand(
 		column?: number;
 		platform?: string;
 		isDir?: boolean;
+		/** The target would run as a program if opened with the system default (see `isLaunchable`). */
+		launchable?: boolean;
 	},
 ): { command: string; args: string[] } | null {
 	const platform = options.platform ?? process.platform;
-	const { opener, line, column, isDir } = options;
+	const { line, column, isDir } = options;
+	// A link in a reply is written by the model. Opening an app, a script or an installer with the
+	// system default would run it outside the sandbox on one click, so those are only shown.
+	const opener = options.opener === "system" && options.launchable ? "finder" : options.opener;
 	const lineSuffix =
 		!isDir && line && line > 0 ? `:${line}${column && column > 0 ? `:${column}` : ""}` : "";
 	if (platform === "darwin") {
@@ -129,6 +134,45 @@ export function openFileCommand(
 	return null;
 }
 
+/** Bundles and file types that macOS or a Linux desktop runs, installs or follows when opened. */
+const LAUNCHABLE_TYPES = new Set([
+	".app",
+	".action",
+	".appimage",
+	".applescript",
+	".bundle",
+	".command",
+	".desktop",
+	".dmg",
+	".fileloc",
+	".inetloc",
+	".jar",
+	".kext",
+	".mpkg",
+	".pkg",
+	".plugin",
+	".prefpane",
+	".saver",
+	".scpt",
+	".scptd",
+	".service",
+	".sh",
+	".shortcut",
+	".terminal",
+	".tool",
+	".webloc",
+	".workflow",
+]);
+
+/** True when opening the path with the system default would run something: a known type or an executable file. */
+export function isLaunchable(
+	targetPath: string,
+	stat: { isDirectory(): boolean; mode: number } | null,
+): boolean {
+	if (LAUNCHABLE_TYPES.has(extname(targetPath).toLowerCase())) return true;
+	return stat !== null && !stat.isDirectory() && (stat.mode & 0o111) !== 0;
+}
+
 /** Opens a verified local file or folder in the person's configured editor or file manager. */
 export async function openLocalFile(
 	targetPath: string,
@@ -140,13 +184,15 @@ export async function openLocalFile(
 		run?: RunCommand;
 	},
 ): Promise<void> {
-	let isDir = false;
+	let stat: ReturnType<typeof statSync> | null = null;
 	try {
-		isDir = statSync(targetPath).isDirectory();
+		stat = statSync(targetPath);
 	} catch {
 		// Caller already verified existence; treat as file if stat races.
 	}
-	const program = openFileCommand(targetPath, { ...options, isDir });
+	const isDir = stat?.isDirectory() ?? false;
+	const launchable = isLaunchable(targetPath, stat);
+	const program = openFileCommand(targetPath, { ...options, isDir, launchable });
 	if (!program) {
 		throw conflict(
 			"Opening local files works on macOS and Linux.",

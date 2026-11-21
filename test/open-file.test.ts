@@ -162,6 +162,50 @@ describe("POST /api/open-file and fileOpener setting", () => {
 		}
 	});
 
+	test("shows apps, scripts and executables in Finder instead of opening them with the system default", async () => {
+		const root = mkdtempSync(join(tmpdir(), "yew-open-launchable-"));
+		const yewHome = join(root, ".yew");
+		mkdirSync(yewHome, { recursive: true });
+		const script = join(root, "run.command");
+		const binary = join(root, "tool");
+		const bundle = join(root, "Some.app");
+		const note = join(root, "note.md");
+		writeFileSync(script, "echo hi\n", "utf8");
+		writeFileSync(binary, "#!/bin/sh\n", { mode: 0o755 });
+		mkdirSync(bundle);
+		writeFileSync(note, "# Note\n", "utf8");
+		const db = openDatabase(":memory:");
+		const store = new Store(db, new EventBus());
+		const launched: { command: string; args: string[] }[] = [];
+		const app = api({
+			store,
+			yewHome,
+			userHome: root,
+			platform: "darwin",
+			openFile: async (command, args) => {
+				launched.push({ command, args });
+			},
+		});
+		app.onError(errorHandler(() => {}));
+		const open = (path: string) =>
+			app.request("/open-file", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ path, opener: "system" }),
+			});
+		try {
+			for (const path of [script, binary, bundle]) {
+				assert.equal((await open(path)).status, 204);
+				assert.deepEqual(launched.at(-1), { command: "open", args: ["-R", realpathSync(path)] });
+			}
+			assert.equal((await open(note)).status, 204);
+			assert.deepEqual(launched.at(-1), { command: "open", args: [realpathSync(note)] });
+		} finally {
+			db.close();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	test("blocks paired phones from calling /api/open-file", async () => {
 		const db = openDatabase(":memory:");
 		const store = new Store(db, new EventBus());
