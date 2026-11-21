@@ -1,6 +1,6 @@
 # Yew Harness 对外介绍
 
-版本 0.45（2026-11-21）。官网产品库、README、App Store 描述和各渠道介绍 Yew Harness 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是产品蓝图（Tenon-AI 的 `docs/products/yew/blueprint.md`）第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
+版本 0.46（2026-11-21）。官网产品库、README、App Store 描述和各渠道介绍 Yew Harness 时以本文为准；能力有变化先改这里，再改各处。改了以后把提交号告诉平台组，由它同步官网产品库的条目。依据是产品蓝图（Tenon-AI 的 `docs/products/yew/blueprint.md`）第一至五节、`~/memory/session-engineering.md`，以及产品规范 1.8、14.1–14.3。
 
 ## 一、定义
 
@@ -58,7 +58,7 @@ Yew Harness 的特点不在单个会话多能干，而在一组会话怎样组�
   - 消息下的操作：每条消息和回复下面，鼠标移上去显示时间、复制、回溯和分叉。
   - 助手：会话可以把一件独立的事交给助手去查，只拿回结论。助手只能读和查，不能改东西，几个可以同时跑。
   - 常用 MCP 服务：GitHub、Gitee、Context7、Notion、Sentry 填上令牌就能添加；Linear、Vercel、Gmail、Google 日历、Google 云端硬盘在浏览器里登录（Google 的几个要用户自己在 Google Cloud 建客户端，目前在 Google 的开发者预览阶段）。要求登录的远程 MCP 服务都能在 Yew Harness 里登录。
-  - 悬浮的 Yew：Yew 不再站在侧栏底部，悬浮在窗口上，可以拖到窗口里任何地方，气泡照旧说眼下最要紧的一件事，点一下直接过去；侧栏底部只留设置。发布后第六节第 6 条里的「侧栏底部的 Yew」要跟着改，新写法由创始人定。
+  - 悬浮的 Yew：Yew 不再站在侧栏底部，悬浮在窗口上，可以拖到窗口里任何地方，气泡照旧说眼下最要紧的一件事，点一下直接过去；侧栏底部只留设置。
   - 数据导出：`yew export` 把会话导出成 Markdown，其余导出成 JSON；设置的「数据管理」里也能导出，还能看数据目录占了多少、清理临时文件。
   - 用量：「用量」页画出最近 30 天每天的费用，今天花了多少、离每日上限多远，某一天每个会话的费用和 token。费用按服务商的价格估算，写的时候说「估算」。
   - 会话关系：「会话关系」页用一张图列出全部会话，谁开了谁、最近 24 小时的信从哪到哪、各自的状态。
@@ -107,7 +107,7 @@ Yew Harness 的特点不在单个会话多能干，而在一组会话怎样组�
 | 3 | 真正坐进办公室当老板 | 授权与决定都在审批中心，你的操作才有实权。 | `permission` |
 | 4 | 随时随地，打破工位枷锁 | 手机也能审批，人不在电脑前，授权和决定照样处理。 | `phone` |
 | 5 | 模型随你选 | 接入库用开源的 pi-ai，支持超级多家模型服务商。 | `models` |
-| 6 | 一眼看到要你处理的事 | 侧栏底部的 Yew 用气泡说眼下最要紧的一件事：几件事等你处理、哪个会话出错了或做完了，点一下直接过去。 | Yew |
+| 6 | 一眼看到要你处理的事 | Yew 用气泡说眼下最要紧的一件事：几件事等你处理、哪个会话出错了或做完了，点一下直接过去。 | Yew |
 
 | | Title | Body |
 | --- | --- | --- |
@@ -116,7 +116,7 @@ Yew Harness 的特点不在单个会话多能干，而在一组会话怎样组�
 | 3 | Take the boss’s chair for real | Approvals and decisions all sit in the approval center, and only your actions carry real authority. |
 | 4 | Anywhere, anytime, off the desk | Approve from your phone. Away from the computer, approvals and decisions still get handled. |
 | 5 | Your choice of model | Model access is built on the open-source pi-ai library, with a huge range of model providers supported. |
-| 6 | See what needs you at a glance | Yew, at the foot of the sidebar, says the one thing that matters most right now: what is waiting for you, or which session failed or finished. One click takes you there. |
+| 6 | See what needs you at a glance | Yew says the one thing that matters most right now: what is waiting for you, or which session failed or finished. One click takes you there. |
 
 **界面那句**（有界面的 Tenon 产品共用）：优雅克制的交互界面，顺畅丝滑的用户体验。/ An elegant, restrained interface. A smooth, effortless experience.
 
@@ -146,6 +146,7 @@ Yew Harness 的特点不在单个会话多能干，而在一组会话怎样组�
 
 ## 修改记录
 
+- **0.46（2026-11-21）** 第六节第 6 条去掉「侧栏底部」：中文改成「Yew 用气泡说眼下最要紧的一件事……」，英文改成 "Yew says the one thing that matters most right now: …"，标题不变。创始人 11-21 在两种写法（不写位置、写成悬浮）里选了不写位置（答「A」），以后 Yew 换位置也不用再改。新写法和已发布的 1.10.2、下个版本都对得上，平台组可以现在同步官网。
 - **0.45（2026-11-21）** Yew 改成悬浮在窗口上、可以拖动（创始人 11-21：「Yew 悬浮可拖动，侧栏底部只保留设置」）：第四节「已实现、还没发布」补一条。第六节第 6 条写的「侧栏底部的 Yew」到 1.10.2 都是对的，原文先不动；下次发布前按创始人定的新写法改，再把提交号告诉平台组同步官网。版本行补上 0.44 漏改的版本号。
 - **0.44（2026-11-21）** 授权体系收成界限、授权、审批三层（创始人 11-21「按你建议」「跳过模式跳过所有授权」「审批条尽量做选择题」）：第三节第 4 条和第四节「授权和审批」改写，不再写「三种方式下都要你决定」；跳过方式什么都不问，只有提高花费上限还问；沙箱外的命令和 MCP 的发送类工具在跳过方式下也不问；会话读不到的目录在沙箱外也读不到。第六节的主张原文不变，第 3 条的核对事实补一句。这些改动还没发布。
 - **0.43（2026-11-20）** 1.9.0 发布：消息附件、多目录工作区、分级放行域名、双模式定时任务、自动授权溯源、原地新上下文与触发器、手机端对齐记进第四节「已发布」。第六节不变。
