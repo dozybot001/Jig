@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { boot, openSettings } from "./actions.ts";
 import { ArtifactsPage } from "./components/artifacts.tsx";
 import { CenterPage } from "./components/center.tsx";
+import { Companion } from "./components/companion.tsx";
 import { MapPage } from "./components/map.tsx";
 import { Mascot } from "./components/mascot.tsx";
 import { Opening } from "./components/opening.tsx";
@@ -122,6 +123,8 @@ function App() {
 				className={`app${!narrow && collapsed ? " app-collapsed" : ""}${narrow && drawerOpen ? " sidebar-open" : ""}${backdrop ? " with-yew" : ""}${backdrop && isHome ? " yew-home" : ""}${backdrop && isFeature ? " yew-feature" : ""}${backdrop && !isFeature && isWorking ? " yew-working" : ""}`}
 			>
 				{!narrow && collapsed ? <SidebarRail /> : <Sidebar />}
+				{/* Yew floats over the window; a narrow one has no room for her (blueprint, section 12). */}
+				{!narrow && <Companion />}
 				{narrow && drawerOpen && (
 					<div
 						className="drawer-backdrop"
@@ -172,8 +175,8 @@ if (root) {
 		</StrictMode>,
 	);
 	watchInput();
-	void boot();
-	watchPresence();
+	// After sign-in: a link's token is traded for the cookie first.
+	void boot().then(watchPresence);
 	// The Mac app's menu (macos/): "About Yew Harness" opens that page of the settings.
 	window.addEventListener("yew-app", (event) => {
 		if ((event as CustomEvent<unknown>).detail === "about") openSettings("about");

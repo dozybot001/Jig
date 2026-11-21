@@ -86,7 +86,7 @@ import {
 	TrashIcon,
 } from "./icons.tsx";
 import { Mascot } from "./mascot.tsx";
-import { ProgressLine } from "./progress.tsx";
+import { SessionClock, useSessionClock } from "./progress.tsx";
 import { Transcript } from "./transcript.tsx";
 import {
 	Button,
@@ -260,7 +260,11 @@ export function SidebarToggle({ className = "" }: { className?: string }) {
 	);
 }
 
-/** The header names the session; its actions live in the composer and in the sidebar's row menu. */
+/**
+ * The header names the session; its actions live in the composer and in the sidebar's row menu. While
+ * the session works or waits for the person, the time it has taken sits in the middle (blueprint 6.9,
+ * item 27).
+ */
 function SessionHeader({
 	session,
 	transcript,
@@ -278,14 +282,15 @@ function SessionHeader({
 	const detailed = useAppState((state) => state.transcriptDetail);
 	const tokens =
 		session.usage.input + session.usage.output + session.usage.cacheRead + session.usage.cacheWrite;
+	const clock = useSessionClock(session, transcript);
 	return (
-		<header className="session-header">
+		<header className={`session-header${clock.text ? " session-header-clock" : ""}`}>
 			<SidebarToggle />
 			{/* The title takes the left; marks, status and usage sit on the right and give way first. */}
-			<div className="session-title session-title-stack">
+			<div className="session-title">
 				<h1>{session.name}</h1>
-				<ProgressLine session={session} transcript={transcript} />
 			</div>
+			<SessionClock clock={clock} />
 			<div className="session-aside">
 				{isMain && <span className="tag">{t("mainConversation")}</span>}
 				{session.outcome && <span className="tag">{t(`outcome_${session.outcome}`)}</span>}

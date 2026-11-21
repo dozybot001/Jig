@@ -61,7 +61,7 @@ export const SETTING_DEFAULTS = {
 	notify: { waiting: true, error: true, task: true, budget: true } as NotifySettings,
 	/** Skills switched off in the settings, each by its folder's real path (blueprint 6.10, item 35). */
 	disabledSkills: [] as string[],
-	/** The mascot at the foot of the sidebar and the opening animation (blueprint, section 12). */
+	/** Yew in the interface: floating over the window, the opening and the rest (blueprint, section 12). */
 	mascot: true as boolean,
 	/** Whether the opening leaves by itself once started, or waits for a click (blueprint 6.10, item 45). */
 	opening: "auto" as OpeningMode,

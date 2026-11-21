@@ -30,7 +30,6 @@ import {
 	useAppState,
 	type Workspace,
 } from "../state.ts";
-import { Companion } from "./companion.tsx";
 import { Snippet } from "./content.tsx";
 import { ConfirmDialog, GroupDialog, NewSessionDialog, SessionSettingsDialog } from "./dialogs.tsx";
 import {
@@ -1266,8 +1265,8 @@ export function Sidebar() {
 					</>
 				)}
 			</div>
+			{/* Only the settings: Yew floats over the window (blueprint, sections 8 and 12). */}
 			<div className="sidebar-bottom">
-				<Companion />
 				<SettingsButton variant="row" />
 			</div>
 			{newSession && <NewSessionDialog groupId={newSession} onClose={() => setNewSession(null)} />}

@@ -4,12 +4,18 @@ import { describe, test } from "node:test";
 import type { Session, ToolCallView } from "../src/shared/types.ts";
 import {
 	activeToolPose,
+	boxAt,
+	bubbleSide,
 	companionMood,
+	defaultSpot,
+	EDGE,
 	GREETING_MS,
 	greetingFor,
 	isNight,
 	POSES,
+	parseSpot,
 	poseForTool,
+	spotOf,
 } from "../web/src/companion.ts";
 import { MASCOT_POSES } from "../web/src/poses.ts";
 
@@ -25,7 +31,7 @@ function session(
 // Long after Yew opened, at two in the afternoon.
 const base = { now: 10 * GREETING_MS, hour: 14, openedAt: 0 };
 
-describe("the mascot at the foot of the sidebar", () => {
+describe("what the floating Yew says", () => {
 	test("things waiting for the person come first and take her to the approval center", () => {
 		const mood = companionMood({ ...base, sessions: [session("a", "error")], waiting: 2 });
 		assert.deepEqual(mood.line, { kind: "waiting", count: 2 });
@@ -133,5 +139,46 @@ describe("the mascot at the foot of the sidebar", () => {
 		};
 		assert.equal(activeToolPose(calls), "typing");
 		assert.equal(activeToolPose({ a: calls.a as ToolCallView }), null);
+	});
+});
+
+describe("where the floating Yew stands", () => {
+	const size = { width: 71, height: 76 };
+	const view = { width: 1440, height: 900 };
+
+	test("until moved she stands at the bottom, just right of the sidebar", () => {
+		const box = boxAt(defaultSpot(260), view, size);
+		assert.deepEqual(box, { left: 276, top: 900 - 76 - 12 });
+		assert.deepEqual(bubbleSide(box, view, size), { side: "right", align: "bottom" });
+		assert.equal(boxAt(defaultSpot(56), view, size).left, 72);
+	});
+
+	test("a place she is put down is kept from its nearer edges, and she keeps to them", () => {
+		const spot = spotOf({ left: 1300, top: 100 }, view, size);
+		assert.deepEqual(spot, { x: "right", dx: 1440 - 71 - 1300, y: "top", dy: 100 });
+		// A wider window: the same distance from the right edge and the top.
+		assert.deepEqual(boxAt(spot, { width: 1920, height: 1080 }, size), {
+			left: 1920 - 71 - spot.dx,
+			top: 100,
+		});
+		// Up here her bubble hangs under her feet and reaches toward the middle.
+		assert.deepEqual(bubbleSide({ left: 1300, top: 100 }, view, size), {
+			side: "left",
+			align: "top",
+		});
+	});
+
+	test("she stays inside a window that shrinks", () => {
+		const spot = { x: "left", dx: 1200, y: "top", dy: 800 } as const;
+		const box = boxAt(spot, { width: 900, height: 640 }, size);
+		assert.deepEqual(box, { left: 900 - 71 - EDGE, top: 640 - 76 - EDGE });
+	});
+
+	test("a remembered spot is read back, and anything else is ignored", () => {
+		const spot = { x: "right", dx: 40, y: "bottom", dy: 24 } as const;
+		assert.deepEqual(parseSpot(JSON.stringify(spot)), spot);
+		assert.equal(parseSpot(null), null);
+		assert.equal(parseSpot("{"), null);
+		assert.equal(parseSpot(JSON.stringify({ x: "middle", dx: 1, y: "top", dy: 1 })), null);
 	});
 });

@@ -314,22 +314,41 @@ a {
 	}
 }
 
-/* --- the mascot at the foot of the sidebar (blueprint, section 12) --- */
+/*
+ * --- Yew floating over the window (blueprint, section 12) ---
+ * Placed by companion.tsx at her own edges away from the bubble. Above the sidebar and the page,
+ * below dialogs, menus and the opening. Only her picture and a bubble that goes somewhere take clicks.
+ */
 
+/* Her bubble is over her head in the lower half of the window and under her feet in the upper half,
+   reaching toward the middle, so it stays clear of the composer at the bottom. */
 .companion {
+	position: fixed;
+	z-index: 12;
 	display: flex;
+	flex-direction: column-reverse;
+	align-items: flex-start;
+	gap: 6px;
+	width: max-content;
+	pointer-events: none;
+	user-select: none;
+	-webkit-user-select: none;
+}
+.companion-left {
 	align-items: flex-end;
-	gap: 4px;
-	margin-bottom: 4px;
-	padding: 0 2px;
+}
+.companion-top {
+	flex-direction: column;
 }
 .companion-mascot-btn {
 	flex: none;
 	padding: 0;
 	border: none;
 	background: transparent;
-	cursor: pointer;
+	cursor: grab;
 	line-height: 0;
+	pointer-events: auto;
+	touch-action: none;
 	transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 @media (hover: hover) {
@@ -339,6 +358,18 @@ a {
 }
 .companion-mascot-btn:active {
 	transform: translateY(1px) scale(0.96);
+}
+/* Picked up: a little larger while she moves. */
+.companion-dragging .companion-mascot-btn,
+.companion-dragging .companion-mascot-btn:active {
+	cursor: grabbing;
+	transform: scale(1.06);
+}
+.companion-mascot {
+	filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.12));
+}
+:root[data-theme="dark"] .companion-mascot {
+	filter: drop-shadow(0 6px 12px rgb(0 0 0 / 0.4));
 }
 @media (prefers-reduced-motion: no-preference) {
 	.companion-mascot {
@@ -355,9 +386,10 @@ a {
 }
 .companion-bubble {
 	position: relative;
-	flex: 1 1 auto;
-	min-width: 0;
-	margin: 0 0 30px;
+	flex: none;
+	width: max-content;
+	/* max-width: set by companion.tsx, so the bubble stays in the window. */
+	margin: 0;
 	padding: 7px 10px;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
@@ -371,28 +403,38 @@ a {
 	overflow-wrap: anywhere;
 	text-wrap: pretty;
 }
-/* The tail points at her. */
+/* The tail points at her, over the middle of her picture. */
 .companion-bubble::before {
 	content: "";
 	position: absolute;
-	left: -5px;
-	bottom: 12px;
+	left: 30px;
+	bottom: -5px;
 	width: 8px;
 	height: 8px;
+	border-right: 1px solid var(--border);
 	border-bottom: 1px solid var(--border);
-	border-left: 1px solid var(--border);
 	background: inherit;
 	transform: rotate(45deg);
 }
+.companion-left .companion-bubble::before {
+	left: auto;
+	right: 30px;
+}
+.companion-top .companion-bubble::before {
+	top: -5px;
+	bottom: auto;
+	transform: rotate(-135deg);
+}
 .companion-go {
 	cursor: pointer;
+	pointer-events: auto;
 }
 @media (hover: hover) {
 	.companion-go:hover {
 		background: var(--hover);
 	}
 }
-/* In a short window the sessions keep the room. */
+/* A short window keeps its room for the work; a narrow one does not draw her at all (main.tsx). */
 @media (max-height: 620px) {
 	.companion {
 		display: none;
@@ -1236,17 +1278,6 @@ body.scroll-locked {
 }
 :root[data-theme="dark"] .app.with-yew.yew-feature .yew-backdrop-feature {
 	opacity: 0.14;
-}
-@media (prefers-reduced-motion: no-preference) {
-	.progress-mascot {
-		animation: yew-pop 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-}
-@keyframes yew-pop {
-	from {
-		opacity: 0;
-		transform: translateY(4px) scale(0.94);
-	}
 }
 @media (prefers-reduced-motion: reduce) {
 	.yew-backdrop,
@@ -2464,6 +2495,30 @@ body.scroll-locked {
 	margin: 0 auto;
 	display: grid;
 	gap: 8px;
+}
+/*
+ * While Yew stands where she starts (16 px right of the sidebar, 71 px wide), a composer that would
+ * reach under her starts 8 px to her right and keeps its right edge with the conversation's; her bubble
+ * then reaches back over the sidebar (companion.tsx, which sets data-yew-docked). She is not shown in a
+ * window under 621 px tall.
+ */
+@media (max-width: 1209px) and (min-height: 621px) {
+	:root[data-yew-docked] .app:not(.app-collapsed) .composer {
+		padding-left: 95px;
+		padding-right: max(20px, calc((100% - 760px) / 2));
+	}
+	:root[data-yew-docked] .app:not(.app-collapsed) .composer-inner {
+		max-width: none;
+	}
+}
+@media (max-width: 1005px) and (min-height: 621px) {
+	:root[data-yew-docked] .app.app-collapsed .composer {
+		padding-left: 95px;
+		padding-right: max(20px, calc((100% - 760px) / 2));
+	}
+	:root[data-yew-docked] .app.app-collapsed .composer-inner {
+		max-width: none;
+	}
 }
 .composer-box {
 	position: relative;
@@ -4459,44 +4514,27 @@ button.about-row {
 	text-align: left;
 }
 
-/* --- a session's progress: one line under its name, inside the header's height (blueprint 6.9) --- */
+/*
+ * --- the time a session's turn or wait has taken, in the middle of its header (blueprint 6.9) ---
+ * While it shows, the header becomes three columns with equal sides, so the time sits in the middle
+ * whatever the title and the usage take; a narrow header keeps it in line after the title.
+ */
 
-.session-title-stack {
-	flex-direction: column;
-	align-items: flex-start;
-	gap: 2px;
-}
-.session-title-stack h1 {
-	max-width: 100%;
-}
-.progress-line {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	max-width: 100%;
+.session-clock {
+	flex: none;
+	min-width: 0;
 	color: var(--text-2);
 	font-size: var(--fs-s);
-	line-height: 18px;
 	font-variant-numeric: tabular-nums;
-}
-.progress-text {
-	min-width: 0;
+	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	white-space: nowrap;
 }
-.progress-line .row-dot {
-	flex: none;
-	margin: 0 -1px 0 1px;
-}
-.progress-mascot {
-	flex: none;
-	margin: 0;
-	pointer-events: none;
-}
-.progress-time {
-	flex: none;
-	color: var(--text-3);
+@media (min-width: 761px) {
+	.session-header-clock {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+	}
 }
 /* The steps for making a client of one's own (Google's MCP servers). */
 .preset-steps {

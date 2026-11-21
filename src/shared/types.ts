@@ -722,7 +722,7 @@ export interface Transcript {
 /** How this Yew Harness was installed: a global npm package, a source checkout, or some other way. */
 export type InstallKind = "npm" | "source" | "other";
 
-/** Versions and updates, for the About page and Yew in the sidebar (blueprint, "版本与更新"). */
+/** Versions and updates, for the About page and the floating Yew (blueprint, "版本与更新"). */
 export interface UpdateState {
 	/** What is running now. */
 	version: string;

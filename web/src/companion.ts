@@ -1,9 +1,10 @@
 /**
- * What Yew at the foot of the sidebar says (blueprint, section 12): the one thing that matters most
- * right now, in this order: things waiting for the person, a session that failed, a session that
- * finished and waits for review, sessions at work, a new version; otherwise that nothing waits. In the first minute
- * after the interface opens she greets first. Her pose follows what she says: holding a card when a
+ * What the floating Yew says (blueprint, section 12): the one thing that matters most right now, in
+ * this order: things waiting for the person, a session that failed, a session that finished and waits
+ * for review, sessions at work, a new version; otherwise that nothing waits. In the first minute after
+ * the interface opens she greets first. Her pose follows what she says: holding a card when a
  * permission waits, and on duty when nothing does but scheduled tasks are on (blueprint, section 11).
+ * She can be dragged anywhere in the window; where she stands is worked out at the end of this file.
  */
 import type { Session, ToolCallView } from "../../src/shared/types.ts";
 import type { MascotPose } from "./poses.ts";
@@ -177,4 +178,110 @@ export function companionMood(input: {
 		line: { kind: "clear", night },
 		target: null,
 	};
+}
+
+/**
+ * Where the floating Yew stands, as remembered in this browser: the window edge nearer to her on each
+ * axis and how far she is from it. Measured this way she keeps to her corner when the window grows or
+ * shrinks.
+ */
+export interface Spot {
+	x: "left" | "right";
+	dx: number;
+	y: "top" | "bottom";
+	dy: number;
+}
+
+/** Her box's top left corner in the window, in CSS pixels. */
+export interface Box {
+	left: number;
+	top: number;
+}
+
+export interface Size {
+	width: number;
+	height: number;
+}
+
+/** How close to the window's edges she may stand. */
+export const EDGE = 8;
+
+/**
+ * Until she is moved she stands at the bottom of the window, just right of the sidebar; a composer that
+ * would reach under her there starts to her right instead (`data-yew-docked` in app.css).
+ */
+export function defaultSpot(sidebarWidth: number): Spot {
+	return { x: "left", dx: sidebarWidth + 16, y: "bottom", dy: 12 };
+}
+
+/** Keeps her whole box inside the window; one too small for her pins her to the top left. */
+export function clampBox(box: Box, view: Size, size: Size): Box {
+	const maxLeft = Math.max(EDGE, view.width - size.width - EDGE);
+	const maxTop = Math.max(EDGE, view.height - size.height - EDGE);
+	return {
+		left: Math.min(Math.max(box.left, EDGE), maxLeft),
+		top: Math.min(Math.max(box.top, EDGE), maxTop),
+	};
+}
+
+/** Her box in this window for a remembered spot. */
+export function boxAt(spot: Spot, view: Size, size: Size): Box {
+	return clampBox(
+		{
+			left: spot.x === "left" ? spot.dx : view.width - size.width - spot.dx,
+			top: spot.y === "top" ? spot.dy : view.height - size.height - spot.dy,
+		},
+		view,
+		size,
+	);
+}
+
+/** The spot to remember for a box: on each axis, measured from the edge nearer to her middle. */
+export function spotOf(box: Box, view: Size, size: Size): Spot {
+	const x = box.left + size.width / 2 < view.width / 2 ? "left" : "right";
+	const y = box.top + size.height / 2 < view.height / 2 ? "top" : "bottom";
+	return {
+		x,
+		dx: Math.round(x === "left" ? box.left : view.width - size.width - box.left),
+		y,
+		dy: Math.round(y === "top" ? box.top : view.height - size.height - box.top),
+	};
+}
+
+/**
+ * Where her bubble goes: over her head in the lower half of the window and under her feet in the upper
+ * half (`align` is the half she is in), reaching toward the middle (`side`), so it stays in the window
+ * wherever she is and clear of the composer while she is at the bottom.
+ */
+export function bubbleSide(
+	box: Box,
+	view: Size,
+	size: Size,
+): { side: "left" | "right"; align: "top" | "bottom" } {
+	return {
+		side: box.left + size.width / 2 < view.width / 2 ? "right" : "left",
+		align: box.top + size.height / 2 < view.height / 2 ? "top" : "bottom",
+	};
+}
+
+/** Reads a remembered spot; anything else counts as none. */
+export function parseSpot(text: string | null): Spot | null {
+	if (!text) return null;
+	try {
+		const value = JSON.parse(text) as Partial<Spot> | null;
+		if (
+			value &&
+			(value.x === "left" || value.x === "right") &&
+			(value.y === "top" || value.y === "bottom") &&
+			typeof value.dx === "number" &&
+			Number.isFinite(value.dx) &&
+			typeof value.dy === "number" &&
+			Number.isFinite(value.dy)
+		) {
+			return { x: value.x, dx: Math.max(0, value.dx), y: value.y, dy: Math.max(0, value.dy) };
+		}
+		return null;
+	} catch {
+		return null;
+	}
 }

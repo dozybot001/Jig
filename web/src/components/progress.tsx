@@ -1,9 +1,7 @@
 import type { Session } from "../../../src/shared/types.ts";
-import { activeToolPose } from "../companion.ts";
-import { formatClock, formatElapsed, t, useLang } from "../i18n.ts";
-import { SUMMARY_KINDS, type Tally, tally, turnProgress, waitingOn } from "../progress.ts";
+import { formatClock, formatElapsed, t } from "../i18n.ts";
+import { SUMMARY_KINDS, type Tally, turnProgress, waitingOn } from "../progress.ts";
 import { type TranscriptState, useAppState } from "../state.ts";
-import { Mascot } from "./mascot.tsx";
 import { useNow } from "./ui.tsx";
 
 /** "读取 6 个文件，运行 4 条命令，编辑 2 处": tool calls counted by kind; empty when there are none. */
@@ -19,78 +17,71 @@ export function tallyText({ counts, others }: Tally): string {
 		.join(t("listSeparator"));
 }
 
+/** What the middle of a session's header shows. */
+export interface Clock {
+	/** The words on screen; empty while the session is idle. */
+	text: string;
+	/** What a screen reader hears instead of the ticking time: when the turn or the wait began. */
+	spoken: string;
+	/** While a failed model request is tried again: the error, shown on hover. */
+	retry: string | null;
+}
+
 /**
- * One line under the session's name (blueprint 6.9, item 27). While the session works: what this
- * turn has done so far, counted like the folded steps in the conversation, and how long it has taken.
- * While it waits for the person: what it waits for and for how long. Nothing when it is idle. The line
- * sits in the header's own height, so the conversation does not move when it comes and goes.
- *
- * The words are a live region and change only when a count or the state does. The ticking time is
- * kept out of it; in its place a screen reader hears when the turn or the wait began.
+ * How long this turn has taken while the session works, or how long it has waited for the person
+ * (blueprint 6.9, item 27); while a failed model request is about to be tried again, that instead.
+ * What the turn did is counted in the conversation's folded line, so it is not repeated here.
  */
-export function ProgressLine({
-	session,
-	transcript,
-}: {
-	session: Session;
-	transcript: TranscriptState | null;
-}) {
-	useLang();
+export function useSessionClock(session: Session, transcript: TranscriptState | null): Clock {
 	const cards = useAppState((state) => state.center.cards);
 	const approvals = useAppState((state) => state.center.approvals);
-	const mascotOn = useAppState((state) => state.settings?.mascot !== false);
-	const waiting = waitingOn(session.id, Object.values(approvals), Object.values(cards));
 	const working = session.status === "working";
-	const turn = working && transcript ? turnProgress(transcript.entries, transcript.draft) : null;
 	// A session that works on while a card of its own waits shows its work; the card is in the center.
-	const wait = working ? null : waiting;
+	const wait = working
+		? null
+		: waitingOn(session.id, Object.values(approvals), Object.values(cards));
+	const turn = working && transcript ? turnProgress(transcript.entries, transcript.draft) : null;
 	const since = wait ? wait.since : (turn?.startedAt ?? null);
 	const now = useNow(since === null ? 0 : 1000);
-	let text = "";
-	let spoken = "";
-	let hint = "";
-	if (wait) {
-		text =
-			wait.count > 1
-				? t("progressWaitingMany", { n: wait.count })
-				: t(`progressWaiting_${wait.kind}`);
-		spoken = t("progressSince", { time: formatClock(wait.since) });
-	} else if (working && transcript?.retry) {
-		// The request failed in a way that may pass; Yew waits and asks again by itself.
-		const { attempt, of, seconds } = transcript.retry;
-		text = t("progressRetrying", { n: attempt, of, s: seconds });
-		hint = transcript.retry.text;
-	} else if (turn) {
-		text = tallyText(tally(turn.tools)) || t("status_working");
-		if (turn.startedAt !== null)
-			spoken = t("progressStarted", { time: formatClock(turn.startedAt) });
+	const retry = working ? (transcript?.retry ?? null) : null;
+	if (retry) {
+		return {
+			text: t("clockRetrying", { s: retry.seconds, n: retry.attempt, of: retry.of }),
+			spoken: "",
+			retry: retry.text,
+		};
 	}
-	const shown = wait ? "waiting" : "working";
-	const pose = wait
-		? "permission"
-		: working && transcript?.retry
-			? "waking"
-			: (activeToolPose(transcript?.toolCalls) ?? "thinking");
+	if (since === null) return { text: "", spoken: "", retry: null };
+	const time = formatElapsed(Math.max(0, now - since));
+	return wait
+		? {
+				text: t("clockWaited", { t: time }),
+				spoken: t("progressSince", { time: formatClock(since) }),
+				retry: null,
+			}
+		: {
+				text: t("progressSpent", { t: time }),
+				spoken: t("progressStarted", { time: formatClock(since) }),
+				retry: null,
+			};
+}
+
+/**
+ * The middle of a session's header. It is always in the page, empty while the session is idle, so a
+ * screen reader hears it as soon as a turn or a wait begins or a retry is announced; the ticking time
+ * itself is kept from it.
+ */
+export function SessionClock({ clock }: { clock: Clock }) {
 	return (
-		<div className="progress-line">
-			{text &&
-				(mascotOn ? (
-					<Mascot key={pose} pose={pose} height={18} className="progress-mascot" />
-				) : (
-					<span className={`dot row-dot dot-${shown}`} aria-hidden="true" />
-				))}
-			{/* Always in the page, so a screen reader hears the words when they appear. */}
-			<span className="progress-text" role="status" title={hint || undefined}>
-				{text}
-				{spoken && <span className="visually-hidden"> · {spoken}</span>}
+		<div className="session-clock">
+			<span
+				role="status"
+				className={clock.retry === null ? "visually-hidden" : undefined}
+				title={clock.retry || undefined}
+			>
+				{clock.retry === null ? clock.spoken : clock.text}
 			</span>
-			{text && since !== null && (
-				<span className="progress-time" aria-hidden="true">
-					{t(wait ? "progressWaited" : "progressSpent", {
-						t: formatElapsed(Math.max(0, now - since)),
-					})}
-				</span>
-			)}
+			{clock.retry === null && clock.text && <span aria-hidden="true">{clock.text}</span>}
 		</div>
 	);
 }

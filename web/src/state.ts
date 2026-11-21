@@ -20,7 +20,7 @@ import type {
 import type { MessageKey } from "./i18n.ts";
 import type { MascotPose } from "./poses.ts";
 
-/** Short-lived reaction shown by Yew in the sidebar after a workbench action. */
+/** Short-lived reaction shown by the floating Yew after a workbench action. */
 export interface MascotReaction {
 	pose: MascotPose;
 	key: MessageKey;
@@ -49,7 +49,7 @@ export interface Settings {
 	defaultWorkspaceId: string | null;
 	/** Which kinds of events notify the phone. */
 	notify: Record<NotifyKind, boolean>;
-	/** The mascot at the foot of the sidebar and the opening (blueprint, section 12). */
+	/** Yew in the interface: floating over the window, the opening and the rest (blueprint, section 12). */
 	mascot: boolean;
 	/** The opening leaves by itself once started, or waits for a click (blueprint 6.10, item 45). */
 	opening: "auto" | "click";
@@ -338,7 +338,7 @@ export interface AppState {
 	letterTick: number;
 	/** Text to put in a session's message box when it opens: a message taken back or forked from. */
 	prefill: Record<string, string>;
-	/** Short-lived sidebar reaction from Yew after a workbench event. */
+	/** What the floating Yew says for a moment after a workbench event. */
 	reaction: MascotReaction | null;
 }
 
@@ -462,7 +462,7 @@ let state: AppState = {
 
 let reactionTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Shows a brief work-state reaction from Yew in the sidebar, then returns to live status. */
+/** Shows a brief work-state reaction from the floating Yew, then returns to live status. */
 export function triggerReaction(
 	pose: MascotPose,
 	key: MessageKey,

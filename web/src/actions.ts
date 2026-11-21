@@ -208,9 +208,9 @@ export async function boot(): Promise<void> {
 			hasArchived: archived.items.length > 0,
 		});
 		await loadCenter();
-		// The About page and Yew in the sidebar say when there is a new version (blueprint, "版本与更新").
+		// The About page and the floating Yew say when there is a new version (blueprint, "版本与更新").
 		void loadUpdates();
-		// Yew in the sidebar is on duty while a scheduled task is on (blueprint, section 11).
+		// The floating Yew is on duty while a scheduled task is on (blueprint, section 11).
 		void loadSchedules().catch(() => {});
 		setState({ booted: true });
 		// A reload stays where the tab was. Otherwise Yew opens on the main conversation; without one,

@@ -144,7 +144,7 @@ export const CheckAllIcon = () => <CheckCheck {...props} />;
 export const RefuseIcon = () => <Ban {...props} />;
 export const ThemeIcon = () => <SunMoon {...props} />;
 export const LanguageIcon = () => <Languages {...props} />;
-/** The mascot at the foot of the sidebar and the opening, shown or hidden in the settings menu. */
+/** Yew in the interface (floating, the opening and the rest), shown or hidden in the settings. */
 export const MascotIcon = () => <Smile {...props} />;
 /** Yew's data on this computer. */
 export const DataIcon = () => <Database {...props} />;
