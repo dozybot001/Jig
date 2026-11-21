@@ -188,6 +188,9 @@ describe("POST /api/open-file and fileOpener setting", () => {
 			"app.flatpakref",
 			"repo.flatpakrepo",
 			"setup.run",
+			"old.doc",
+			"old.xls",
+			"old.ppt",
 			"blob.bin",
 			"mystery.foo",
 			"noextension",
@@ -203,6 +206,8 @@ describe("POST /api/open-file and fileOpener setting", () => {
 		const picture = join(root, "photo.png");
 		writeFileSync(note, "# Note\n", "utf8");
 		writeFileSync(picture, "x", "utf8");
+		const report = join(root, "report.docx");
+		writeFileSync(report, "x", "utf8");
 		const db = openDatabase(":memory:");
 		const store = new Store(db, new EventBus());
 		const launched: { command: string; args: string[] }[] = [];
@@ -233,7 +238,7 @@ describe("POST /api/open-file and fileOpener setting", () => {
 					path,
 				);
 			}
-			for (const path of [note, picture, folder]) {
+			for (const path of [note, picture, report, folder]) {
 				assert.deepEqual(await open(path), { command: "open", args: [realpathSync(path)] }, path);
 			}
 		} finally {
@@ -258,6 +263,9 @@ describe("POST /api/open-file and fileOpener setting", () => {
 				openFileCommand("/work/project", { opener, platform: "linux", isDir: true, reveal: true }),
 				{ command: "xdg-open", args: ["/work/project"] },
 			);
+		}
+		for (const opener of ["system", "vscode", "cursor", "zed"] as const) {
+			assert.equal(revealOnly("/work/note.md", null, opener), true);
 		}
 		assert.deepEqual(
 			openFileCommand("/work/app.ts", { opener: "vscode", platform: "darwin", reveal: false }),

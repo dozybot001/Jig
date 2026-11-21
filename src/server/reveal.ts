@@ -136,13 +136,14 @@ export function openFileCommand(
  * What the system default may open: documents, pictures, PDFs, audio and video. Anything else could be
  * run, installed or followed by the program registered for it (scripts, apps, profiles, installers),
  * and third-party apps register more of those, so only this list is opened (the security group, 11-21).
+ * The old Office formats (.doc, .xls, .ppt) can carry macros and are left out; the new ones cannot.
  */
 const DOCUMENT_TYPES = new Set(
 	(
 		"txt md markdown rst log csv tsv json jsonl yaml yml toml " +
 		"png jpg jpeg gif webp heic heif bmp tif tiff ico pdf " +
 		"mp3 m4a wav aac flac ogg opus mp4 m4v mov webm mkv avi " +
-		"rtf doc docx xls xlsx ppt pptx odt ods odp pages numbers key"
+		"rtf docx xlsx pptx odt ods odp pages numbers key"
 	)
 		.split(" ")
 		.map((type) => `.${type}`),
@@ -164,12 +165,14 @@ export function revealOnly(
 	stat: { isDirectory(): boolean; mode: number } | null,
 	opener: FileOpener,
 ): boolean {
-	const type = extname(targetPath).toLowerCase();
-	const isDir = stat?.isDirectory() ?? false;
 	if (opener === "finder") return false;
+	// What it is could not be read (it may have been swapped since it was checked): only show it.
+	if (stat === null) return true;
+	const type = extname(targetPath).toLowerCase();
+	const isDir = stat.isDirectory();
 	if (opener !== "system") return isDir || EDITOR_PROJECT_TYPES.has(type);
 	if (isDir) return type !== "";
-	return !DOCUMENT_TYPES.has(type) || (stat !== null && (stat.mode & 0o111) !== 0);
+	return !DOCUMENT_TYPES.has(type) || (stat.mode & 0o111) !== 0;
 }
 
 /** Opens a verified local file or folder in the person's configured editor or file manager. */
