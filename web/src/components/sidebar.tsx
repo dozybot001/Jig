@@ -22,7 +22,9 @@ import { isImeEvent } from "../ime.ts";
 import { blockedSessions } from "../progress.ts";
 import {
 	centerCount,
+	NO_TEAM,
 	type SidebarSection,
+	setNavMoreOpen,
 	setSectionFolded,
 	setSidebarCollapsed,
 	setState,
@@ -49,8 +51,10 @@ import {
 	MainIcon,
 	MapIcon,
 	MenuPinIcon,
+	MoreIcon,
 	NewTeamIcon,
 	NewWorkspaceIcon,
+	NoTeamIcon,
 	PinIcon,
 	ProductName,
 	RenameIcon,
@@ -327,6 +331,44 @@ function TeamRow({
 	);
 }
 
+/**
+ * The sessions in no team, listed after the teams and chosen like one. Dropping a session here
+ * takes it out of its team.
+ */
+function NoTeamRow({ count, active }: { count: number; active: boolean }) {
+	useLang();
+	const drop = useSessionDrop((id) => updateSession(id, { groupId: null }));
+	return (
+		<div className="session-item" {...drop.props}>
+			<button
+				type="button"
+				className="session-row"
+				aria-pressed={active}
+				onClick={() => {
+					setState({ teamFilter: active ? null : NO_TEAM });
+					if (!active) setSectionFolded("sessions", false);
+				}}
+			>
+				<span className="session-icon" aria-hidden="true">
+					<NoTeamIcon />
+				</span>
+				<span className="session-name">
+					{t("noTeam")}
+					<span className="visually-hidden"> · {t("teamCount", { n: count })}</span>
+				</span>
+				<span className="session-time" aria-hidden="true">
+					{count}
+				</span>
+			</button>
+			{drop.error !== null && drop.error !== undefined && (
+				<div className="row-error">
+					<ErrorBox error={drop.error} />
+				</div>
+			)}
+		</div>
+	);
+}
+
 function useFolded(section: SidebarSection): boolean {
 	return useAppState((state) => state.foldedSections.includes(section));
 }
@@ -381,10 +423,11 @@ function Teams() {
 		| null
 	>(null);
 	const counts = new Map<string, number>();
+	let teamless = 0;
 	for (const session of Object.values(sessions)) {
-		if (session.archivedAt === null && session.groupId) {
-			counts.set(session.groupId, (counts.get(session.groupId) ?? 0) + 1);
-		}
+		if (session.archivedAt !== null) continue;
+		if (session.groupId) counts.set(session.groupId, (counts.get(session.groupId) ?? 0) + 1);
+		else teamless += 1;
 	}
 	return (
 		<section aria-label={t("teams")}>
@@ -418,6 +461,10 @@ function Teams() {
 							onDelete={() => setDialog({ kind: "delete", group })}
 						/>
 					))
+				)}
+				{/* With teams in use, the sessions in none are one click away too. */}
+				{groups.length > 0 && teamless > 0 && (
+					<NoTeamRow count={teamless} active={filter === NO_TEAM} />
 				)}
 			</SectionBody>
 			{dialog?.kind === "create" && <GroupDialog onClose={() => setDialog(null)} />}
@@ -728,6 +775,14 @@ function FixedEntries() {
 	const onArtifacts = useAppState((state) => state.page === "artifacts");
 	const onUsage = useAppState((state) => state.page === "usage");
 	const onMap = useAppState((state) => state.page === "map");
+	const moreOpen = useAppState((state) => state.navMoreOpen);
+	// The pages opened less often sit one level down, so the top of the sidebar stays short.
+	const morePage = onArtifacts ? t("artifacts") : onMap ? t("map") : onUsage ? t("usage") : null;
+	const onMore = morePage !== null;
+	// Reaching one of them from elsewhere opens the level, so the sidebar shows where you are.
+	useEffect(() => {
+		if (onMore) setNavMoreOpen(true);
+	}, [onMore]);
 	return (
 		<>
 			{mainId && mainName && (
@@ -771,33 +826,53 @@ function FixedEntries() {
 				<ScheduleIcon />
 				<span className="nav-label">{t("schedules")}</span>
 			</button>
+			{/* Folded while one of its pages is open, the row stands for that page and names it. */}
 			<button
 				type="button"
 				className="nav-row"
-				aria-current={onArtifacts ? "page" : undefined}
-				onClick={() => openArtifacts()}
+				aria-expanded={moreOpen}
+				aria-controls="sidebar-more"
+				aria-current={!moreOpen && onMore ? "page" : undefined}
+				onClick={() => setNavMoreOpen(!moreOpen)}
 			>
-				<ArtifactIcon />
-				<span className="nav-label">{t("artifacts")}</span>
+				<MoreIcon />
+				<span className="nav-label">{t("navMore")}</span>
+				{!moreOpen && morePage && <span className="nav-detail">{morePage}</span>}
+				<ChevronIcon />
 			</button>
-			<button
-				type="button"
-				className="nav-row"
-				aria-current={onMap ? "page" : undefined}
-				onClick={() => openMap()}
-			>
-				<MapIcon />
-				<span className="nav-label">{t("map")}</span>
-			</button>
-			<button
-				type="button"
-				className="nav-row"
-				aria-current={onUsage ? "page" : undefined}
-				onClick={() => openUsage()}
-			>
-				<UsageIcon />
-				<span className="nav-label">{t("usage")}</span>
-			</button>
+			<div id="sidebar-more" className="nav-sub" hidden={!moreOpen}>
+				{moreOpen && (
+					<>
+						<button
+							type="button"
+							className="nav-row"
+							aria-current={onArtifacts ? "page" : undefined}
+							onClick={() => openArtifacts()}
+						>
+							<ArtifactIcon />
+							<span className="nav-label">{t("artifacts")}</span>
+						</button>
+						<button
+							type="button"
+							className="nav-row"
+							aria-current={onMap ? "page" : undefined}
+							onClick={() => openMap()}
+						>
+							<MapIcon />
+							<span className="nav-label">{t("map")}</span>
+						</button>
+						<button
+							type="button"
+							className="nav-row"
+							aria-current={onUsage ? "page" : undefined}
+							onClick={() => openUsage()}
+						>
+							<UsageIcon />
+							<span className="nav-label">{t("usage")}</span>
+						</button>
+					</>
+				)}
+			</div>
 		</>
 	);
 }
@@ -1094,13 +1169,29 @@ export function Sidebar() {
 	const blocked = blockedSessions(Object.values(center.approvals), Object.values(center.cards));
 	const [newSession, setNewSession] = useState<string | null>(null);
 
-	// A filter for a team that was deleted meanwhile shows everything.
-	const filter = groups.some((group) => group.id === chosen) ? chosen : null;
-	const filterName = groups.find((group) => group.id === filter)?.name ?? null;
 	const all = Object.values(sessions);
+	const teamless = (s: Session) => s.archivedAt === null && !s.groupId;
+	// A filter for a team that was deleted meanwhile shows everything; so does the one for the
+	// sessions in no team once there are none, when its row is gone too.
+	const filter =
+		chosen === NO_TEAM
+			? groups.length > 0 && all.some(teamless)
+				? NO_TEAM
+				: null
+			: groups.some((group) => group.id === chosen)
+				? chosen
+				: null;
+	// The team new sessions started from this list go into; none for the sessions in no team.
+	const team = filter === NO_TEAM ? null : filter;
+	const filterName =
+		filter === NO_TEAM ? t("noTeam") : (groups.find((group) => group.id === filter)?.name ?? null);
 	const archived = sortSessions(all.filter((s) => s.archivedAt !== null));
 	const listed = sortSessions(
-		all.filter((s) => s.archivedAt === null && (filter === null || s.groupId === filter)),
+		all.filter(
+			(s) =>
+				s.archivedAt === null &&
+				(filter === null || (filter === NO_TEAM ? !s.groupId : s.groupId === filter)),
+		),
 	);
 	const current = selectedId;
 	const row = (session: Session, depth = 0) => (
@@ -1179,11 +1270,11 @@ export function Sidebar() {
 								<Button
 									variant="icon"
 									className="heading-add"
-									aria-label={filter ? t("newSessionHere") : t("newSession")}
-									title={filter ? t("newSessionHere") : t("newSession")}
+									aria-label={team ? t("newSessionHere") : t("newSession")}
+									title={team ? t("newSessionHere") : t("newSession")}
 									onClick={() => {
-										if (filter) {
-											setNewSession(filter);
+										if (team) {
+											setNewSession(team);
 											return;
 										}
 										closeDrawer();

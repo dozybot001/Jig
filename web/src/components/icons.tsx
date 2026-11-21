@@ -11,12 +11,14 @@ import {
 	ChevronRight,
 	Circle,
 	CircleCheck,
+	CircleDashed,
 	CircleDot,
 	Clock,
 	Code,
 	Copy,
 	Database,
 	Download,
+	Ellipsis,
 	Eye,
 	EyeOff,
 	FileText,
@@ -128,6 +130,10 @@ export const MapIcon = () => <Network {...props} />;
 export const MainIcon = () => <MessagesSquare {...props} />;
 /** A team in the person's organization. */
 export const TeamIcon = () => <Users {...props} />;
+/** The sessions in no team, listed after the teams. */
+export const NoTeamIcon = () => <CircleDashed {...props} />;
+/** The sidebar entry that holds the pages opened less often. */
+export const MoreIcon = () => <Ellipsis {...props} />;
 /** New team, new workspace and new session look different where they stand side by side (the rail). */
 export const NewTeamIcon = () => <UserRoundPlus {...props} />;
 export const NewWorkspaceIcon = () => <FolderPlus {...props} />;
