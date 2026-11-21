@@ -1045,7 +1045,7 @@ const zh = {
 		"开一个单独的 Chrome 窗口。在里面登录过的网站会一直保持登录，记录存在 Yew Harness 的数据目录里，和你平时用的 Chrome 分开。它的点击、输入可以选「总是允许」，只在当前会话有效。",
 	mcpBuiltin_computer: "电脑操控",
 	mcpBuiltinHelp_computer:
-		"会话可以看屏幕截图、移动鼠标、敲键盘，能操作这台电脑上的任何程序。第一次用时 macOS 会请你给运行 Yew Harness 的程序「屏幕录制」和「辅助功能」权限。由开源的 computer-use-mcp 提供，第一次使用时从 npm 安装到 Yew Harness 的数据目录。它能越过 Yew Harness 的其他授权规则，所以默认方式下点击、输入和按键每一次都要你确认，不能选「总是允许」；跳过方式下不问，它能点到屏幕上的任何东西，包括 Yew Harness 里等你批准的按钮，所以用跳过方式时请停用它，或留意它在做什么。",
+		"会话可以看屏幕截图、移动鼠标、敲键盘，能操作这台电脑上的任何程序。第一次用时 macOS 会请你给运行 Yew Harness 的程序「屏幕录制」和「辅助功能」权限。由开源的 computer-use-mcp 提供，第一次使用时从 npm 安装到 Yew Harness 的数据目录。它能越过 Yew Harness 的其他授权规则，所以默认方式下点击、输入和按键每一次都要你确认，不能选「总是允许」；跳过方式下不问，它能点到屏幕上的任何东西，包括 Yew Harness 里等你回答的按钮，所以用跳过方式时请停用它，或留意它在做什么。",
 	mcpAdded: "已添加的服务",
 	mcpPresets: "常用服务",
 	mcpPresetsInfo:
@@ -2271,7 +2271,7 @@ const en: Record<MessageKey, string> = {
 		"Opens a Chrome window of its own. Sites you sign in to there stay signed in, kept in Yew Harness's data folder and apart from the Chrome you use. Its clicks and typing can be set to Always allow, for the current session only.",
 	mcpBuiltin_computer: "Computer control",
 	mcpBuiltinHelp_computer:
-		"Sessions can take screenshots, move the mouse and type, so they can use any program on this computer. The first time, macOS asks you to give the program that runs Yew Harness the Screen Recording and Accessibility permissions. Provided by the open-source computer-use-mcp, installed from npm into Yew Harness's data folder the first time it is used. It can get past Yew Harness's other permission rules, so in the default mode every click, keystroke and typed text is confirmed by you and Always allow is not offered; skip mode does not ask, and it can click anything on the screen, including the buttons in Yew Harness that wait for your approval, so turn it off or keep an eye on it when you use skip mode.",
+		"Sessions can take screenshots, move the mouse and type, so they can use any program on this computer. The first time, macOS asks you to give the program that runs Yew Harness the Screen Recording and Accessibility permissions. Provided by the open-source computer-use-mcp, installed from npm into Yew Harness's data folder the first time it is used. It can get past Yew Harness's other permission rules, so in the default mode every click, keystroke and typed text is confirmed by you and Always allow is not offered; skip mode does not ask, and it can click anything on the screen, including the buttons in Yew Harness that wait for your answer, so turn it off or keep an eye on it when you use skip mode.",
 	mcpAdded: "Added servers",
 	mcpPresets: "Common servers",
 	mcpPresetsInfo:
