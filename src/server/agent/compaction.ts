@@ -4,6 +4,7 @@
  */
 import { type JsonObject, messageText, type Notice } from "../../shared/messages.ts";
 import {
+	defaultCompactAt,
 	type Entry,
 	normalizePermissionMode,
 	permissionModeOf,
@@ -45,9 +46,9 @@ export type Compacted = "done" | "nothing" | "failed";
 
 const MAX_REQUEST_CHARS = 20_000;
 
-/** The context size at which a session's history is summarized: 80% of the model's window unless set. */
+/** The context size at which a session's history is compacted: its own number, else the default. */
 function compactAt(session: Session, model: ModelInfo): number {
-	return session.options.compactAt ?? Math.floor(model.contextWindow * 0.8);
+	return session.options.compactAt ?? defaultCompactAt(model.contextWindow);
 }
 
 /** A message from the person or a letter, not one of Yew's own notes to the model. */

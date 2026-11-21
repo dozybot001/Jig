@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { AttachmentRef } from "../../../src/shared/messages.ts";
 import {
+	defaultCompactAt,
 	PERMISSION_MODES,
 	type PermissionMode,
 	permissionModeOf,
@@ -331,7 +332,7 @@ function ContextPie({ session, total }: { session: Session; total: number }) {
 
 	const used = session.contextTokens;
 	const percent = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
-	const threshold = session.options.compactAt ?? Math.floor(total * 0.8);
+	const threshold = session.options.compactAt ?? defaultCompactAt(total);
 	const thresholdPercent = total > 0 ? Math.min(100, Math.round((threshold / total) * 100)) : 80;
 	const remaining = Math.max(0, total - used);
 	const cumulative =

@@ -12,7 +12,12 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "../src/server/
 import { PermissionEngine } from "../src/server/permissions/engine.ts";
 import { ALL_TOOLS } from "../src/server/tools/registry.ts";
 import { type ToolDefinition, text } from "../src/server/tools/types.ts";
-import type { Entry, PermissionRequest, Session } from "../src/shared/types.ts";
+import {
+	defaultCompactAt,
+	type Entry,
+	type PermissionRequest,
+	type Session,
+} from "../src/shared/types.ts";
 import { newStore, tempDir } from "./helpers/store.ts";
 
 type Context = { messages: { role: string; content: unknown; toolsAdded?: { name: string }[] }[] };
@@ -518,6 +523,13 @@ describe("agent loop", () => {
 		);
 		assert.match(textOf(messages[3]), /补充一句/);
 		assert.deepEqual(store.listQueue(session.id), []);
+	});
+
+	test("the default compaction threshold is 80% of the model's window, at most 300,000 tokens", () => {
+		assert.equal(defaultCompactAt(128_000), 102_400);
+		assert.equal(defaultCompactAt(200_000), 160_000);
+		assert.equal(defaultCompactAt(375_000), 300_000);
+		assert.equal(defaultCompactAt(1_000_000), 300_000);
 	});
 
 	test("near the context limit, older history is summarized and the model sees the summary", async () => {

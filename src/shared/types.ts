@@ -106,6 +106,19 @@ export function permissionModeOf(options: SessionOptions): PermissionMode {
 	return normalizePermissionMode(options.permissionMode) ?? "default";
 }
 
+/** The most tokens the default compaction threshold reaches, however large the model's window is. */
+export const COMPACT_CAP = 300_000;
+
+/**
+ * The context size at which a session's history is compacted unless the session sets its own: 80% of
+ * the model's window, at most COMPACT_CAP. A window of a million tokens would otherwise fill to
+ * 800,000 before compacting, and every request is billed for the context it carries (blueprint 6.1,
+ * item 1; the founder, 11-21).
+ */
+export function defaultCompactAt(contextWindow: number): number {
+	return Math.min(Math.floor(contextWindow * 0.8), COMPACT_CAP);
+}
+
 export interface Todo {
 	text: string;
 	status: "pending" | "in_progress" | "done";
