@@ -174,6 +174,17 @@ export function createApp(options: AppOptions): Hono<AppEnv> {
 				c.res.headers.set("Cache-Control", "public, max-age=31536000, immutable");
 			}
 		});
+		app.use("*", async (c, next) => {
+			await next();
+			// The page itself (served for "/" by serveStatic too) is checked every time: a page kept from
+			// before an update would load the old interface's assets, which stay cached for good.
+			if (
+				!c.req.path.startsWith("/assets/") &&
+				c.res.headers.get("Content-Type")?.startsWith("text/html")
+			) {
+				c.res.headers.set("Cache-Control", "no-cache");
+			}
+		});
 		app.use("*", serveStatic({ root }));
 		app.get("*", (c) => {
 			if (c.req.path.startsWith("/api/")) return c.notFound();
